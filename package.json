@@ -1,0 +1,65 @@
+{
+  "name": "borehole-field-log",
+  "productName": "Borehole Field Log",
+  "version": "0.1.0",
+  "description": "Borehole logging, groundwater and reporting for Alberta and Saskatchewan consultants",
+  "main": "./out/main/index.js",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "sync-legacy": "node scripts/sync-legacy.mjs",
+    "dev": "npm run sync-legacy && electron-vite dev",
+    "build": "npm run sync-legacy && electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac"
+  },
+  "build": {
+    "appId": "ca.boreholefieldlog.app",
+    "productName": "Borehole Field Log",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**",
+      "resources/**"
+    ],
+    "fileAssociations": [
+      {
+        "ext": "bhp",
+        "name": "Borehole project",
+        "role": "Editor"
+      },
+      {
+        "ext": "bhlog",
+        "name": "Borehole workspace",
+        "role": "Editor"
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.productivity"
+    }
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^45.2.0",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}
