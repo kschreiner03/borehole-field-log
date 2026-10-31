@@ -436,6 +436,38 @@ app.whenReady().then(async () => {
     expect(r.arrowHead, 'arrow shape has no head');
   });
 
+  await check('report: paper sizes, margins and title block fields', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); S.cpage = 1; S.csort = false; rerenderCompose(); await w(200);
+      const a3 = newPage('free', { title: 'A3 FIGURE', orient: 'land', items: [newItem('text', 1300, 700, { w: 200, h: 60, o: { text: 'far right' } })] }); setPaper(a3, 'a3');
+      const tab = newPage('free', { title: 'TABLOID', items: [] }); setPaper(tab, 'tabloid');
+      const out = await PDFLib.PDFDocument.load(await buildReportBytes({ pages: [a3, tab] })), sz = i => out.getPage(i).getSize();
+      setPaper(a3, 'letter'); const d = pgDims(a3), it = a3.items[0];
+      const m = newPage('free', { title: 'MARGINS', margin: 20, items: [] }), bd = bodyOf(m);
+      const tb = newPage('free', { title: 'SITE PLAN', tb: { fig: '3', drawn: 'K.S.', checked: 'L.M.', date: '2026-10-31', rev: '1' }, items: [] });
+      const frame = pageFrame(tb.title, 2, 9, '', pgDims(tb));
+      return { a3: sz(0), tab: sz(1), clamped: it.x + it.w <= d.W && it.y + it.h <= d.H, bdx: bd.x, mm20: 20 * 96 / 25.4, frame };
+    })()`);
+    expect(Math.abs(r.a3.width - 1190.55) < 0.6 && Math.abs(r.a3.height - 841.89) < 0.6, 'A3 landscape size: ' + JSON.stringify(r.a3));
+    expect(Math.abs(r.tab.width - 792) < 0.6 && Math.abs(r.tab.height - 1224) < 0.6, 'Tabloid size: ' + JSON.stringify(r.tab));
+    expect(r.clamped, 'items left off a smaller paper');
+    expect(Math.abs(r.bdx - r.mm20) < 0.5, 'margin: ' + JSON.stringify(r));
+    for (const t of ['Figure 3', 'Drawn K.S.', 'Checked L.M.', '2026-10-31', 'Rev 1']) expect(r.frame.includes(t), 'title block is missing ' + t);
+  });
+
+  await check('report: bookmarks name every report page and open at its first page', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); await w(200);
+      const logs = newPage('logs'); logs.bh = projList().slice(0, 2).map(b => b.id);
+      const L = { pages: [newPage('key'), logs, newPage('free', { title: 'SITE PLAN', items: [] })] }, outs = await layoutPages(L);
+      const bytes = await buildReportBytes(L), pj = await pdfjsLib.getDocument({ data: bytes.slice() }).promise, ol = await pj.getOutline() || [];
+      const at = []; for (const o of ol) { const dest = typeof o.dest === 'string' ? await pj.getDestination(o.dest) : o.dest; at.push(dest ? await pj.getPageIndex(dest[0]) : -1); }
+      return { titles: ol.map(o => o.title), at, n: outs.length, want: L.pages.map(pageLabel) };
+    })()`);
+    expect(r.titles.join('|') === r.want.join('|'), 'bookmark titles: ' + JSON.stringify(r));
+    expect(r.at[0] === 0 && r.at[1] === 1 && r.at[2] === r.n - 1, 'bookmark targets: ' + JSON.stringify(r));
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
