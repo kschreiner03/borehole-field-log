@@ -283,6 +283,25 @@ app.whenReady().then(async () => {
     expect(r.afterDelete === 0 && r.restored === 3, 'delete and undo: ' + JSON.stringify(r));
   });
 
+  await check('report: export keeps imported pages as real PDF pages with their text and rotation', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); await w(200);
+      const doc = await PDFLib.PDFDocument.create(), font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+      for (let i = 1; i <= 2; i++) doc.addPage([792, 612]).drawText('ARCGIS MAP PAGE ' + i, { x: 72, y: 500, size: 18, font });
+      await importReportFiles([new File([await doc.save()], 'map.pdf', { type: 'application/pdf' })]);
+      const imported = repLayout().pages.filter(p => p.kind === 'pdf'); imported[1].rot = 180;
+      const L = { pages: [newPage('key'), ...imported] }, outs = await layoutPages(L);
+      const bytes = await buildReportBytes(L), out = await PDFLib.PDFDocument.load(bytes);
+      const k = outs.findIndex(o => o.pdf), pj = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+      const text = (await (await pj.getPage(k + 1)).getTextContent()).items.map(i => i.str).join(' ');
+      return { n: out.getPageCount(), want: outs.length, text, rot: out.getPage(k + 1).getRotation().angle, keySize: out.getPage(0).getSize() };
+    })()`);
+    expect(r.n === r.want && r.want === 3, 'page count: ' + JSON.stringify(r));
+    expect(/ARCGIS MAP PAGE 1/.test(r.text), 'imported text not kept: ' + JSON.stringify(r));
+    expect(r.rot === 180, 'rotation: ' + JSON.stringify(r));
+    expect(Math.round(r.keySize.width) === 612 && Math.round(r.keySize.height) === 792, 'Letter page size: ' + JSON.stringify(r));
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
