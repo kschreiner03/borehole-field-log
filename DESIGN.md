@@ -117,7 +117,7 @@ components:
 
 **Creative North Star: "The Borehole Is the Document"**
 
-A conventional engineering desktop workspace, built 2026-10-30 to the user's brief and PRODUCT.md's commitment to the category standard played straight, at the craft level of Bentley OpenGround and Esri ArcGIS Field Maps. From top to bottom: a menu bar (File, Edit, View, Project, Boreholes, Tools, Reports, Help), a 40px toolbar, a 248px project tree at the left, the work area, and a 24px status bar along the bottom that always reports the save state, the project, the selected borehole and its problems, and the units. In the desktop app the menu bar is the operating system's, built from the same menu model the browser draws.
+A conventional engineering desktop workspace, built 2026-10-30 to the user's brief and PRODUCT.md's commitment to the category standard played straight, at the craft level of Bentley OpenGround and Esri ArcGIS Field Maps. From top to bottom: a menu bar (File, Edit, View, Project, Boreholes, Tools, Reports, Help), a 40px toolbar with the project switcher and the find box, a 64px rail of project pages and a 272px borehole list at the left, the work area, and a 24px status bar along the bottom that always reports the save state, the project, the selected borehole and its problems, and the units. In the desktop app the menu bar is the operating system's, built from the same menu model the browser draws.
 
 Colour does a job or stays out. The chrome is cool grey and white; one slate-teal marks the primary action, the current selection and keyboard focus; soil, water and status hues appear only on data. Panels and tables are square, controls are barely rounded, and only floating layers cast a shadow.
 
@@ -169,7 +169,7 @@ The ground and panels are neutral; every hue encodes something.
 
 ## Layout
 
-The shell is a fixed grid: menu bar, toolbar, then the 248px tree beside the fluid work area, with the status bar fixed to the bottom. The work area sits on the ground with 16px padding and a 12px gap between panels; each view opens with breadcrumbs, a title row with its page tools at the right, a one-line facts row, then panels. The tree and the work area scroll independently. Below 1100px toolbar labels collapse to icons; below 1280px the status bar drops the project and units segments; below 860px the tree stacks above the work area.
+The shell is a fixed grid: menu bar, toolbar, then the 64px page rail, the 272px borehole list and the fluid work area, with the status bar fixed to the bottom. The work area sits on the ground with 16px padding and a 12px gap between panels; each view opens with breadcrumbs, a title row with its page tools at the right, a one-line facts row, then panels. The tree and the work area scroll independently. Below 1100px toolbar labels collapse to icons; below 1280px the status bar drops the project and units segments; below 860px the rail becomes a row and the list stacks above the work area.
 
 ## Elevation & Depth
 
@@ -200,7 +200,10 @@ Panels are white, square and bordered, with a raised 34px header band holding th
 30px, white, control stroke, 3px corners; hover darkens the stroke; focus takes a slate teal stroke with a soft 2px ring; read-only and disabled fill with raised. Labels sit above in the label style.
 
 ### Navigation
-The project tree: project picker, Overview and Map & sections, the Boreholes group with status tags and each selected borehole's Log, Data and PDF views, then project pages and Find anything (⌘K / Ctrl+K). Selected rows take the selected fill and semibold text. Tabs in the work area use a 2px slate teal underline on a full-width rule.
+- **Page rail:** Overview, Borehole (the selected borehole's Log & data), Map, Tables, Water, Lab and Reports, each a 20px outline icon over an 11px label; the current page takes the selected fill and slate-teal-deep label.
+- **Borehole list:** the project's boreholes with a filter box, status chips with counts (All, Draft, Review, Issued, Wells), a sort (Name, Depth, Vapour) and, per row, the borehole glyph, name, status tag and a muted line of depth, latest water and peak vapour. Choosing a borehole opens it in Log & data.
+- **Toolbar:** the project switcher sits after the app name; the find box (⌘K / Ctrl+K) sits before Settings.
+- **Tabs** in the work area use a 2px slate teal underline on a full-width rule.
 
 ### Data grid
 Spreadsheet editing for layers, samples, tests and water readings: borderless 28px cells with ellipsis and full-value tooltips, a raised sticky header, the borehole column pinned, an inset slate teal outline on the focused cell, visible scrollbars, and problem cells tinted with their message on hover. It can be scoped to one borehole or the whole project.

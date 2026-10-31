@@ -1164,10 +1164,48 @@ body.field .nv, body.field .nv-bh, body.field .nv-sub button { min-height: 40px;
 body.field .chip { min-height: 40px; font-size: 14.5px; padding: 0 12px; }
 body.field .dtabs button { padding: 12px 4px 10px; font-size: 15px; }
 
+/* left side: page rail, then the borehole list */
+.shell { grid-template-columns: 64px var(--sidebar-width) minmax(0, 1fr); --sidebar-width: 272px; }
+.prail { grid-column: 1; grid-row: 1 / -1; position: sticky; top: var(--appbar-h, 68px); align-self: start; height: calc(100vh - var(--appbar-h, 68px) - var(--status-h)); display: flex; flex-direction: column; gap: 2px; padding: 8px 6px; background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; }
+.prail button { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 100%; padding: 7px 2px 6px; border: 0; border-radius: var(--r-sm); background: none; color: var(--muted); font: 11px/1.2 var(--f-body); cursor: pointer; }
+.prail button svg { width: 20px; height: 20px; }
+.prail button:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
+.prail button[aria-current="page"] { background: var(--active); color: var(--accent-2); font-weight: 600; }
+.prail button:disabled { opacity: .45; cursor: default; }
+.side { grid-column: 2; padding: 0; gap: 0; display: flex; flex-direction: column; }
+.main { grid-column: 3; }
+.bl-head { display: flex; flex-direction: column; gap: 8px; padding: 10px 10px 8px; border-bottom: 1px solid var(--rule); }
+.bl-title { display: flex; align-items: center; gap: 6px; } .bl-title .ct { color: var(--muted); } .bl-title .sp { flex: 1 1 auto; }
+.bl-new { min-height: 26px; padding: 0 8px; font-size: 12.5px; } .bl-new svg { width: 13px; height: 13px; }
+.bl-head input[type="search"] { width: 100%; min-height: 28px; }
+.bl-chips { display: flex; flex-wrap: wrap; gap: 4px; } .bl-chips .chip { min-height: 24px; padding: 0 7px; font-size: 12px; }
+.bl-sort { font-size: 12px; color: var(--muted); } .bl-sort .btn.link { font-size: 12px; text-decoration: none; color: var(--muted); }
+.bl-sort .btn.link[aria-pressed="true"] { color: var(--ink); font-weight: 600; }
+.bl-rows { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1 1 auto; }
+.bl-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; column-gap: 8px; row-gap: 1px; align-items: center; width: 100%; padding: 6px 10px; border: 0; border-bottom: 1px solid var(--rule); background: none; text-align: left; font: 13px var(--f-body); color: var(--ink); cursor: pointer; }
+.bl-row:hover { background: var(--hover); }
+.bl-row[aria-current="true"] { background: var(--active); }
+.bl-row[aria-current="true"] .nm { font-weight: 600; }
+.bl-row .bhg { width: 12px; height: 12px; color: var(--muted); }
+.bl-row[aria-current="true"] .bhg { color: var(--accent); }
+.bl-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.bl-row .meta { grid-column: 2 / 4; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bl-empty { padding: 10px; }
+.side-foot { margin: 0; padding: 8px 10px; }
+/* toolbar: project switcher and the find box */
+.tb-proj { display: flex; align-items: center; margin-left: 4px; }
+.tb-proj select { min-height: var(--h-tb); max-width: min(380px, 30vw); font: 600 13px var(--f-body); border: 1px solid var(--btn-line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); padding: 0 24px 0 8px; text-overflow: ellipsis; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.tb-find { width: 220px; margin: 0 6px 0 0; min-height: var(--h-tb); flex: none; }
+body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail button { padding: 10px 2px; font-size: 12px; }
+@media (max-width: 1100px) { .tb-find { width: auto; } .tb-find span { display: none; } }
+
 @media (max-width: 860px) {
-  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
-  .side { grid-row: 1; position: static; height: auto; max-height: none; border-right: 0; border-bottom: 1px solid var(--border); }
-  .main { grid-column: 1; grid-row: 2; padding: 12px 12px 32px; }
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr; }
+  .prail { grid-column: 1; grid-row: 1; position: static; height: auto; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+  .prail button { width: auto; min-width: 60px; }
+  .side { grid-column: 1; grid-row: 2; position: static; height: auto; max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--border); }
+  .main { grid-column: 1; grid-row: 3; padding: 12px 12px 32px; }
   body.drawer-open .main { margin-right: 0; }
   .titlebar h1, .titlebar .co { display: none; }
   #statusbar .sb-opt { display: none; }
@@ -1183,6 +1221,7 @@ body.field .dtabs button { padding: 12px 4px 10px; font-size: 15px; }
     <svg class="mark" viewBox="0 0 22 22" aria-hidden="true"><rect x="5" y="1" width="12" height="20" rx="3" fill="#ead08c"/><rect x="5" y="1" width="12" height="6" rx="3" fill="#8a6b4b"/><rect x="5" y="5" width="12" height="2" fill="#8a6b4b"/><rect x="5" y="7" width="12" height="7" fill="#a3afa8"/><path d="M5 14.5h12" stroke="#2f70bb" stroke-width="1.6"/></svg>
     <h1>Borehole Field Log</h1>
     <span class="co" id="tb-co"></span>
+    <div class="proj-pick tb-proj"><label for="proj" class="sr">Project</label><select id="proj" aria-label="Project"></select></div>
     <div class="tb-actions">
       <span class="tb-sep" aria-hidden="true"></span>
       <button class="tb" data-act="new" title="New borehole in this project"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">New borehole</span></button>
@@ -1194,6 +1233,7 @@ body.field .dtabs button { padding: 12px 4px 10px; font-size: 15px; }
       <button class="tb" data-act="pdf-one" title="Download this borehole as a PDF log"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M12 11v6M9.5 14.5 12 17l2.5-2.5"/></svg><span class="lbl">PDF</span></button>
     </div>
     <span class="tb-spring" aria-hidden="true"></span>
+    <button type="button" class="find-btn tb-find" data-act="find" title="Find a borehole, page or tool (Ctrl+K)"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><span>Find anything…</span><kbd>Ctrl K</kbd></button>
     <button class="tb" data-act="prefs" title="Units, symbols, page depth, log columns, company and logo"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Settings</span></button>
   </div>
   <div class="rtabs" role="tablist" aria-label="Tool categories" id="rtabs"></div>
@@ -1212,10 +1252,10 @@ body.field .dtabs button { padding: 12px 4px 10px; font-size: 15px; }
 
 <div class="shell">
   <nav class="rail" id="rail" aria-label="Views"></nav>
-  <aside class="side" aria-label="Project">
-    <div class="proj-pick"><label for="proj">Project</label><select id="proj" aria-label="Project"></select></div>
-    <ul class="nav-tree" id="list"></ul>
-    <button type="button" class="find-btn" data-act="find" title="Find a borehole, page or tool (Ctrl+K)"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><span>Find anything…</span><kbd>Ctrl K</kbd></button>
+  <nav class="prail" id="prail" aria-label="Project pages"></nav>
+  <aside class="side" aria-label="Boreholes">
+    <div class="bl-head" id="bl-head"></div>
+    <ul class="bl-rows" id="list"></ul>
     <div class="side-foot" id="side-foot" hidden></div>
   </aside>
   <main class="main" id="main"><p class="note">Loading boreholes…</p></main>
@@ -1787,23 +1827,42 @@ const NAV_ICON = { table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><p
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const bhGlyph = well => `<svg class="bhg" viewBox="0 0 16 16" aria-hidden="true">${well ? '<circle cx="8" cy="8" r="4.6" fill="#fff" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/>' : '<circle cx="8" cy="8" r="4.6" fill="currentColor"/>'}</svg>`;
 /* the sidebar is the project as a tree: project pages, and each borehole with its own pages nested under it when chosen */
+/* the left side: a rail of project pages, then the project's boreholes as a list with a filter, status chips and a sort */
+const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['compose', 'Reports']];
+const BH_ICON = '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M8 9h8M8 14h8"/>';
+S.bl = { q: '', st: lsGet('bhlog.blSt') || 'all', sort: lsGet('bhlog.blSort') || 'name' };
+const blMeta = b => { const w = latestWater(b), v = vapourMax(b, null, null); return { d: depthOf(b), w: w ? w.depth : null, v: v ? v.cvc : null }; };
 function renderList(list) {
   renderProjPick(list);
   const ex = list.filter(b => b.example).length, foot = $('#side-foot');
   foot.hidden = !ex || S.readOnly;
-  foot.innerHTML = (ex ? `${ex} example borehole${ex > 1 ? 's' : ''}. <button class="btn link" data-act="clear-examples">Remove examples</button>` : '') + (S.readOnly || [...S.bh.values()].some(b => b.project === LLOYD_PROJ) ? '' : `${ex ? '<br>' : ''}<button class="btn link" data-act="load-lloyd">Load the oil lease example</button>`) + (S.readOnly || [...S.bh.values()].some(b => b.project === SK_PROJ) ? '' : `<br><button class="btn link" data-act="load-sk">Load the service-station plume example</button>`) + (S.readOnly || [...S.bh.values()].some(b => b.project === DL_PROJ) ? '' : `<br><button class="btn link" data-act="load-dl">Load the Dawn Lake excavation example</button>`);
-  const ps = projList(), tab = S.tab === 'reports' ? 'compose' : S.tab, onBh = BH_TABS.includes(tab), open = !S.fold.has('bh');
-  const nav = k => `<li><button class="nv" data-tab="${k}" aria-current="${tab === k ? 'page' : 'false'}">${svgI(NAV_ICON[k])}<span>${NAV_LABEL[k]}</span></button></li>`;
-  const rows = ps.map(b => {
-    const sel = b.id === S.sel, st = b.status || 'draft';
-    return `<li><button class="nv-bh" data-pick="${esc(b.id)}" data-sel="${sel}" aria-current="${sel && onBh ? 'true' : 'false'}" title="${esc(`${b.name || 'Untitled'} · ${b.well?.installed ? 'monitoring well' : 'borehole'} · ${fx(depthOf(b), 1)} ${LEN()} deep`)}">${bhGlyph(b.well?.installed)}<span class="nm">${esc(b.name || 'Untitled')}</span><span class="st st-${st}">${st === 'issued' ? `Rev ${b.issued?.rev ?? b.rev}` : st === 'review' ? 'Review' : 'Draft'}</span></button>`
-      + (sel ? `<ul class="nv-sub">${['edit', 'report'].map(k => `<li><button data-tab="${k}" aria-current="${tab === k || (k === 'edit' && tab === 'log') ? 'page' : 'false'}">${NAV_LABEL[k]}</button></li>`).join('')}</ul>` : '') + '</li>';
+  foot.innerHTML = ex ? `${ex} example borehole${ex > 1 ? 's' : ''} · <button class="btn link" data-act="clear-examples">Remove examples</button>` : '';
+  const tab = S.tab === 'reports' ? 'compose' : S.tab, onBh = BH_TABS.includes(tab), b0 = cur();
+  $('#prail').innerHTML = RAIL_PAGES.map(([k, t]) => {
+    const on = k === 'edit' ? onBh : tab === k, off = k === 'edit' && !b0;
+    return `<button type="button" data-tab="${k}" aria-current="${on ? 'page' : 'false'}" ${off ? 'disabled' : ''} title="${esc(k === 'edit' ? (b0 ? `${b0.name}: log and data` : 'Select a borehole first') : NAV_LABEL[k])}">${svgI(k === 'edit' ? BH_ICON : NAV_ICON[k])}<span>${t}</span></button>`;
   }).join('');
-  $('#list').innerHTML = nav('home') + nav('site')
-    + `<li class="nv-grp"><button class="nv-fold" data-fold="bh" aria-expanded="${open}">${TW}<span>Boreholes</span><span class="ct">${ps.length}</span></button><button class="nv-add" data-act="new" aria-label="New borehole" title="New borehole in this project" ${S.readOnly ? 'disabled' : ''}>${svgI('<path d="M12 5v14M5 12h14"/>')}</button></li>`
-    + (open ? `<li><ul class="nv-bhs">${rows || '<li class="note" style="padding:6px 10px">No boreholes yet.</li>'}</ul></li>` : '')
-    + nav('table') + nav('gw') + nav('contam') + nav('compose');
+  const ps = projList(), n = { draft: 0, review: 0, issued: 0, wells: 0 };
+  for (const b of ps) { n[b.status || 'draft']++; if (b.well?.installed) n.wells++; }
+  const head = $('#bl-head');
+  if (!head.contains(document.activeElement)) head.innerHTML = `<div class="bl-title"><b>Boreholes</b><span class="ct">${ps.length}</span><span class="sp"></span><button class="btn bl-new" data-act="new" ${S.readOnly ? 'disabled' : ''} title="New borehole in this project">${svgI('<path d="M12 5v14M5 12h14"/>')}New</button></div>
+    <input type="search" id="bl-q" placeholder="Filter by name" aria-label="Filter boreholes by name" value="${esc(S.bl.q)}" autocomplete="off">
+    <div class="bl-chips" role="group" aria-label="Show">${[['all', 'All', ps.length], ['draft', 'Draft', n.draft], ['review', 'Review', n.review], ['issued', 'Issued', n.issued], ['wells', 'Wells', n.wells]].filter(([k, , c]) => k === 'all' || c).map(([k, t, c]) => `<button type="button" class="chip" data-blst="${k}" aria-pressed="${S.bl.st === k}">${t}${k === 'all' ? '' : ` ${c}`}</button>`).join('')}</div>
+    <div class="bl-sort">Sort by ${[['name', 'Name'], ['depth', 'Depth'], ['vapour', 'Vapour']].map(([k, t]) => `<button type="button" class="btn link" data-blsort="${k}" aria-pressed="${S.bl.sort === k}">${t}</button>`).join(' · ')}</div>`;
+  const q = S.bl.q.trim().toLowerCase(), st = S.bl.st;
+  const rows = ps.map(b => ({ b, m: blMeta(b) })).filter(({ b }) => (!q || (b.name || '').toLowerCase().includes(q)) && (st === 'all' || (st === 'wells' ? b.well?.installed : (b.status || 'draft') === st)));
+  if (S.bl.sort === 'depth') rows.sort((x, y) => (y.m.d || 0) - (x.m.d || 0)); else if (S.bl.sort === 'vapour') rows.sort((x, y) => (y.m.v ?? -1) - (x.m.v ?? -1));
+  $('#list').innerHTML = rows.map(({ b, m }) => {
+    const s2 = b.status || 'draft', sel = b.id === S.sel;
+    const meta = [m.d ? `${fx(m.d, 1)} ${LEN()}` : 'no depth', m.w != null ? `water ${fx(m.w)}` : null, m.v != null ? `${m.v.toLocaleString('en-CA')} ppm` : null].filter(Boolean).join(' · ');
+    return `<li><button type="button" class="bl-row" data-pick="${esc(b.id)}" aria-current="${sel ? 'true' : 'false'}" title="${esc(`${b.name || 'Untitled'} · ${b.well?.installed ? 'monitoring well' : 'borehole'}`)}">${bhGlyph(b.well?.installed)}<span class="nm">${esc(b.name || 'Untitled')}</span><span class="st st-${s2}">${s2 === 'issued' ? `Rev ${b.issued?.rev ?? b.rev ?? 0}` : s2 === 'review' ? 'Review' : 'Draft'}</span><span class="meta">${esc(meta)}</span></button></li>`;
+  }).join('') || `<li class="note bl-empty">${ps.length ? 'No boreholes match.' : 'No boreholes yet.'}</li>`;
 }
+document.addEventListener('input', e => { if (e.target.id === 'bl-q') { S.bl.q = e.target.value; renderList(sortedList()); } });
+document.addEventListener('click', e => {
+  const c = e.target.closest('[data-blst]'); if (c) { S.bl.st = c.dataset.blst; lsSet('bhlog.blSt', S.bl.st); $('#bl-head').innerHTML = ''; renderList(sortedList()); return; }
+  const so = e.target.closest('[data-blsort]'); if (so) { S.bl.sort = so.dataset.blsort; lsSet('bhlog.blSort', S.bl.sort); $('#bl-head').innerHTML = ''; renderList(sortedList()); }
+});
 /* legal land descriptions (Dominion Land Survey, third system, as used in Alberta and Saskatchewan) to latitude and longitude.
    Townships are 6 miles plus 3 one-chain road allowances north–south and 6 east–west, counted from the 49th parallel and each
    meridian, with range widths set out along the base lines. Computed, not surveyed: expect it within a few hundred metres. */
