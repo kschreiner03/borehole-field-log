@@ -1140,6 +1140,18 @@ table.sum td, table.sum th, .lgrid td, .lgrid th { border-color: var(--rule); pa
 
 /* report editor, map editor */
 .cmp-pg { border-radius: 0; padding: 5px 8px; }
+.cmp-pg { display: grid; grid-template-columns: 22px 52px minmax(0, 1fr); align-items: center; gap: 8px; }
+.cmp-pg .th, .tile .th { display: block; background: #fff; border: 1px solid var(--border); min-height: 40px; }
+.cmp-pg .th img, .tile .th img { display: block; width: 100%; height: auto; }
+.cmp-pg .tx { min-width: 0; } .cmp-pg .tx b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-pages li.drop-before { box-shadow: inset 0 2px 0 var(--accent); } .cmp-pages li.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.cmp-mode { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; } .cmp-mode .sp { flex: 1 1 auto; } .cmp-mode .note { margin: 0; font-size: 12px; }
+.cmp-sorter { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; padding: 12px; background: var(--raised); border: 1px solid var(--border); align-items: start; }
+.tile { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); text-align: left; font: 12.5px var(--f-body); color: var(--ink); cursor: pointer; }
+.tile:hover { border-color: #8f99a5; } .tile[aria-selected="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); background: var(--accent-soft); }
+.tile .th { min-height: 120px; } .tile .cap { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile.drop-before { box-shadow: -3px 0 0 var(--accent); } .tile.drop-after { box-shadow: 3px 0 0 var(--accent); }
+.cmp.sorting { grid-template-columns: 250px minmax(0, 1fr); }
 .cmp-row .btn, .cmp-add .btn { min-height: 26px; font-size: 12.5px; }
 .map-ctl button, .map-go input { border-radius: var(--r-sm); }
 .map-layers .lyr { border-radius: var(--r-sm); }
@@ -1661,7 +1673,7 @@ const store = {
   },
   save(b) {
     if (S.readOnly) return;
-    b.updated = new Date().toISOString();
+    b.updated = new Date().toISOString(); S.dataGen = (S.dataGen || 0) + 1;
     histRecord(b.id); autosaveSoon(projKey(b)); if (b.id === S.sel) { requestAnimationFrame(() => markIssues(b)); if (S.tab === 'edit') wsSoon(); }
     if (S.mode !== 'db') { clearTimeout(this.localTimer); this.localTimer = setTimeout(() => this.saveLocal(), 300); setSync(); return; }
     setSync('saving');
@@ -2534,7 +2546,7 @@ function renderView(full) {
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
   else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); }
   else if (S.tab === 'reports') { v.innerHTML = reportsHubHTML(b); }
-  else if (S.tab === 'compose') { v.innerHTML = composeHTML(); requestAnimationFrame(drawCompose); }
+  else if (S.tab === 'compose') { v.innerHTML = composeHTML(); requestAnimationFrame(() => { drawCompose(); fillThumbs(); }); }
   else { v.innerHTML = nextSteps(b) + (editable(b) ? '<p class="log-hint">Click any layer, sample, water level or the standpipe on the log to edit it. Click empty space in a column to add one at that depth.</p>' : '') + sheetHTML(b) + logLegendHTML(b); const el = $('#log'); el.innerHTML = logSVG(b, Math.max(el.clientWidth, 900)); }
   if (MAP_TABS.includes(S.tab)) v.insertAdjacentHTML('afterbegin', hiddenNote());
   if (BH_TABS.includes(S.tab)) markIssues(b);
@@ -6976,6 +6988,41 @@ async function reportFile(id) {
   })().catch(e => { RFILES.delete(id); throw e; }));
   return RFILES.get(id);
 }
+/* an imported page drawn by pdf.js, `width` px wide, with its own and the user's rotation; w/h are its size in CSS px */
+async function pdfPageImage(ref, width) {
+  const { doc } = await reportFile(ref.file), pg = await doc.getPage(ref.page), rotation = (pg.rotate + (ref.rot || 0)) % 360;
+  const base = pg.getViewport({ scale: 1, rotation }), vp = pg.getViewport({ scale: width / base.width, rotation });
+  const c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  await pg.render({ canvasContext: ctx, viewport: vp }).promise;
+  return { url: c.toDataURL('image/png'), w: base.width * 96 / 72, h: base.height * 96 / 72 };
+}
+/* a small picture of one layout page, cached until the page or the data changes */
+const THUMBS = new Map();
+function pageThumb(pg, w) {
+  const key = `${w}:${JSON.stringify(pg)}:${pg.kind === 'pdf' ? '' : S.dataGen || 0}`;
+  if (!THUMBS.has(key)) THUMBS.set(key, (async () => {
+    if (pg.kind === 'pdf') return (await pdfPageImage(pg, w * 2)).url;
+    const out = (await layoutPages({ pages: [pg] }))[0]; if (!out || out.pdf) return null;
+    const svg = out.svg || pageFrame(out.framed.title, 1, 1, out.framed.body, out.framed.dims), m = /width="([\d.]+)"/.exec(svg);
+    return (await svgToPng(svg, (w * 2) / +m[1]))?.data || null;
+  })().catch(() => null));
+  return THUMBS.get(key);
+}
+async function fillThumbs() {
+  for (const el of document.querySelectorAll('[data-th]')) {
+    const pg = repLayout().pages.find(p => p.id === el.dataset.th); if (!pg) continue;
+    const url = await pageThumb(pg, +el.dataset.w || 56);
+    if (url && el.isConnected && !el.querySelector('img')) el.innerHTML = `<img src="${url}" alt="">`;
+  }
+}
+function movePage(from, to) {
+  const L = repLayout(), pg = L.pages[from]; if (!pg || from === to) return;
+  L.pages.splice(from, 1); L.pages.splice(Math.max(0, Math.min(to, L.pages.length)), 0, pg);
+  S.cpage = L.pages.indexOf(pg); S.csel = null; commit(L);
+}
+const pageLabel = p => p.kind === 'free' || p.kind === 'pdf' ? (p.title || 'Untitled page') : RPAGES[p.kind];
+const pageSub = p => p.kind === 'free' ? `${p.items.length} item${p.items.length === 1 ? '' : 's'}` : p.kind === 'pdf' ? `Imported PDF, page ${p.page}${p.rot ? `, turned ${p.rot}°` : ''}` : 'Fills itself from the data';
 async function importReportFiles(files, at = S.cpage) {
   if (S.readOnly) return 0;
   const L = repLayout(), p = projKey(projList()[0]);
@@ -7060,11 +7107,11 @@ async function buildReport() {
 
 function composeHTML() {
   const L = repLayout(), pg = curPage(), n = L.pages.length, tpls = S.co.reportTpls || [];
-  const pages = L.pages.map((p, i) => `<li><button class="cmp-pg" data-cpage="${i}" aria-current="${i === S.cpage}"><span class="n">${i + 1}</span><span><b>${esc(p.kind === 'free' ? (p.title || 'Untitled page') : RPAGES[p.kind])}</b><small>${p.kind === 'free' ? `${p.items.length} item${p.items.length === 1 ? '' : 's'}` : 'Fills itself from the data'}</small></span></button></li>`).join('');
+  const pages = L.pages.map((p, i) => `<li data-pgi="${i}" draggable="${!S.readOnly}"><button class="cmp-pg" data-cpage="${i}" aria-current="${i === S.cpage}"><span class="n">${i + 1}</span><span class="th" data-th="${p.id}" data-w="52"></span><span class="tx"><b>${esc(pageLabel(p))}</b><small>${esc(pageSub(p))}</small></span></button></li>`).join('');
   const side = `<aside class="cmp-side">
     <div class="cmp-head"><h3>Report pages</h3><button class="btn primary" id="cmp-pdf" data-act="cmp-pdf">Create PDF</button></div>
     <ol class="cmp-pages">${pages}</ol>
-    <div class="cmp-row"><button class="btn" data-act="cmp-up" ${S.cpage === 0 ? 'disabled' : ''} title="Move this page up">Up</button><button class="btn" data-act="cmp-down" ${S.cpage >= n - 1 ? 'disabled' : ''} title="Move this page down">Down</button><button class="btn" data-act="cmp-dup" title="Duplicate this page">Duplicate</button><button class="btn" data-act="cmp-delpage" ${n < 2 ? 'disabled' : ''} title="Remove this page">Remove</button></div>
+    <div class="cmp-row"><button class="btn" data-act="cmp-up" ${S.cpage === 0 ? 'disabled' : ''} title="Move this page up">Up</button><button class="btn" data-act="cmp-down" ${S.cpage >= n - 1 ? 'disabled' : ''} title="Move this page down">Down</button><button class="btn" data-act="cmp-dup" title="Duplicate this page">Duplicate</button><button class="btn" data-act="cmp-delpage" ${n < 2 ? 'disabled' : ''} title="Remove this page">Remove</button><button class="btn" data-act="cmp-rot-l" title="Turn left (imported pages) or switch portrait and landscape">Rotate left</button><button class="btn" data-act="cmp-rot-r" title="Turn right (imported pages) or switch portrait and landscape">Rotate right</button></div>
     <button class="btn" data-act="cmp-import" ${S.readOnly ? 'disabled' : ''} title="Insert the pages of a PDF (an ArcGIS map, a lab certificate) or a picture after the current page">Add PDF or image…</button>
     <label class="cmp-lbl" for="cmp-add-page">Add a page</label><select id="cmp-add-page"><option value="">Choose a page type…</option>${Object.entries(RPAGES).filter(([k]) => k !== 'pdf').map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>
     <h3 style="margin-top:18px">Templates</h3>
@@ -7090,7 +7137,10 @@ function composeHTML() {
     stage = `<div class="cmp-tools"><b>${esc(RPAGES[pg.kind])}</b>${pg.kind === 'logs' || pg.kind === 'photos' ? '' : `<label class="cmp-lbl" for="cmp-title">Page title</label><input id="cmp-title" value="${esc(pg.title || '')}">`}</div>${opts}
       <div class="cmp-stage" id="cmp-stage"><div class="cmp-paper" id="cmp-paper" data-auto="${pg.kind}"></div></div><p class="note">These pages fill themselves from the project's data; long tables continue onto more pages. Preview of the first page.</p>`;
   }
-  return `<div class="cmp">${side}<div class="cmp-main">${stage}</div>${pg.kind === 'free' ? `<aside class="cmp-props" id="cmp-props">${propsHTML()}</aside>` : ''}</div>`;
+  const sel = S.csortSel || new Set();
+  const mode = `<div class="cmp-mode"><span class="seg" role="group" aria-label="View"><button data-csort="0" aria-pressed="${!S.csort}">Edit page</button><button data-csort="1" aria-pressed="${!!S.csort}">All pages</button></span>${S.csort ? `<span class="note">${sel.size ? `${sel.size} selected` : 'Click to select; Shift or Ctrl/⌘ for several; drag to reorder; double-click to open'}</span><span class="sp"></span><button class="btn" data-act="cmp-rot-l" ${sel.size ? '' : 'disabled'}>Rotate left</button><button class="btn" data-act="cmp-rot-r" ${sel.size ? '' : 'disabled'}>Rotate right</button><button class="btn" data-act="cmp-dup" ${sel.size ? '' : 'disabled'}>Duplicate</button><button class="btn danger" data-act="cmp-delpage" ${sel.size && sel.size < n ? '' : 'disabled'}>Delete</button>` : ''}</div>`;
+  if (S.csort) stage = `<div class="cmp-sorter" role="listbox" aria-multiselectable="true" aria-label="All pages">${L.pages.map((p, i) => `<button type="button" class="tile" role="option" data-tile="${i}" data-pgi="${i}" draggable="${!S.readOnly}" aria-selected="${sel.has(p.id)}"><span class="th" data-th="${p.id}" data-w="150"></span><span class="cap"><b>${i + 1}</b> ${esc(pageLabel(p))}</span></button>`).join('')}</div>`;
+  return `<div class="cmp${S.csort ? ' sorting' : ''}">${side}<div class="cmp-main">${mode}${stage}</div>${pg.kind === 'free' && !S.csort ? `<aside class="cmp-props" id="cmp-props">${propsHTML()}</aside>` : ''}</div>`;
 }
 function propsHTML() {
   const pg = curPage(), it = pg?.items?.find(x => x.id === S.csel);
@@ -7113,9 +7163,10 @@ function drawCompose() {
   const stage = $('#cmp-stage'), paper = $('#cmp-paper'); if (!stage || !paper) return;
   const d = pgDims(curPage()), z = Math.min(1, (stage.clientWidth - 2) / d.W); paper.style.setProperty('--z', z); stage.style.height = d.H * z + 'px'; S.cz = z;
   for (const it of curPage().items || []) { const bx = paper.querySelector(`[data-box="${it.id}"]`); if (bx) Object.assign(bx.style, { left: it.x + 'px', top: it.y + 'px', width: it.w + 'px', height: it.h + 'px' }); }
-  if (paper.dataset.auto) layoutPages({ pages: [curPage()] }).then(ps => { const p = ps[0]; paper.innerHTML = p?.pdf ? `<p class="note" style="padding:20px">Page ${p.pdf.page} of an imported PDF.</p>` : p ? (p.svg || pageFrame(p.framed.title, S.cpage + 1, repLayout().pages.length, p.framed.body)) : '<p class="note" style="padding:20px">Nothing to show yet for this page.</p>'; });
+  if (paper.dataset.auto) layoutPages({ pages: [curPage()] }).then(ps => { const p = ps[0]; if (p?.pdf) { pdfPageImage(p.pdf, Math.min(1600, stage.clientWidth * 2)).then(r => { const z = Math.min(1, (stage.clientWidth - 2) / r.w); Object.assign(paper.style, { width: r.w + 'px', height: r.h + 'px' }); paper.style.setProperty('--z', z); stage.style.height = r.h * z + 'px'; paper.innerHTML = `<img src="${r.url}" alt="${esc(curPage().title || 'Imported page')}" style="display:block;width:100%;height:100%">`; }).catch(() => { paper.innerHTML = '<p class="note" style="padding:20px">This imported page could not be shown. The file may be missing from this computer.</p>'; }); return; }
+    paper.innerHTML = p ? (p.svg || pageFrame(p.framed.title, S.cpage + 1, repLayout().pages.length, p.framed.body)) : '<p class="note" style="padding:20px">Nothing to show yet for this page.</p>'; });
 }
-function rerenderCompose() { if (S.tab !== 'compose') return; const v = $('#view'); v.innerHTML = hiddenNote() + composeHTML(); drawCompose(); }
+function rerenderCompose() { if (S.tab !== 'compose') return; const v = $('#view'); v.innerHTML = hiddenNote() + composeHTML(); drawCompose(); fillThumbs(); }
 function commit(L = repLayout()) { saveLayout(L); rerenderCompose(); }
 function fitItem(it, how) {
   const g = 12, BODY = bodyOf(curPage());
@@ -7130,8 +7181,14 @@ function composeAct(act, el) {
   if (act === 'cmp-pdf') { buildReport(); return; }
   if (act === 'cmp-up' && i > 0) { [L.pages[i - 1], L.pages[i]] = [L.pages[i], L.pages[i - 1]]; S.cpage--; }
   if (act === 'cmp-down' && i < L.pages.length - 1) { [L.pages[i + 1], L.pages[i]] = [L.pages[i], L.pages[i + 1]]; S.cpage++; }
-  if (act === 'cmp-dup') { const c = structuredClone(pg); c.id = uid('pg'); c.items.forEach(x => x.id = uid('it')); L.pages.splice(i + 1, 0, c); S.cpage++; }
-  if (act === 'cmp-delpage' && L.pages.length > 1) { L.pages.splice(i, 1); S.csel = null; }
+  const many = S.csort && S.csortSel?.size ? L.pages.filter(p => S.csortSel.has(p.id)) : null, targets = many || [pg];
+  const copyOf = p => { const c = structuredClone(p); c.id = uid('pg'); (c.items || []).forEach(x => x.id = uid('it')); return c; };
+  if (act === 'cmp-dup') { if (many) { for (const p of many) L.pages.splice(L.pages.indexOf(p) + 1, 0, copyOf(p)); } else { L.pages.splice(i + 1, 0, copyOf(pg)); S.cpage++; } }
+  if (act === 'cmp-delpage') { if (many) { if (many.length < L.pages.length) { L.pages = L.pages.filter(p => !S.csortSel.has(p.id)); S.csortSel = new Set(); } } else if (L.pages.length > 1) { L.pages.splice(i, 1); S.csel = null; } }
+  if (act === 'cmp-rot-l' || act === 'cmp-rot-r') for (const p of targets) {
+    if (p.kind === 'pdf') p.rot = ((p.rot || 0) + (act === 'cmp-rot-r' ? 90 : 270)) % 360;
+    else if (p.kind === 'free') { p.orient = p.orient === 'land' ? undefined : 'land'; for (const x of p.items || []) clampIt(x, p); }
+  }
   if (act === 'cmp-del' && it) { pg.items = pg.items.filter(x => x !== it); S.csel = null; }
   if (act === 'cmp-front' && it) { pg.items = [...pg.items.filter(x => x !== it), it]; }
   if (act === 'cmp-copy' && it) { const c = { ...structuredClone(it), id: uid('it'), x: it.x + 18, y: it.y + 18 }; clampIt(c); pg.items.push(c); S.csel = c.id; }
@@ -7158,6 +7215,21 @@ function composeAct(act, el) {
   if (act === 'cmp-tpl-del-go') { const gone = new Set([...document.querySelectorAll('[data-tpldel]:checked')].map(x => x.dataset.tpldel)); S.co.reportTpls = (S.co.reportTpls || []).filter(t => !gone.has(t.id)); store.saveCompany(); closeOverlay(); rerenderCompose(); return; }
   commit(L);
 }
+document.addEventListener('dblclick', e => { const tl = e.target.closest('[data-tile]'); if (!tl) return; S.csort = false; S.cpage = +tl.dataset.tile; S.csortSel = new Set(); rerenderCompose(); });
+let pgDrag = null;
+document.addEventListener('dragstart', e => { const li = e.target.closest?.('[data-pgi]'); if (!li || S.readOnly) return; pgDrag = +li.dataset.pgi; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(pgDrag)); });
+document.addEventListener('dragover', e => {
+  const li = e.target.closest?.('[data-pgi]'); if (!li || pgDrag == null) return; e.preventDefault();
+  const r = li.getBoundingClientRect(), after = li.classList.contains('tile') ? e.clientX > r.left + r.width / 2 : e.clientY > r.top + r.height / 2;
+  document.querySelectorAll('.drop-before, .drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after')); li.classList.add(after ? 'drop-after' : 'drop-before');
+});
+document.addEventListener('drop', e => {
+  const li = e.target.closest?.('[data-pgi]'); if (!li || pgDrag == null) return; e.preventDefault();
+  const to = +li.dataset.pgi + (li.classList.contains('drop-after') ? 1 : 0), from = pgDrag; pgDrag = null;
+  document.querySelectorAll('.drop-before, .drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after'));
+  movePage(from, to > from ? to - 1 : to);
+});
+document.addEventListener('dragend', () => { pgDrag = null; document.querySelectorAll('.drop-before, .drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after')); });
 /* moving and resizing on the page */
 let cDrag = null;
 document.addEventListener('pointerdown', e => {
@@ -8113,6 +8185,14 @@ document.addEventListener('click', e => {
   const imb = e.target.closest('[data-imzoom], [data-imdel]'); if (imb) { imageryAct(imb); return; }
   const mt = e.target.closest('[data-mtool]'); if (mt) { S.mapTool = mt.dataset.mtool; S.draft = null; S.mapSel = null; if (S.mapTool === 'place' && !S.bh.has(S.placeId)) S.placeId = nextToPlace(); refreshMapEd(); return; }
   const ms = e.target.closest('[data-mfsel]'); if (ms) { S.mapSel = ms.dataset.mfsel; refreshMapEd(); return; }
+  const cs = e.target.closest('[data-csort]'); if (cs) { S.csort = cs.dataset.csort === '1'; S.csortSel = new Set(); rerenderCompose(); return; }
+  const tl = e.target.closest('[data-tile]'); if (tl) {
+    const L = repLayout(), i = +tl.dataset.tile, id = L.pages[i]?.id, sel = S.csortSel ||= new Set();
+    if (e.shiftKey && S.csortLast != null) { const [a, b] = [Math.min(S.csortLast, i), Math.max(S.csortLast, i)]; for (let k = a; k <= b; k++) sel.add(L.pages[k].id); }
+    else if (e.ctrlKey || e.metaKey) { sel.has(id) ? sel.delete(id) : sel.add(id); S.csortLast = i; }
+    else { S.csortSel = new Set([id]); S.csortLast = i; }
+    rerenderCompose(); return;
+  }
   const cp = e.target.closest('[data-cpage]'); if (cp) { S.cpage = +cp.dataset.cpage; S.csel = null; rerenderCompose(); return; }
   const ca = e.target.closest('[data-cadd]'); if (ca) { const pg = curPage(), k = ca.dataset.cadd, bd = bodyOf(pg), low = Math.max(bd.y, ...pg.items.map(x => x.y + x.h + 12)), it = newItem(k, bd.x, low + RITEMS[k][2] <= bd.y + bd.h ? low : bd.y); if (RITEMS[k][1] === BODY.w) it.w = bd.w; clampIt(it); pg.items.push(it); S.csel = it.id; commit(); return; }
   const co = e.target.closest('[data-corient]'); if (co) { const pg = curPage(), was = bodyOf(pg); pg.orient = co.dataset.corient === 'land' ? 'land' : undefined; const now = bodyOf(pg); for (const it of pg.items) { if (Math.round(it.w) === Math.round(was.w)) it.w = now.w; clampIt(it, pg); } commit(); return; }
