@@ -1,0 +1,290 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-28T00:00:00Z",
+  "title": "Design System: Borehole Field Log",
+  "extensions": {
+    "colorMeta": {
+      "groundwater-blue": {
+        "role": "secondary",
+        "displayName": "Groundwater Blue",
+        "canonical": "#1876bd",
+        "tonalRamp": [
+          "#0a2c47",
+          "#0f4572",
+          "#145e99",
+          "#1876bd",
+          "#4b95cf",
+          "#86b9e0",
+          "#bcd7ee",
+          "#e3f0fa"
+        ]
+      },
+      "caution-rust": {
+        "role": "tertiary",
+        "displayName": "Caution Rust",
+        "canonical": "#b4451a",
+        "tonalRamp": [
+          "#3d1709",
+          "#62250e",
+          "#8a3414",
+          "#b4451a",
+          "#cf6c45",
+          "#e39d80",
+          "#f2c9b8",
+          "#fcebe3"
+        ]
+      },
+      "issued-green": {
+        "role": "tertiary",
+        "displayName": "Issued Green",
+        "canonical": "#2b7a49",
+        "tonalRamp": [
+          "#0e2a19",
+          "#174528",
+          "#215f38",
+          "#2b7a49",
+          "#4f9a6b",
+          "#83bd98",
+          "#b9dcc6",
+          "#e2f3e8"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#22272c",
+        "tonalRamp": [
+          "#111417",
+          "#22272c",
+          "#3a4148",
+          "#5b636c",
+          "#87909a",
+          "#c4cbd2",
+          "#d6dbe0",
+          "#f3f4f6"
+        ]
+      },
+      "earth-brown": {
+        "role": "tertiary",
+        "displayName": "Earth Brown",
+        "canonical": "#8a5c22"
+      },
+      "action-blue": {
+        "role": "primary",
+        "displayName": "Action Blue",
+        "canonical": "#0b6fb8",
+        "tonalRamp": [
+          "#062b47",
+          "#073f69",
+          "#085a96",
+          "#0b6fb8",
+          "#3d8fcc",
+          "#7cb4de",
+          "#bcd8ee",
+          "#e6f1fa"
+        ]
+      },
+      "shell-slate": {
+        "role": "neutral",
+        "displayName": "Shell Slate",
+        "canonical": "#1e2a35",
+        "tonalRamp": [
+          "#0f151b",
+          "#1e2a35",
+          "#2a3946",
+          "#3e4f5e",
+          "#5a6d7e",
+          "#8696a5",
+          "#a9b6c2",
+          "#e9eef3"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "page-title": {
+        "displayName": "Page title",
+        "purpose": "Borehole or project name heading the work area."
+      },
+      "panel-title": {
+        "displayName": "Panel title",
+        "purpose": "Panel and dialog headers."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Office views."
+      },
+      "field-body": {
+        "displayName": "Field body",
+        "purpose": "Guided logging on tablets."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels, table headers."
+      },
+      "rail-label": {
+        "displayName": "Rail label",
+        "purpose": "Navigation rail captions."
+      },
+      "measurement": {
+        "displayName": "Measurement",
+        "purpose": "Depths, elevations, ticks, readings."
+      }
+    },
+    "shadows": [
+      {
+        "name": "menu",
+        "value": "0 18px 48px rgba(10, 20, 30, .2)",
+        "purpose": "More menu."
+      },
+      {
+        "name": "dialog",
+        "value": "0 24px 64px rgba(10, 20, 30, .28)",
+        "purpose": "Dialogs."
+      },
+      {
+        "name": "drawer",
+        "value": "-12px 0 32px rgba(10, 20, 30, .12)",
+        "purpose": "Properties panel."
+      },
+      {
+        "name": "toast",
+        "value": "0 10px 28px rgba(10, 20, 30, .25)",
+        "purpose": "Toasts."
+      },
+      {
+        "name": "focus",
+        "value": "0 0 0 3px rgba(11, 111, 184, .18)",
+        "purpose": "Input focus ring."
+      }
+    ],
+    "motion": [],
+    "breakpoints": [
+      {
+        "name": "phone",
+        "value": "560px"
+      },
+      {
+        "name": "field-stack",
+        "value": "760px"
+      },
+      {
+        "name": "sidebar-stack",
+        "value": "860px"
+      },
+      {
+        "name": "site-grid",
+        "value": "1150px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary action in a region.",
+      "html": "<button class=\"ds-btn-primary\">Download PDF</button>",
+      "css": ".ds-btn-primary { background:#0b6fb8; color:#fff; border:1px solid #0b6fb8; border-radius:4px; padding:5px 12px; min-height:32px; font:600 13.5px 'Avenir Next', 'Segoe UI', -apple-system, Roboto, Arial, sans-serif; cursor:pointer; } .ds-btn-primary:hover { background:#085a96; border-color:#085a96; } .ds-btn-primary:focus-visible { outline:2px solid #0b6fb8; outline-offset:2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Everyday actions.",
+      "html": "<button class=\"ds-btn\">+ New borehole</button>",
+      "css": ".ds-btn { background:#fff; color:#22272c; border:1px solid #c4cbd2; border-radius:4px; padding:5px 12px; min-height:32px; font:500 13.5px 'Avenir Next', 'Segoe UI', -apple-system, Roboto, Arial, sans-serif; cursor:pointer; } .ds-btn:hover { background:#f1f4f7; border-color:#aab3bc; } .ds-btn:focus-visible { outline:2px solid #0b6fb8; outline-offset:2px; }"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Office-density field.",
+      "html": "<label class=\"ds-fld\"><span>Easting</span><input class=\"ds-input\" value=\"560152\"></label>",
+      "css": ".ds-fld { display:grid; gap:4px; font:600 12.5px 'Avenir Next', 'Segoe UI', -apple-system, Roboto, Arial, sans-serif; color:#5b636c; width:220px; } .ds-input { border:1px solid #c4cbd2; border-radius:4px; padding:6px 9px; min-height:34px; font:14px 'Avenir Next', 'Segoe UI', -apple-system, Roboto, Arial, sans-serif; color:#22272c; font-variant-numeric:tabular-nums; } .ds-input:hover { border-color:#9aa5af; } .ds-input:focus { outline:none; border-color:#0b6fb8; box-shadow:0 0 0 3px rgba(11,111,184,.18); }"
+    },
+    {
+      "name": "Navigation Rail",
+      "kind": "nav",
+      "description": "View switcher.",
+      "html": "<nav class=\"ds-rail\"><button aria-current=\"page\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\"><rect x=\"7\" y=\"3\" width=\"10\" height=\"18\" rx=\"1.5\"/><path d=\"M7 8h10M7 13h10M7 17h10\"/></svg>Log</button><button><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\"><path d=\"M4 6h16M4 12h16M4 18h16M9 6v12\"/></svg>Data</button></nav>",
+      "css": ".ds-rail { width:72px; display:grid; gap:2px; padding:8px 6px; background:#fff; border-right:1px solid #d6dbe0; } .ds-rail button { display:grid; justify-items:center; gap:3px; padding:8px 2px 7px; border:0; background:none; border-radius:6px; color:#5b636c; font:600 11px 'Avenir Next', 'Segoe UI', -apple-system, Roboto, Arial, sans-serif; cursor:pointer; } .ds-rail svg { width:22px; height:22px; } .ds-rail button:hover { background:#f1f4f7; color:#22272c; } .ds-rail [aria-current=page] { background:#e6f1fa; color:#085a96; }"
+    },
+    {
+      "name": "Borehole Row",
+      "kind": "custom",
+      "description": "Project borehole list row with status dot.",
+      "html": "<button class=\"ds-row on\"><i></i><b>BH24-01</b><em>▼ 1.7</em><small>6.0 m · standpipe · draft</small></button>",
+      "css": ".ds-row { display:grid; grid-template-columns:auto 1fr auto; gap:1px 10px; align-items:center; width:240px; padding:8px 10px; border:0; border-radius:6px; background:none; font:14px 'Avenir Next', 'Segoe UI', -apple-system, Roboto, Arial, sans-serif; color:#22272c; text-align:left; cursor:pointer; } .ds-row i { grid-row:1/span 2; width:9px; height:9px; border-radius:50%; background:#c9a227; } .ds-row em { font-style:normal; color:#1676bd; font-size:12px; } .ds-row small { grid-column:2/-1; color:#5b636c; font-size:12px; } .ds-row:hover { background:#f1f4f7; } .ds-row.on { background:#e6f1fa; } .ds-row.on b { color:#085a96; }"
+    },
+    {
+      "name": "Status Pills",
+      "kind": "chip",
+      "description": "Draft, review, issued.",
+      "html": "<span class=\"ds-pill d\">Draft</span> <span class=\"ds-pill r\">For review</span> <span class=\"ds-pill i\">Issued · Rev 0</span>",
+      "css": ".ds-pill { display:inline-flex; font:600 12px 'Avenir Next', 'Segoe UI', -apple-system, Roboto, Arial, sans-serif; padding:2px 9px; border-radius:999px; border:1px solid; } .ds-pill.d { color:#6f5600; background:#fdf3cf; border-color:#ecd47e; } .ds-pill.r { color:#8a3b07; background:#fde8d6; border-color:#f0bf95; } .ds-pill.i { color:#1f6239; background:#e1f2e7; border-color:#a5d3b4; }"
+    },
+    {
+      "name": "Field Chips",
+      "kind": "chip",
+      "refersTo": "chip-field-selected",
+      "description": "Tap-to-select options on tablets.",
+      "html": "<div class=\"ds-chips\"><button>Firm</button><button aria-pressed=\"true\">Stiff</button></div>",
+      "css": ".ds-chips { display:flex; gap:6px; } .ds-chips button { min-height:44px; padding:0 14px; border:1px solid #c4cbd2; border-radius:999px; background:#fff; font:15px 'Avenir Next', 'Segoe UI', -apple-system, Roboto, Arial, sans-serif; color:#22272c; cursor:pointer; } .ds-chips button[aria-pressed=true] { background:#0b6fb8; border-color:#0b6fb8; color:#fff; }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Border-defined white panel.",
+      "html": "<section class=\"ds-panel\"><header>Soil layers</header><div>Rows and details.</div></section>",
+      "css": ".ds-panel { width:320px; background:#fff; border:1px solid #d6dbe0; border-radius:8px; font:14px 'Avenir Next', 'Segoe UI', -apple-system, Roboto, Arial, sans-serif; color:#22272c; } .ds-panel header { padding:12px 16px; border-bottom:1px solid #eceef1; font-weight:600; font-size:15px; } .ds-panel div { padding:14px 16px; color:#5b636c; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Category Standard, Done Properly",
+    "overview": "The app looks and behaves like the best engineering field-data software (Bentley OpenGround, Esri ArcGIS Field Maps and Survey123), played straight and finished to their level. A dark slate header, a narrow navigation rail, a panel listing the project's boreholes, the work area, and a properties panel from the right.\n\nThe look is calm and neutral; colour does jobs only: action blue for action and selection, groundwater blue, soil colours and status colours. Panels are border-defined; only floating layers cast shadows.\n\nOffice density and field density of the same components; light only.",
+    "keyCharacteristics": [
+      "Dark slate header, light rail and panels, cool grey canvas.",
+      "One action blue; every other colour encodes data or status.",
+      "Border-defined panels with 8px corners; shadows only on floating layers.",
+      "Tabular, monospaced measurements on logs and plots.",
+      "Office and field densities of the same parts."
+    ],
+    "rules": [
+      {
+        "name": "The One Action Rule",
+        "body": "Action blue marks the primary action, focus and the current selection only; it never decorates.",
+        "section": "colors"
+      },
+      {
+        "name": "The Data Colour Rule",
+        "body": "Every other saturated colour means water, soil or status, and never appears without its symbol or word.",
+        "section": "colors"
+      },
+      {
+        "name": "The Measurement Rule",
+        "body": "Numbers that are measured use tabular figures; on drawings they use the mono face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Declare-Once Rule",
+        "body": "A surface gets a border or a shadow, never both; resting panels get the border.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep panels white with a 1px Border (#d6dbe0) on the Canvas (#f3f4f6).",
+      "Do keep Action Blue (#0b6fb8) for the primary action, focus and selection.",
+      "Do give field controls at least 44px and step actions 52 to 56px.",
+      "Do pair every data colour with its symbol, pattern or word.",
+      "Do theme selection, focus rings, scrollbars and checkboxes from the palette."
+    ],
+    "donts": [
+      "Don't add a dark theme; light only.",
+      "Don't put shadows on resting panels or combine a border with a wide shadow.",
+      "Don't mark selection with a thick coloured edge; use the Selection fill.",
+      "Don't use eyebrow labels above headings.",
+      "Don't go below 11px for on-screen text."
+    ]
+  }
+}
