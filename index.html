@@ -6458,6 +6458,7 @@ function planSVG(W, H, interactive) {
   if (interactive && S.mv && S.mvProj !== projKey(projList()[0])) S.mv = null;
   const free = RO.scale || (interactive && S.mv); if (interactive && S.mv) ({ cx, cy, sc } = S.mv);
   const X = e => W / 2 + (e - cx) * sc, Y = n => H / 2 - (n - cy) * sc;
+  RO.sc = sc;   // page px per metre as drawn, for a linked scale bar
   if (interactive) S._plan = S._drawn = { W, H, cx, cy, sc };
   const o = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Borehole location plan">`, `<rect width="${W}" height="${H}" style="fill:var(--panel-2)"/>`];
   o.push(basemapSVG(W, H, cx, cy, sc));
@@ -6829,6 +6830,7 @@ function mapFrame(list, W, H, pad = 44) {
   const ex = pts.map(b => [b.easting, b.northing]); if (!ex.length) return null;
   const x0 = Math.min(...ex.map(p => p[0])), x1 = Math.max(...ex.map(p => p[0])), y0 = Math.min(...ex.map(p => p[1])), y1 = Math.max(...ex.map(p => p[1]));
   const span = Math.max(x1 - x0, y1 - y0, 20) * 1.3, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, sc = RO.scale ? PX_PER_M / RO.scale : Math.min((W - 2 * pad) / span, (H - 2 * pad) / span);
+  RO.sc = sc;
   const X = e => W / 2 + (e - cx) * sc, Y = n => H / 2 - (n - cy) * sc, id = 'mf' + Math.random().toString(36).slice(2, 7);
   const head = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"><defs><clipPath id="${id}"><rect width="${W}" height="${H}"/></clipPath></defs><g clip-path="url(#${id})"><rect width="${W}" height="${H}" style="fill:var(--panel-2)"/>`];
   head.push(basemapSVG(W, H, cx, cy, sc, .75));
@@ -6960,6 +6962,7 @@ const xsecPage = () => newPage('free', { orient: 'land', title: 'CROSS-SECTION A
 const RITEMS = {
   plan: ['Site plan', BODY.w, 560], section: ['Cross-section', BODY.w, 440], wt: ['Water-table map', BODY.w, 520], vap: ['Vapour map', BODY.w, 520],
   flow: ['Groundwater flow', BODY.w, 460], hydro: ['Hydrograph', BODY.w, 320], text: ['Text box', 360, 110], image: ['Picture', 360, 260],
+  scalebar: ['Scale bar', 300, 56], north: ['North arrow', 80, 96], legend: ['Legend', 220, 110], shape: ['Shape', 160, 100],
 };
 const RPAGES = { pdf: 'Imported page', free: 'Free page', xsec: 'Cross-section page (landscape)', key: 'Key to symbols', logs: 'Borehole logs', lab: 'Summary of tests', chem: 'Soil analytical results', gw: 'Groundwater observations', photos: 'Photographs' };
 const RTITLES = { key: 'KEY TO SYMBOLS AND TERMS', logs: 'BOREHOLE LOGS', lab: 'SUMMARY OF TESTS', chem: 'SOIL ANALYTICAL RESULTS', gw: 'GROUNDWATER OBSERVATIONS', photos: 'PHOTOGRAPHS' };
@@ -6972,9 +6975,12 @@ const ROPTS = {
   vap: [['scale', 'Scale', SCALES]],
   hydro: [['mode', 'Plot', [['elev', 'Water elevation'], ['depth', 'Depth to water']]]],
   text: [['size', 'Text size', [[9, 'Small'], [11, 'Normal'], [14, 'Large'], [18, 'Heading']]]],
+  north: [['mode', 'Points to', [['grid', 'Grid north (the map is drawn grid-north up)'], ['true', 'True north (turned by the meridian convergence)']]]],
+  shape: [['kind', 'Shape', [['rect', 'Rectangle'], ['ellipse', 'Ellipse'], ['line', 'Line'], ['arrow', 'Arrow']]], ['stroke', 'Colour', [['ink', 'Black'], ['accent', 'Blue-grey'], ['red', 'Red'], ['water', 'Water blue']]],
+    ['fill', 'Fill', [['none', 'None'], ['tint', 'Light tint']]], ['dir', 'Direction (lines)', [['down', 'Top-left to bottom-right'], ['up', 'Bottom-left to top-right'], ['h', 'Across'], ['v', 'Down']]], ['sw', 'Line width', [[1, 'Thin'], [1.8, 'Normal'], [3, 'Thick']]]],
 };
 const mm = px => Math.round(px * 25.4 / 96), pxOf = v => v * 96 / 25.4;
-const newItem = (t, x = BODY.x, y = BODY.y, extra = {}) => ({ id: uid('it'), t, x, y, w: RITEMS[t][1], h: RITEMS[t][2], cap: '', frame: t !== 'text', o: {}, ...extra });
+const newItem = (t, x = BODY.x, y = BODY.y, extra = {}) => ({ id: uid('it'), t, x, y, w: RITEMS[t][1], h: RITEMS[t][2], cap: '', frame: !['text', 'scalebar', 'north', 'shape'].includes(t), o: {}, ...extra });
 const newPage = (kind, extra = {}) => ({ id: uid('pg'), kind, title: kind === 'free' ? 'FIGURE' : RTITLES[kind], items: [], bh: [], ...extra });
 const fullBody = t => newItem(t, BODY.x, BODY.y, { w: BODY.w, h: BODY.h });
 /* ready-made layouts; the company's own templates are listed after these */
@@ -7077,7 +7083,11 @@ function itemInner(it, w, h) {
   for (const k of ['scale', 'grid', 've', 'tick', 'bw', 'iv']) if (o[k] !== '' && o[k] != null) ro[k] = +o[k];
   const msg = t => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#f6f8fa"/><text x="12" y="24" style="font:12px Arial,sans-serif;fill:#5d6a75">${esc(t)}</text></svg>`;
   const fromEl = (fn, none) => { const el = document.createElement('div'); fn(el); return el.querySelector('svg')?.outerHTML || msg(none); };
-  return withRO(ro, () => {
+  if (it.t === 'scalebar') return scaleBarSVG(it, w, h);
+  if (it.t === 'north') return northSVG(it, w, h);
+  if (it.t === 'legend') return legendSVG(it, w, h);
+  if (it.t === 'shape') return shapeSVG(it, w, h);
+  const out = withRO(ro, () => {
     if (it.t === 'plan') { const r = planSVG(w, h, false); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'section') return fromEl(el => drawSection(el, {}, w, sectionList(), false, h), 'Log at least two boreholes to draw a cross-section.');
     if (it.t === 'wt') return wtMapSVG(w, h)?.svg || msg('Needs water levels in at least 3 wells with coordinates and ground elevations.');
@@ -7088,6 +7098,74 @@ function itemInner(it, w, h) {
     if (it.t === 'image') return o.img ? `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><image href="${o.img}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/></svg>` : msg('Choose a picture in the panel on the right.');
     return msg('');
   });
+  if (ro.sc) ITEM_SC.set(it.id, ro.sc); else ITEM_SC.delete(it.id);
+  return out;
+}
+/* a page's items in their stacking order; maps are drawn first so a scale bar can read the scale they were drawn at */
+const ITEM_SC = new Map(); let PAGE_CTX = null;
+function pageItemsSVG(pg) {
+  PAGE_CTX = pg;
+  try { const first = pg.items.map(it => it.t === 'scalebar' ? null : itemSVG(it)); return pg.items.map((it, i) => first[i] ?? itemSVG(it)).join(''); }
+  finally { PAGE_CTX = null; }
+}
+const niceFloor = v => { const p = 10 ** Math.floor(Math.log10(v)); return [5, 2.5, 2, 1].map(k => k * p).find(n => n <= v) || p; };
+/* a segmented scale bar for a map on the same page: lengths come from the map's drawn scale (page px per metre), so the
+   ratio is true when the PDF is printed at 100 % on its paper */
+function scaleBarSVG(it, w, h) {
+  const o = it.o || {}, map = PAGE_CTX?.items.find(x => x.id === o.link), sc = map && ITEM_SC.get(map.id);
+  const msg = t => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><text x="4" y="${h / 2 + 4}" style="font:11px Arial,sans-serif;fill:#b42318">${esc(t)}</text></svg>`;
+  if (!map) return msg('No map linked: choose the map this bar measures.');
+  if (!sc) return msg('The linked map has no scale yet.');
+  const ft = (o.units || 'auto') === 'ft' || ((o.units || 'auto') === 'auto' && S.units === 'ft'), u = ft ? .3048 : 1, ppu = sc * u, unit = ft ? 'ft' : 'm';
+  const seg = niceFloor((w - 36) / ppu / 4), segpx = seg * ppu, x0 = 14, y0 = h - 22, bh = 6, ratio = Math.round(PX_PER_M / sc);
+  const fitted = !(map.o?.scale > 0), r = [];
+  for (let i = 0; i < 4; i++) {
+    if (i === 0) { r.push(`<rect x="${x0}" y="${y0}" width="${segpx / 2}" height="${bh}" fill="#000" stroke="#000" stroke-width=".8"/><rect x="${x0 + segpx / 2}" y="${y0}" width="${segpx / 2}" height="${bh}" fill="#fff" stroke="#000" stroke-width=".8"/>`); continue; }
+    r.push(`<rect x="${x0 + i * segpx}" y="${y0}" width="${segpx}" height="${bh}" fill="${i % 2 ? '#000' : '#fff'}" stroke="#000" stroke-width=".8"/>`);
+  }
+  const lab = (x, t) => `<text x="${x}" y="${y0 + bh + 12}" text-anchor="middle" style="font:10px Arial,sans-serif;fill:#000">${t}</text>`;
+  const fmt = v => (+v.toFixed(2)).toLocaleString('en-CA');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><g data-ratio="${ratio}" data-ppm="${sc}" data-len="${4 * seg}" data-lenpx="${4 * segpx}">
+    <text x="${x0}" y="${y0 - 6}" style="font:bold 10.5px Arial,sans-serif;fill:#000">Scale 1:${ratio.toLocaleString('en-CA')}${fitted ? ' (as drawn)' : ''}</text>${r.join('')}
+    ${lab(x0, '0')}${lab(x0 + segpx, fmt(seg))}${lab(x0 + 2 * segpx, fmt(2 * seg))}${lab(x0 + 4 * segpx, `${fmt(4 * seg)} ${unit}`)}</g></svg>`;
+}
+/* north arrow: UTM maps are drawn grid-north up; true north is turned by the meridian convergence
+   γ = atan(tan(λ − λ0)·sin φ) at the boreholes' centroid (grid north lies γ east of true north when γ > 0) */
+function northSVG(it, w, h) {
+  const o = it.o || {}, rad = Math.PI / 180; let rot = 0, note = 'Grid north';
+  if (o.mode === 'true') {
+    const ll = projList().map(latLonOf).filter(Boolean), z = crsZone();
+    if (ll.length && z) { const lat = ll.reduce((t, p) => t + p.lat, 0) / ll.length, lon = ll.reduce((t, p) => t + p.lon, 0) / ll.length, g = Math.atan(Math.tan((lon - (z * 6 - 183)) * rad) * Math.sin(lat * rad)) / rad;
+      rot = -g; note = `True north; grid north ${Math.abs(g).toFixed(2)}° ${g >= 0 ? 'east' : 'west'}`; }
+    else note = 'True north needs borehole coordinates';
+  }
+  const cx = w / 2, s2 = Math.min(w, h - 26) / 2 - 4, cy = s2 + 4;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><g data-north="1" data-mode="${o.mode === 'true' ? 'true' : 'grid'}" data-rot="${+rot.toFixed(4)}" transform="rotate(${rot} ${cx} ${cy})">
+    <path d="M${cx} ${cy - s2}L${cx + s2 * .38} ${cy + s2 * .7}L${cx} ${cy + s2 * .38}Z" fill="#000"/><path d="M${cx} ${cy - s2}L${cx - s2 * .38} ${cy + s2 * .7}L${cx} ${cy + s2 * .38}Z" fill="#fff" stroke="#000" stroke-width="1"/>
+    <text x="${cx}" y="${cy - s2 - 2}" text-anchor="middle" style="font:bold 12px Arial,sans-serif;fill:#000" dy="0">N</text></g>
+    <text x="${cx}" y="${h - 4}" text-anchor="middle" style="font:9px Arial,sans-serif;fill:#333">${esc(note)}</text></svg>`;
+}
+/* legend: only what the project actually shows */
+function legendSVG(it, w, h) {
+  const pts = projList(), rows = [];
+  if (pts.some(b => !b.well?.installed)) rows.push(['Borehole', y => BH_SYMBOL(18, y, false)]);
+  if (pts.some(b => b.well?.installed)) rows.push(['Monitoring well', y => BH_SYMBOL(18, y, true)]);
+  if (PAGE_CTX?.items.some(x => x.t === 'plan') && S.secIds?.size >= 2) rows.push(['Cross-section line', y => `<line x1="8" x2="28" y1="${y}" y2="${y}" stroke="#245b78" stroke-width="1.6" stroke-dasharray="6 3"/>`]);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><text x="8" y="16" style="font:bold 11px Arial,sans-serif;fill:#000">Legend</text>${rows.map(([t, sym], i) => `${sym(34 + i * 20)}<text x="38" y="${38 + i * 20}" style="font:10.5px Arial,sans-serif;fill:#000">${esc(t)}</text>`).join('')}</svg>`;
+}
+const SHAPE_INK = { ink: '#1f2937', accent: '#245b78', red: '#b42318', water: '#2867a8' };
+function shapeSVG(it, w, h) {
+  const o = it.o || {}, c = SHAPE_INK[o.stroke] || SHAPE_INK.ink, sw = +o.sw || 1.8, fill = o.fill === 'tint' ? c : 'none', p = sw + 1, kind = o.kind || 'rect';
+  let body;
+  if (kind === 'rect') body = `<rect x="${p}" y="${p}" width="${w - 2 * p}" height="${h - 2 * p}" fill="${fill}" fill-opacity=".12" stroke="${c}" stroke-width="${sw}"/>`;
+  else if (kind === 'ellipse') body = `<ellipse cx="${w / 2}" cy="${h / 2}" rx="${w / 2 - p}" ry="${h / 2 - p}" fill="${fill}" fill-opacity=".12" stroke="${c}" stroke-width="${sw}"/>`;
+  else {
+    const [x1, y1, x2, y2] = o.dir === 'up' ? [p, h - p, w - p, p] : o.dir === 'h' ? [p, h / 2, w - p, h / 2] : o.dir === 'v' ? [w / 2, p, w / 2, h - p] : [p, p, w - p, h - p];
+    const a = Math.atan2(y2 - y1, x2 - x1), L = 8 + sw * 3, ex = x2 - Math.cos(a) * L * .7, ey = y2 - Math.sin(a) * L * .7;
+    body = `<line x1="${x1}" y1="${y1}" x2="${kind === 'arrow' ? ex : x2}" y2="${kind === 'arrow' ? ey : y2}" stroke="${c}" stroke-width="${sw}" stroke-linecap="round"/>`
+      + (kind === 'arrow' ? `<path data-head="1" d="M${x2} ${y2}L${x2 - Math.cos(a - .42) * L} ${y2 - Math.sin(a - .42) * L}L${x2 - Math.cos(a + .42) * L} ${y2 - Math.sin(a + .42) * L}Z" fill="${c}"/>` : '');
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`;
 }
 function itemSVG(it) {
   const cap = it.cap ? 18 : 0, ih = Math.max(20, it.h - cap), body = itemInner(it, it.w, ih).replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
@@ -7097,7 +7175,7 @@ function itemSVG(it) {
 async function layoutPages(L = repLayout()) {
   const out = [];
   for (const pg of L.pages) {
-    if (pg.kind === 'free') out.push({ framed: { title: pg.title || '', body: pg.items.map(itemSVG).join(''), dims: pg.orient === 'land' ? pgDims(pg) : undefined } });
+    if (pg.kind === 'free') out.push({ framed: { title: pg.title || '', body: pageItemsSVG(pg), dims: pg.orient === 'land' ? pgDims(pg) : undefined } });
     else if (pg.kind === 'pdf') out.push({ pdf: { file: pg.file, page: pg.page, rot: pg.rot || 0, title: pg.title || 'Imported page' } });
     else if (pg.kind === 'key') out.push({ framed: { title: pg.title || RTITLES.key, body: keyPageBody() } });
     else if (pg.kind === 'logs') { const ids = pg.bh?.length ? new Set(pg.bh) : null; for (const b of projList().filter(b => !ids || ids.has(b.id))) { const n = pageCount(b); for (let i = 0; i < n; i++) out.push({ svg: pageSVG(b, i, n) }); } }
@@ -7162,7 +7240,7 @@ function composeHTML() {
       <label class="cmp-zoom"><span class="note">Zoom</span><select id="cmp-zoom" aria-label="Zoom">${[['fit', 'Fit page'], ['width', 'Fit width'], ...[0.5, 0.75, 1, 1.5, 2, 4].map(v => [v, Math.round(v * 100) + ' %'])].map(([v, t]) => `<option value="${v}" ${String(S.czoom) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <span class="cmp-add"><span class="note">Add</span>${Object.entries(RITEMS).map(([k, [t]]) => `<button class="btn" data-cadd="${k}">${esc(t)}</button>`).join('')}</span></div>
       <div class="cmp-canvas"><span class="rl-c" aria-hidden="true"></span><svg class="rl-x" id="rl-x" aria-hidden="true"></svg><svg class="rl-y" id="rl-y" aria-hidden="true"></svg>
-      <div class="cmp-stage cmp-scroll" id="cmp-stage"><div class="cmp-sizer" id="cmp-sizer"><div class="cmp-paper" id="cmp-paper" style="width:${d.W}px;height:${d.H}px">${pageFrame(pg.title || '', S.cpage + 1, n, pg.items.map(itemSVG).join(''), d)}
+      <div class="cmp-stage cmp-scroll" id="cmp-stage"><div class="cmp-sizer" id="cmp-sizer"><div class="cmp-paper" id="cmp-paper" style="width:${d.W}px;height:${d.H}px">${pageFrame(pg.title || '', S.cpage + 1, n, pageItemsSVG(pg), d)}
         <div class="cmp-body" style="left:${bd.x}px;top:${bd.y}px;width:${bd.w}px;height:${bd.h}px" aria-hidden="true"></div>
         ${['x', 'y'].map(a => (pg.guides?.[a] || []).map((v, gi) => `<div class="cmp-guide g${a}" data-gaxis="${a}" data-gi="${gi}" style="${a === 'x' ? 'left' : 'top'}:${v}px" title="Guide at ${(v / MMPX).toFixed(1)} mm: drag to move, drag onto the ruler to remove"></div>`).join('')).join('')}
         <div class="cmp-snaps" id="cmp-snaps" aria-hidden="true"></div>
@@ -7211,6 +7289,9 @@ function propsHTML() {
     ${(ROPTS[it.t] || []).map(([k, l, list]) => sel(k, l, list)).join('')}
     ${it.t === 'section' ? `<p class="note">Follows the section line chosen on <button class="btn link" data-tab="site">Site plan &amp; sections</button>.</p>` : ''}
     ${it.t === 'plan' || it.t === 'wt' || it.t === 'vap' ? '<p class="note">A fixed scale is true on the printed Letter page; resize the frame to show more or less of the site.</p>' : ''}
+    ${it.t === 'scalebar' ? (() => { const maps = pg.items.filter(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); return `<label class="cmp-lbl" for="co-link">Measures</label><select id="co-link" data-copt="link"><option value="">Choose a map…</option>${maps.map(m => `<option value="${m.id}" ${it.o?.link === m.id ? 'selected' : ''}>${esc(m.cap || RITEMS[m.t][0])}</option>`).join('')}</select>
+      <label class="cmp-lbl" for="co-units">Units</label><select id="co-units" data-copt="units">${[['auto', 'As the project (m or ft)'], ['m', 'Metres'], ['ft', 'Feet']].map(([v, t]) => `<option value="${v}" ${(it.o?.units || 'auto') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <p class="note">The bar uses the scale the map is drawn at. It is true when the PDF is printed at 100 %.</p>`; })() : ''}
     ${it.t === 'text' ? `<label class="cmp-lbl" for="cp-text">Text</label><textarea id="cp-text" data-copt="text" rows="6">${esc(it.o?.text || '')}</textarea>` : ''}
     ${it.t === 'image' ? `<button class="btn" data-act="cmp-img">${it.o?.img ? 'Replace picture…' : 'Choose picture…'}</button>` : ''}
     <h4>Position and size</h4><div class="cmp-geos">${geo('x', 'Left')}${geo('y', 'Top')}${geo('w', 'Width')}${geo('h', 'Height')}</div>
@@ -8326,7 +8407,9 @@ document.addEventListener('click', e => {
     rerenderCompose(); return;
   }
   const cp = e.target.closest('[data-cpage]'); if (cp) { S.cpage = +cp.dataset.cpage; S.csel = null; rerenderCompose(); return; }
-  const ca = e.target.closest('[data-cadd]'); if (ca) { const pg = curPage(), k = ca.dataset.cadd, bd = bodyOf(pg), low = Math.max(bd.y, ...pg.items.map(x => x.y + x.h + 12)), it = newItem(k, bd.x, low + RITEMS[k][2] <= bd.y + bd.h ? low : bd.y); if (RITEMS[k][1] === BODY.w) it.w = bd.w; clampIt(it); pg.items.push(it); S.csel = it.id; commit(); return; }
+  const ca = e.target.closest('[data-cadd]'); if (ca) { const pg = curPage(), k = ca.dataset.cadd, bd = bodyOf(pg), low = Math.max(bd.y, ...pg.items.map(x => x.y + x.h + 12)), it = newItem(k, bd.x, low + RITEMS[k][2] <= bd.y + bd.h ? low : bd.y); if (RITEMS[k][1] === BODY.w) it.w = bd.w;
+    if (k === 'scalebar') { const m = pg.items.find(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); it.frame = false; if (m) { it.o = { link: m.id }; it.x = m.x + 10; it.y = m.y + m.h - it.h - 10; } }   // inside its map's bottom-left corner
+    clampIt(it); pg.items.push(it); S.csel = it.id; commit(); return; }
   const co = e.target.closest('[data-corient]'); if (co) { const pg = curPage(), was = bodyOf(pg); pg.orient = co.dataset.corient === 'land' ? 'land' : undefined; const now = bodyOf(pg); for (const it of pg.items) { if (Math.round(it.w) === Math.round(was.w)) it.w = now.w; clampIt(it, pg); } commit(); return; }
   const al = e.target.closest('[data-calign]'); if (al) { alignItems(al.dataset.calign); return; }
   const dsb = e.target.closest('[data-cdist]'); if (dsb) { distributeItems(dsb.dataset.cdist); return; }
