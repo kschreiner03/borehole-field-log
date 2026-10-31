@@ -30,8 +30,9 @@ const expect = (ok, msg) => { if (!ok) throw new Error(msg); };
 
 app.whenReady().then(async () => {
   await check('loads offline: libraries from lib/, the system UI font, no web fonts', async run => {
-    const r = await run(`(async () => { await document.fonts.ready; return { xlsx: !!window.XLSX, excel: !!window.ExcelJS, pdf: !!window.jspdf, font: getComputedStyle(document.body).fontFamily, links: [...document.querySelectorAll('link[rel=stylesheet]')].map(l => l.href).filter(h => /^https?:/.test(h)), sync: document.querySelector('#sync').textContent }; })()`);
+    const r = await run(`(async () => { await document.fonts.ready; return { xlsx: !!window.XLSX, excel: !!window.ExcelJS, pdf: !!window.jspdf, pdfjs: !!window.pdfjsLib, pdflib: !!window.PDFLib, worker: window.pdfjsLib?.GlobalWorkerOptions?.workerSrc || '', font: getComputedStyle(document.body).fontFamily, links: [...document.querySelectorAll('link[rel=stylesheet]')].map(l => l.href).filter(h => /^https?:/.test(h)), sync: document.querySelector('#sync').textContent }; })()`);
     expect(r.xlsx && r.excel && r.pdf, 'a library did not load: ' + JSON.stringify(r));
+    expect(r.pdfjs && r.pdflib && /^lib\/pdf\.worker\.min\.js$/.test(r.worker), 'PDF libraries did not load from lib/: ' + JSON.stringify(r));
     expect(/Segoe UI/.test(r.font) && /system-ui/.test(r.font), 'not the system UI font: ' + r.font);
     expect(!r.links.length, 'loads stylesheets from the internet: ' + r.links.join(', '));
     expect(r.sync === 'Saved on this computer', 'unexpected status ' + r.sync);
