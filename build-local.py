@@ -7,6 +7,9 @@ src = src.replace('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.
 src = src.replace('https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js', 'lib/exceljs.min.js')
 src = src.replace('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', 'lib/jspdf.umd.min.js')
 src = src.replace('https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js', 'lib/geotiff.js')
+src = src.replace('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 'lib/pdf.min.js')
+src = src.replace('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', 'lib/pdf.worker.min.js')
+src = src.replace('https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js', 'lib/pdf-lib.min.js')
 # integrity checks are for the CDN copies; a page opened from disk cannot verify local files
 src = re.sub(r' integrity="sha384-[^"]+" crossorigin="anonymous"', '', src)
 left = re.findall(r'https://(?:cdnjs\.|cdn\.jsdelivr\.|fonts\.g)\S+', src)
