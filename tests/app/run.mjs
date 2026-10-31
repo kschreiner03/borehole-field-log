@@ -468,6 +468,57 @@ app.whenReady().then(async () => {
     expect(r.at[0] === 0 && r.at[1] === 1 && r.at[2] === r.n - 1, 'bookmark targets: ' + JSON.stringify(r));
   });
 
+  await check('report canvas review: group drag, page changes, north note, links, placeholder scales, convergence', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); S.cpage = 1; S.csort = false; rerenderCompose(); await w(200);
+      const out = {}, pg = curPage(), z = () => S.cz || 1;
+      const drag = async (id, dx) => { const box = document.querySelector('[data-box="' + id + '"]'), r0 = box.getBoundingClientRect(), x = r0.left + 5, y = r0.top + 5;
+        box.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: x, clientY: y, pointerId: 7 }));
+        document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: x + dx, clientY: y, pointerId: 7 })); document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7 })); await w(80); };
+      // 1. two items aligned on the left edge move together by a small drag
+      pg.items = [newItem('text', 300, 200, { w: 120, h: 50 }), newItem('text', 300, 400, { w: 160, h: 50 })]; S.cmulti = new Set(pg.items.map(i => i.id)); S.csel = pg.items[0].id; rerenderCompose(); await w(100);
+      const a0 = curPage().items.map(i => i.x); await drag(curPage().items[0].id, 4 * z() > 2 ? 4 : 4);
+      out.small = { before: a0, after: curPage().items.map(i => i.x) };
+      // 2. a group dragged into the page edge keeps its spacing
+      { const p2 = curPage(); p2.items = [newItem('text', 100, 200, { w: 100, h: 50 }), newItem('text', 600, 300, { w: 150, h: 50 })]; S.cmulti = new Set(p2.items.map(i => i.id)); S.csel = p2.items[0].id; rerenderCompose(); await w(100);
+        await drag(curPage().items[0].id, 900 * z()); const [i1, i2] = curPage().items; out.edge = { gap: i2.x - i1.x, right: i2.x + i2.w, W: pgDims(curPage()).W }; }
+      // 3. paper and margin changes keep items inside the printable area
+      { const p3 = newPage('free', { items: [fullBody('plan')] }); setPaper(p3, 'a4'); const b = bodyOf(p3), it = p3.items[0]; out.paper = { right: it.x + it.w, bodyRight: b.x + b.w };
+        p3.margin = 15; fitToBody(p3); const b2 = bodyOf(p3); out.margin = { y: p3.items[0].y, bodyY: b2.y, bottom: p3.items[0].y + p3.items[0].h, bodyBottom: b2.y + b2.h }; }
+      // 4. the true-north note fits the default arrow; without coordinates it says grid north
+      { const d = new DOMParser().parseFromString(northSVG(newItem('north', 0, 0, { o: { mode: 'true' } }), RITEMS.north[1], RITEMS.north[2]), 'image/svg+xml'); out.noteLines = [...d.querySelectorAll('[data-note]')].map(t => t.textContent); }
+      // 5. duplicating a page or applying a template keeps a scale bar on its map
+      { const L = repLayout(); const p5 = newPage('free', { title: 'LINKED', items: [fullBody('plan')] }); p5.items.push({ ...newItem('scalebar'), o: { link: p5.items[0].id } }); L.pages.push(p5); S.cpage = L.pages.length - 1; S.csel = null;
+        composeAct('cmp-dup'); const c = repLayout().pages[S.cpage]; out.dup = { link: c.items[1].o.link, plan: c.items[0].id };
+        composeAct('cmp-tpl-save'); document.querySelector('#tpl-name').value = 'Linked'; composeAct('cmp-tpl-save-go');
+        const tpl = S.co.reportTpls.find(t => t.name === 'Linked'); document.querySelector('#cmp-tpl').value = 't:' + tpl.id; composeAct('cmp-tpl-apply');
+        const tp = repLayout().pages.find(p => p.title === 'LINKED'); out.tpl = { link: tp.items[1].o.link, plan: tp.items[0].id }; }
+      // 6. a flow map gives its scale bar a scale
+      { const p6 = newPage('free', { items: [fullBody('flow')] }); p6.items.push({ ...newItem('scalebar'), o: { link: p6.items[0].id } }); out.flow = /data-ratio/.test(pageItemsSVG(p6)); }
+      // 8. convergence against an independent value: 3 deg east of the central meridian at 50 N, gamma = +2.30 deg (arrow turns anticlockwise)
+      { const [E, N] = llToUtm(50, -108, 12), b = blankBorehole('ZT1'); Object.assign(b, { project: 'Convergence test', easting: E, northing: N, crs: 'UTM NAD83(CSRS) Zone 12' }); S.bh.set(b.id, normalize(b)); S.sel = b.id;
+        out.utm = +new DOMParser().parseFromString(northSVG(newItem('north', 0, 0, { o: { mode: 'true' } }), 160, 120), 'image/svg+xml').querySelector('[data-north]').getAttribute('data-rot');
+        Object.assign(b, { easting: -108, northing: 50, crs: 'Lat/Long WGS84' });
+        out.ll = +new DOMParser().parseFromString(northSVG(newItem('north', 0, 0, { o: { mode: 'true' } }), 160, 120), 'image/svg+xml').querySelector('[data-north]').getAttribute('data-rot');
+        Object.assign(b, { easting: null, northing: null, crs: '' }); const d = new DOMParser().parseFromString(northSVG(newItem('north', 0, 0, { o: { mode: 'true' } }), 160, 120), 'image/svg+xml');
+        out.none = { mode: d.querySelector('[data-north]').getAttribute('data-mode'), text: d.documentElement.textContent }; }
+      // 7. a water-table map that only shows a placeholder (two wells) gives no scale
+      { for (const n of ['BH-EX1', 'BH-EX2']) { const c = structuredClone(sortedList().find(b => b.name === n)); Object.assign(c, { id: uid('bh'), project: 'Two wells' }); S.bh.set(c.id, normalize(c)); S.sel = c.id; } const p7 = newPage('free', { items: [fullBody('wt')] }); p7.items.push({ ...newItem('scalebar'), o: { link: p7.items[0].id } }); out.wt = pageItemsSVG(p7); out.wtRatio = /data-ratio/.test(out.wt); out.wt = out.wt.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 300); }
+      return out;
+    })()`);
+    expect(r.small.after[0] - r.small.before[0] === r.small.after[1] - r.small.before[1] && r.small.after[0] !== r.small.before[0], 'group drag stuck: ' + JSON.stringify(r.small));
+    expect(r.edge.gap === 500 && r.edge.right <= r.edge.W, 'group spacing at the edge: ' + JSON.stringify(r.edge));
+    expect(r.paper.right <= r.paper.bodyRight + 0.5, 'item past the margin after a paper change: ' + JSON.stringify(r.paper));
+    expect(r.margin.y >= r.margin.bodyY - 0.5 && r.margin.bottom <= r.margin.bodyBottom + 0.5, 'item outside the body after a margin change: ' + JSON.stringify(r.margin));
+    expect(r.noteLines.length >= 1 && r.noteLines.every(t => t.length <= 16), 'north note too long for the arrow: ' + JSON.stringify(r.noteLines));
+    expect(r.dup.link === r.dup.plan && r.tpl.link === r.tpl.plan, 'scale bar link lost: ' + JSON.stringify(r));
+    expect(r.flow, 'flow map gives no scale');
+    expect(Math.abs(r.utm + 2.30) < 0.02, 'UTM convergence (expected -2.30 rotation): ' + r.utm);
+    expect(r.ll === 0, 'lat/long map should not turn: ' + r.ll);
+    expect(r.none.mode === 'grid' && /Grid north/.test(r.none.text), 'no coordinates must read grid north: ' + JSON.stringify(r.none));
+    expect(!r.wtRatio, 'placeholder map gave a scale: ' + r.wt);
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
