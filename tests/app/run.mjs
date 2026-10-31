@@ -259,6 +259,30 @@ app.whenReady().then(async () => {
     expect(r.travels, 'the imported file is not saved in the project file');
   });
 
+  await check('report: thumbnails, page sorter, drag order, rotate and delete with undo', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); await w(200);
+      const doc = await PDFLib.PDFDocument.create(), font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+      for (let i = 1; i <= 3; i++) doc.addPage([792, 612]).drawText('ARCGIS MAP PAGE ' + i, { x: 72, y: 500, size: 18, font });
+      await importReportFiles([new File([await doc.save()], 'map.pdf', { type: 'application/pdf' })]);
+      const L = () => repLayout(), pdfIx = () => L().pages.map((p, i) => p.kind === 'pdf' ? i : -1).filter(i => i >= 0);
+      let thumbs = 0; for (let t = 0; t < 60 && thumbs < L().pages.length; t++) { await w(250); thumbs = [...document.querySelectorAll('.cmp-pg img')].filter(i => i.complete && i.naturalWidth).length; }
+      const total = L().pages.length;
+      S.csort = true; rerenderCompose(); await w(300); const tiles = document.querySelectorAll('.cmp-sorter [data-tile]').length; S.csort = false;
+      const last = pdfIx().at(-1); movePage(last, 0); const first = L().pages[0];
+      S.cpage = 0; composeAct('cmp-rot-r'); composeAct('cmp-rot-r'); const rot = L().pages[0].rot;
+      for (const i of pdfIx().reverse()) { S.cpage = i; composeAct('cmp-delpage'); await w(80); }
+      const afterDelete = pdfIx().length;
+      for (let k = 0; k < 6 && pdfIx().length < 3; k++) { undo(); await w(50); }
+      return { thumbs, total, tiles, first: [first.kind, first.page], rot, afterDelete, restored: pdfIx().length };
+    })()`);
+    expect(r.thumbs === r.total, 'thumbnails: ' + JSON.stringify(r));
+    expect(r.tiles === r.total, 'page sorter tiles: ' + JSON.stringify(r));
+    expect(r.first.join() === 'pdf,3', 'move page: ' + JSON.stringify(r));
+    expect(r.rot === 180, 'rotate: ' + JSON.stringify(r));
+    expect(r.afterDelete === 0 && r.restored === 3, 'delete and undo: ' + JSON.stringify(r));
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
