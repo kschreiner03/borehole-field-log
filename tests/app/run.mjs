@@ -236,6 +236,29 @@ app.whenReady().then(async () => {
     expect(r.tab === 'edit' && r.rail === 'Borehole', 'picking a borehole opens it: ' + JSON.stringify(r));
   });
 
+  await check('report: imported PDF pages and images become pages and travel in the project file', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); await w(200);
+      const doc = await PDFLib.PDFDocument.create(), font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+      for (let i = 1; i <= 3; i++) doc.addPage([612, 792]).drawText('ARCGIS MAP PAGE ' + i, { x: 72, y: 700, size: 18, font });
+      const n0 = repLayout().pages.length;
+      const added = await importReportFiles([new File([await doc.save()], 'map.pdf', { type: 'application/pdf' })]);
+      const pdfPages = repLayout().pages.filter(p => p.kind === 'pdf').map(p => [p.page, p.file]);
+      const png = await (await fetch('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==')).blob();
+      const addedImg = await importReportFiles([new File([png], 'photo.png', { type: 'image/png' })]);
+      const imgPage = repLayout().pages.some(p => p.kind === 'free' && p.items.length === 1 && p.items[0].t === 'image' && /^data:image/.test(p.items[0].o?.img || ''));
+      const bad = await importReportFiles([new File([new Uint8Array([1, 2, 3])], 'bad.pdf', { type: 'application/pdf' })]);
+      const n1 = repLayout().pages.length;
+      let saved = null; window.saveTo = async (key, name, ext, data) => { saved = data; };
+      await saveProject(false);
+      return { added, pdfPages, addedImg, imgPage, bad, n0, n1, travels: !!saved?.photos?.some(ph => String(ph.bhId).startsWith('reportfile:')) };
+    })()`);
+    expect(r.added === 3 && r.pdfPages.map(p => p[0]).join() === '1,2,3' && new Set(r.pdfPages.map(p => p[1])).size === 1, 'PDF import: ' + JSON.stringify(r));
+    expect(r.addedImg === 1 && r.imgPage, 'image import: ' + JSON.stringify(r));
+    expect(r.bad === 0 && r.n1 === r.n0 + 4, 'a damaged PDF adds nothing: ' + JSON.stringify(r));
+    expect(r.travels, 'the imported file is not saved in the project file');
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
