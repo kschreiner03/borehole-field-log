@@ -1140,6 +1140,18 @@ table.sum td, table.sum th, .lgrid td, .lgrid th { border-color: var(--rule); pa
 
 /* report editor, map editor */
 .cmp-pg { border-radius: 0; padding: 5px 8px; }
+.cmp-canvas { display: grid; grid-template-columns: 24px minmax(0, 1fr); grid-template-rows: 24px auto; border: 1px solid var(--border); background: var(--raised); }
+.rl-c { background: var(--raised); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.rl-x, .rl-y { display: block; background: var(--raised); overflow: hidden; } .rl-x { width: 100%; height: 24px; border-bottom: 1px solid var(--border); } .rl-y { width: 24px; height: 100%; border-right: 1px solid var(--border); }
+.rl-x line, .rl-y line { stroke: #8f99a5; stroke-width: 1; } .rl-x text, .rl-y text { font: 11px var(--f-body); fill: var(--muted); }
+.rl-page { fill: var(--surface); } .rl-x .rl-cur, .rl-y .rl-cur { stroke: var(--accent); stroke-width: 1.5; }
+.cmp-scroll { position: relative; overflow: auto; height: max(420px, calc(100vh - var(--appbar-h, 68px) - var(--status-h) - 250px)); background: #e3e6ea; border: 0; }
+.cmp-sizer { position: relative; } .cmp-scroll .cmp-paper { left: 24px; top: 24px; }
+.cmp-guide { position: absolute; z-index: 4; background: #1e9bd7; } .cmp-guide.gx { top: 0; bottom: 0; width: calc(1px / var(--z, 1)); cursor: ew-resize; } .cmp-guide.gy { left: 0; right: 0; height: calc(1px / var(--z, 1)); cursor: ns-resize; }
+.cmp-guide::after { content: ""; position: absolute; inset: -4px; }
+.cmp-snaps { position: absolute; inset: 0; pointer-events: none; z-index: 5; } .snap-l { position: absolute; background: #e0368c; } .snap-l.sx { top: 0; bottom: 0; width: calc(1px / var(--z, 1)); } .snap-l.sy { left: 0; right: 0; height: calc(1px / var(--z, 1)); }
+.rl-x, .rl-y { cursor: crosshair; }
+.cmp-zoom { display: inline-flex; align-items: center; gap: 6px; } .cmp-zoom select { min-height: 28px; width: auto; }
 .cmp-pg { display: grid; grid-template-columns: 22px 52px minmax(0, 1fr); align-items: center; gap: 8px; }
 .cmp-pg .th, .tile .th { display: block; background: #fff; border: 1px solid var(--border); min-height: 40px; }
 .cmp-pg .th img, .tile .th img { display: block; width: 100%; height: auto; }
@@ -6446,6 +6458,7 @@ function planSVG(W, H, interactive) {
   if (interactive && S.mv && S.mvProj !== projKey(projList()[0])) S.mv = null;
   const free = RO.scale || (interactive && S.mv); if (interactive && S.mv) ({ cx, cy, sc } = S.mv);
   const X = e => W / 2 + (e - cx) * sc, Y = n => H / 2 - (n - cy) * sc;
+  RO.sc = sc;   // page px per metre as drawn, for a linked scale bar
   if (interactive) S._plan = S._drawn = { W, H, cx, cy, sc };
   const o = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Borehole location plan">`, `<rect width="${W}" height="${H}" style="fill:var(--panel-2)"/>`];
   o.push(basemapSVG(W, H, cx, cy, sc));
@@ -6654,6 +6667,7 @@ function flowPlanSVG(F, W, H) {
   const ex = pts.map(w => [w.e, w.n]);
   const x0 = Math.min(...ex.map(p => p[0])), x1 = Math.max(...ex.map(p => p[0])), y0 = Math.min(...ex.map(p => p[1])), y1 = Math.max(...ex.map(p => p[1]));
   const span = Math.max(x1 - x0, y1 - y0, 20) * 1.35, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, sc = Math.min((W - 2 * pad) / span, (H - 2 * pad) / span);
+  RO.sc = sc;   // page px per metre as drawn, for a linked scale bar
   const X = e => W / 2 + (e - cx) * sc, Y = n => H / 2 - (n - cy) * sc, uid2 = 'fc' + Math.round(W + H);
   const o = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Groundwater flow direction"><defs><clipPath id="${uid2}"><rect width="${W}" height="${H}"/></clipPath></defs><g clip-path="url(#${uid2})">`, `<rect width="${W}" height="${H}" style="fill:var(--panel-2)"/>`];
   if (site?.img && S.lyr.img !== false) o.push(`<image href="${site.img}" x="${X(site.e0)}" y="${Y(site.n1)}" width="${(site.e1 - site.e0) * sc}" height="${(site.n1 - site.n0) * sc}" preserveAspectRatio="none" opacity=".55"/>`);
@@ -6817,6 +6831,7 @@ function mapFrame(list, W, H, pad = 44) {
   const ex = pts.map(b => [b.easting, b.northing]); if (!ex.length) return null;
   const x0 = Math.min(...ex.map(p => p[0])), x1 = Math.max(...ex.map(p => p[0])), y0 = Math.min(...ex.map(p => p[1])), y1 = Math.max(...ex.map(p => p[1]));
   const span = Math.max(x1 - x0, y1 - y0, 20) * 1.3, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, sc = RO.scale ? PX_PER_M / RO.scale : Math.min((W - 2 * pad) / span, (H - 2 * pad) / span);
+  RO.sc = sc;
   const X = e => W / 2 + (e - cx) * sc, Y = n => H / 2 - (n - cy) * sc, id = 'mf' + Math.random().toString(36).slice(2, 7);
   const head = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"><defs><clipPath id="${id}"><rect width="${W}" height="${H}"/></clipPath></defs><g clip-path="url(#${id})"><rect width="${W}" height="${H}" style="fill:var(--panel-2)"/>`];
   head.push(basemapSVG(W, H, cx, cy, sc, .75));
@@ -6941,13 +6956,27 @@ function homeHTML() {
    the other kinds fill themselves from the data (logs, key, tables, photos). Layouts are kept per project and can be
    saved as templates for the company. ---------- */
 const BODY = { x: PG.M, y: PG.M + 80, w: PG.W - 2 * PG.M, h: PG.H - 2 * PG.M - 104 };   // free-page area under the title block (portrait)
-const pgDims = pg => pg?.orient === 'land' ? { W: PG.H, H: PG.W } : { W: PG.W, H: PG.H };
-const bodyOf = pg => { const d = pgDims(pg); return { x: PG.M, y: PG.M + 80, w: d.W - 2 * PG.M, h: d.H - 2 * PG.M - 104 }; };
+/* paper sizes in CSS px at 96 dpi (points × 96 / 72); margins in mm */
+const PAPERS = { letter: ['Letter (8.5 × 11 in)', 816, 1056], legal: ['Legal (8.5 × 14 in)', 816, 1344], tabloid: ['Tabloid (11 × 17 in)', 1056, 1632], a4: ['A4 (210 × 297 mm)', 793.7008, 1122.5197], a3: ['A3 (297 × 420 mm)', 1122.5197, 1587.4016] };
+const pgDims = pg => { const [, w, h] = PAPERS[pg?.paper] || PAPERS.letter, M = pg?.margin != null ? pg.margin * 96 / 25.4 : PG.M; return { ...(pg?.orient === 'land' ? { W: h, H: w } : { W: w, H: h }), M, tb: pg?.tb }; };
+function setPaper(pg, key) { const old = bodyOf(pg); pg.paper = PAPERS[key] ? key : 'letter'; fitToBody(pg, old); }
+/* after a paper or margin change: items that spanned the old body width span the new one, and every item stays inside the printable area */
+function fitToBody(pg, old) {
+  const b = bodyOf(pg);
+  for (const it of pg.items || []) {
+    if (old && Math.abs(it.w - old.w) <= 1) it.w = b.w;
+    if (old && Math.abs(it.h - old.h) <= 1) it.h = b.h;
+    it.w = Math.round(Math.min(it.w, b.w)); it.h = Math.round(Math.min(it.h, b.h));
+    it.x = Math.round(Math.max(b.x, Math.min(it.x, b.x + b.w - it.w))); it.y = Math.round(Math.max(b.y, Math.min(it.y, b.y + b.h - it.h)));
+  }
+}
+const bodyOf = pg => { const d = pgDims(pg); return { x: d.M, y: d.M + 80, w: d.W - 2 * d.M, h: d.H - 2 * d.M - 104 }; };
 const LB = bodyOf({ orient: 'land' });
 const xsecPage = () => newPage('free', { orient: 'land', title: 'CROSS-SECTION A–A′', items: [newItem('section', LB.x, LB.y, { w: LB.w, h: LB.h - 64 }), newItem('text', LB.x, LB.y + LB.h - 52, { w: LB.w, h: 52, o: { size: 9, text: 'Units between boreholes are an interpretation; conditions between boreholes are not known. The water table is interpolated between readings.' } })] });
 const RITEMS = {
   plan: ['Site plan', BODY.w, 560], section: ['Cross-section', BODY.w, 440], wt: ['Water-table map', BODY.w, 520], vap: ['Vapour map', BODY.w, 520],
   flow: ['Groundwater flow', BODY.w, 460], hydro: ['Hydrograph', BODY.w, 320], text: ['Text box', 360, 110], image: ['Picture', 360, 260],
+  scalebar: ['Scale bar', 300, 56], north: ['North arrow', 80, 96], legend: ['Legend', 220, 110], shape: ['Shape', 160, 100],
 };
 const RPAGES = { pdf: 'Imported page', free: 'Free page', xsec: 'Cross-section page (landscape)', key: 'Key to symbols', logs: 'Borehole logs', lab: 'Summary of tests', chem: 'Soil analytical results', gw: 'Groundwater observations', photos: 'Photographs' };
 const RTITLES = { key: 'KEY TO SYMBOLS AND TERMS', logs: 'BOREHOLE LOGS', lab: 'SUMMARY OF TESTS', chem: 'SOIL ANALYTICAL RESULTS', gw: 'GROUNDWATER OBSERVATIONS', photos: 'PHOTOGRAPHS' };
@@ -6960,9 +6989,12 @@ const ROPTS = {
   vap: [['scale', 'Scale', SCALES]],
   hydro: [['mode', 'Plot', [['elev', 'Water elevation'], ['depth', 'Depth to water']]]],
   text: [['size', 'Text size', [[9, 'Small'], [11, 'Normal'], [14, 'Large'], [18, 'Heading']]]],
+  north: [['mode', 'Points to', [['grid', 'Grid north (the map is drawn grid-north up)'], ['true', 'True north (turned by the meridian convergence)']]]],
+  shape: [['kind', 'Shape', [['rect', 'Rectangle'], ['ellipse', 'Ellipse'], ['line', 'Line'], ['arrow', 'Arrow']]], ['stroke', 'Colour', [['ink', 'Black'], ['accent', 'Blue-grey'], ['red', 'Red'], ['water', 'Water blue']]],
+    ['fill', 'Fill', [['none', 'None'], ['tint', 'Light tint']]], ['dir', 'Direction (lines)', [['down', 'Top-left to bottom-right'], ['up', 'Bottom-left to top-right'], ['h', 'Across'], ['v', 'Down']]], ['sw', 'Line width', [[1, 'Thin'], [1.8, 'Normal'], [3, 'Thick']]]],
 };
 const mm = px => Math.round(px * 25.4 / 96), pxOf = v => v * 96 / 25.4;
-const newItem = (t, x = BODY.x, y = BODY.y, extra = {}) => ({ id: uid('it'), t, x, y, w: RITEMS[t][1], h: RITEMS[t][2], cap: '', frame: t !== 'text', o: {}, ...extra });
+const newItem = (t, x = BODY.x, y = BODY.y, extra = {}) => ({ id: uid('it'), t, x, y, w: RITEMS[t][1], h: RITEMS[t][2], cap: '', frame: !['text', 'scalebar', 'north', 'shape'].includes(t), o: {}, ...extra });
 const newPage = (kind, extra = {}) => ({ id: uid('pg'), kind, title: kind === 'free' ? 'FIGURE' : RTITLES[kind], items: [], bh: [], ...extra });
 const fullBody = t => newItem(t, BODY.x, BODY.y, { w: BODY.w, h: BODY.h });
 /* ready-made layouts; the company's own templates are listed after these */
@@ -7063,9 +7095,13 @@ const curPage = () => { const L = repLayout(); S.cpage = Math.max(0, Math.min(S.
 function itemInner(it, w, h) {
   const o = it.o || {}, ro = {};
   for (const k of ['scale', 'grid', 've', 'tick', 'bw', 'iv']) if (o[k] !== '' && o[k] != null) ro[k] = +o[k];
-  const msg = t => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#f6f8fa"/><text x="12" y="24" style="font:12px Arial,sans-serif;fill:#5d6a75">${esc(t)}</text></svg>`;
+  const msg = t => (delete ro.sc, `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#f6f8fa"/><text x="12" y="24" style="font:12px Arial,sans-serif;fill:#5d6a75">${esc(t)}</text></svg>`);
   const fromEl = (fn, none) => { const el = document.createElement('div'); fn(el); return el.querySelector('svg')?.outerHTML || msg(none); };
-  return withRO(ro, () => {
+  if (it.t === 'scalebar') return scaleBarSVG(it, w, h);
+  if (it.t === 'north') return northSVG(it, w, h);
+  if (it.t === 'legend') return legendSVG(it, w, h);
+  if (it.t === 'shape') return shapeSVG(it, w, h);
+  const out = withRO(ro, () => {
     if (it.t === 'plan') { const r = planSVG(w, h, false); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'section') return fromEl(el => drawSection(el, {}, w, sectionList(), false, h), 'Log at least two boreholes to draw a cross-section.');
     if (it.t === 'wt') return wtMapSVG(w, h)?.svg || msg('Needs water levels in at least 3 wells with coordinates and ground elevations.');
@@ -7076,6 +7112,78 @@ function itemInner(it, w, h) {
     if (it.t === 'image') return o.img ? `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><image href="${o.img}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/></svg>` : msg('Choose a picture in the panel on the right.');
     return msg('');
   });
+  if (ro.sc) ITEM_SC.set(it.id, ro.sc); else ITEM_SC.delete(it.id);
+  return out;
+}
+/* a page's items in their stacking order; maps are drawn first so a scale bar can read the scale they were drawn at */
+const ITEM_SC = new Map(); let PAGE_CTX = null;
+function pageItemsSVG(pg) {
+  PAGE_CTX = pg;
+  try { const first = pg.items.map(it => it.t === 'scalebar' ? null : itemSVG(it)); return pg.items.map((it, i) => first[i] ?? itemSVG(it)).join(''); }
+  finally { PAGE_CTX = null; }
+}
+const niceFloor = v => { const p = 10 ** Math.floor(Math.log10(v)); return [5, 2.5, 2, 1].map(k => k * p).find(n => n <= v) || p; };
+/* a segmented scale bar for a map on the same page: lengths come from the map's drawn scale (page px per metre), so the
+   ratio is true when the PDF is printed at 100 % on its paper */
+function scaleBarSVG(it, w, h) {
+  const o = it.o || {}, map = PAGE_CTX?.items.find(x => x.id === o.link), sc = map && ITEM_SC.get(map.id);
+  const msg = t => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><text x="4" y="${h / 2 + 4}" style="font:11px Arial,sans-serif;fill:#b42318">${esc(t)}</text></svg>`;
+  if (!map) return msg('No map linked: choose the map this bar measures.');
+  if (!sc) return msg('The linked map has no scale yet.');
+  const ft = (o.units || 'auto') === 'ft' || ((o.units || 'auto') === 'auto' && S.units === 'ft'), u = ft ? .3048 : 1, ppu = sc * u, unit = ft ? 'ft' : 'm';
+  const seg = niceFloor((w - 36) / ppu / 4), segpx = seg * ppu, x0 = 14, y0 = h - 22, bh = 6, ratio = Math.round(PX_PER_M / sc);
+  const fitted = !(map.o?.scale > 0), r = [];
+  for (let i = 0; i < 4; i++) {
+    if (i === 0) { r.push(`<rect x="${x0}" y="${y0}" width="${segpx / 2}" height="${bh}" fill="#000" stroke="#000" stroke-width=".8"/><rect x="${x0 + segpx / 2}" y="${y0}" width="${segpx / 2}" height="${bh}" fill="#fff" stroke="#000" stroke-width=".8"/>`); continue; }
+    r.push(`<rect x="${x0 + i * segpx}" y="${y0}" width="${segpx}" height="${bh}" fill="${i % 2 ? '#000' : '#fff'}" stroke="#000" stroke-width=".8"/>`);
+  }
+  const lab = (x, t) => `<text x="${x}" y="${y0 + bh + 12}" text-anchor="middle" style="font:10px Arial,sans-serif;fill:#000">${t}</text>`;
+  const fmt = v => (+v.toFixed(2)).toLocaleString('en-CA');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><g data-ratio="${ratio}" data-ppm="${sc}" data-len="${4 * seg}" data-lenpx="${4 * segpx}">
+    <text x="${x0}" y="${y0 - 6}" style="font:bold 10.5px Arial,sans-serif;fill:#000">Scale 1:${ratio.toLocaleString('en-CA')}${fitted ? ' (as drawn)' : ''}</text>${r.join('')}
+    ${lab(x0, '0')}${lab(x0 + segpx, fmt(seg))}${lab(x0 + 2 * segpx, fmt(2 * seg))}${lab(x0 + 4 * segpx, `${fmt(4 * seg)} ${unit}`)}</g></svg>`;
+}
+/* north arrow: UTM maps are drawn grid-north up; true north is turned by the meridian convergence
+   γ = atan(tan(λ − λ0)·sin φ) at the boreholes' centroid (grid north lies γ east of true north when γ > 0) */
+function northSVG(it, w, h) {
+  const o = it.o || {}, rad = Math.PI / 180; let rot = 0, mode = o.mode === 'true' ? 'true' : 'grid', note = ['Grid north'];
+  if (mode === 'true') {
+    const crs = projList().find(b => b.crs)?.crs || '', ll = projList().map(latLonOf).filter(Boolean), tm = /3TM/i.test(crs) && /(\d{3})\s*°\s*W/i.exec(crs);
+    if (!ll.length) { mode = 'grid'; note = ['Grid north', 'no coordinates']; }
+    else if (/lat|long/i.test(crs)) note = ['True north'];   // a latitude/longitude map is drawn true-north up
+    else {
+      const lat = ll.reduce((t, p) => t + p.lat, 0) / ll.length, lon = ll.reduce((t, p) => t + p.lon, 0) / ll.length, lon0 = tm ? -tm[1] : crsZone() * 6 - 183;
+      const g = Math.atan(Math.tan((lon - lon0) * rad) * Math.sin(lat * rad)) / rad;
+      rot = -g; note = ['True north', `grid ${Math.abs(g).toFixed(2)}° ${g >= 0 ? 'E' : 'W'}`];
+    }
+  }
+  const nh = 4 + note.length * 11, cx = w / 2, s2 = Math.min(w, h - nh - 14) / 2 - 2, cy = s2 + 16;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><g data-north="1" data-mode="${mode}" data-rot="${+rot.toFixed(4)}" transform="rotate(${rot} ${cx} ${cy})">
+    <path d="M${cx} ${cy - s2}L${cx + s2 * .38} ${cy + s2 * .7}L${cx} ${cy + s2 * .38}Z" fill="#000"/><path d="M${cx} ${cy - s2}L${cx - s2 * .38} ${cy + s2 * .7}L${cx} ${cy + s2 * .38}Z" fill="#fff" stroke="#000" stroke-width="1"/>
+    <text x="${cx}" y="${cy - s2 - 2}" text-anchor="middle" style="font:bold 12px Arial,sans-serif;fill:#000">N</text></g>
+    ${note.map((t, i) => `<text data-note="1" x="${cx}" y="${h - 4 - (note.length - 1 - i) * 11}" text-anchor="middle" style="font:9px Arial,sans-serif;fill:#333">${esc(t)}</text>`).join('')}</svg>`;
+}
+/* legend: only what the project actually shows */
+function legendSVG(it, w, h) {
+  const pts = projList(), rows = [];
+  if (pts.some(b => !b.well?.installed)) rows.push(['Borehole', y => BH_SYMBOL(18, y, false)]);
+  if (pts.some(b => b.well?.installed)) rows.push(['Monitoring well', y => BH_SYMBOL(18, y, true)]);
+  if (PAGE_CTX?.items.some(x => x.t === 'plan') && S.secIds?.size >= 2) rows.push(['Cross-section line', y => `<line x1="8" x2="28" y1="${y}" y2="${y}" stroke="#245b78" stroke-width="1.6" stroke-dasharray="6 3"/>`]);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><text x="8" y="16" style="font:bold 11px Arial,sans-serif;fill:#000">Legend</text>${rows.map(([t, sym], i) => `${sym(34 + i * 20)}<text x="38" y="${38 + i * 20}" style="font:10.5px Arial,sans-serif;fill:#000">${esc(t)}</text>`).join('')}</svg>`;
+}
+const SHAPE_INK = { ink: '#1f2937', accent: '#245b78', red: '#b42318', water: '#2867a8' };
+function shapeSVG(it, w, h) {
+  const o = it.o || {}, c = SHAPE_INK[o.stroke] || SHAPE_INK.ink, sw = +o.sw || 1.8, fill = o.fill === 'tint' ? c : 'none', p = sw + 1, kind = o.kind || 'rect';
+  let body;
+  if (kind === 'rect') body = `<rect x="${p}" y="${p}" width="${w - 2 * p}" height="${h - 2 * p}" fill="${fill}" fill-opacity=".12" stroke="${c}" stroke-width="${sw}"/>`;
+  else if (kind === 'ellipse') body = `<ellipse cx="${w / 2}" cy="${h / 2}" rx="${w / 2 - p}" ry="${h / 2 - p}" fill="${fill}" fill-opacity=".12" stroke="${c}" stroke-width="${sw}"/>`;
+  else {
+    const [x1, y1, x2, y2] = o.dir === 'up' ? [p, h - p, w - p, p] : o.dir === 'h' ? [p, h / 2, w - p, h / 2] : o.dir === 'v' ? [w / 2, p, w / 2, h - p] : [p, p, w - p, h - p];
+    const a = Math.atan2(y2 - y1, x2 - x1), L = 8 + sw * 3, ex = x2 - Math.cos(a) * L * .7, ey = y2 - Math.sin(a) * L * .7;
+    body = `<line x1="${x1}" y1="${y1}" x2="${kind === 'arrow' ? ex : x2}" y2="${kind === 'arrow' ? ey : y2}" stroke="${c}" stroke-width="${sw}" stroke-linecap="round"/>`
+      + (kind === 'arrow' ? `<path data-head="1" d="M${x2} ${y2}L${x2 - Math.cos(a - .42) * L} ${y2 - Math.sin(a - .42) * L}L${x2 - Math.cos(a + .42) * L} ${y2 - Math.sin(a + .42) * L}Z" fill="${c}"/>` : '');
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`;
 }
 function itemSVG(it) {
   const cap = it.cap ? 18 : 0, ih = Math.max(20, it.h - cap), body = itemInner(it, it.w, ih).replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
@@ -7084,13 +7192,15 @@ function itemSVG(it) {
 /* every page of the finished report, in order: {svg} for a log page, {framed:{title, body}} for the others */
 async function layoutPages(L = repLayout()) {
   const out = [];
-  for (const pg of L.pages) {
-    if (pg.kind === 'free') out.push({ framed: { title: pg.title || '', body: pg.items.map(itemSVG).join(''), dims: pg.orient === 'land' ? pgDims(pg) : undefined } });
+  for (const [lp, pg] of L.pages.entries()) {
+    const start = out.length;
+    if (pg.kind === 'free') out.push({ framed: { title: pg.title || '', body: pageItemsSVG(pg), dims: pgDims(pg) } });
     else if (pg.kind === 'pdf') out.push({ pdf: { file: pg.file, page: pg.page, rot: pg.rot || 0, title: pg.title || 'Imported page' } });
     else if (pg.kind === 'key') out.push({ framed: { title: pg.title || RTITLES.key, body: keyPageBody() } });
     else if (pg.kind === 'logs') { const ids = pg.bh?.length ? new Set(pg.bh) : null; for (const b of projList().filter(b => !ids || ids.has(b.id))) { const n = pageCount(b); for (let i = 0; i < n; i++) out.push({ svg: pageSVG(b, i, n) }); } }
     else if (pg.kind === 'photos') { let ph = []; try { const ids = new Set(projList().map(b => b.id)); ph = (await Promise.all([...ids].map(id => photoStore.all(id)))).flat().sort((a, c) => (S.bh.get(a.bhId).name || '').localeCompare(S.bh.get(c.bhId).name || '', undefined, { numeric: true }) || (a.depth ?? 0) - (c.depth ?? 0)); } catch {} out.push(...photoPages(ph).map(p => ({ framed: p }))); }
     else out.push(...tablePagesFor(pg.kind).map(p => ({ framed: { ...p, title: pg.title || p.title } })));
+    for (let q = start; q < out.length; q++) out[q].lp = lp;
   }
   return out;
 }
@@ -7110,11 +7220,27 @@ async function buildReportBytes(L = repLayout()) {
   for (let i = 0; i < all.length; i++) {
     const p = all[i];
     if (p.pdf) { const pg = copies.get(p.pdf.file).shift(); pg.setRotation(degrees(((pg.getRotation().angle || 0) + (p.pdf.rot || 0)) % 360)); out.addPage(pg); continue; }
-    const land = !!p.framed?.dims, W = land ? 792 : 612, H = land ? 612 : 792;
+    const dm = p.framed?.dims, W = dm ? dm.W * 72 / 96 : 612, H = dm ? dm.H * 72 / 96 : 792;   // points
     const png = await svgToPng(p.svg || pageFrame(p.framed.title, i + 1, all.length, p.framed.body, p.framed.dims), PRINT_SCALE); if (!png) throw new Error('render');
     out.addPage([W, H]).drawImage(await out.embedPng(png.data), { x: 0, y: 0, width: W, height: H });
   }
+  addOutline(out, L, all);
   return out.save();
+}
+/* bookmarks: one per report page, opening at its first page */
+function addOutline(doc, L, all) {
+  const { PDFName, PDFHexString, PDFNumber } = PDFLib, ctx = doc.context, pages = doc.getPages(), items = [];
+  L.pages.forEach((pg, lp) => { const k = all.findIndex(o => o.lp === lp); if (k >= 0) items.push({ title: pageLabel(pg), page: pages[k] }); });
+  if (!items.length) return;
+  const root = ctx.nextRef(), refs = items.map(() => ctx.nextRef());
+  items.forEach((it, i) => {
+    const d = ctx.obj({}); d.set(PDFName.of('Title'), PDFHexString.fromText(it.title)); d.set(PDFName.of('Parent'), root);
+    d.set(PDFName.of('Dest'), ctx.obj([it.page.ref, PDFName.of('XYZ'), null, null, null]));
+    if (i) d.set(PDFName.of('Prev'), refs[i - 1]); if (i < items.length - 1) d.set(PDFName.of('Next'), refs[i + 1]);
+    ctx.assign(refs[i], d);
+  });
+  const o = ctx.obj({}); o.set(PDFName.of('Type'), PDFName.of('Outlines')); o.set(PDFName.of('First'), refs[0]); o.set(PDFName.of('Last'), refs.at(-1)); o.set(PDFName.of('Count'), PDFNumber.of(items.length));
+  ctx.assign(root, o); doc.catalog.set(PDFName.of('Outlines'), root); doc.catalog.set(PDFName.of('PageMode'), PDFName.of('UseOutlines'));
 }
 async function buildReport() {
   if (!window.PDFLib) { toast('The PDF library did not load.'); return; }
@@ -7147,11 +7273,17 @@ function composeHTML() {
     const d = pgDims(pg), bd = bodyOf(pg);
     stage = `<div class="cmp-tools"><label class="cmp-lbl" for="cmp-title">Page title</label><input id="cmp-title" value="${esc(pg.title || '')}" placeholder="FIGURE 1 – SITE PLAN">
       <span class="seg" role="group" aria-label="Page orientation"><button data-corient="port" aria-pressed="${pg.orient !== 'land'}">Portrait</button><button data-corient="land" aria-pressed="${pg.orient === 'land'}">Landscape</button></span>
+      <label class="cmp-zoom"><span class="note">Paper</span><select id="cmp-paper-size" aria-label="Paper size">${Object.entries(PAPERS).map(([k, [t]]) => `<option value="${k}" ${(pg.paper || 'letter') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label class="cmp-zoom"><span class="note">Margin</span><input id="cmp-margin" type="number" min="5" max="40" step="1" value="${Math.round(pgDims(pg).M / MMPX)}" style="width:64px"><span class="note">mm</span></label>
+      <label class="cmp-zoom"><span class="note">Zoom</span><select id="cmp-zoom" aria-label="Zoom">${[['fit', 'Fit page'], ['width', 'Fit width'], ...[0.5, 0.75, 1, 1.5, 2, 4].map(v => [v, Math.round(v * 100) + ' %'])].map(([v, t]) => `<option value="${v}" ${String(S.czoom) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <span class="cmp-add"><span class="note">Add</span>${Object.entries(RITEMS).map(([k, [t]]) => `<button class="btn" data-cadd="${k}">${esc(t)}</button>`).join('')}</span></div>
-      <div class="cmp-stage" id="cmp-stage"><div class="cmp-paper" id="cmp-paper" style="width:${d.W}px;height:${d.H}px">${pageFrame(pg.title || '', S.cpage + 1, n, pg.items.map(itemSVG).join(''), d)}
+      <div class="cmp-canvas"><span class="rl-c" aria-hidden="true"></span><svg class="rl-x" id="rl-x" aria-hidden="true"></svg><svg class="rl-y" id="rl-y" aria-hidden="true"></svg>
+      <div class="cmp-stage cmp-scroll" id="cmp-stage"><div class="cmp-sizer" id="cmp-sizer"><div class="cmp-paper" id="cmp-paper" style="width:${d.W}px;height:${d.H}px">${pageFrame(pg.title || '', S.cpage + 1, n, pageItemsSVG(pg), d)}
         <div class="cmp-body" style="left:${bd.x}px;top:${bd.y}px;width:${bd.w}px;height:${bd.h}px" aria-hidden="true"></div>
-        ${pg.items.map(it => `<div class="cmp-box" data-box="${it.id}" aria-selected="${it.id === S.csel}" title="${esc(RITEMS[it.t][0])}: drag to move, drag the corner to resize"><span class="cmp-tag">${esc(it.cap || RITEMS[it.t][0])}</span><span class="cmp-rz" data-rz aria-hidden="true"></span></div>`).join('')}
-      </div></div>
+        ${['x', 'y'].map(a => (pg.guides?.[a] || []).map((v, gi) => `<div class="cmp-guide g${a}" data-gaxis="${a}" data-gi="${gi}" style="${a === 'x' ? 'left' : 'top'}:${v}px" title="Guide at ${(v / MMPX).toFixed(1)} mm: drag to move, drag onto the ruler to remove"></div>`).join('')).join('')}
+        <div class="cmp-snaps" id="cmp-snaps" aria-hidden="true"></div>
+        ${pg.items.map(it => `<div class="cmp-box" data-box="${it.id}" aria-selected="${it.id === S.csel || !!S.cmulti?.has(it.id)}" title="${esc(RITEMS[it.t][0])}: drag to move, drag the corner to resize"><span class="cmp-tag">${esc(it.cap || RITEMS[it.t][0])}</span><span class="cmp-rz" data-rz aria-hidden="true"></span></div>`).join('')}
+      </div></div></div></div>
       <p class="note">Drag a diagram to move it; drag its bottom-right corner to resize. Arrow keys nudge the selected one (Shift for bigger steps); Delete removes it. The dashed line is the printable area.</p>`;
   } else {
     const opts = pg.kind === 'logs' ? `<div class="cmp-logs"><span class="note">Boreholes in this section (none ticked = all, in name order)</span><div class="sec-chips">${projList().map(b => `<label class="check"><input type="checkbox" data-clog="${esc(b.id)}" ${pg.bh?.includes(b.id) ? 'checked' : ''}> ${esc(b.name)}</label>`).join('')}</div><p class="note">Log layout, text size, columns and depth per page are set on <button class="btn link" data-tab="report">PDF preview</button>.</p></div>` : '';
@@ -7163,9 +7295,31 @@ function composeHTML() {
   if (S.csort) stage = `<div class="cmp-sorter" role="listbox" aria-multiselectable="true" aria-label="All pages">${L.pages.map((p, i) => `<button type="button" class="tile" role="option" data-tile="${i}" data-pgi="${i}" draggable="${!S.readOnly}" aria-selected="${sel.has(p.id)}"><span class="th" data-th="${p.id}" data-w="150"></span><span class="cap"><b>${i + 1}</b> ${esc(pageLabel(p))}</span></button>`).join('')}</div>`;
   return `<div class="cmp${S.csort ? ' sorting' : ''}">${side}<div class="cmp-main">${mode}${stage}</div>${pg.kind === 'free' && !S.csort ? `<aside class="cmp-props" id="cmp-props">${propsHTML()}</aside>` : ''}</div>`;
 }
+/* several selected: align to the selection's edges or centres, or space them evenly */
+const selItems = () => (curPage()?.items || []).filter(i => S.cmulti?.has(i.id));
+function alignItems(how) {
+  const its = selItems(); if (its.length < 2) return;
+  const l = Math.min(...its.map(i => i.x)), r = Math.max(...its.map(i => i.x + i.w)), t = Math.min(...its.map(i => i.y)), b = Math.max(...its.map(i => i.y + i.h));
+  for (const i of its) {
+    if (how === 'left') i.x = l; if (how === 'right') i.x = r - i.w; if (how === 'hcenter') i.x = Math.round((l + r) / 2 - i.w / 2);
+    if (how === 'top') i.y = t; if (how === 'bottom') i.y = b - i.h; if (how === 'vcenter') i.y = Math.round((t + b) / 2 - i.h / 2);
+  }
+  commit();
+}
+function distributeItems(axis) {
+  const its = selItems(); if (its.length < 3) return;
+  const [p, len] = axis === 'h' ? ['x', 'w'] : ['y', 'h'], s2 = [...its].sort((a, c) => a[p] - c[p]);
+  const span = s2.at(-1)[p] + s2.at(-1)[len] - s2[0][p], gap = (span - s2.reduce((t, i) => t + i[len], 0)) / (s2.length - 1);
+  let at = s2[0][p]; for (const i of s2) { i[p] = Math.round(at); at += i[len] + gap; }
+  commit();
+}
 function propsHTML() {
+  if (S.cmulti?.size >= 2) return `<h3>${S.cmulti.size} selected</h3><p class="note">Shift or Ctrl/⌘-click adds or removes an item. Dragging moves them together.</p>
+    <h4>Align</h4><div class="cmp-row">${[['left', 'Left'], ['hcenter', 'Centre'], ['right', 'Right'], ['top', 'Top'], ['vcenter', 'Middle'], ['bottom', 'Bottom']].map(([k, t]) => `<button class="btn" data-calign="${k}">${t}</button>`).join('')}</div>
+    <h4>Distribute</h4><div class="cmp-row"><button class="btn" data-cdist="h" ${S.cmulti.size < 3 ? 'disabled' : ''}>Horizontally</button><button class="btn" data-cdist="v" ${S.cmulti.size < 3 ? 'disabled' : ''}>Vertically</button></div>`;
   const pg = curPage(), it = pg?.items?.find(x => x.id === S.csel);
-  if (!it) return `<h3>Diagram</h3><p class="note">Click a diagram on the page to change its size, scale, intervals and caption.</p><p class="note">Use the Add buttons above the page to place a site plan, cross-section, map, hydrograph, text or a picture.</p>`;
+  const tbPanel = `<h3>Title block</h3><div class="cmp-geos">${[['fig', 'Figure no.'], ['rev', 'Revision'], ['drawn', 'Drawn by'], ['checked', 'Checked by'], ['date', 'Date']].map(([k, l]) => `<label class="cmp-geo"><span>${l}</span><input ${k === 'date' ? 'type="date"' : ''} data-tbf="${k}" value="${esc(pg?.tb?.[k] || '')}" ${S.readOnly ? 'readonly' : ''}></label>`).join('')}</div><p class="note">Company, project and number come from Settings and the project.</p>`;
+  if (!it) return tbPanel + `<h3>Diagram</h3><p class="note">Click a diagram on the page to change its size, scale, intervals and caption.</p><p class="note">Use the Add buttons above the page to place a site plan, cross-section, map, hydrograph, text or a picture.</p>`;
   const sel = (k, label, list) => `<label class="cmp-lbl" for="co-${k}">${label}</label><select id="co-${k}" data-copt="${k}">${list.map(([v, t]) => `<option value="${v}" ${String(it.o?.[k] ?? '') === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
   const geo = (k, label) => `<label class="cmp-geo"><span>${label}</span><input type="number" step="1" data-cgeo="${k}" value="${mm(it[k])}"><span class="note">mm</span></label>`;
   return `<h3>${esc(RITEMS[it.t][0])}</h3>
@@ -7174,15 +7328,47 @@ function propsHTML() {
     ${(ROPTS[it.t] || []).map(([k, l, list]) => sel(k, l, list)).join('')}
     ${it.t === 'section' ? `<p class="note">Follows the section line chosen on <button class="btn link" data-tab="site">Site plan &amp; sections</button>.</p>` : ''}
     ${it.t === 'plan' || it.t === 'wt' || it.t === 'vap' ? '<p class="note">A fixed scale is true on the printed Letter page; resize the frame to show more or less of the site.</p>' : ''}
+    ${it.t === 'scalebar' ? (() => { const maps = pg.items.filter(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); return `<label class="cmp-lbl" for="co-link">Measures</label><select id="co-link" data-copt="link"><option value="">Choose a map…</option>${maps.map(m => `<option value="${m.id}" ${it.o?.link === m.id ? 'selected' : ''}>${esc(m.cap || RITEMS[m.t][0])}</option>`).join('')}</select>
+      <label class="cmp-lbl" for="co-units">Units</label><select id="co-units" data-copt="units">${[['auto', 'As the project (m or ft)'], ['m', 'Metres'], ['ft', 'Feet']].map(([v, t]) => `<option value="${v}" ${(it.o?.units || 'auto') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <p class="note">The bar uses the scale the map is drawn at. It is true when the PDF is printed at 100 %.</p>`; })() : ''}
     ${it.t === 'text' ? `<label class="cmp-lbl" for="cp-text">Text</label><textarea id="cp-text" data-copt="text" rows="6">${esc(it.o?.text || '')}</textarea>` : ''}
     ${it.t === 'image' ? `<button class="btn" data-act="cmp-img">${it.o?.img ? 'Replace picture…' : 'Choose picture…'}</button>` : ''}
     <h4>Position and size</h4><div class="cmp-geos">${geo('x', 'Left')}${geo('y', 'Top')}${geo('w', 'Width')}${geo('h', 'Height')}</div>
     <div class="cmp-row"><button class="btn" data-cfit="page">Fill the page</button><button class="btn" data-cfit="top">Top half</button><button class="btn" data-cfit="bottom">Bottom half</button><button class="btn" data-cfit="width">Full width</button></div>
     <div class="cmp-row"><button class="btn" data-act="cmp-front">Bring to front</button><button class="btn" data-act="cmp-copy">Duplicate</button><button class="btn danger-text" data-act="cmp-del">Remove</button></div>`;
 }
+/* zoom: 'fit' (whole page), 'width', or a factor; the free-page canvas scrolls and its rulers follow */
+S.czoom = (v => v === 'fit' || v === 'width' ? v : +v || 'fit')(lsGet('bhlog.czoom') || 'fit');
+const CPAD = 24, MMPX = 96 / 25.4;
+function setZoom(v, at) {
+  const stage = $('#cmp-stage'), old = S.cz || 1, keep = stage && at ? { x: (stage.scrollLeft + at.x - CPAD) / old, y: (stage.scrollTop + at.y - CPAD) / old } : null;
+  S.czoom = v; lsSet('bhlog.czoom', String(v)); drawCompose();
+  if (keep && stage) { stage.scrollLeft = keep.x * S.cz + CPAD - at.x; stage.scrollTop = keep.y * S.cz + CPAD - at.y; drawRulers(); }
+}
+function drawRulers(cursor) {
+  const stage = $('#cmp-stage'), rx = $('#rl-x'), ry = $('#rl-y'); if (!stage || !rx || !ry) return;
+  const z = S.cz || 1, imp = S.units === 'ft', unit = imp ? 96 : MMPX * 10, sub = imp ? 8 : 10, step = unit * z;   // a labelled tick every cm (or inch)
+  const every = step < 28 ? (imp ? 2 : 5) : 1, ox = CPAD - stage.scrollLeft, oy = CPAD - stage.scrollTop, d = pgDims(curPage());
+  const ticks = (len, o, dim, vert) => { const out = []; for (let i = 0; i * unit <= dim + 1e-6; i++) { const p = o + i * step, lab = i % every === 0;
+      out.push(vert ? `<line x1="${lab ? 6 : 14}" x2="24" y1="${p}" y2="${p}" data-mm="${imp ? i * 25.4 : i * 10}"/>${lab ? `<text x="4" y="${p + 12}">${imp ? i : i * 10}</text>` : ''}` : `<line y1="${lab ? 6 : 14}" y2="24" x1="${p}" x2="${p}" data-mm="${imp ? i * 25.4 : i * 10}"/>${lab ? `<text x="${p + 3}" y="11">${imp ? i : i * 10}</text>` : ''}`);
+      if (step / sub >= 5) for (let k = 1; k < sub; k++) { const q = p + k * step / sub; if (i * unit + k * unit / sub <= dim) out.push(vert ? `<line x1="${k === sub / 2 ? 16 : 19}" x2="24" y1="${q}" y2="${q}"/>` : `<line y1="${k === sub / 2 ? 16 : 19}" y2="24" x1="${q}" x2="${q}"/>`); } }
+    return out.join(''); };
+  rx.innerHTML = `<rect x="${ox}" width="${d.W * z}" height="24" class="rl-page"/>${ticks(stage.clientWidth, ox, d.W, false)}${cursor ? `<line class="rl-cur" x1="${cursor.x}" x2="${cursor.x}" y1="0" y2="24"/>` : ''}`;
+  ry.innerHTML = `<rect y="${oy}" height="${d.H * z}" width="24" class="rl-page"/>${ticks(stage.clientHeight, oy, d.H, true)}${cursor ? `<line class="rl-cur" y1="${cursor.y}" y2="${cursor.y}" x1="0" x2="24"/>` : ''}`;
+}
+document.addEventListener('scroll', e => { if (e.target.id === 'cmp-stage') drawRulers(); }, true);
+document.addEventListener('pointermove', e => { const st = e.target.closest?.('#cmp-stage'); if (!st || !$('#rl-x')) return; const r = st.getBoundingClientRect(); drawRulers({ x: e.clientX - r.left, y: e.clientY - r.top }); });
+document.addEventListener('wheel', e => { const st = e.target.closest?.('#cmp-stage'); if (!st || !(e.ctrlKey || e.metaKey) || !$('#rl-x')) return; e.preventDefault(); const r = st.getBoundingClientRect(); setZoom(Math.max(0.25, Math.min(4, (S.cz || 1) * (e.deltaY < 0 ? 1.15 : 1 / 1.15))), { x: e.clientX - r.left, y: e.clientY - r.top }); }, { passive: false });
 function drawCompose() {
   const stage = $('#cmp-stage'), paper = $('#cmp-paper'); if (!stage || !paper) return;
-  const d = pgDims(curPage()), z = Math.min(1, (stage.clientWidth - 2) / d.W); paper.style.setProperty('--z', z); stage.style.height = d.H * z + 'px'; S.cz = z;
+  const d = pgDims(curPage()), sizer = $('#cmp-sizer');
+  if (sizer) {
+    const z = S.czoom === 'fit' ? Math.min((stage.clientWidth - 2 * CPAD) / d.W, (stage.clientHeight - 2 * CPAD) / d.H) : S.czoom === 'width' ? (stage.clientWidth - 2 * CPAD) / d.W : +S.czoom;
+    S.cz = Math.max(0.1, z); paper.style.setProperty('--z', S.cz); Object.assign(sizer.style, { width: d.W * S.cz + 2 * CPAD + 'px', height: d.H * S.cz + 2 * CPAD + 'px' });
+    for (const it of curPage().items || []) { const bx = paper.querySelector(`[data-box="${it.id}"]`); if (bx) Object.assign(bx.style, { left: it.x + 'px', top: it.y + 'px', width: it.w + 'px', height: it.h + 'px' }); }
+    drawRulers(); return;
+  }
+  const z = Math.min(1, (stage.clientWidth - 2) / d.W); paper.style.setProperty('--z', z); stage.style.height = d.H * z + 'px'; S.cz = z;
   for (const it of curPage().items || []) { const bx = paper.querySelector(`[data-box="${it.id}"]`); if (bx) Object.assign(bx.style, { left: it.x + 'px', top: it.y + 'px', width: it.w + 'px', height: it.h + 'px' }); }
   if (paper.dataset.auto) layoutPages({ pages: [curPage()] }).then(ps => { const p = ps[0]; if (p?.pdf) { pdfPageImage(p.pdf, Math.min(1600, stage.clientWidth * 2)).then(r => { const z = Math.min(1, (stage.clientWidth - 2) / r.w); Object.assign(paper.style, { width: r.w + 'px', height: r.h + 'px' }); paper.style.setProperty('--z', z); stage.style.height = r.h * z + 'px'; paper.innerHTML = `<img src="${r.url}" alt="${esc(curPage().title || 'Imported page')}" style="display:block;width:100%;height:100%">`; }).catch(() => { paper.innerHTML = '<p class="note" style="padding:20px">This imported page could not be shown. The file may be missing from this computer.</p>'; }); return; }
     paper.innerHTML = p ? (p.svg || pageFrame(p.framed.title, S.cpage + 1, repLayout().pages.length, p.framed.body)) : '<p class="note" style="padding:20px">Nothing to show yet for this page.</p>'; });
@@ -7196,6 +7382,8 @@ function fitItem(it, how) {
   if (how === 'top') Object.assign(it, { x: BODY.x, y: BODY.y, w: BODY.w, h: (BODY.h - g) / 2 });
   if (how === 'bottom') Object.assign(it, { x: BODY.x, y: BODY.y + (BODY.h + g) / 2, w: BODY.w, h: (BODY.h - g) / 2 });
 }
+/* new ids for a copied page's items; a scale bar keeps pointing at the copy of its map */
+function relink(pg) { const ids = new Map(); for (const x of pg.items || []) { const n = uid('it'); ids.set(x.id, n); x.id = n; } for (const x of pg.items || []) if (x.o?.link) x.o.link = ids.get(x.o.link) || null; return pg; }
 const clampIt = (it, pg = curPage()) => { const d = pgDims(pg); it.w = Math.max(40, Math.min(it.w, d.W)); it.h = Math.max(30, Math.min(it.h, d.H)); it.x = Math.max(0, Math.min(it.x, d.W - it.w)); it.y = Math.max(0, Math.min(it.y, d.H - it.h)); };
 function composeAct(act, el) {
   const L = repLayout(), pg = curPage(), it = pg.items?.find(x => x.id === S.csel), i = S.cpage;
@@ -7203,7 +7391,7 @@ function composeAct(act, el) {
   if (act === 'cmp-up' && i > 0) { [L.pages[i - 1], L.pages[i]] = [L.pages[i], L.pages[i - 1]]; S.cpage--; }
   if (act === 'cmp-down' && i < L.pages.length - 1) { [L.pages[i + 1], L.pages[i]] = [L.pages[i], L.pages[i + 1]]; S.cpage++; }
   const many = S.csort && S.csortSel?.size ? L.pages.filter(p => S.csortSel.has(p.id)) : null, targets = many || [pg];
-  const copyOf = p => { const c = structuredClone(p); c.id = uid('pg'); (c.items || []).forEach(x => x.id = uid('it')); return c; };
+  const copyOf = p => relink({ ...structuredClone(p), id: uid('pg') });
   if (act === 'cmp-dup') { if (many) { for (const p of many) L.pages.splice(L.pages.indexOf(p) + 1, 0, copyOf(p)); } else { L.pages.splice(i + 1, 0, copyOf(pg)); S.cpage++; } }
   if (act === 'cmp-delpage') { if (many) { if (many.length < L.pages.length) { L.pages = L.pages.filter(p => !S.csortSel.has(p.id)); S.csortSel = new Set(); } } else if (L.pages.length > 1) { L.pages.splice(i, 1); S.csel = null; } }
   if (act === 'cmp-rot-l' || act === 'cmp-rot-r') for (const p of targets) {
@@ -7217,7 +7405,7 @@ function composeAct(act, el) {
   if (act === 'cmp-import') { $('#rep-file').click(); return; }
   if (act === 'cmp-tpl-apply') {
     const v = $('#cmp-tpl').value; if (!v) { toast('Choose a template first.'); return; }
-    const pages = v.startsWith('p:') ? REPORT_PRESETS[v.slice(2)][1]() : structuredClone((S.co.reportTpls || []).find(t => t.id === v.slice(2))?.pages || []).map(p => ({ ...p, id: uid('pg'), items: (p.items || []).map(x => ({ ...x, id: uid('it') })) }));
+    const pages = v.startsWith('p:') ? REPORT_PRESETS[v.slice(2)][1]() : structuredClone((S.co.reportTpls || []).find(t => t.id === v.slice(2))?.pages || []).map(p => relink({ ...p, id: uid('pg') }));
     if (!pages.length) return;
     L.pages = pages; S.cpage = 0; S.csel = null; toast('Template applied. Every page can still be changed.');
   }
@@ -7252,25 +7440,75 @@ document.addEventListener('drop', e => {
 });
 document.addEventListener('dragend', () => { pgDrag = null; document.querySelectorAll('.drop-before, .drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after')); });
 /* moving and resizing on the page */
+/* guides and snapping: edges and centres of the box snap to guides, the printable area, the page centre and other items */
+function addGuide(pg, axis, v) { (pg.guides ||= { x: [], y: [] })[axis].push(Math.round(v * 10) / 10); }
+function snapBox(pg, box, ignore = [], resize = false) {
+  const tol = 6 / (S.cz || 1), d = pgDims(pg), bd = bodyOf(pg), out = { ...box, lines: [] };
+  const T = { x: [...(pg.guides?.x || []), bd.x, bd.x + bd.w, bd.x + bd.w / 2, d.W / 2], y: [...(pg.guides?.y || []), bd.y, bd.y + bd.h, bd.y + bd.h / 2, d.H / 2] };
+  for (const it of pg.items || []) if (!ignore.includes(it.id)) { T.x.push(it.x, it.x + it.w, it.x + it.w / 2); T.y.push(it.y, it.y + it.h, it.y + it.h / 2); }
+  for (const [a, pos, len] of [['x', 'x', 'w'], ['y', 'y', 'h']]) {
+    const edges = resize ? [[box[pos] + box[len], 1]] : [[box[pos], 0], [box[pos] + box[len] / 2, .5], [box[pos] + box[len], 1]];
+    let best = null; for (const [e, k] of edges) for (const t of T[a]) { const dlt = t - e; if (Math.abs(dlt) <= tol && (!best || Math.abs(dlt) < Math.abs(best.dlt))) best = { dlt, t, k }; }
+    if (best) { if (resize) out[len] = box[len] + best.dlt; else out[pos] = box[pos] + best.dlt; out.lines.push({ axis: a, v: best.t }); }
+  }
+  return out;
+}
+const showSnaps = lines => { const el = $('#cmp-snaps'); if (el) el.innerHTML = lines.map(l => `<div class="snap-l s${l.axis}" style="${l.axis === 'x' ? 'left' : 'top'}:${l.v}px"></div>`).join(''); };
+/* guides: drag one out of a ruler; drag it to move; drag it back onto the ruler to remove it */
+let gDrag = null;
+const pagePt = e => { const r = $('#cmp-paper').getBoundingClientRect(), z = S.cz || 1; return { x: (e.clientX - r.left) / z, y: (e.clientY - r.top) / z }; };
+document.addEventListener('pointerdown', e => {
+  if (S.readOnly || S.tab !== 'compose') return;
+  const rl = e.target.closest?.('#rl-x, #rl-y'), gd = e.target.closest?.('.cmp-guide'); if (!rl && !gd) return;
+  const pg = curPage(); pg.guides ||= { x: [], y: [] };
+  if (rl) { const axis = rl.id === 'rl-x' ? 'y' : 'x'; pg.guides[axis].push(-1000); gDrag = { axis, i: pg.guides[axis].length - 1 }; }
+  else gDrag = { axis: gd.dataset.gaxis, i: +gd.dataset.gi };
+  e.preventDefault();
+});
+document.addEventListener('pointermove', e => {
+  if (!gDrag) return; const pg = curPage(), p = pagePt(e), v = gDrag.axis === 'x' ? p.x : p.y;
+  pg.guides[gDrag.axis][gDrag.i] = Math.round(v * 10) / 10;
+  let el = document.querySelector(`.cmp-guide[data-gaxis="${gDrag.axis}"][data-gi="${gDrag.i}"]`);
+  if (!el) { $('#cmp-paper').insertAdjacentHTML('beforeend', `<div class="cmp-guide g${gDrag.axis}" data-gaxis="${gDrag.axis}" data-gi="${gDrag.i}"></div>`); el = document.querySelector(`.cmp-guide[data-gaxis="${gDrag.axis}"][data-gi="${gDrag.i}"]`); }
+  el.style[gDrag.axis === 'x' ? 'left' : 'top'] = v + 'px';
+});
+document.addEventListener('pointerup', e => {
+  if (!gDrag) return; const pg = curPage(), st = $('#cmp-stage').getBoundingClientRect(), g = gDrag; gDrag = null;
+  const off = g.axis === 'x' ? e.clientX < st.left : e.clientY < st.top;   // released over its ruler (or the corner): removed
+  if (off) pg.guides[g.axis].splice(g.i, 1);
+  commit();
+});
 let cDrag = null;
 document.addEventListener('pointerdown', e => {
   const box = e.target.closest('.cmp-box'); if (!box) return;
   const it = curPage().items.find(x => x.id === box.dataset.box); if (!it) return;
-  if (S.csel !== it.id) { S.csel = it.id; document.querySelectorAll('.cmp-box').forEach(b => b.setAttribute('aria-selected', String(b === box))); $('#cmp-props').innerHTML = propsHTML(); }
-  cDrag = { it, box, rz: !!e.target.closest('[data-rz]'), sx: e.clientX, sy: e.clientY, x: it.x, y: it.y, w: it.w, h: it.h, moved: false };
-  box.setPointerCapture?.(e.pointerId); e.preventDefault();
+  if (e.shiftKey || e.ctrlKey || e.metaKey) { const m = S.cmulti ||= new Set(); if (S.csel && !m.size) m.add(S.csel); m.has(it.id) ? m.delete(it.id) : m.add(it.id); S.csel = it.id; }
+  else if (!S.cmulti?.has(it.id)) { S.cmulti = new Set(); S.csel = it.id; }
+  document.querySelectorAll('.cmp-box').forEach(b => b.setAttribute('aria-selected', String(b.dataset.box === S.csel || !!S.cmulti?.has(b.dataset.box)))); $('#cmp-props').innerHTML = propsHTML();
+  const group = S.cmulti?.size > 1 && S.cmulti.has(it.id) ? selItems().filter(x => x !== it).map(x => ({ x, ox: x.x, oy: x.y })) : [];
+  cDrag = { it, box, group, rz: !!e.target.closest('[data-rz]') && !group.length, sx: e.clientX, sy: e.clientY, x: it.x, y: it.y, w: it.w, h: it.h, moved: false };
+  try { box.setPointerCapture(e.pointerId); } catch { /* pointer already released */ } e.preventDefault();
 });
 document.addEventListener('pointermove', e => {
   if (!cDrag) return;
-  const z = S.cz || 1, snap = v => Math.round(v / 6) * 6, dx = (e.clientX - cDrag.sx) / z, dy = (e.clientY - cDrag.sy) / z, it = cDrag.it;
+  const z = S.cz || 1, dx = (e.clientX - cDrag.sx) / z, dy = (e.clientY - cDrag.sy) / z, it = cDrag.it;
   if (Math.abs(dx) + Math.abs(dy) > 2) cDrag.moved = true;
-  if (cDrag.rz) { it.w = snap(cDrag.w + dx); it.h = snap(cDrag.h + dy); } else { it.x = snap(cDrag.x + dx); it.y = snap(cDrag.y + dy); }
-  clampIt(it);
+  const raw = cDrag.rz ? { x: cDrag.x, y: cDrag.y, w: cDrag.w + dx, h: cDrag.h + dy } : { x: cDrag.x + dx, y: cDrag.y + dy, w: cDrag.w, h: cDrag.h };
+  const sn = e.altKey ? { ...raw, lines: [] } : snapBox(curPage(), raw, [it.id, ...cDrag.group.map(g => g.x.id)], cDrag.rz);   // Alt/Option turns snapping off
+  Object.assign(it, { x: Math.round(sn.x), y: Math.round(sn.y), w: Math.round(sn.w), h: Math.round(sn.h) }); showSnaps(sn.lines);
+  if (cDrag.group.length) {   // the selection moves as one box, so its spacing holds at the page edge
+    const d = pgDims(curPage()), all = [{ ox: cDrag.x, oy: cDrag.y, x: it }, ...cDrag.group];
+    let mx = it.x - cDrag.x, my = it.y - cDrag.y;
+    mx = Math.max(mx, -Math.min(...all.map(g => g.ox))); mx = Math.min(mx, d.W - Math.max(...all.map(g => g.ox + g.x.w)));
+    my = Math.max(my, -Math.min(...all.map(g => g.oy))); my = Math.min(my, d.H - Math.max(...all.map(g => g.oy + g.x.h)));
+    it.x = Math.round(cDrag.x + mx); it.y = Math.round(cDrag.y + my);
+  } else clampIt(it);
+  for (const g of cDrag.group) { g.x.x = Math.round(g.ox + it.x - cDrag.x); g.x.y = Math.round(g.oy + it.y - cDrag.y); const b2 = document.querySelector(`[data-box="${g.x.id}"]`); if (b2) Object.assign(b2.style, { left: g.x.x + 'px', top: g.x.y + 'px' }); }
   Object.assign(cDrag.box.style, { left: it.x + 'px', top: it.y + 'px', width: it.w + 'px', height: it.h + 'px' });
   const g = document.querySelector(`#cmp-paper [data-g="${it.id}"]`);
   if (g) g.setAttribute('transform', cDrag.rz ? `translate(${it.x} ${it.y}) scale(${it.w / cDrag.w} ${it.h / cDrag.h}) translate(${-it.x} ${-it.y})` : `translate(${it.x - cDrag.x} ${it.y - cDrag.y})`);
 });
-document.addEventListener('pointerup', () => { if (!cDrag) return; const d = cDrag; cDrag = null; if (d.moved) commit(); });
+document.addEventListener('pointerup', () => { if (!cDrag) return; const d = cDrag; cDrag = null; showSnaps([]); if (d.moved) commit(); });
 document.addEventListener('keydown', e => {
   if (S.tab !== 'compose' || !S.csel || e.target.closest?.('input, textarea, select')) return;
   const it = curPage().items?.find(x => x.id === S.csel); if (!it) return;
@@ -7282,6 +7520,10 @@ document.addEventListener('dblclick', e => { const box = e.target.closest('.cmp-
 function composeChange(t) {
   const L = repLayout(), pg = curPage(), it = pg.items?.find(x => x.id === S.csel);
   if (t.id === 'cmp-title') pg.title = t.value;
+  else if (t.id === 'cmp-paper-size') { setPaper(pg, t.value); }
+  else if (t.id === 'cmp-margin') { const v = Math.max(5, Math.min(40, +t.value || 8)), old = bodyOf(pg); pg.margin = v; fitToBody(pg, old); }
+  else if (t.dataset?.tbf) { pg.tb = { ...(pg.tb || {}), [t.dataset.tbf]: t.value.trim() }; }
+  else if (t.id === 'cmp-zoom') { setZoom(t.value === 'fit' || t.value === 'width' ? t.value : +t.value); return; }
   else if (t.id === 'cmp-add-page') { if (!t.value) return; L.pages.splice(S.cpage + 1, 0, t.value === 'xsec' ? xsecPage() : newPage(t.value)); S.cpage++; S.csel = null; }
   else if (t.dataset.clog) { const s = new Set(pg.bh || []); t.checked ? s.add(t.dataset.clog) : s.delete(t.dataset.clog); pg.bh = projList().map(b => b.id).filter(id => s.has(id)); }
   else if (it && t.dataset.cprop) it[t.dataset.cprop] = t.type === 'checkbox' ? t.checked : t.value;
@@ -7580,14 +7822,16 @@ function openSiteImg() {
 
 /* ---------- report appendix: key sheet, plan, logs, lab, groundwater, photos as one PDF ---------- */
 function pageFrame(title, pi, pn, body, dims) {
-  const { W, H } = dims || PG, M = PG.M, X1 = W - M, o = [];
+  const { W, H } = dims || PG, M = dims?.M ?? PG.M, X1 = W - M, o = [], tb = dims?.tb || {};
   const T = (x, y, t, s = 8, w = '', c = 'var(--ink)', a = '') => `<text x="${x}" y="${y}" style="font:${w} ${s}px Arial,Helvetica,sans-serif;fill:${c}" ${a ? `text-anchor="${a}"` : ''}>${esc(t)}</text>`;
   o.push(`<rect x="${M}" y="${M}" width="${W - 2 * M}" height="62" fill="none" style="stroke:var(--ink)" stroke-width="1.2"/>`);
   if (S.co.logo) o.push(`<image href="${S.co.logo}" x="${M + 6}" y="${M + 6}" width="120" height="50" preserveAspectRatio="xMinYMid meet"/>`);
   o.push(`<line x1="${M + 132}" y1="${M}" x2="${M + 132}" y2="${M + 62}" style="stroke:var(--ink)" stroke-width=".6"/>`);
   const projs = [...new Set(projList().map(b => b.project).filter(Boolean))], nos = [...new Set(projList().map(b => b.projNo).filter(Boolean))];
   o.push(T(M + 142, M + 22, S.co.name || '', 12, 700), T(M + 142, M + 40, projs.length === 1 ? projs[0] : 'Borehole investigation', 9), T(M + 142, M + 54, nos.length === 1 ? `${S.co.projLabel || 'Project No.'}: ${nos[0]}` : '', 8.5));
-  o.push(T(X1 - 8, M + 26, title, 13, 700, 'var(--accent-2)', 'end'), T(X1 - 8, M + 46, `Page ${pi} of ${pn}`, 8.5, '', 'var(--ink)', 'end'));
+  const fields = [tb.fig && `Figure ${tb.fig}`, tb.rev !== undefined && tb.rev !== '' && `Rev ${tb.rev}`, tb.drawn && `Drawn ${tb.drawn}`, tb.checked && `Checked ${tb.checked}`, tb.date].filter(Boolean).join('   ');
+  o.push(T(X1 - 8, M + 24, title, 13, 700, 'var(--accent-2)', 'end'), T(X1 - 8, M + 40, `Page ${pi} of ${pn}`, 8.5, '', 'var(--ink)', 'end'));
+  if (fields) o.push(T(X1 - 8, M + 55, fields, 7.5, '', 'var(--ink)', 'end'));
   o.push(T(M, H - M + 2, [S.co.name, S.co.address].filter(Boolean).join(' · '), 7, '', 'var(--muted)'), T(X1, H - M + 2, today(), 7, '', 'var(--muted)', 'end'));
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#fff"/>${o.join('')}${body}</svg>`;
 }
@@ -8215,8 +8459,12 @@ document.addEventListener('click', e => {
     rerenderCompose(); return;
   }
   const cp = e.target.closest('[data-cpage]'); if (cp) { S.cpage = +cp.dataset.cpage; S.csel = null; rerenderCompose(); return; }
-  const ca = e.target.closest('[data-cadd]'); if (ca) { const pg = curPage(), k = ca.dataset.cadd, bd = bodyOf(pg), low = Math.max(bd.y, ...pg.items.map(x => x.y + x.h + 12)), it = newItem(k, bd.x, low + RITEMS[k][2] <= bd.y + bd.h ? low : bd.y); if (RITEMS[k][1] === BODY.w) it.w = bd.w; clampIt(it); pg.items.push(it); S.csel = it.id; commit(); return; }
+  const ca = e.target.closest('[data-cadd]'); if (ca) { const pg = curPage(), k = ca.dataset.cadd, bd = bodyOf(pg), low = Math.max(bd.y, ...pg.items.map(x => x.y + x.h + 12)), it = newItem(k, bd.x, low + RITEMS[k][2] <= bd.y + bd.h ? low : bd.y); if (RITEMS[k][1] === BODY.w) it.w = bd.w;
+    if (k === 'scalebar') { const m = pg.items.find(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); it.frame = false; if (m) { it.o = { link: m.id }; it.x = m.x + 10; it.y = m.y + m.h - it.h - 10; } }   // inside its map's bottom-left corner
+    clampIt(it); pg.items.push(it); S.csel = it.id; commit(); return; }
   const co = e.target.closest('[data-corient]'); if (co) { const pg = curPage(), was = bodyOf(pg); pg.orient = co.dataset.corient === 'land' ? 'land' : undefined; const now = bodyOf(pg); for (const it of pg.items) { if (Math.round(it.w) === Math.round(was.w)) it.w = now.w; clampIt(it, pg); } commit(); return; }
+  const al = e.target.closest('[data-calign]'); if (al) { alignItems(al.dataset.calign); return; }
+  const dsb = e.target.closest('[data-cdist]'); if (dsb) { distributeItems(dsb.dataset.cdist); return; }
   const cf = e.target.closest('[data-cfit]'); if (cf) { const it = curPage().items.find(x => x.id === S.csel); if (it) { fitItem(it, cf.dataset.cfit); commit(); } return; }
   const btd = e.target.closest('[data-btdel]'); if (btd) { S.co.bhTpls = (S.co.bhTpls || []).filter(x => x.id !== btd.dataset.btdel); store.saveCompany(); btd.closest('.nt-row')?.remove(); return; }
   const so = e.target.closest('[data-secopt]'); if (so) { const [k, v] = so.dataset.secopt.split(':'); setSec(k, v); return; }
