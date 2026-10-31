@@ -12,8 +12,9 @@
     "build": "npm run sync-legacy && electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac"
+    "test:app": "npm run sync-legacy && node scripts/test-app.mjs",
+    "dist:win": "npm test && npm run test:app && npm run build && electron-builder --win",
+    "dist:mac": "npm test && npm run test:app && npm run build && electron-builder --mac"
   },
   "build": {
     "appId": "ca.boreholefieldlog.app",
@@ -43,7 +44,8 @@
     },
     "mac": {
       "target": "dmg",
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true
     }
   },
   "dependencies": {
