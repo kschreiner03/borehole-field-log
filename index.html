@@ -1267,6 +1267,7 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
 <input type="file" id="map-file" hidden>
 <input type="file" id="img-file" accept=".tif,.tiff,.png,.jpg,.jpeg,.jgw,.pgw,.tfw,.wld,.jpw" multiple hidden>
 <input type="file" id="cmp-img-file" accept="image/*" hidden>
+<input type="file" id="rep-file" accept=".pdf,application/pdf,image/*" multiple hidden>
 <input type="file" id="restore-file" accept=".bhp,.bhlog,.json,application/json" hidden>
 <aside class="drawer edit" id="drawer" hidden aria-label="Edit"></aside>
 <div class="find" id="find" hidden></div>
@@ -4338,7 +4339,7 @@ async function saveProject(as, proj, quiet) {
   const list = proj == null ? projList() : sortedList().filter(b => projKey(b) === proj); if (!list.length) { if (!quiet) toast('There are no boreholes in this project to save.'); return; }
   const p = projKey(list[0]), no = list.find(b => b.projNo)?.projNo || '';
   const st = S.site?.projects ? (S.site.projects[p] || S.site.projects['*'] || null) : (S.site?.img ? S.site : null);
-  const data = { app: 'borehole-field-log', kind: 'project', version: 4, saved: new Date().toISOString(), project: p, projNo: no, company: S.co, site: st, boreholes: list, photos: await photosFor(new Set([...list.map(b => b.id), 'imagery:' + p])) };
+  const data = { app: 'borehole-field-log', kind: 'project', version: 4, saved: new Date().toISOString(), project: p, projNo: no, company: S.co, site: st, boreholes: list, photos: await photosFor(new Set([...list.map(b => b.id), 'imagery:' + p, REPORT_FILE_KEY(p)])) };
   await saveTo(p, `${fileSlug([no, p].filter(Boolean).join(' ')) || 'Borehole project'}.bhp`, 'bhp', data, as, quiet);
 }
 async function backup(as, quiet) {
@@ -6933,7 +6934,7 @@ const RITEMS = {
   plan: ['Site plan', BODY.w, 560], section: ['Cross-section', BODY.w, 440], wt: ['Water-table map', BODY.w, 520], vap: ['Vapour map', BODY.w, 520],
   flow: ['Groundwater flow', BODY.w, 460], hydro: ['Hydrograph', BODY.w, 320], text: ['Text box', 360, 110], image: ['Picture', 360, 260],
 };
-const RPAGES = { free: 'Free page', xsec: 'Cross-section page (landscape)', key: 'Key to symbols', logs: 'Borehole logs', lab: 'Summary of tests', chem: 'Soil analytical results', gw: 'Groundwater observations', photos: 'Photographs' };
+const RPAGES = { pdf: 'Imported page', free: 'Free page', xsec: 'Cross-section page (landscape)', key: 'Key to symbols', logs: 'Borehole logs', lab: 'Summary of tests', chem: 'Soil analytical results', gw: 'Groundwater observations', photos: 'Photographs' };
 const RTITLES = { key: 'KEY TO SYMBOLS AND TERMS', logs: 'BOREHOLE LOGS', lab: 'SUMMARY OF TESTS', chem: 'SOIL ANALYTICAL RESULTS', gw: 'GROUNDWATER OBSERVATIONS', photos: 'PHOTOGRAPHS' };
 const SCALES = [['', 'Fit to frame'], ...[100, 200, 250, 500, 750, 1000, 1500, 2000, 2500, 5000, 10000].map(n => [n, '1:' + n.toLocaleString('en-CA')])];
 const ROPTS = {
@@ -6960,6 +6961,45 @@ const REPORT_PRESETS = {
     newPage('logs'), newPage('chem'), newPage('gw'), newPage('photos')]],
   logs: ['Logs only', () => [newPage('logs')]],
 };
+/* outside documents in a report: an imported PDF is stored once (like a photo, so it travels in project files) and each of
+   its pages becomes a page of kind 'pdf' that points at it; a picture becomes a page holding one picture */
+const REPORT_FILE_KEY = p => 'reportfile:' + p;
+const RFILES = new Map();
+const dataUrlBytes = u => Uint8Array.from(atob(u.slice(u.indexOf(',') + 1)), c => c.charCodeAt(0));
+const bytesDataUrl = (bytes, type) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(new Blob([bytes], { type })); });
+async function reportFile(id) {
+  if (!RFILES.has(id)) RFILES.set(id, (async () => {
+    const rec = (await photoStore.all(REPORT_FILE_KEY(projKey(projList()[0])))).find(x => x.id === id) || (await photoStore.all()).find(x => x.id === id);
+    if (!rec) throw new Error('The imported file is missing.');
+    const bytes = dataUrlBytes(rec.data);
+    return { bytes, rec, doc: await pdfjsLib.getDocument({ data: bytes.slice() }).promise };
+  })().catch(e => { RFILES.delete(id); throw e; }));
+  return RFILES.get(id);
+}
+async function importReportFiles(files, at = S.cpage) {
+  if (S.readOnly) return 0;
+  const L = repLayout(), p = projKey(projList()[0]);
+  let pos = Math.min(L.pages.length, (at ?? L.pages.length - 1) + 1), added = 0;
+  for (const file of files) {
+    if (/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name)) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let n = 0;
+      try { const d = await pdfjsLib.getDocument({ data: bytes.slice() }).promise; n = d.numPages; d.destroy(); } catch { toast(`${file.name} could not be opened. It may be damaged or password-protected.`); continue; }
+      const id = uid('rf');
+      try { await photoStore.put({ id, bhId: REPORT_FILE_KEY(p), name: file.name, kind: 'pdf', pages: n, data: await bytesDataUrl(bytes, 'application/pdf'), takenAt: new Date().toISOString() }); }
+      catch { toast(`${file.name} could not be stored on this computer.`); continue; }
+      const title = file.name.replace(/\.pdf$/i, '');
+      L.pages.splice(pos, 0, ...Array.from({ length: n }, (_, i) => newPage('pdf', { title: n > 1 ? `${title} (${i + 1} of ${n})` : title, file: id, page: i + 1, rot: 0 })));
+      pos += n; added += n;
+    } else if (/^image\//.test(file.type)) {
+      const img = await readPicture(file); if (!img) { toast(`${file.name} could not be read.`); continue; }
+      L.pages.splice(pos++, 0, newPage('free', { title: file.name.replace(/\.[^.]+$/, '').toUpperCase(), items: [{ ...fullBody('image'), frame: false, o: { img } }] }));
+      added++;
+    } else toast(`${file.name} is not a PDF or a picture.`);
+  }
+  if (added) { S.cpage = pos - 1; S.csel = null; saveLayout(L); rerenderCompose(); toast(`Added ${added} page${added === 1 ? '' : 's'}.`); }
+  return added;
+}
 S.cpage = 0; S.csel = null;
 function repLayout() { const r = siteOf()?.report; if (r?.pages?.length) return r; return S._repDraft?.p === projKey(projList()[0]) ? S._repDraft.L : (S._repDraft = { p: projKey(projList()[0]), L: { pages: REPORT_PRESETS.standard[1]() } }).L; }
 function saveLayout(L) { if (S.readOnly) return; setSite({ ...(siteOf() || {}), report: L }); }
@@ -6992,6 +7032,7 @@ async function layoutPages(L = repLayout()) {
   const out = [];
   for (const pg of L.pages) {
     if (pg.kind === 'free') out.push({ framed: { title: pg.title || '', body: pg.items.map(itemSVG).join(''), dims: pg.orient === 'land' ? pgDims(pg) : undefined } });
+    else if (pg.kind === 'pdf') out.push({ pdf: { file: pg.file, page: pg.page, rot: pg.rot || 0 } });
     else if (pg.kind === 'key') out.push({ framed: { title: pg.title || RTITLES.key, body: keyPageBody() } });
     else if (pg.kind === 'logs') { const ids = pg.bh?.length ? new Set(pg.bh) : null; for (const b of projList().filter(b => !ids || ids.has(b.id))) { const n = pageCount(b); for (let i = 0; i < n; i++) out.push({ svg: pageSVG(b, i, n) }); } }
     else if (pg.kind === 'photos') { let ph = []; try { const ids = new Set(projList().map(b => b.id)); ph = (await photoStore.all()).filter(p => ids.has(p.bhId)).sort((a, c) => (S.bh.get(a.bhId).name || '').localeCompare(S.bh.get(c.bhId).name || '', undefined, { numeric: true }) || (a.depth ?? 0) - (c.depth ?? 0)); } catch {} out.push(...photoPages(ph).map(p => ({ framed: p }))); }
@@ -7024,7 +7065,8 @@ function composeHTML() {
     <div class="cmp-head"><h3>Report pages</h3><button class="btn primary" id="cmp-pdf" data-act="cmp-pdf">Create PDF</button></div>
     <ol class="cmp-pages">${pages}</ol>
     <div class="cmp-row"><button class="btn" data-act="cmp-up" ${S.cpage === 0 ? 'disabled' : ''} title="Move this page up">Up</button><button class="btn" data-act="cmp-down" ${S.cpage >= n - 1 ? 'disabled' : ''} title="Move this page down">Down</button><button class="btn" data-act="cmp-dup" title="Duplicate this page">Duplicate</button><button class="btn" data-act="cmp-delpage" ${n < 2 ? 'disabled' : ''} title="Remove this page">Remove</button></div>
-    <label class="cmp-lbl" for="cmp-add-page">Add a page</label><select id="cmp-add-page"><option value="">Choose a page type…</option>${Object.entries(RPAGES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>
+    <button class="btn" data-act="cmp-import" ${S.readOnly ? 'disabled' : ''} title="Insert the pages of a PDF (an ArcGIS map, a lab certificate) or a picture after the current page">Add PDF or image…</button>
+    <label class="cmp-lbl" for="cmp-add-page">Add a page</label><select id="cmp-add-page"><option value="">Choose a page type…</option>${Object.entries(RPAGES).filter(([k]) => k !== 'pdf').map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>
     <h3 style="margin-top:18px">Templates</h3>
     <p class="note" style="margin:0">Start from a layout, or save this one to reuse on any project.</p>
     <select id="cmp-tpl"><option value="">Choose a template…</option><optgroup label="Ready-made">${Object.entries(REPORT_PRESETS).map(([k, [t]]) => `<option value="p:${k}">${esc(t)}</option>`).join('')}</optgroup>${tpls.length ? `<optgroup label="Your company">${tpls.map(t => `<option value="t:${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>` : ''}</select>
@@ -7071,7 +7113,7 @@ function drawCompose() {
   const stage = $('#cmp-stage'), paper = $('#cmp-paper'); if (!stage || !paper) return;
   const d = pgDims(curPage()), z = Math.min(1, (stage.clientWidth - 2) / d.W); paper.style.setProperty('--z', z); stage.style.height = d.H * z + 'px'; S.cz = z;
   for (const it of curPage().items || []) { const bx = paper.querySelector(`[data-box="${it.id}"]`); if (bx) Object.assign(bx.style, { left: it.x + 'px', top: it.y + 'px', width: it.w + 'px', height: it.h + 'px' }); }
-  if (paper.dataset.auto) layoutPages({ pages: [curPage()] }).then(ps => { const p = ps[0]; paper.innerHTML = p ? (p.svg || pageFrame(p.framed.title, S.cpage + 1, repLayout().pages.length, p.framed.body)) : '<p class="note" style="padding:20px">Nothing to show yet for this page.</p>'; });
+  if (paper.dataset.auto) layoutPages({ pages: [curPage()] }).then(ps => { const p = ps[0]; paper.innerHTML = p?.pdf ? `<p class="note" style="padding:20px">Page ${p.pdf.page} of an imported PDF.</p>` : p ? (p.svg || pageFrame(p.framed.title, S.cpage + 1, repLayout().pages.length, p.framed.body)) : '<p class="note" style="padding:20px">Nothing to show yet for this page.</p>'; });
 }
 function rerenderCompose() { if (S.tab !== 'compose') return; const v = $('#view'); v.innerHTML = hiddenNote() + composeHTML(); drawCompose(); }
 function commit(L = repLayout()) { saveLayout(L); rerenderCompose(); }
@@ -7094,6 +7136,7 @@ function composeAct(act, el) {
   if (act === 'cmp-front' && it) { pg.items = [...pg.items.filter(x => x !== it), it]; }
   if (act === 'cmp-copy' && it) { const c = { ...structuredClone(it), id: uid('it'), x: it.x + 18, y: it.y + 18 }; clampIt(c); pg.items.push(c); S.csel = c.id; }
   if (act === 'cmp-img') { $('#cmp-img-file').click(); return; }
+  if (act === 'cmp-import') { $('#rep-file').click(); return; }
   if (act === 'cmp-tpl-apply') {
     const v = $('#cmp-tpl').value; if (!v) { toast('Choose a template first.'); return; }
     const pages = v.startsWith('p:') ? REPORT_PRESETS[v.slice(2)][1]() : structuredClone((S.co.reportTpls || []).find(t => t.id === v.slice(2))?.pages || []).map(p => ({ ...p, id: uid('pg'), items: (p.items || []).map(x => ({ ...x, id: uid('it') })) }));
@@ -7151,6 +7194,7 @@ function composeChange(t) {
   else if (it && t.dataset.cprop) it[t.dataset.cprop] = t.type === 'checkbox' ? t.checked : t.value;
   else if (it && t.dataset.copt) it.o = { ...(it.o || {}), [t.dataset.copt]: t.value };
   else if (it && t.dataset.cgeo) { it[t.dataset.cgeo] = pxOf(+t.value || 0); clampIt(it); }
+  else if (t.id === 'rep-file' && t.files.length) { importReportFiles([...t.files]); t.value = ''; return; }
   else if (t.id === 'cmp-img-file' && it && t.files[0]) { readPicture(t.files[0]).then(d => { if (d) { it.o = { ...(it.o || {}), img: d }; commit(L); } }); t.value = ''; return; }
   else return;
   commit(L);
