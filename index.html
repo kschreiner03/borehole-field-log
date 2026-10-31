@@ -7087,21 +7087,32 @@ async function layoutPages(L = repLayout()) {
   }
   return out;
 }
+/* the whole package as one PDF: imported pages are copied in as real PDF pages (text and drawings intact, with the
+   user's rotation added to their own); the app's pages go in as 300 dpi images at their paper size */
+async function buildReportBytes(L = repLayout()) {
+  const { PDFDocument, degrees } = PDFLib, out = await PDFDocument.create(), src = new Map();
+  if (basemapKey() !== 'none') { await layoutPages(L); await basemapIdle(); }   // first pass asks for the map tiles the pages need
+  const all = await layoutPages(L); if (!all.length) throw new Error('empty');
+  for (let i = 0; i < all.length; i++) {
+    const p = all[i];
+    if (p.pdf) {
+      if (!src.has(p.pdf.file)) src.set(p.pdf.file, reportFile(p.pdf.file).then(f => PDFDocument.load(f.bytes, { ignoreEncryption: true })));
+      const [pg] = await out.copyPages(await src.get(p.pdf.file), [p.pdf.page - 1]);
+      pg.setRotation(degrees(((pg.getRotation().angle || 0) + (p.pdf.rot || 0)) % 360)); out.addPage(pg); continue;
+    }
+    const land = !!p.framed?.dims, W = land ? 792 : 612, H = land ? 612 : 792;
+    const png = await svgToPng(p.svg || pageFrame(p.framed.title, i + 1, all.length, p.framed.body, p.framed.dims), PRINT_SCALE); if (!png) throw new Error('render');
+    out.addPage([W, H]).drawImage(await out.embedPng(png.data), { x: 0, y: 0, width: W, height: H });
+  }
+  return out.save();
+}
 async function buildReport() {
-  if (!window.jspdf?.jsPDF) { toast('The PDF library did not load.'); return; }
+  if (!window.PDFLib) { toast('The PDF library did not load.'); return; }
   const btn = $('#cmp-pdf'); if (btn) { btn.disabled = true; btn.textContent = 'Building…'; }
   try {
-    if (basemapKey() !== 'none') { await layoutPages(); await basemapIdle(); }   // first pass asks for the map tiles the pages need
-    const all = await layoutPages(); if (!all.length) { toast('The report has no pages.'); return; }
-    const land = p => !!p.framed?.dims, doc = new jspdf.jsPDF({ unit: 'pt', format: 'letter', orientation: land(all[0]) ? 'landscape' : 'portrait', compress: true });
-    for (let i = 0; i < all.length; i++) {
-      const png = await svgToPng(all[i].svg || pageFrame(all[i].framed.title, i + 1, all.length, all[i].framed.body, all[i].framed.dims), PRINT_SCALE); if (!png) throw new Error('render');
-      if (i) doc.addPage('letter', land(all[i]) ? 'landscape' : 'portrait');
-      doc.addImage(png.data, 'PNG', 0, 0, land(all[i]) ? 792 : 612, land(all[i]) ? 612 : 792, undefined, 'FAST');
-    }
-    const no = [...new Set(projList().map(b => b.projNo).filter(Boolean))];
-    await saveFile(`${(no.length === 1 ? no[0] : 'borehole') + '-report-' + today()}.pdf`, doc.output('blob'));
-  } catch (e) { console.error(e); toast('The report could not be created.'); }
+    const bytes = await buildReportBytes(), no = [...new Set(projList().map(b => b.projNo).filter(Boolean))];
+    await saveFile(`${(no.length === 1 ? no[0] : 'borehole') + '-report-' + today()}.pdf`, new Blob([bytes], { type: 'application/pdf' }));
+  } catch (e) { console.error(e); toast(e.message === 'empty' ? 'The report has no pages.' : 'The report could not be created.'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Create PDF'; } }
 }
 
@@ -7135,7 +7146,7 @@ function composeHTML() {
   } else {
     const opts = pg.kind === 'logs' ? `<div class="cmp-logs"><span class="note">Boreholes in this section (none ticked = all, in name order)</span><div class="sec-chips">${projList().map(b => `<label class="check"><input type="checkbox" data-clog="${esc(b.id)}" ${pg.bh?.includes(b.id) ? 'checked' : ''}> ${esc(b.name)}</label>`).join('')}</div><p class="note">Log layout, text size, columns and depth per page are set on <button class="btn link" data-tab="report">PDF preview</button>.</p></div>` : '';
     stage = `<div class="cmp-tools"><b>${esc(RPAGES[pg.kind])}</b>${pg.kind === 'logs' || pg.kind === 'photos' ? '' : `<label class="cmp-lbl" for="cmp-title">Page title</label><input id="cmp-title" value="${esc(pg.title || '')}">`}</div>${opts}
-      <div class="cmp-stage" id="cmp-stage"><div class="cmp-paper" id="cmp-paper" data-auto="${pg.kind}"></div></div><p class="note">These pages fill themselves from the project's data; long tables continue onto more pages. Preview of the first page.</p>`;
+      <div class="cmp-stage" id="cmp-stage"><div class="cmp-paper" id="cmp-paper" data-auto="${pg.kind}"></div></div>${pg.kind === 'pdf' ? '<p class="note">An imported page goes into the PDF as it is: sharp, with its text still searchable. Turn it with Rotate left or right.</p>' : `<p class="note">These pages fill themselves from the project's data; long tables continue onto more pages. Preview of the first page.</p>`}`;
   }
   const sel = S.csortSel || new Set();
   const mode = `<div class="cmp-mode"><span class="seg" role="group" aria-label="View"><button data-csort="0" aria-pressed="${!S.csort}">Edit page</button><button data-csort="1" aria-pressed="${!!S.csort}">All pages</button></span>${S.csort ? `<span class="note">${sel.size ? `${sel.size} selected` : 'Click to select; Shift or Ctrl/⌘ for several; drag to reorder; double-click to open'}</span><span class="sp"></span><button class="btn" data-act="cmp-rot-l" ${sel.size ? '' : 'disabled'}>Rotate left</button><button class="btn" data-act="cmp-rot-r" ${sel.size ? '' : 'disabled'}>Rotate right</button><button class="btn" data-act="cmp-dup" ${sel.size ? '' : 'disabled'}>Duplicate</button><button class="btn danger" data-act="cmp-delpage" ${sel.size && sel.size < n ? '' : 'disabled'}>Delete</button>` : ''}</div>`;
