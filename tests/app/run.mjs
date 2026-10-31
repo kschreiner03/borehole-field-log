@@ -397,6 +397,45 @@ app.whenReady().then(async () => {
     expect(r.panel, 'panel does not offer align for the selection');
   });
 
+  await check('report: scale bar matches the map real scale, fixed or fit to frame', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); S.cpage = 1; S.csort = false; rerenderCompose(); await w(200);
+      const pg = curPage(), plan = pg.items.find(i => i.t === 'plan'); plan.o = { ...plan.o, scale: 500 };
+      const sb = newItem('scalebar', 60, 900, { o: { link: plan.id } }); pg.items.push(sb);
+      const read = svg => { const d = new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + svg + '</svg>', 'image/svg+xml'), g = d.querySelector('[data-g="' + sb.id + '"] [data-ratio]'); return g ? ['ratio', 'ppm', 'len', 'lenpx'].map(k => +g.getAttribute('data-' + k)) : null; };
+      const fixed = read(pageItemsSVG(pg));
+      plan.o.scale = ''; const ro = {}; withRO(ro, () => planSVG(plan.w, plan.h - (plan.cap ? 18 : 0), false));
+      const fit = read(pageItemsSVG(pg));
+      plan.w = Math.round(plan.w * .6); const ro2 = {}; withRO(ro2, () => planSVG(plan.w, plan.h - (plan.cap ? 18 : 0), false)); const fit2 = read(pageItemsSVG(pg));
+      pg.items = pg.items.filter(i => i !== plan); const none = pageItemsSVG(pg);
+      return { fixed, fit, fitSc: ro.sc, fit2, fit2Sc: ro2.sc, PPM: PX_PER_M, noMap: /No map linked/.test(none) };
+    })()`);
+    const [ratio, ppm, len, lenpx] = r.fixed || [];
+    expect(ratio === 500 && Math.abs(ppm - r.PPM / 500) < 1e-6 && Math.abs(lenpx - len * r.PPM / 500) < 0.01, 'fixed 1:500: ' + JSON.stringify(r));
+    expect(r.fit && r.fit[0] === Math.round(r.PPM / r.fitSc) && Math.abs(r.fit[3] - r.fit[2] * r.fitSc) < 0.01, 'fit to frame: ' + JSON.stringify(r));
+    expect(r.fit2 && r.fit2[0] === Math.round(r.PPM / r.fit2Sc) && r.fit2[0] !== r.fit[0], 'resized frame changes the ratio: ' + JSON.stringify(r));
+    expect(r.noMap, 'a scale bar without its map still drew a bar');
+  });
+
+  await check('report: north arrow (grid or true north with convergence), legend and shapes', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); S.cpage = 1; S.csort = false; rerenderCompose(); await w(200);
+      const pg = curPage(), parse = svg => new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + svg + '</svg>', 'image/svg+xml');
+      const tn = newItem('north', 700, 200, { o: { mode: 'true' } }), gn = newItem('north', 600, 200, { o: { mode: 'grid' } }), lg = newItem('legend', 100, 800), ar = newItem('shape', 300, 800, { o: { kind: 'arrow' } });
+      pg.items.push(tn, gn, lg, ar); const d = parse(pageItemsSVG(pg));
+      const rot = id => +d.querySelector('[data-g="' + id + '"] [data-north]')?.getAttribute('data-rot');
+      // expected convergence at the boreholes' centroid, from first principles
+      const ll = projList().map(latLonOf).filter(Boolean), lat = ll.reduce((t, p) => t + p.lat, 0) / ll.length, lon = ll.reduce((t, p) => t + p.lon, 0) / ll.length, z = crsZone(), rad = Math.PI / 180;
+      const gamma = Math.atan(Math.tan((lon - (z * 6 - 183)) * rad) * Math.sin(lat * rad)) / rad;
+      const legendText = d.querySelector('[data-g="' + lg.id + '"]')?.textContent || '';
+      return { trueRot: rot(tn.id), gridRot: rot(gn.id), gamma, legendText, arrowHead: !!d.querySelector('[data-g="' + ar.id + '"] [data-head]') };
+    })()`);
+    expect(Math.abs(r.trueRot + r.gamma) < 0.05 && Math.abs(r.gamma) > 0.1, 'true north rotation: ' + JSON.stringify(r));
+    expect(r.gridRot === 0, 'grid north must be upright: ' + JSON.stringify(r));
+    expect(/Borehole/.test(r.legendText) && /Monitoring well/.test(r.legendText), 'legend: ' + JSON.stringify(r));
+    expect(r.arrowHead, 'arrow shape has no head');
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
