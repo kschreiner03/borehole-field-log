@@ -6955,8 +6955,11 @@ function homeHTML() {
    the other kinds fill themselves from the data (logs, key, tables, photos). Layouts are kept per project and can be
    saved as templates for the company. ---------- */
 const BODY = { x: PG.M, y: PG.M + 80, w: PG.W - 2 * PG.M, h: PG.H - 2 * PG.M - 104 };   // free-page area under the title block (portrait)
-const pgDims = pg => pg?.orient === 'land' ? { W: PG.H, H: PG.W } : { W: PG.W, H: PG.H };
-const bodyOf = pg => { const d = pgDims(pg); return { x: PG.M, y: PG.M + 80, w: d.W - 2 * PG.M, h: d.H - 2 * PG.M - 104 }; };
+/* paper sizes in CSS px at 96 dpi (points × 96 / 72); margins in mm */
+const PAPERS = { letter: ['Letter (8.5 × 11 in)', 816, 1056], legal: ['Legal (8.5 × 14 in)', 816, 1344], tabloid: ['Tabloid (11 × 17 in)', 1056, 1632], a4: ['A4 (210 × 297 mm)', 793.7008, 1122.5197], a3: ['A3 (297 × 420 mm)', 1122.5197, 1587.4016] };
+const pgDims = pg => { const [, w, h] = PAPERS[pg?.paper] || PAPERS.letter, M = pg?.margin != null ? pg.margin * 96 / 25.4 : PG.M; return { ...(pg?.orient === 'land' ? { W: h, H: w } : { W: w, H: h }), M, tb: pg?.tb }; };
+function setPaper(pg, key) { pg.paper = PAPERS[key] ? key : 'letter'; for (const it of pg.items || []) clampIt(it, pg); }
+const bodyOf = pg => { const d = pgDims(pg); return { x: d.M, y: d.M + 80, w: d.W - 2 * d.M, h: d.H - 2 * d.M - 104 }; };
 const LB = bodyOf({ orient: 'land' });
 const xsecPage = () => newPage('free', { orient: 'land', title: 'CROSS-SECTION A–A′', items: [newItem('section', LB.x, LB.y, { w: LB.w, h: LB.h - 64 }), newItem('text', LB.x, LB.y + LB.h - 52, { w: LB.w, h: 52, o: { size: 9, text: 'Units between boreholes are an interpretation; conditions between boreholes are not known. The water table is interpolated between readings.' } })] });
 const RITEMS = {
@@ -7174,13 +7177,15 @@ function itemSVG(it) {
 /* every page of the finished report, in order: {svg} for a log page, {framed:{title, body}} for the others */
 async function layoutPages(L = repLayout()) {
   const out = [];
-  for (const pg of L.pages) {
-    if (pg.kind === 'free') out.push({ framed: { title: pg.title || '', body: pageItemsSVG(pg), dims: pg.orient === 'land' ? pgDims(pg) : undefined } });
+  for (const [lp, pg] of L.pages.entries()) {
+    const start = out.length;
+    if (pg.kind === 'free') out.push({ framed: { title: pg.title || '', body: pageItemsSVG(pg), dims: pgDims(pg) } });
     else if (pg.kind === 'pdf') out.push({ pdf: { file: pg.file, page: pg.page, rot: pg.rot || 0, title: pg.title || 'Imported page' } });
     else if (pg.kind === 'key') out.push({ framed: { title: pg.title || RTITLES.key, body: keyPageBody() } });
     else if (pg.kind === 'logs') { const ids = pg.bh?.length ? new Set(pg.bh) : null; for (const b of projList().filter(b => !ids || ids.has(b.id))) { const n = pageCount(b); for (let i = 0; i < n; i++) out.push({ svg: pageSVG(b, i, n) }); } }
     else if (pg.kind === 'photos') { let ph = []; try { const ids = new Set(projList().map(b => b.id)); ph = (await Promise.all([...ids].map(id => photoStore.all(id)))).flat().sort((a, c) => (S.bh.get(a.bhId).name || '').localeCompare(S.bh.get(c.bhId).name || '', undefined, { numeric: true }) || (a.depth ?? 0) - (c.depth ?? 0)); } catch {} out.push(...photoPages(ph).map(p => ({ framed: p }))); }
     else out.push(...tablePagesFor(pg.kind).map(p => ({ framed: { ...p, title: pg.title || p.title } })));
+    for (let q = start; q < out.length; q++) out[q].lp = lp;
   }
   return out;
 }
@@ -7200,11 +7205,27 @@ async function buildReportBytes(L = repLayout()) {
   for (let i = 0; i < all.length; i++) {
     const p = all[i];
     if (p.pdf) { const pg = copies.get(p.pdf.file).shift(); pg.setRotation(degrees(((pg.getRotation().angle || 0) + (p.pdf.rot || 0)) % 360)); out.addPage(pg); continue; }
-    const land = !!p.framed?.dims, W = land ? 792 : 612, H = land ? 612 : 792;
+    const dm = p.framed?.dims, W = dm ? dm.W * 72 / 96 : 612, H = dm ? dm.H * 72 / 96 : 792;   // points
     const png = await svgToPng(p.svg || pageFrame(p.framed.title, i + 1, all.length, p.framed.body, p.framed.dims), PRINT_SCALE); if (!png) throw new Error('render');
     out.addPage([W, H]).drawImage(await out.embedPng(png.data), { x: 0, y: 0, width: W, height: H });
   }
+  addOutline(out, L, all);
   return out.save();
+}
+/* bookmarks: one per report page, opening at its first page */
+function addOutline(doc, L, all) {
+  const { PDFName, PDFHexString, PDFNumber } = PDFLib, ctx = doc.context, pages = doc.getPages(), items = [];
+  L.pages.forEach((pg, lp) => { const k = all.findIndex(o => o.lp === lp); if (k >= 0) items.push({ title: pageLabel(pg), page: pages[k] }); });
+  if (!items.length) return;
+  const root = ctx.nextRef(), refs = items.map(() => ctx.nextRef());
+  items.forEach((it, i) => {
+    const d = ctx.obj({}); d.set(PDFName.of('Title'), PDFHexString.fromText(it.title)); d.set(PDFName.of('Parent'), root);
+    d.set(PDFName.of('Dest'), ctx.obj([it.page.ref, PDFName.of('XYZ'), null, null, null]));
+    if (i) d.set(PDFName.of('Prev'), refs[i - 1]); if (i < items.length - 1) d.set(PDFName.of('Next'), refs[i + 1]);
+    ctx.assign(refs[i], d);
+  });
+  const o = ctx.obj({}); o.set(PDFName.of('Type'), PDFName.of('Outlines')); o.set(PDFName.of('First'), refs[0]); o.set(PDFName.of('Last'), refs.at(-1)); o.set(PDFName.of('Count'), PDFNumber.of(items.length));
+  ctx.assign(root, o); doc.catalog.set(PDFName.of('Outlines'), root); doc.catalog.set(PDFName.of('PageMode'), PDFName.of('UseOutlines'));
 }
 async function buildReport() {
   if (!window.PDFLib) { toast('The PDF library did not load.'); return; }
@@ -7237,6 +7258,8 @@ function composeHTML() {
     const d = pgDims(pg), bd = bodyOf(pg);
     stage = `<div class="cmp-tools"><label class="cmp-lbl" for="cmp-title">Page title</label><input id="cmp-title" value="${esc(pg.title || '')}" placeholder="FIGURE 1 – SITE PLAN">
       <span class="seg" role="group" aria-label="Page orientation"><button data-corient="port" aria-pressed="${pg.orient !== 'land'}">Portrait</button><button data-corient="land" aria-pressed="${pg.orient === 'land'}">Landscape</button></span>
+      <label class="cmp-zoom"><span class="note">Paper</span><select id="cmp-paper-size" aria-label="Paper size">${Object.entries(PAPERS).map(([k, [t]]) => `<option value="${k}" ${(pg.paper || 'letter') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label class="cmp-zoom"><span class="note">Margin</span><input id="cmp-margin" type="number" min="5" max="40" step="1" value="${Math.round(pgDims(pg).M / MMPX)}" style="width:64px"><span class="note">mm</span></label>
       <label class="cmp-zoom"><span class="note">Zoom</span><select id="cmp-zoom" aria-label="Zoom">${[['fit', 'Fit page'], ['width', 'Fit width'], ...[0.5, 0.75, 1, 1.5, 2, 4].map(v => [v, Math.round(v * 100) + ' %'])].map(([v, t]) => `<option value="${v}" ${String(S.czoom) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <span class="cmp-add"><span class="note">Add</span>${Object.entries(RITEMS).map(([k, [t]]) => `<button class="btn" data-cadd="${k}">${esc(t)}</button>`).join('')}</span></div>
       <div class="cmp-canvas"><span class="rl-c" aria-hidden="true"></span><svg class="rl-x" id="rl-x" aria-hidden="true"></svg><svg class="rl-y" id="rl-y" aria-hidden="true"></svg>
@@ -7280,7 +7303,8 @@ function propsHTML() {
     <h4>Align</h4><div class="cmp-row">${[['left', 'Left'], ['hcenter', 'Centre'], ['right', 'Right'], ['top', 'Top'], ['vcenter', 'Middle'], ['bottom', 'Bottom']].map(([k, t]) => `<button class="btn" data-calign="${k}">${t}</button>`).join('')}</div>
     <h4>Distribute</h4><div class="cmp-row"><button class="btn" data-cdist="h" ${S.cmulti.size < 3 ? 'disabled' : ''}>Horizontally</button><button class="btn" data-cdist="v" ${S.cmulti.size < 3 ? 'disabled' : ''}>Vertically</button></div>`;
   const pg = curPage(), it = pg?.items?.find(x => x.id === S.csel);
-  if (!it) return `<h3>Diagram</h3><p class="note">Click a diagram on the page to change its size, scale, intervals and caption.</p><p class="note">Use the Add buttons above the page to place a site plan, cross-section, map, hydrograph, text or a picture.</p>`;
+  const tbPanel = `<h3>Title block</h3><div class="cmp-geos">${[['fig', 'Figure no.'], ['rev', 'Revision'], ['drawn', 'Drawn by'], ['checked', 'Checked by'], ['date', 'Date']].map(([k, l]) => `<label class="cmp-geo"><span>${l}</span><input ${k === 'date' ? 'type="date"' : ''} data-tbf="${k}" value="${esc(pg?.tb?.[k] || '')}" ${S.readOnly ? 'readonly' : ''}></label>`).join('')}</div><p class="note">Company, project and number come from Settings and the project.</p>`;
+  if (!it) return tbPanel + `<h3>Diagram</h3><p class="note">Click a diagram on the page to change its size, scale, intervals and caption.</p><p class="note">Use the Add buttons above the page to place a site plan, cross-section, map, hydrograph, text or a picture.</p>`;
   const sel = (k, label, list) => `<label class="cmp-lbl" for="co-${k}">${label}</label><select id="co-${k}" data-copt="${k}">${list.map(([v, t]) => `<option value="${v}" ${String(it.o?.[k] ?? '') === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
   const geo = (k, label) => `<label class="cmp-geo"><span>${label}</span><input type="number" step="1" data-cgeo="${k}" value="${mm(it[k])}"><span class="note">mm</span></label>`;
   return `<h3>${esc(RITEMS[it.t][0])}</h3>
@@ -7473,6 +7497,9 @@ document.addEventListener('dblclick', e => { const box = e.target.closest('.cmp-
 function composeChange(t) {
   const L = repLayout(), pg = curPage(), it = pg.items?.find(x => x.id === S.csel);
   if (t.id === 'cmp-title') pg.title = t.value;
+  else if (t.id === 'cmp-paper-size') { setPaper(pg, t.value); }
+  else if (t.id === 'cmp-margin') { const v = Math.max(5, Math.min(40, +t.value || 8)); pg.margin = v; for (const x of pg.items || []) clampIt(x, pg); }
+  else if (t.dataset?.tbf) { pg.tb = { ...(pg.tb || {}), [t.dataset.tbf]: t.value.trim() }; }
   else if (t.id === 'cmp-zoom') { setZoom(t.value === 'fit' || t.value === 'width' ? t.value : +t.value); return; }
   else if (t.id === 'cmp-add-page') { if (!t.value) return; L.pages.splice(S.cpage + 1, 0, t.value === 'xsec' ? xsecPage() : newPage(t.value)); S.cpage++; S.csel = null; }
   else if (t.dataset.clog) { const s = new Set(pg.bh || []); t.checked ? s.add(t.dataset.clog) : s.delete(t.dataset.clog); pg.bh = projList().map(b => b.id).filter(id => s.has(id)); }
@@ -7772,14 +7799,16 @@ function openSiteImg() {
 
 /* ---------- report appendix: key sheet, plan, logs, lab, groundwater, photos as one PDF ---------- */
 function pageFrame(title, pi, pn, body, dims) {
-  const { W, H } = dims || PG, M = PG.M, X1 = W - M, o = [];
+  const { W, H } = dims || PG, M = dims?.M ?? PG.M, X1 = W - M, o = [], tb = dims?.tb || {};
   const T = (x, y, t, s = 8, w = '', c = 'var(--ink)', a = '') => `<text x="${x}" y="${y}" style="font:${w} ${s}px Arial,Helvetica,sans-serif;fill:${c}" ${a ? `text-anchor="${a}"` : ''}>${esc(t)}</text>`;
   o.push(`<rect x="${M}" y="${M}" width="${W - 2 * M}" height="62" fill="none" style="stroke:var(--ink)" stroke-width="1.2"/>`);
   if (S.co.logo) o.push(`<image href="${S.co.logo}" x="${M + 6}" y="${M + 6}" width="120" height="50" preserveAspectRatio="xMinYMid meet"/>`);
   o.push(`<line x1="${M + 132}" y1="${M}" x2="${M + 132}" y2="${M + 62}" style="stroke:var(--ink)" stroke-width=".6"/>`);
   const projs = [...new Set(projList().map(b => b.project).filter(Boolean))], nos = [...new Set(projList().map(b => b.projNo).filter(Boolean))];
   o.push(T(M + 142, M + 22, S.co.name || '', 12, 700), T(M + 142, M + 40, projs.length === 1 ? projs[0] : 'Borehole investigation', 9), T(M + 142, M + 54, nos.length === 1 ? `${S.co.projLabel || 'Project No.'}: ${nos[0]}` : '', 8.5));
-  o.push(T(X1 - 8, M + 26, title, 13, 700, 'var(--accent-2)', 'end'), T(X1 - 8, M + 46, `Page ${pi} of ${pn}`, 8.5, '', 'var(--ink)', 'end'));
+  const fields = [tb.fig && `Figure ${tb.fig}`, tb.rev !== undefined && tb.rev !== '' && `Rev ${tb.rev}`, tb.drawn && `Drawn ${tb.drawn}`, tb.checked && `Checked ${tb.checked}`, tb.date].filter(Boolean).join('   ');
+  o.push(T(X1 - 8, M + 24, title, 13, 700, 'var(--accent-2)', 'end'), T(X1 - 8, M + 40, `Page ${pi} of ${pn}`, 8.5, '', 'var(--ink)', 'end'));
+  if (fields) o.push(T(X1 - 8, M + 55, fields, 7.5, '', 'var(--ink)', 'end'));
   o.push(T(M, H - M + 2, [S.co.name, S.co.address].filter(Boolean).join(' · '), 7, '', 'var(--muted)'), T(X1, H - M + 2, today(), 7, '', 'var(--muted)', 'end'));
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#fff"/>${o.join('')}${body}</svg>`;
 }
