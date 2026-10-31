@@ -23,6 +23,7 @@ async function withPage(fn) {
 }
 
 async function check(name, fn) {
+  if (process.env.ONLY && !name.includes(process.env.ONLY)) return;   // ONLY=<text> runs the checks whose name contains it
   try { await withPage(async (run, load) => { await fn(run, load); const errs = await run('window.__errs'); if (errs.length) throw new Error('page errors: ' + errs.join(' | ')); }); results.push([name, null]); }
   catch (e) { results.push([name, e.message || String(e)]); }
 }
@@ -349,6 +350,51 @@ app.whenReady().then(async () => {
     expect(r.tplPdf === 0, 'template kept imported pages: ' + JSON.stringify(r));
     expect(/Lab certificate 7/.test(r.missingMsg), 'missing file not named: ' + JSON.stringify(r));
     expect(r.orphans === 0, 'deleted imports still saved in the project file: ' + JSON.stringify(r));
+  });
+
+  await check('report canvas: zoom and rulers line up with the paper', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); S.cpage = 1; S.csort = false; rerenderCompose(); await w(300);
+      setZoom(2); await w(300);
+      const paper = document.querySelector('#cmp-paper').getBoundingClientRect(), d = pgDims(curPage());
+      const tick = document.querySelector('.rl-x [data-mm="100"]'), ytick = document.querySelector('.rl-y [data-mm="100"]');
+      return { pw: paper.width, want: d.W * 2, off: tick ? tick.getBoundingClientRect().left - paper.left : null, yoff: ytick ? ytick.getBoundingClientRect().top - paper.top : null, mm100: 100 * 96 / 25.4 * 2 };
+    })()`);
+    expect(Math.abs(r.pw - r.want) < 1, 'zoomed paper width: ' + JSON.stringify(r));
+    expect(r.off != null && Math.abs(r.off - r.mm100) < 1.5 && Math.abs(r.yoff - r.mm100) < 1.5, 'ruler ticks off the paper: ' + JSON.stringify(r));
+  });
+
+  await check('report canvas: guides and snapping', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); S.cpage = 1; S.csort = false; rerenderCompose(); await w(300);
+      const pg = curPage(), bd = bodyOf(pg); addGuide(pg, 'y', 300);
+      const other = newItem('text', 200, 600, { w: 100, h: 50 }); pg.items.push(other);
+      const a = snapBox(pg, { x: 400, y: 296, w: 120, h: 80 }, []);
+      const b = snapBox(pg, { x: bd.x + 4, y: 500, w: 100, h: 100 }, []);
+      const c = snapBox(pg, { x: 303, y: 700, w: 80, h: 40 }, []);
+      const far = snapBox(pg, { x: 450, y: 450, w: 37, h: 37 }, []);
+      return { a, b, c, far, bdx: bd.x, guides: pg.guides };
+    })()`);
+    expect(r.a.y === 300 && r.a.lines.some(l => l.axis === 'y' && l.v === 300), 'guide snap: ' + JSON.stringify(r.a));
+    expect(r.b.x === r.bdx, 'margin snap: ' + JSON.stringify(r));
+    expect(r.c.x === 300, 'item edge snap: ' + JSON.stringify(r.c));
+    expect(r.far.x === 450 && r.far.y === 450 && !r.far.lines.length, 'snapped with nothing nearby: ' + JSON.stringify(r.far));
+  });
+
+  await check('report canvas: multi-select, align and distribute', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); S.cpage = 1; S.csort = false; rerenderCompose(); await w(200);
+      const pg = curPage(), put = () => { pg.items = [newItem('text', 100, 200, { w: 80, h: 40 }), newItem('text', 300, 260, { w: 60, h: 40 }), newItem('text', 520, 320, { w: 100, h: 40 })]; S.cmulti = new Set(pg.items.map(i => i.id)); };
+      put(); alignItems('left'); const left = curPage().items.map(i => i.x);
+      put(); alignItems('bottom'); const bottom = curPage().items.map(i => i.y + i.h);
+      put(); distributeItems('h'); const xs = curPage().items.map(i => i.x);
+      rerenderCompose(); await w(100); const panel = document.querySelector('#cmp-props')?.textContent || '';
+      return { left, bottom, xs, panel: /3 selected/.test(panel) && /Align/.test(panel) };
+    })()`);
+    expect(r.left.every(x => x === 100), 'align left: ' + JSON.stringify(r.left));
+    expect(r.bottom.every(y => y === 360), 'align bottom: ' + JSON.stringify(r.bottom));
+    expect(r.xs[0] === 100 && Math.abs(r.xs[1] - 320) <= 1 && r.xs[2] === 520, 'distribute: ' + JSON.stringify(r.xs));
+    expect(r.panel, 'panel does not offer align for the selection');
   });
 
   await check('dates are local, not UTC', async run => {
