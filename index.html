@@ -6667,6 +6667,7 @@ function flowPlanSVG(F, W, H) {
   const ex = pts.map(w => [w.e, w.n]);
   const x0 = Math.min(...ex.map(p => p[0])), x1 = Math.max(...ex.map(p => p[0])), y0 = Math.min(...ex.map(p => p[1])), y1 = Math.max(...ex.map(p => p[1]));
   const span = Math.max(x1 - x0, y1 - y0, 20) * 1.35, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, sc = Math.min((W - 2 * pad) / span, (H - 2 * pad) / span);
+  RO.sc = sc;   // page px per metre as drawn, for a linked scale bar
   const X = e => W / 2 + (e - cx) * sc, Y = n => H / 2 - (n - cy) * sc, uid2 = 'fc' + Math.round(W + H);
   const o = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Groundwater flow direction"><defs><clipPath id="${uid2}"><rect width="${W}" height="${H}"/></clipPath></defs><g clip-path="url(#${uid2})">`, `<rect width="${W}" height="${H}" style="fill:var(--panel-2)"/>`];
   if (site?.img && S.lyr.img !== false) o.push(`<image href="${site.img}" x="${X(site.e0)}" y="${Y(site.n1)}" width="${(site.e1 - site.e0) * sc}" height="${(site.n1 - site.n0) * sc}" preserveAspectRatio="none" opacity=".55"/>`);
@@ -6958,7 +6959,17 @@ const BODY = { x: PG.M, y: PG.M + 80, w: PG.W - 2 * PG.M, h: PG.H - 2 * PG.M - 1
 /* paper sizes in CSS px at 96 dpi (points × 96 / 72); margins in mm */
 const PAPERS = { letter: ['Letter (8.5 × 11 in)', 816, 1056], legal: ['Legal (8.5 × 14 in)', 816, 1344], tabloid: ['Tabloid (11 × 17 in)', 1056, 1632], a4: ['A4 (210 × 297 mm)', 793.7008, 1122.5197], a3: ['A3 (297 × 420 mm)', 1122.5197, 1587.4016] };
 const pgDims = pg => { const [, w, h] = PAPERS[pg?.paper] || PAPERS.letter, M = pg?.margin != null ? pg.margin * 96 / 25.4 : PG.M; return { ...(pg?.orient === 'land' ? { W: h, H: w } : { W: w, H: h }), M, tb: pg?.tb }; };
-function setPaper(pg, key) { pg.paper = PAPERS[key] ? key : 'letter'; for (const it of pg.items || []) clampIt(it, pg); }
+function setPaper(pg, key) { const old = bodyOf(pg); pg.paper = PAPERS[key] ? key : 'letter'; fitToBody(pg, old); }
+/* after a paper or margin change: items that spanned the old body width span the new one, and every item stays inside the printable area */
+function fitToBody(pg, old) {
+  const b = bodyOf(pg);
+  for (const it of pg.items || []) {
+    if (old && Math.abs(it.w - old.w) <= 1) it.w = b.w;
+    if (old && Math.abs(it.h - old.h) <= 1) it.h = b.h;
+    it.w = Math.round(Math.min(it.w, b.w)); it.h = Math.round(Math.min(it.h, b.h));
+    it.x = Math.round(Math.max(b.x, Math.min(it.x, b.x + b.w - it.w))); it.y = Math.round(Math.max(b.y, Math.min(it.y, b.y + b.h - it.h)));
+  }
+}
 const bodyOf = pg => { const d = pgDims(pg); return { x: d.M, y: d.M + 80, w: d.W - 2 * d.M, h: d.H - 2 * d.M - 104 }; };
 const LB = bodyOf({ orient: 'land' });
 const xsecPage = () => newPage('free', { orient: 'land', title: 'CROSS-SECTION A–A′', items: [newItem('section', LB.x, LB.y, { w: LB.w, h: LB.h - 64 }), newItem('text', LB.x, LB.y + LB.h - 52, { w: LB.w, h: 52, o: { size: 9, text: 'Units between boreholes are an interpretation; conditions between boreholes are not known. The water table is interpolated between readings.' } })] });
@@ -7084,7 +7095,7 @@ const curPage = () => { const L = repLayout(); S.cpage = Math.max(0, Math.min(S.
 function itemInner(it, w, h) {
   const o = it.o || {}, ro = {};
   for (const k of ['scale', 'grid', 've', 'tick', 'bw', 'iv']) if (o[k] !== '' && o[k] != null) ro[k] = +o[k];
-  const msg = t => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#f6f8fa"/><text x="12" y="24" style="font:12px Arial,sans-serif;fill:#5d6a75">${esc(t)}</text></svg>`;
+  const msg = t => (delete ro.sc, `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#f6f8fa"/><text x="12" y="24" style="font:12px Arial,sans-serif;fill:#5d6a75">${esc(t)}</text></svg>`);
   const fromEl = (fn, none) => { const el = document.createElement('div'); fn(el); return el.querySelector('svg')?.outerHTML || msg(none); };
   if (it.t === 'scalebar') return scaleBarSVG(it, w, h);
   if (it.t === 'north') return northSVG(it, w, h);
@@ -7135,18 +7146,22 @@ function scaleBarSVG(it, w, h) {
 /* north arrow: UTM maps are drawn grid-north up; true north is turned by the meridian convergence
    γ = atan(tan(λ − λ0)·sin φ) at the boreholes' centroid (grid north lies γ east of true north when γ > 0) */
 function northSVG(it, w, h) {
-  const o = it.o || {}, rad = Math.PI / 180; let rot = 0, note = 'Grid north';
-  if (o.mode === 'true') {
-    const ll = projList().map(latLonOf).filter(Boolean), z = crsZone();
-    if (ll.length && z) { const lat = ll.reduce((t, p) => t + p.lat, 0) / ll.length, lon = ll.reduce((t, p) => t + p.lon, 0) / ll.length, g = Math.atan(Math.tan((lon - (z * 6 - 183)) * rad) * Math.sin(lat * rad)) / rad;
-      rot = -g; note = `True north; grid north ${Math.abs(g).toFixed(2)}° ${g >= 0 ? 'east' : 'west'}`; }
-    else note = 'True north needs borehole coordinates';
+  const o = it.o || {}, rad = Math.PI / 180; let rot = 0, mode = o.mode === 'true' ? 'true' : 'grid', note = ['Grid north'];
+  if (mode === 'true') {
+    const crs = projList().find(b => b.crs)?.crs || '', ll = projList().map(latLonOf).filter(Boolean), tm = /3TM/i.test(crs) && /(\d{3})\s*°\s*W/i.exec(crs);
+    if (!ll.length) { mode = 'grid'; note = ['Grid north', 'no coordinates']; }
+    else if (/lat|long/i.test(crs)) note = ['True north'];   // a latitude/longitude map is drawn true-north up
+    else {
+      const lat = ll.reduce((t, p) => t + p.lat, 0) / ll.length, lon = ll.reduce((t, p) => t + p.lon, 0) / ll.length, lon0 = tm ? -tm[1] : crsZone() * 6 - 183;
+      const g = Math.atan(Math.tan((lon - lon0) * rad) * Math.sin(lat * rad)) / rad;
+      rot = -g; note = ['True north', `grid ${Math.abs(g).toFixed(2)}° ${g >= 0 ? 'E' : 'W'}`];
+    }
   }
-  const cx = w / 2, s2 = Math.min(w, h - 26) / 2 - 4, cy = s2 + 4;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><g data-north="1" data-mode="${o.mode === 'true' ? 'true' : 'grid'}" data-rot="${+rot.toFixed(4)}" transform="rotate(${rot} ${cx} ${cy})">
+  const nh = 4 + note.length * 11, cx = w / 2, s2 = Math.min(w, h - nh - 14) / 2 - 2, cy = s2 + 16;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><g data-north="1" data-mode="${mode}" data-rot="${+rot.toFixed(4)}" transform="rotate(${rot} ${cx} ${cy})">
     <path d="M${cx} ${cy - s2}L${cx + s2 * .38} ${cy + s2 * .7}L${cx} ${cy + s2 * .38}Z" fill="#000"/><path d="M${cx} ${cy - s2}L${cx - s2 * .38} ${cy + s2 * .7}L${cx} ${cy + s2 * .38}Z" fill="#fff" stroke="#000" stroke-width="1"/>
-    <text x="${cx}" y="${cy - s2 - 2}" text-anchor="middle" style="font:bold 12px Arial,sans-serif;fill:#000" dy="0">N</text></g>
-    <text x="${cx}" y="${h - 4}" text-anchor="middle" style="font:9px Arial,sans-serif;fill:#333">${esc(note)}</text></svg>`;
+    <text x="${cx}" y="${cy - s2 - 2}" text-anchor="middle" style="font:bold 12px Arial,sans-serif;fill:#000">N</text></g>
+    ${note.map((t, i) => `<text data-note="1" x="${cx}" y="${h - 4 - (note.length - 1 - i) * 11}" text-anchor="middle" style="font:9px Arial,sans-serif;fill:#333">${esc(t)}</text>`).join('')}</svg>`;
 }
 /* legend: only what the project actually shows */
 function legendSVG(it, w, h) {
@@ -7367,6 +7382,8 @@ function fitItem(it, how) {
   if (how === 'top') Object.assign(it, { x: BODY.x, y: BODY.y, w: BODY.w, h: (BODY.h - g) / 2 });
   if (how === 'bottom') Object.assign(it, { x: BODY.x, y: BODY.y + (BODY.h + g) / 2, w: BODY.w, h: (BODY.h - g) / 2 });
 }
+/* new ids for a copied page's items; a scale bar keeps pointing at the copy of its map */
+function relink(pg) { const ids = new Map(); for (const x of pg.items || []) { const n = uid('it'); ids.set(x.id, n); x.id = n; } for (const x of pg.items || []) if (x.o?.link) x.o.link = ids.get(x.o.link) || null; return pg; }
 const clampIt = (it, pg = curPage()) => { const d = pgDims(pg); it.w = Math.max(40, Math.min(it.w, d.W)); it.h = Math.max(30, Math.min(it.h, d.H)); it.x = Math.max(0, Math.min(it.x, d.W - it.w)); it.y = Math.max(0, Math.min(it.y, d.H - it.h)); };
 function composeAct(act, el) {
   const L = repLayout(), pg = curPage(), it = pg.items?.find(x => x.id === S.csel), i = S.cpage;
@@ -7374,7 +7391,7 @@ function composeAct(act, el) {
   if (act === 'cmp-up' && i > 0) { [L.pages[i - 1], L.pages[i]] = [L.pages[i], L.pages[i - 1]]; S.cpage--; }
   if (act === 'cmp-down' && i < L.pages.length - 1) { [L.pages[i + 1], L.pages[i]] = [L.pages[i], L.pages[i + 1]]; S.cpage++; }
   const many = S.csort && S.csortSel?.size ? L.pages.filter(p => S.csortSel.has(p.id)) : null, targets = many || [pg];
-  const copyOf = p => { const c = structuredClone(p); c.id = uid('pg'); (c.items || []).forEach(x => x.id = uid('it')); return c; };
+  const copyOf = p => relink({ ...structuredClone(p), id: uid('pg') });
   if (act === 'cmp-dup') { if (many) { for (const p of many) L.pages.splice(L.pages.indexOf(p) + 1, 0, copyOf(p)); } else { L.pages.splice(i + 1, 0, copyOf(pg)); S.cpage++; } }
   if (act === 'cmp-delpage') { if (many) { if (many.length < L.pages.length) { L.pages = L.pages.filter(p => !S.csortSel.has(p.id)); S.csortSel = new Set(); } } else if (L.pages.length > 1) { L.pages.splice(i, 1); S.csel = null; } }
   if (act === 'cmp-rot-l' || act === 'cmp-rot-r') for (const p of targets) {
@@ -7388,7 +7405,7 @@ function composeAct(act, el) {
   if (act === 'cmp-import') { $('#rep-file').click(); return; }
   if (act === 'cmp-tpl-apply') {
     const v = $('#cmp-tpl').value; if (!v) { toast('Choose a template first.'); return; }
-    const pages = v.startsWith('p:') ? REPORT_PRESETS[v.slice(2)][1]() : structuredClone((S.co.reportTpls || []).find(t => t.id === v.slice(2))?.pages || []).map(p => ({ ...p, id: uid('pg'), items: (p.items || []).map(x => ({ ...x, id: uid('it') })) }));
+    const pages = v.startsWith('p:') ? REPORT_PRESETS[v.slice(2)][1]() : structuredClone((S.co.reportTpls || []).find(t => t.id === v.slice(2))?.pages || []).map(p => relink({ ...p, id: uid('pg') }));
     if (!pages.length) return;
     L.pages = pages; S.cpage = 0; S.csel = null; toast('Template applied. Every page can still be changed.');
   }
@@ -7470,17 +7487,23 @@ document.addEventListener('pointerdown', e => {
   document.querySelectorAll('.cmp-box').forEach(b => b.setAttribute('aria-selected', String(b.dataset.box === S.csel || !!S.cmulti?.has(b.dataset.box)))); $('#cmp-props').innerHTML = propsHTML();
   const group = S.cmulti?.size > 1 && S.cmulti.has(it.id) ? selItems().filter(x => x !== it).map(x => ({ x, ox: x.x, oy: x.y })) : [];
   cDrag = { it, box, group, rz: !!e.target.closest('[data-rz]') && !group.length, sx: e.clientX, sy: e.clientY, x: it.x, y: it.y, w: it.w, h: it.h, moved: false };
-  box.setPointerCapture?.(e.pointerId); e.preventDefault();
+  try { box.setPointerCapture(e.pointerId); } catch { /* pointer already released */ } e.preventDefault();
 });
 document.addEventListener('pointermove', e => {
   if (!cDrag) return;
   const z = S.cz || 1, dx = (e.clientX - cDrag.sx) / z, dy = (e.clientY - cDrag.sy) / z, it = cDrag.it;
   if (Math.abs(dx) + Math.abs(dy) > 2) cDrag.moved = true;
   const raw = cDrag.rz ? { x: cDrag.x, y: cDrag.y, w: cDrag.w + dx, h: cDrag.h + dy } : { x: cDrag.x + dx, y: cDrag.y + dy, w: cDrag.w, h: cDrag.h };
-  const sn = e.altKey ? { ...raw, lines: [] } : snapBox(curPage(), raw, [it.id], cDrag.rz);   // Alt/Option turns snapping off
+  const sn = e.altKey ? { ...raw, lines: [] } : snapBox(curPage(), raw, [it.id, ...cDrag.group.map(g => g.x.id)], cDrag.rz);   // Alt/Option turns snapping off
   Object.assign(it, { x: Math.round(sn.x), y: Math.round(sn.y), w: Math.round(sn.w), h: Math.round(sn.h) }); showSnaps(sn.lines);
-  clampIt(it);
-  for (const g of cDrag.group) { g.x.x = Math.round(g.ox + it.x - cDrag.x); g.x.y = Math.round(g.oy + it.y - cDrag.y); clampIt(g.x); const b2 = document.querySelector(`[data-box="${g.x.id}"]`); if (b2) Object.assign(b2.style, { left: g.x.x + 'px', top: g.x.y + 'px' }); }
+  if (cDrag.group.length) {   // the selection moves as one box, so its spacing holds at the page edge
+    const d = pgDims(curPage()), all = [{ ox: cDrag.x, oy: cDrag.y, x: it }, ...cDrag.group];
+    let mx = it.x - cDrag.x, my = it.y - cDrag.y;
+    mx = Math.max(mx, -Math.min(...all.map(g => g.ox))); mx = Math.min(mx, d.W - Math.max(...all.map(g => g.ox + g.x.w)));
+    my = Math.max(my, -Math.min(...all.map(g => g.oy))); my = Math.min(my, d.H - Math.max(...all.map(g => g.oy + g.x.h)));
+    it.x = Math.round(cDrag.x + mx); it.y = Math.round(cDrag.y + my);
+  } else clampIt(it);
+  for (const g of cDrag.group) { g.x.x = Math.round(g.ox + it.x - cDrag.x); g.x.y = Math.round(g.oy + it.y - cDrag.y); const b2 = document.querySelector(`[data-box="${g.x.id}"]`); if (b2) Object.assign(b2.style, { left: g.x.x + 'px', top: g.x.y + 'px' }); }
   Object.assign(cDrag.box.style, { left: it.x + 'px', top: it.y + 'px', width: it.w + 'px', height: it.h + 'px' });
   const g = document.querySelector(`#cmp-paper [data-g="${it.id}"]`);
   if (g) g.setAttribute('transform', cDrag.rz ? `translate(${it.x} ${it.y}) scale(${it.w / cDrag.w} ${it.h / cDrag.h}) translate(${-it.x} ${-it.y})` : `translate(${it.x - cDrag.x} ${it.y - cDrag.y})`);
@@ -7498,7 +7521,7 @@ function composeChange(t) {
   const L = repLayout(), pg = curPage(), it = pg.items?.find(x => x.id === S.csel);
   if (t.id === 'cmp-title') pg.title = t.value;
   else if (t.id === 'cmp-paper-size') { setPaper(pg, t.value); }
-  else if (t.id === 'cmp-margin') { const v = Math.max(5, Math.min(40, +t.value || 8)); pg.margin = v; for (const x of pg.items || []) clampIt(x, pg); }
+  else if (t.id === 'cmp-margin') { const v = Math.max(5, Math.min(40, +t.value || 8)), old = bodyOf(pg); pg.margin = v; fitToBody(pg, old); }
   else if (t.dataset?.tbf) { pg.tb = { ...(pg.tb || {}), [t.dataset.tbf]: t.value.trim() }; }
   else if (t.id === 'cmp-zoom') { setZoom(t.value === 'fit' || t.value === 'width' ? t.value : +t.value); return; }
   else if (t.id === 'cmp-add-page') { if (!t.value) return; L.pages.splice(S.cpage + 1, 0, t.value === 'xsec' ? xsecPage() : newPage(t.value)); S.cpage++; S.csel = null; }
