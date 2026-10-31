@@ -302,6 +302,55 @@ app.whenReady().then(async () => {
     expect(Math.round(r.keySize.width) === 612 && Math.round(r.keySize.height) === 792, 'Letter page size: ' + JSON.stringify(r));
   });
 
+  await check('report: the Add and Rotate buttons and the file picker work when clicked', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); await w(200);
+      const input = document.querySelector('#rep-file'); let opened = 0; input.click = () => { opened++; };
+      document.querySelector('[data-act="cmp-import"]').click();
+      const doc = await PDFLib.PDFDocument.create(); doc.addPage([792, 612]); const dt = new DataTransfer(); dt.items.add(new File([await doc.save()], 'one.pdf', { type: 'application/pdf' }));
+      const n0 = repLayout().pages.length; input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+      for (let t = 0; t < 40 && repLayout().pages.length === n0; t++) await w(100);
+      const added = repLayout().pages.length - n0, pg = curPage();
+      document.querySelector('.cmp-side [data-act="cmp-rot-r"]').click(); await w(50);
+      return { opened, added, kind: pg.kind, rot: curPage().rot };
+    })()`);
+    expect(r.opened === 1, 'Add PDF or image did not open the picker: ' + JSON.stringify(r));
+    expect(r.added === 1 && r.kind === 'pdf', 'picked file not imported: ' + JSON.stringify(r));
+    expect(r.rot === 90, 'Rotate right button: ' + JSON.stringify(r));
+  });
+
+  await check('report: secured PDFs refused, shared resources copied once, deleted imports not saved, templates and missing files', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); goTab('compose'); await w(200);
+      // a PDF whose trailer says it is encrypted: pdf-lib cannot copy its pages, so it must be refused at import
+      const plain = await PDFLib.PDFDocument.create(); plain.addPage([612, 792]);
+      const enc = plain.context.register(plain.context.obj({ Filter: 'Standard', V: 1, R: 2, P: -44, O: PDFLib.PDFHexString.of('00'.repeat(32)), U: PDFLib.PDFHexString.of('00'.repeat(32)) }));
+      plain.context.trailerInfo.Encrypt = enc;
+      const secured = await importReportFiles([new File([await plain.save({ useObjectStreams: false })], 'secured.pdf', { type: 'application/pdf' })]);
+      // 40 pages sharing one picture: the export must not copy the picture 40 times
+      const c = document.createElement('canvas'); c.width = c.height = 300; const ctx = c.getContext('2d'); for (let i = 0; i < 9000; i++) { ctx.fillStyle = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'); ctx.fillRect(Math.random() * 300, Math.random() * 300, 4, 4); }
+      const big = await PDFLib.PDFDocument.create(), img = await big.embedPng(c.toDataURL('image/png'));
+      for (let i = 0; i < 40; i++) big.addPage([612, 792]).drawImage(img, { x: 50, y: 300, width: 300, height: 300 });
+      const srcBytes = await big.save(); await importReportFiles([new File([srcBytes], 'atlas.pdf', { type: 'application/pdf' })]);
+      const atlas = repLayout().pages.filter(p => p.kind === 'pdf' && /^atlas/.test(p.title));
+      const outBytes = await buildReportBytes({ pages: atlas });
+      // template: imported pages belong to one project and are left out
+      composeAct('cmp-tpl-save'); document.querySelector('#tpl-name').value = 'With imports'; composeAct('cmp-tpl-save-go');
+      const tpl = (S.co.reportTpls || []).find(t => t.name === 'With imports');
+      // a page whose file is missing names itself in the error
+      let missingMsg = ''; try { await buildReportBytes({ pages: [{ ...newPage('pdf', { title: 'Lab certificate 7', file: 'rf-gone', page: 1, rot: 0 }) }] }); } catch (e) { missingMsg = e.message; }
+      // deleted imports do not travel in the project file
+      const L = repLayout(); L.pages = L.pages.filter(p => p.kind !== 'pdf'); saveLayout(L);
+      let saved = null; window.saveTo = async (key, name, ext, data) => { saved = data; }; await saveProject(false);
+      return { secured, srcSize: srcBytes.length, outSize: outBytes.length, atlas: atlas.length, tplPdf: tpl ? tpl.pages.filter(p => p.kind === 'pdf').length : -1, missingMsg, orphans: (saved?.photos || []).filter(ph => String(ph.bhId).startsWith('reportfile:')).length };
+    })()`);
+    expect(r.secured === 0, 'secured PDF was imported: ' + JSON.stringify(r));
+    expect(r.atlas === 40 && r.outSize < r.srcSize * 1.5, 'shared picture copied per page: ' + JSON.stringify(r));
+    expect(r.tplPdf === 0, 'template kept imported pages: ' + JSON.stringify(r));
+    expect(/Lab certificate 7/.test(r.missingMsg), 'missing file not named: ' + JSON.stringify(r));
+    expect(r.orphans === 0, 'deleted imports still saved in the project file: ' + JSON.stringify(r));
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
