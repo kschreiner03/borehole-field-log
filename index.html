@@ -4059,6 +4059,17 @@ function domenico({ C0, v, R = 1, ax, ay, az, k = 0, ks = 0, Y, Z, x, y = 0, z =
 /* default dispersivities: Xu and Eckstein (1995) ax = 0.83 (log10 Lp)^2.414 m; ay = ax/10 (Gelhar et al. 1992); az ≈ 0 (BIOSCREEN default, conservative) */
 const xuEckstein = Lp => .83 * Math.log10(Lp) ** 2.414;
 const retardation = (koc, foc, rhob, n) => 1 + koc * foc * rhob / n;
+/* groundwater concentration under a soil source: US EPA (1996) Soil Screening Guidance User's Guide, EPA/540/R-96/018,
+   Eq. 10 soil–water partitioning Cw = Cs / [Kd + (θw + θa·H′)/ρb], Kd = Koc·foc; Eq. 12 mixing-zone depth
+   d = (0.0112 L²)^0.5 + da{1 − exp[−L·I/(K·i·da)]} (not more than da); Eq. 11 dilution factor DF = 1 + K·i·d/(I·L); Cgw = Cw/DF.
+   Units: Cs mg/kg, Koc L/kg, ρb kg/L, K and I m/yr, L, da m. Recharge I drives the leachate into the aquifer. */
+function leachSource({ Cs, koc, foc, H, thw, tha, rhob, K, i, I, L, da, sol }) {
+  const need = { Cs, koc, foc, H, thw, tha, rhob, K, i, I, L, da }, missing = Object.entries(need).filter(([, v]) => v == null || !isFinite(v)).map(([k]) => k);
+  if (missing.length) return { missing };
+  const Kd = koc * foc, Cw0 = Cs / (Kd + (thw + tha * H) / rhob), aboveSol = sol != null && Cw0 > sol, Cw = aboveSol ? sol : Cw0;
+  const d = Math.min(da, Math.sqrt(.0112 * L * L) + da * (1 - Math.exp(-L * I / (K * i * da)))), DF = 1 + K * i * d / (I * L);
+  return { Kd, Cw, d, DF, Cgw: Cw / DF, aboveSol, note: aboveSol ? `The calculated leachate (${(+Cw0.toPrecision(3)).toLocaleString('en-CA')} mg/L) is above the solubility (${sol} mg/L): free product is likely and this model does not apply; leachate capped at solubility.` : '' };
+}
 function setXs(k, v) { S.xs = { ...S.xs, [k]: v }; lsSet('bhlog.xs', JSON.stringify(S.xs)); redrawSec(); }
 function readingFor(b) {
   if (!S.round) return latestWater(b);
