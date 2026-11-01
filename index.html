@@ -3989,6 +3989,19 @@ function drawHydro(el = $('#hydro'), list = projList().filter(b => !S.hidden.has
   o.push('</svg>');
   el.innerHTML = o.join('');
 }
+/* where each borehole sits on the section: d = distance along the line (m); off = distance from the line (m, + to the left
+   looking along it) for a best-fit line, 0 when the line runs through the picked boreholes; dir = compass side of the line */
+function secPos(bhs) {
+  const located = bhs.every(b => b.easting != null && b.northing != null);
+  if (located && S.secIds.size >= 2 && bhs.every(b => S.secIds.has(b.id))) { let d = 0; return bhs.map((b, i) => { if (i) d += Math.hypot(b.easting - bhs[i - 1].easting, b.northing - bhs[i - 1].northing); return { b, d, off: 0 }; }); }
+  if (!located) return bhs.map((b, i) => ({ b, d: i, off: 0 }));
+  const mx = bhs.reduce((s, b) => s + b.easting, 0) / bhs.length, my = bhs.reduce((s, b) => s + b.northing, 0) / bhs.length;
+  let sxx = 0, syy = 0, sxy = 0; for (const b of bhs) { const dx = b.easting - mx, dy = b.northing - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+  const ang = .5 * Math.atan2(2 * sxy, sxx - syy), ux = Math.cos(ang), uy = Math.sin(ang);
+  const proj = bhs.map(b => { const dx = b.easting - mx, dy = b.northing - my, off = -dx * uy + dy * ux, az = (Math.atan2(-uy * Math.sign(off), ux * Math.sign(off)) * 180 / Math.PI + 360) % 360;
+    return { b, p: dx * ux + dy * uy, off, dir: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(az / 45) % 8] }; }).sort((a, c) => a.p - c.p);
+  return proj.map(x => ({ b: x.b, d: x.p - proj[0].p, off: x.off, dir: x.dir }));
+}
 function drawSection(el = $('#section'), note = $('#section-note'), forceW, list, vapour, fillH) {
   if (!el) return;
   note = note || {};
@@ -3996,15 +4009,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   if (bhs.length < 2) { el.innerHTML = `<p class="note">Log at least two boreholes to draw a cross-section.</p>`; note.textContent = ''; return; }
   const located = bhs.every(b => b.easting != null && b.northing != null);
   const ordered = located && S.secIds.size >= 2 && bhs.every(b => S.secIds.has(b.id));
-  let pos;
-  if (ordered) { let d = 0; pos = bhs.map((b, i) => { if (i) d += Math.hypot(b.easting - bhs[i - 1].easting, b.northing - bhs[i - 1].northing); return { b, d }; }); }
-  else if (located) {
-    const mx = bhs.reduce((s, b) => s + b.easting, 0) / bhs.length, my = bhs.reduce((s, b) => s + b.northing, 0) / bhs.length;
-    let sxx = 0, syy = 0, sxy = 0; for (const b of bhs) { const dx = b.easting - mx, dy = b.northing - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
-    const ang = .5 * Math.atan2(2 * sxy, sxx - syy), ux = Math.cos(ang), uy = Math.sin(ang);
-    const proj = bhs.map(b => ({ b, p: (b.easting - mx) * ux + (b.northing - my) * uy })).sort((a, c) => a.p - c.p);
-    pos = proj.map(x => ({ b: x.b, d: x.p - proj[0].p }));
-  } else pos = bhs.map((b, i) => ({ b, d: i }));
+  const pos = secPos(bhs);
   const noElev = bhs.some(b => b.elevation == null);
   const top = b => b.elevation ?? 0;
   const su = b => b.well?.installed && b.well.stickup > 0 ? b.well.stickup : 0;
@@ -4027,20 +4032,21 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   o.push(`<text class="lbl" x="${m.l}" y="16">${noElev ? `Depth (${LEN()})` : `Elevation (${LEN()}${datum ? ', ' + esc(datum) : ''})`}</text>`);
   o.push(`<text class="lbl2" x="${W - m.r}" y="16" text-anchor="end">${located ? `Length ${fu(maxD, 0)}${ve ? ` · vertical exaggeration ×${ve >= 10 ? Math.round(ve) : ve.toFixed(1)}` : ''}` : 'Not to horizontal scale'}</text>`);
   for (const v of ticks) { const yy = Y(fromD(v)); o.push(`<line x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}" style="stroke:var(--grid)"/><text class="tick" x="${m.l - 8}" y="${yy + 4}" text-anchor="end">${+v.toFixed(2)}</text>`); }
-  o.push(`<path d="${pos.map((p, i) => `${i ? 'L' : 'M'}${X(p.d)} ${Y(top(p.b))}`).join('')}" fill="none" style="stroke:var(--earth)" stroke-width="2"/>`);
+  o.push(`<path data-ground="1" d="${pos.map((p, i) => `${i ? 'L' : 'M'}${X(p.d)} ${Y(top(p.b))}`).join('')}" fill="none" style="stroke:var(--earth)" stroke-width="2" stroke-dasharray="6 3"><title>Ground surface interpolated between boreholes (measured at each borehole)</title></path>`);
   const bw = secOpt('bw');
+  for (const p of pos) o.push(`<path d="M${X(p.d) - bw / 2 - 6} ${Y(top(p.b))}h${bw + 12}" style="stroke:var(--earth)" stroke-width="2.4"/>`);
   // interpreted units: join the top and base of the same unit in neighbouring boreholes; units missing next door pinch out halfway
   if (S.sec.units !== false) {
-    const units = b => { const out = []; for (const l of (b.layers || []).filter(l => l.top != null && l.bottom > l.top).sort((a, c) => a.top - c.top)) { const u = defaultUnit(l); const last = out[out.length - 1]; if (last && last.u === u && Math.abs(last.bot - l.top) < 1e-6) last.bot = l.bottom; else out.push({ u, top: l.top, bot: l.bottom, fill: soilOf(l.uscs)?.fill || 'panel-2' }); } return out; };
+    const alias = siteOf()?.xsec?.alias || {}, units = b => { const out = []; for (const l of (b.layers || []).filter(l => l.top != null && l.bottom > l.top).sort((a, c) => a.top - c.top)) { const u = alias[b.id + '|' + defaultUnit(l)] || defaultUnit(l); const last = out[out.length - 1]; if (last && last.u === u && Math.abs(last.bot - l.top) < 1e-6) last.bot = l.bottom; else out.push({ u, top: l.top, bot: l.bottom, fill: soilOf(l.uscs)?.fill || 'panel-2' }); } return out; };
     const U2 = pos.map(p => units(p.b));
     for (let i = 0; i < pos.length - 1; i++) {
       const A = pos[i], B = pos[i + 1], xa = X(A.d) + bw / 2, xb = X(B.d) - bw / 2, xm = xa + (xb - xa) / 3, xm2 = xb - (xb - xa) / 3, ea = top(A.b), eb = top(B.b);
       for (const ua of U2[i]) {
         const ub = U2[i + 1].find(u => u.u === ua.u);
-        if (ub) o.push(`<path d="M${xa} ${Y(ea - ua.top)}L${xb} ${Y(eb - ub.top)}L${xb} ${Y(eb - ub.bot)}L${xa} ${Y(ea - ua.bot)}Z" style="fill:var(--${ua.fill});stroke:var(--muted)" fill-opacity=".28" stroke-width=".7" stroke-dasharray="4 3"><title>${esc(ua.u)} (interpreted)</title></path>`);
-        else o.push(`<path d="M${xa} ${Y(ea - ua.top)}L${xm} ${Y(ea - (ua.top + ua.bot) / 2)}L${xa} ${Y(ea - ua.bot)}Z" style="fill:var(--${ua.fill});stroke:var(--muted)" fill-opacity=".28" stroke-width=".7" stroke-dasharray="4 3"/>`);
+        if (ub) o.push(`<path data-unit="join" d="M${xa} ${Y(ea - ua.top)}L${xb} ${Y(eb - ub.top)}L${xb} ${Y(eb - ub.bot)}L${xa} ${Y(ea - ua.bot)}Z" style="fill:var(--${ua.fill});stroke:var(--muted)" fill-opacity=".28" stroke-width=".7" stroke-dasharray="4 3"><title>${esc(ua.u)} (interpreted)</title></path>`);
+        else o.push(`<path data-unit="pinch" d="M${xa} ${Y(ea - ua.top)}L${xm} ${Y(ea - (ua.top + ua.bot) / 2)}L${xa} ${Y(ea - ua.bot)}Z" style="fill:var(--${ua.fill});stroke:var(--muted)" fill-opacity=".28" stroke-width=".7" stroke-dasharray="4 3"/>`);
       }
-      for (const ub of U2[i + 1]) if (!U2[i].some(u => u.u === ub.u)) o.push(`<path d="M${xb} ${Y(eb - ub.top)}L${xm2} ${Y(eb - (ub.top + ub.bot) / 2)}L${xb} ${Y(eb - ub.bot)}Z" style="fill:var(--${ub.fill});stroke:var(--muted)" fill-opacity=".28" stroke-width=".7" stroke-dasharray="4 3"/>`);
+      for (const ub of U2[i + 1]) if (!U2[i].some(u => u.u === ub.u)) o.push(`<path data-unit="pinch" d="M${xb} ${Y(eb - ub.top)}L${xm2} ${Y(eb - (ub.top + ub.bot) / 2)}L${xb} ${Y(eb - ub.bot)}Z" style="fill:var(--${ub.fill});stroke:var(--muted)" fill-opacity=".28" stroke-width=".7" stroke-dasharray="4 3"/>`);
     }
     const seen = new Map(); U2.flat().forEach(u => seen.has(u.u) || seen.set(u.u, u.fill));
     let lx = m.l;
@@ -4050,6 +4056,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
     const x = X(p.d) - bw / 2, e = top(p.b);
     for (const l of (p.b.layers || []).filter(l => l.top != null && l.bottom > l.top)) o.push(`<g><title>${esc(`${p.b.name}: ${(l.uscs || '').toUpperCase()} ${fx(l.top)}–${fu(l.bottom)}`)}</title>${soilRects(x, Y(e - l.top), bw, Y(e - l.bottom) - Y(e - l.top), l.uscs, l.origin, l.texture)}</g>`);
     o.push(`<rect x="${x}" y="${Y(e)}" width="${bw}" height="${Y(e - depthOf(p.b)) - Y(e)}" fill="none" style="stroke:var(--ink)"/>`);
+    if (Math.abs(p.off) >= .5) o.push(`<text class="lbl2" x="${X(p.d)}" y="${Y(e - depthOf(p.b)) + 12}" text-anchor="middle">${fu(Math.abs(p.off), 1)} ${p.dir}, projected<title>${esc(p.b.name)} is ${fu(Math.abs(p.off), 1)} ${p.dir} of the section line and is projected onto it</title></text>`);
     if (vapour) for (const sm of (p.b.samples || []).filter(sm => sm.cvc != null && sm.depth != null)) { const c = vapClass(sm.cvc), len = Math.log10(Math.max(1, Math.min(sm.cvc, 1e4))) / 4 * 34; o.push(`<rect x="${x + bw + 2}" y="${Y(e - sm.depth) - 3}" width="${Math.max(1.5, len)}" height="6" style="fill:${c[2] === '#ffffff' ? '#d9dcd8' : c[2]};stroke:var(--ink)" stroke-width=".4"><title>${esc(`${p.b.name} ${sampleId(sm)}: ${sm.cvc} ppm at ${fu(sm.depth)}`)}</title></rect>`); }
     const w = p.b.well;
     if (S.sec.wells !== false && w?.installed && w.screenTop != null && w.screenBottom != null) {
@@ -6425,9 +6432,20 @@ function xsecHTML() {
   return `<div class="xs-page">
     <section class="sec"><header><h3>Cross-section A–A′</h3><span class="note">Included in the report package as drawn here</span><label class="note" for="round">Water level</label><select id="round" style="width:auto"><option value="">Latest in each borehole</option>${roundDates().map(d => `<option value="${d}" ${d === S.round ? 'selected' : ''}>Readings near ${d}</option>`).join('')}</select></header><div class="body">${secToolsHTML()}
       <div class="scroll-x" id="xs-draw"></div>
-      <div class="legend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--earth)" stroke-width="2"/></svg>Ground surface</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="6 3"/></svg>Water table (interpolated)</span><span><svg width="22" height="12" aria-hidden="true"><rect x="7" y="0" width="8" height="12" style="fill:var(--panel);stroke:var(--ink)"/><path d="M9 6h4M9 9h4" style="stroke:var(--ink)"/></svg>Slotted interval</span><span><svg width="22" height="12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" style="fill:var(--s-clay);stroke:var(--muted)" fill-opacity=".38" stroke-dasharray="4 2"/></svg>Interpreted between boreholes</span></div>
+      <div class="legend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--earth)" stroke-width="2" stroke-dasharray="6 3"/></svg>Ground surface (measured at boreholes, interpolated between)</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="6 3"/></svg>Water table (interpolated)</span><span><svg width="22" height="12" aria-hidden="true"><rect x="7" y="0" width="8" height="12" style="fill:var(--panel);stroke:var(--ink)"/><path d="M9 6h4M9 9h4" style="stroke:var(--ink)"/></svg>Slotted interval</span><span><svg width="22" height="12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" style="fill:var(--s-clay);stroke:var(--muted)" fill-opacity=".38" stroke-dasharray="4 2"/></svg>Interpreted between boreholes</span></div>
       <p class="note" id="xs-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
+    ${xsCorrHTML()}
   </div>`;
+}
+/* layer correlation: the section joins units of the same name; a unit can be paired with a differently named one by hand */
+function xsCorrHTML() {
+  const al = siteOf()?.xsec?.alias || {}, rows = [];
+  for (const b of sectionList()) for (const u of [...new Set((b.layers || []).filter(l => l.bottom > l.top).map(defaultUnit))]) rows.push([b, u]);
+  const names = [...new Set(rows.map(r => r[1]))];
+  if (!rows.length) return '';
+  return `<section class="sec"><header><h3>Layer correlation</h3><span class="note">Units of the same name are joined between boreholes; pair others here</span></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th>Borehole</th><th>Logged unit</th><th>Joined as</th></tr></thead><tbody>
+    ${rows.map(([b, u]) => { const k = b.id + '|' + u; return `<tr><td>${esc(b.name)}</td><td>${esc(u)}</td><td><select data-xsalias="${esc(k)}" aria-label="${esc(`${b.name} ${u} joined as`)}" ${S.readOnly ? 'disabled' : ''}><option value="">${esc(u)} (as logged)</option>${names.filter(n => n !== u).map(n => `<option value="${esc(n)}" ${al[k] === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></td></tr>`; }).join('')}
+    </tbody></table></div><p class="note">Pairings are an interpretation and are drawn dashed like every other link between boreholes.</p></div></section>`;
 }
 function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); }
 const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
@@ -8642,6 +8660,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.lyr) { setLyr(e.target.dataset.lyr, e.target.checked); return; }
   const t = e.target;
   if (t.id === 'round') { S.round = t.value; redrawSec(); }
+  if (t.dataset?.xsalias != null && !S.readOnly) { const x = siteOf()?.xsec || {}, al = { ...(x.alias || {}) }; if (t.value) al[t.dataset.xsalias] = t.value; else delete al[t.dataset.xsalias]; setSite({ ...(siteOf() || {}), xsec: { ...x, alias: al } }); redrawSec(); }
   else if (t.dataset?.lab || t.dataset?.lablt || t.dataset?.labmeta) {
     const b0 = cur(); if (!editable(b0)) return; const sm = b0.samples[+t.dataset.i]; sm.lab ||= {}; sm.labMeta ||= {};
     if (t.dataset.labmeta) sm.labMeta[t.dataset.labmeta] = t.value;
