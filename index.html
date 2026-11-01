@@ -3996,9 +3996,12 @@ function plumeSVG(pos, xs, X, Y, top, bw, W, H, m) {
     if (p.top === p.bot) o.push(`<circle data-pt="1" data-lt="${p.lt ? 1 : 0}" cx="${x + bw / 2 + 7}" cy="${y1}" r="4.2" fill="${p.lt ? '#fff' : c}" stroke="${p.lt ? '#7f0000' : '#3a1a00'}" stroke-width="1"><title>${esc(tip)}</title></circle>`);
     else o.push(`<rect data-pt="1" data-lt="${p.lt ? 1 : 0}" x="${x + bw / 2 + 3}" y="${y1}" width="8" height="${Math.max(2, y2 - y1)}" fill="${p.lt ? '#fff' : c}" stroke="#3a1a00" stroke-width="1"><title>${esc(tip)}</title></rect>`);
   }
-  const lg = [[`${name} · ${medium}${xs.date ? ` · as of ${xs.date}` : ' · latest'}${xs.round ? ' · this round only' : ''}`]];
-  o.push(`<g transform="translate(${W - m.r - 250} ${m.t - 50})"><rect width="250" height="${16 + Math.max(1, lv.length + 1) * 13}" fill="var(--panel)" opacity=".92" stroke="var(--line)"/><text x="6" y="12" class="lbl2" style="font-weight:600">${esc(lg[0][0])}</text>
-    ${(lv.length ? [`Below ${lv[0].label}`, ...lv.map((l, i) => i < lv.length - 1 ? `${l.label} to ${lv[i + 1].label.split(' (')[0]}` : `Over ${l.label}`)] : ['No guideline set: no contours']).map((t, i) => `<rect x="6" y="${18 + i * 13}" width="10" height="9" fill="${lv.length ? XS_RAMP[i] : '#fff'}" stroke="#3a1a00" stroke-width=".6"/><text x="20" y="${26 + i * 13}" class="lbl2">${esc(t)}</text>`).join('')}</g>`);
+  const items = lv.length ? [`Below ${lv[0].label.split(' (')[0]}`, ...lv.map(l => `≥ ${l.label}`)] : ['No guideline set, so no contours'];
+  let lx = m.l; const ly = H - 8;
+  const head = `${name}${medium === 'vapour' ? '' : ', ' + medium}${xs.date ? `, as of ${xs.date}` : ', latest'}${xs.round ? ', this round only' : ''}:`;
+  o.push(`<text x="${lx}" y="${ly}" class="lbl2" style="font-weight:600">${esc(head)}</text>`); lx += head.length * 6 + 10;
+  items.forEach((t, i) => { o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="9" fill="${lv.length ? XS_RAMP[i] : '#fff'}" stroke="#3a1a00" stroke-width=".6"/><text x="${lx + 14}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 24 + t.length * 5.6; });
+  o.push(`<circle cx="${lx + 5}" cy="${ly - 4}" r="4" fill="#fff" stroke="#7f0000"/><text x="${lx + 13}" y="${ly}" class="lbl2">not detected · hatched = interpolated</text>`);
   return o.join('');
 }
 function setXs(k, v) { S.xs = { ...S.xs, [k]: v }; lsSet('bhlog.xs', JSON.stringify(S.xs)); redrawSec(); }
@@ -4105,6 +4108,9 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const top = b => b.elevation ?? 0;
   const su = b => b.well?.installed && b.well.stickup > 0 ? b.well.stickup : 0;
   let W = forceW || Math.max(el.clientWidth, 600), H = fillH || secOpt('h'); const m = { l: 62, r: 64, t: 70, b: 30 };
+  // room under the drawing for offset labels (three staggered rows) and the plume legend
+  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 20 : 0;
+  m.b += offH + plH; if (!fillH) H += offH + plH;
   const maxD = pos[pos.length - 1].d || 1;
   let e1 = Math.max(...pos.map(p => top(p.b) + su(p.b))), e0 = Math.min(...pos.map(p => top(p.b) - depthOf(p.b)));
   const pad = (e1 - e0) * .05; e1 += pad; e0 -= pad;
@@ -4141,13 +4147,12 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
     }
     const seen = new Map(); U2.flat().forEach(u => seen.has(u.u) || seen.set(u.u, u.fill));
     let lx = m.l;
-    for (const [u, fl] of seen) { o.push(`<rect x="${lx}" y="${H - 16}" width="12" height="9" style="fill:var(--${fl});stroke:var(--muted)" fill-opacity=".6"/><text x="${lx + 16}" y="${H - 8}" class="lbl2">${esc(u)}</text>`); lx += 26 + u.length * 5.6; }
+    for (const [u, fl] of seen) { o.push(`<rect x="${lx}" y="${H - 16 - plH}" width="12" height="9" style="fill:var(--${fl});stroke:var(--muted)" fill-opacity=".6"/><text x="${lx + 16}" y="${H - 8 - plH}" class="lbl2">${esc(u)}</text>`); lx += 26 + u.length * 5.6; }
   }
   for (const p of pos) {
     const x = X(p.d) - bw / 2, e = top(p.b);
     for (const l of (p.b.layers || []).filter(l => l.top != null && l.bottom > l.top)) o.push(`<g><title>${esc(`${p.b.name}: ${(l.uscs || '').toUpperCase()} ${fx(l.top)}–${fu(l.bottom)}`)}</title>${soilRects(x, Y(e - l.top), bw, Y(e - l.bottom) - Y(e - l.top), l.uscs, l.origin, l.texture)}</g>`);
     o.push(`<rect x="${x}" y="${Y(e)}" width="${bw}" height="${Y(e - depthOf(p.b)) - Y(e)}" fill="none" style="stroke:var(--ink)"/>`);
-    if (Math.abs(p.off) >= .5) o.push(`<text class="lbl2" x="${X(p.d)}" y="${Y(e - depthOf(p.b)) + 12}" text-anchor="middle">${fu(Math.abs(p.off), 1)} ${p.dir}, projected<title>${esc(p.b.name)} is ${fu(Math.abs(p.off), 1)} ${p.dir} of the section line and is projected onto it</title></text>`);
     if (vapour) for (const sm of (p.b.samples || []).filter(sm => sm.cvc != null && sm.depth != null)) { const c = vapClass(sm.cvc), len = Math.log10(Math.max(1, Math.min(sm.cvc, 1e4))) / 4 * 34; o.push(`<rect x="${x + bw + 2}" y="${Y(e - sm.depth) - 3}" width="${Math.max(1.5, len)}" height="6" style="fill:${c[2] === '#ffffff' ? '#d9dcd8' : c[2]};stroke:var(--ink)" stroke-width=".4"><title>${esc(`${p.b.name} ${sampleId(sm)}: ${sm.cvc} ppm at ${fu(sm.depth)}`)}</title></rect>`); }
     const w = p.b.well;
     if (S.sec.wells !== false && w?.installed && w.screenTop != null && w.screenBottom != null) {
@@ -4156,6 +4161,11 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
     }
   }
   if (xs && xs.plume !== false && (xs.param || xs.medium === 'vapour')) o.push(plumeSVG(pos, xs, X, Y, top, bw, W, H, m));
+  // offsets of boreholes projected onto a best-fit line, in up to three staggered rows under the drawing
+  { const ends = [-Infinity, -Infinity, -Infinity], yb = m.t + plotH;
+    for (const p of [...pos].sort((a, c) => a.d - c.d)) { if (Math.abs(p.off) < .5) continue; const t = `${fu(Math.abs(p.off), 1)} ${p.dir}`, w = t.length * 5.6, x = X(p.d);
+      let row = ends.findIndex(e => x - w / 2 > e + 4); if (row < 0) row = ends.indexOf(Math.min(...ends)); ends[row] = x + w / 2;
+      o.push(`<g><line x1="${x}" x2="${x}" y1="${yb + 2}" y2="${yb + 6 + row * 12}" style="stroke:var(--muted)" stroke-width=".6"/><text class="lbl2" x="${x}" y="${yb + 15 + row * 12}" text-anchor="middle">${esc(t)}<title>${esc(p.b.name)} is ${fu(Math.abs(p.off), 1)} ${p.dir} of the section line, projected onto it</title></text></g>`); } }
   const rowsEnd = [-Infinity, -Infinity, -Infinity];
   for (const p of pos) {
     const xx = X(p.d), w = Math.min(p.b.name.length, 12) * 7 + 10;
