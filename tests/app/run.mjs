@@ -695,6 +695,53 @@ app.whenReady().then(async () => {
     expect(r.btn && r.link && r.used?.date === r.d0 && r.used?.medium === 'soil', 'panel offers Use current view and links to the section page: ' + JSON.stringify(r));
   });
 
+  await check('model: properties are cited', async run => {
+    const r = await run(`(() => {
+      const uncited = []; for (const [p, c] of Object.entries(CHEM)) for (const k of ['koc', 'H', 'sol', 'hl']) if (c[k] != null && !(c.src?.[k] || '').trim()) uncited.push(p + '.' + k);
+      const b = modelInputs('benzene', {}), x = modelInputs('xylenes', {}), xe = modelInputs('xylenes', { koc: 363, H: .213, sol: 178 }), f1 = modelInputs('f1', {});
+      return { uncited, b: { koc: b.koc, H: b.H, sol: b.sol, missing: b.missing, src: b.src.koc, hl: b.hl, decay: b.decayNote }, xMissing: x.missing, xe: { missing: xe.missing, src: xe.src.koc }, f1: { mixture: f1.mixture, missing: f1.missing } };
+    })()`);
+    expect(!r.uncited.length, 'values without a source: ' + r.uncited);
+    // US EPA (1996) Soil Screening Guidance TBD: Table 39 calculated Koc 5.89E+01 L/kg; Table 36 H' 2.28E-01, S 1.75E+03 mg/L
+    expect(r.b.koc === 58.9 && r.b.H === 0.228 && r.b.sol === 1750 && !r.b.missing.length && /Table 39/.test(r.b.src), 'benzene properties: ' + JSON.stringify(r.b));
+    expect(r.b.hl == null && /no biodegradation/i.test(r.b.decay || ''), 'no half-life means no decay, said plainly: ' + JSON.stringify(r.b));
+    expect(r.xMissing.includes('Koc') && !r.xe.missing.length && r.xe.src === 'entered', 'xylenes need entered values: ' + JSON.stringify(r));
+    expect(r.f1.mixture && r.f1.missing.length, 'F1 is a mixture: ' + JSON.stringify(r.f1));
+  });
+
+  await check('model: Domenico against exact solutions and published values', async run => {
+    const r = await run(`(() => {
+      const out = {};
+      // Abramowitz and Stegun Table 7.1
+      out.erfc = [[.5, .4795001222], [1, .1572992071], [2, .0046777350], [0, 1]].map(([x, v]) => Math.abs(erfc(x) - v));
+      // 1-D limit (wide, deep source, no lateral or vertical spreading, no decay) against the full Ogata–Banks (1961) solution
+      const v = .05, ax = 1, D = ax * v, worst = []; for (const x of [10, 20, 40, 80]) for (const t of [200, 400, 800, 1600, 3200]) {
+        // Domenico keeps the first Ogata–Banks term; the second, exp(x/ax)·erfc((x+vt)/2√(ax v t)), is the known approximation (West et al. 2007)
+        const ob1 = erfc((x - v * t) / (2 * Math.sqrt(D * t))) / 2, ob = ogataBanks({ C0: 1, v, D, R: 1, x, t }), dm = domenico({ C0: 1, v, R: 1, ax, ay: 0, az: 0, k: 0, ks: 0, Y: 1e6, Z: 1e6, x, y: 0, z: 0, t });
+        if (ob1 > .01) worst.push(Math.abs(dm - ob1) / ob1); out.gap = Math.max(out.gap || 0, Math.abs(ob - dm)); }
+      out.ob = Math.max(...worst); out.obN = worst.length;
+      // at the front (x = vt) the dropped term is close to 1/sqrt(pi x/ax) (asymptotic), here x = 80 m, ax = 1 m
+      out.front = { gap: ogataBanks({ C0: 1, v, D, R: 1, x: 80, t: 1600 }) - domenico({ C0: 1, v, R: 1, ax, ay: 0, az: 0, k: 0, ks: 0, Y: 1e6, Z: 1e6, x: 80, y: 0, z: 0, t: 1600 }), est: 1 / Math.sqrt(Math.PI * 80) / 2 };
+      // steady state with decay against the exact 1-D steady solution C/C0 = exp[x/(2ax)(1 - sqrt(1 + 4k ax/v))]
+      out.ss = [5, 20, 60].map(x => { const k = .002, ex = Math.exp(x / (2 * ax) * (1 - Math.sqrt(1 + 4 * k * ax / v))); return Math.abs(domenico({ C0: 1, v, R: 1, ax, ay: 0, az: 0, k, ks: 0, Y: 1e6, Z: 1e6, x, y: 0, z: 0, t: 1e6 }) - ex) / ex; });
+      // retardation slows the front by R; upgradient is clean; the source holds C0 at its centre
+      out.ret = Math.abs(domenico({ C0: 1, v, R: 2, ax, ay: .1, az: 0, k: 0, ks: 0, Y: 10, Z: 3, x: 20, y: 0, z: 0, t: 800 }) - domenico({ C0: 1, v, R: 1, ax, ay: .1, az: 0, k: 0, ks: 0, Y: 10, Z: 3, x: 20, y: 0, z: 0, t: 400 }));
+      out.up = domenico({ C0: 1, v, R: 1, ax, ay: .1, az: 0, k: 0, ks: 0, Y: 10, Z: 3, x: -5, y: 0, z: 0, t: 800 });
+      out.src = domenico({ C0: 7, v, R: 1, ax, ay: .1, az: 0, k: 0, ks: 0, Y: 10, Z: 3, x: 1e-6, y: 0, z: 1, t: 8000 });
+      out.below = domenico({ C0: 1, v, R: 1, ax, ay: .1, az: 0, k: 0, ks: 0, Y: 10, Z: 3, x: 20, y: 0, z: 4, t: 800 });
+      // BIOSCREEN User's Manual (EPA/600/R-96/087), Example 1, Keesler AFB: plume length 280 ft gives alpha x 13.3 ft and alpha y 1.3 ft (Xu and Eckstein 1995);
+      // Koc 38 L/kg, foc 0.0057 %, bulk density 1.7 kg/L, porosity 0.3 give R = 1.0
+      const a = xuEckstein(280 * .3048) / .3048; out.ax = +a.toFixed(1); out.ay = +(a / 10).toFixed(1); out.R = +retardation(38, .000057, 1.7, .3).toFixed(1);
+      return out;
+    })()`);
+    expect(r.erfc.every(e => e < 2e-7), 'erfc against A&S Table 7.1: ' + JSON.stringify(r.erfc));
+    expect(r.obN >= 10 && r.ob < .01, 'Domenico within 1 % of the Ogata–Banks first term in the 1-D limit: ' + r.ob + ' over ' + r.obN);
+    expect(Math.abs(r.front.gap - r.front.est) / r.front.est < .05, 'the dropped second term matches its asymptotic size at the front: ' + JSON.stringify(r.front));
+    expect(r.ss.every(e => e < 1e-6), 'steady state with decay: ' + JSON.stringify(r.ss));
+    expect(r.ret < 1e-12 && r.up === 0 && Math.abs(r.src - 7) < 1e-6 && r.below < 1e-9, 'retardation, upgradient, source, below the source: ' + JSON.stringify(r));
+    expect(r.ax === 13.3 && r.ay === 1.3 && r.R === 1.0, 'BIOSCREEN Example 1 printed values: ' + JSON.stringify(r));
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
