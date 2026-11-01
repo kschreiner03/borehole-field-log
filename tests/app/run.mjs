@@ -768,7 +768,7 @@ app.whenReady().then(async () => {
       S.secIds = new Set(); S.xs = { ...S.xs, date: '', medium: 'groundwater', param: 'benzene', plume: false, model: true }; goTab('xsec'); await w(300);
       const out = {}, txt = document.querySelector('#xs-draw').textContent;
       out.label = txt.includes('Model, not measured'); out.panel = !!document.querySelector('[data-mdl="Y"]'); out.panelOk = !/Not drawn yet/.test(document.querySelector('#xs-model-sec')?.textContent || '') && document.querySelector('[data-mdl="Y"]')?.placeholder === '10';
-      const run0 = modelRun(''); out.ok = run0.ok; out.missing = run0.missing; out.C0 = run0.P?.C0; out.srcNote = run0.P?.src?.C0;
+      const run0 = modelRun(''); out.ok = run0.ok; out.missing = run0.missing; out.C0 = run0.P?.C0; out.srcNote = run0.P?.src?.C0; out.az = run0.P?.az; out.flowAz = run0.P?.flowAz; out.flowDir = gwFlow().az;
       const g8 = modelGrid('', 8), g4 = modelGrid('', 4); out.reach = [g8.reach, g4.reach]; out.len = g8.len;
       out.up = g4.cells.filter(c => c.xd < 0 && c.c != null).every(c => c.c === 0); out.nUp = g4.cells.filter(c => c.xd < 0).length;
       out.contour = document.querySelectorAll('#xs-draw svg [data-model-contour]').length;
@@ -778,6 +778,7 @@ app.whenReady().then(async () => {
       return out;
     })()`);
     expect(r.ok && r.C0 === .5 && /measured/.test(r.srcNote || ''), 'model runs from the measured source: ' + JSON.stringify(r));
+    expect(r.az === 0 && r.flowAz === r.flowDir, 'vertical dispersivity stays the default 0, flow azimuth kept separately: ' + JSON.stringify({ az: r.az, flowAz: r.flowAz, flowDir: r.flowDir }));
     expect(r.label && r.panel && r.panelOk && r.contour > 0, 'forecast drawn, labelled, with inputs panel: ' + JSON.stringify(r));
     expect(r.reach[0] > 0 && Math.abs(r.reach[0] - r.reach[1]) < .01 * r.len, 'halving the grid moves the ×1 reach < 1 % of the section: ' + JSON.stringify(r));
     expect(r.nUp > 0 && r.up, 'upgradient of the source is clean: ' + JSON.stringify(r));
@@ -865,6 +866,34 @@ app.whenReady().then(async () => {
       for (const b of projList()) if (b.well?.installed && b.elevation != null) b.water = [{ id: uid('w'), date: '2026-09-01', depth: b.elevation - 640, measured: b.elevation - 640, ref: 'gs', kind: 'static' }];
       setSite({ ...siteOf(), model: { src: 'gw', srcBh: src.id } }); drawXsec(); want(modelRun('').missing.some(m => /flat/i.test(m)), 'I6 flat: ' + modelRun('').missing);
       } catch (e) { F.push('THREW: ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('example: cross-section shows every feature', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        document.querySelector('[data-act="load-xs"]') ? document.querySelector('[data-act="load-xs"]').click() : loadXsExample(); await w(400);
+        want(S.tab === 'xsec', 'opens on the Cross-section page: ' + S.tab);
+        const d = document.querySelector('#xs-draw'), txt = d?.textContent || '', svg = d?.querySelector('svg');
+        want(svg && [...svg.querySelectorAll('text title')].filter(t => /projected onto it/.test(t.textContent)).length >= 2, 'offsets of off-line boreholes');
+        want(Object.keys(siteOf()?.xsec?.alias || {}).length >= 1 && svg.querySelectorAll('path[data-unit="join"]').length > 0 && svg.querySelectorAll('path[data-unit="pinch"]').length > 0, 'layer pairing, joins and a pinch-out');
+        want(svg.querySelector('[data-ground] title') && svg.querySelectorAll('[data-wtick]').length >= 6 && svg.querySelectorAll('[data-wjoin]').length >= 3, 'ground and dated water');
+        want(xsDates(sectionList()).length >= 6 && document.querySelector('#xs-play') && !document.querySelector('#xs-play').disabled, 'timeline with play');
+        want(svg.querySelectorAll('[data-pt]').length >= 5 && svg.querySelectorAll('path[data-contour]').length >= 1, 'measured plume with contours');
+        const run0 = modelRun(S.xs.date); want(run0.ok, 'forecast runs: ' + run0.missing);
+        want(svg.querySelector('[data-model-legend]') && svg.querySelectorAll('[data-model-contour]').length >= 1 && /Model, not measured/.test(txt), 'forecast drawn and labelled');
+        const C = modelChecks(run0); want(C.residuals.length >= 6 && C.checks.filter(c => !c.info && !/front/i.test(c.name)).every(c => c.ok), 'checks pass with later rounds: ' + JSON.stringify(C.checks.map(c => [c.name, c.ok])) + ' residuals ' + C.residuals.length);
+        want(projList().filter(b => (b.slug || []).length).length >= 3 && projList().some(b => (b.water || []).some(x => x.kind === 'strike')), 'slug tests and strikes');
+        want(projList().some(b => b.samples.some(sm => exceeds(labVal(sm, 'benzene'), 'benzene'))) && projList().some(b => b.gwSamples.some(s => gwExceeds(gwVal(s, 'benzene'), 'benzene'))), 'soil and groundwater exceedances');
+        want(repLayout().pages.some(p => p.items?.some(it => it.t === 'section' && it.o?.xs?.model)), 'report page with the section and forecast');
+        setXs('round', false); setXs('medium', 'vapour'); await w(100); want(document.querySelectorAll('#xs-draw svg [data-pt]').length >= 20, 'vapour plume');
+        setXs('medium', 'soil'); setXs('param', 'benzene'); await w(100); want(document.querySelectorAll('#xs-draw svg [data-pt]').length >= 10, 'soil plume');
+        const last = xsDates(sectionList()).pop(); setXs('medium', 'groundwater'); setXs('round', false); xsSetDate(last); await w(150); want(/left out of the contours/.test(document.querySelector('#xs-draw').textContent), 'high detection limit note on the latest round');
+        want(!(window.__errs || []).length, 'page errors: ' + (window.__errs || []).join(' | '));
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       return F;
     })()`);
     expect(!r.length, r.join(' || '));
