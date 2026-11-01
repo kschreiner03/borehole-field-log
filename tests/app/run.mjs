@@ -591,7 +591,7 @@ app.whenReady().then(async () => {
       S.bh.get(b.id).status = 'draft';
       renderView(true); await w(100); const nd = S.bh.get(b.id).gwSamples.length; S.bh.get(b.id).gwSamples.push({ id: 'tmp', date: '2020-01-01', res: {} }); renderView(true); await w(100); [...document.querySelectorAll('[data-act="gw-del"]')][0]?.click(); await w(100); out.delOk = S.bh.get(b.id).gwSamples.length === nd && !S.bh.get(b.id).gwSamples.some(s => s.id === 'tmp');
       // RF5: a water sample in ug/L
-      const P = parseLabTable([['Sample ID', 'Analyte', 'Result', 'Units', 'Sample date'], ['MW-1', 'Benzene', '12', 'ug/L', '2026-08-01']]); out.parsed = P.samples[0];
+      const P = parseLabTable([['Sample ID', 'Analyte', 'Result', 'Units', 'Sample date'], ['MW-1', 'Benzene', '12', 'ug/L', '2026-08-01']]); out.parsed = P.samples[0]; out.paste = parseLabTable([['Sample ID', 'Analyte', 'Result', 'Units'], ['MW-1 1.5', 'Chloride', '850', 'mg/L']]).samples[0];
       await importLabFile(new File(['Sample ID,Analyte,Result,Units,Sample date\\nMW-1,Benzene,12,ug/L,2026-08-01\\nMW-1,Toluene,<0.5,ug/L,2026-08-01\\n'], 'gw.csv', { type: 'text/csv' })); await w(150);
       out.dest = document.querySelector('[data-labmap="0"]')?.value; importLabGo(); await w(150);
       out.imported = S.bh.get(b.id).gwSamples.find(s => s.date === '2026-08-01');
@@ -602,6 +602,7 @@ app.whenReady().then(async () => {
     expect(r.guide === 0.005 && r.over, 'guideline saved and exceedance marked: ' + JSON.stringify(r));
     expect(r.lockedN === 0, 'issued borehole took a new row');
     expect(r.delOk, 'delete removes the clicked row');
+    expect(r.paste && !r.paste.water && r.paste.res.cl.v === 850, 'saturated-paste chloride stays soil: ' + JSON.stringify(r.paste));
     expect(r.parsed && r.parsed.res.benzene.v === 0.012 && r.parsed.water && r.parsed.unit0 === 'ug/L', 'ug/L converted: ' + JSON.stringify(r.parsed));
     expect(/\|gw$/.test(r.dest || '') && r.imported && r.imported.res.benzene.v === 0.012 && r.imported.res.toluene.lt === true && r.imported.unit0 === 'ug/L', 'imported as a groundwater sample: ' + JSON.stringify(r));
   });
