@@ -742,6 +742,23 @@ app.whenReady().then(async () => {
     expect(r.ax === 13.3 && r.ay === 1.3 && r.R === 1.0, 'BIOSCREEN Example 1 printed values: ' + JSON.stringify(r));
   });
 
+  await check('model: soil-to-groundwater source', async run => {
+    const r = await run(`(() => {
+      // US EPA (1996) Soil Screening Guidance User's Guide, EPA/540/R-96/018, Equations 10–12. Hand calculation:
+      // Kd = 58.9 × 0.002 = 0.1178 L/kg; Kd + (0.30 + 0.13 × 0.228)/1.5 = 0.33756; Cw = 10 / 0.33756 = 29.624 mg/L
+      // d = (0.0112 × 20²)^0.5 + 5{1 − exp[−(20 × 0.18)/(300 × 0.005 × 5)]} = 2.11660 + 1.90608 = 4.02268 m
+      // DF = 1 + (300 × 0.005 × 4.02268)/(0.18 × 20) = 2.67612; Cgw = 29.624 / 2.67612 = 11.070 mg/L
+      const base = { Cs: 10, koc: 58.9, foc: .002, H: .228, thw: .30, tha: .13, rhob: 1.5, K: 300, i: .005, I: .18, L: 20, da: 5, sol: 1750 };
+      const a = leachSource(base), b = leachSource({ ...base, I: .36 }), m = leachSource({ ...base, foc: null }), big = leachSource({ ...base, Cs: 1e5 });
+      return { a, b: b.Cgw, m, big: { capped: big.aboveSol, note: big.note } };
+    })()`);
+    const sig = (x, n) => +x.toPrecision(n);
+    expect(sig(r.a.Kd, 4) === .1178 && sig(r.a.Cw, 5) === 29.624 && sig(r.a.d, 5) === 4.0227 && sig(r.a.DF, 5) === 2.6761 && sig(r.a.Cgw, 5) === 11.07, 'hand calculation: ' + JSON.stringify(r.a));
+    expect(r.b > r.a.Cgw, 'more recharge leaches more into the mixing zone here: ' + r.b);
+    expect(r.m.missing && r.m.missing.includes('foc'), 'missing foc reported: ' + JSON.stringify(r.m));
+    expect(r.big.capped && /solubility/i.test(r.big.note || ''), 'above solubility flagged: ' + JSON.stringify(r.big));
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
