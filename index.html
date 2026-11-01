@@ -2511,7 +2511,7 @@ function renderMain() {
         <div class="step"><span class="n">2</span><h3>Log on site</h3><p>Log borehole walks you through setup, soil, samples, water and well. Tap the soil, set the depth; the log draws itself as you go.</p></div>
         <div class="step"><span class="n">3</span><h3>Get the PDF</h3><p>Download a finished log with symbols, tests and the standpipe, or a full report package.</p></div>
       </div>
-      <div class="actions"><button class="btn" data-act="load-lloyd" ${S.readOnly ? 'disabled' : ''}>Example: oil lease delineation</button><button class="btn" data-act="load-sk" ${S.readOnly ? 'disabled' : ''}>Example: service-station plume</button><button class="btn" data-act="load-dl" ${S.readOnly ? 'disabled' : ''}>Example: Dawn Lake excavation</button><button class="btn" data-act="import" ${S.readOnly ? 'disabled' : ''}>Import from Excel</button><button class="btn" data-act="restore" ${S.readOnly ? 'disabled' : ''}>Open a backup</button></div>
+      <div class="actions"><button class="btn" data-act="load-lloyd" ${S.readOnly ? 'disabled' : ''}>Example: oil lease delineation</button><button class="btn" data-act="load-sk" ${S.readOnly ? 'disabled' : ''}>Example: service-station plume</button><button class="btn" data-act="load-dl" ${S.readOnly ? 'disabled' : ''}>Example: Dawn Lake excavation</button><button class="btn" data-act="load-xs" ${S.readOnly ? 'disabled' : ''}>Example: cross-section and plume</button><button class="btn" data-act="import" ${S.readOnly ? 'disabled' : ''}>Import from Excel</button><button class="btn" data-act="restore" ${S.readOnly ? 'disabled' : ''}>Open a backup</button></div>
     </div>`;
     return;
   }
@@ -4109,7 +4109,7 @@ function modelRun(date, xs = S.xs) {
   if (P.srcHl > 0 && !P.start) missing.push('a release date: a source half-life needs one (at steady state a decaying source would be gone)');
   P.v = F.K != null ? F.v * 86400 : null; P.src.v = F.K != null ? `K·i/nₑ from the flow calculation (${F.nK} slug test${F.nK > 1 ? 's' : ''}, nₑ ${F.ne} assumed)` : '';
   P.ne = F.ne; P.R = P.koc != null ? retardation(P.koc, P.foc, P.rhob, F.ne) : null; P.src.R = '1 + Koc·foc·ρb/nₑ';
-  P.f = [-F.bx / F.i, -F.by / F.i]; P.fit = F.fit; P.az = F.az;
+  P.f = [-F.bx / F.i, -F.by / F.i]; P.fit = F.fit; P.flowAz = F.az;   // flow azimuth; P.az is the vertical dispersivity
   // the source: a well with a measured concentration, or soil results leached by recharge
   const sb = S.bh.get(u.srcBh) || projList().filter(b => b.easting != null).sort((a, c) => maxAt(c, P.param, u.src) - maxAt(a, P.param, u.src))[0];
   if (!sb || sb.easting == null) missing.push('a source borehole with coordinates'); else {
@@ -4181,7 +4181,7 @@ function xsModelHTML() {
       <tr><td>Retardation factor, R</td><td class="r">${fmt(P.R)}</td><td>–</td><td class="note">${esc(P.src.R || '')}</td></tr>
       <tr><td>Source concentration, C₀</td><td class="r">${fmt(P.C0)}</td><td>mg/L</td><td class="note">${esc(P.src.C0 || '')}</td></tr>
     </tbody></table></div>
-    <p class="note">Assumes uniform soil, steady uniform flow along the fitted direction (${P.az != null ? Math.round(P.az) + '°' : '—'}), no free product. ${esc(modelInputs(P.param, u).decayNote || '')}. Placeholders show the value used; type to replace it.</p>${typeof xsChecksHTML === 'function' ? xsChecksHTML(run) : ''}` : '<p class="note">Tick “Show on the section” to forecast a dissolved plume from a source well or from soil results.</p>'}
+    <p class="note">Assumes uniform soil, steady uniform flow along the fitted direction (${P.flowAz != null ? Math.round(P.flowAz) + '°' : '—'}), no free product. ${esc(modelInputs(P.param, u).decayNote || '')}. Placeholders show the value used; type to replace it.</p>${typeof xsChecksHTML === 'function' ? xsChecksHTML(run) : ''}` : '<p class="note">Tick “Show on the section” to forecast a dissolved plume from a source well or from soil results.</p>'}
   </div></section>`;
 }
 /* verification of a forecast, run live with the site's own numbers */
@@ -8839,6 +8839,74 @@ function dlBoreholes() {
   });
   return out;
 }
+/* ---------- worked example for the Cross-section page: a former service station (fictional) ----------
+   Every feature of the page has something to show: boreholes off the section line, a unit logged under another name
+   (paired by hand) and one that pinches out, six monitoring rounds with spring recharge, strikes while drilling,
+   soil, vapour and groundwater results with exceedances and non-detects, slug tests for the flow calculation, and a
+   forecast whose later rounds can be checked. Groundwater results are generated with the same Domenico model the app
+   uses, with scatter, so the example is consistent; they are not real data. */
+const XS_PROJ = 'Cross-section example: Former Service Station (fictional)';
+function xsBoreholes() {
+  let seed = 41; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const [E0, N0] = llToUtm(52.13, -106.62, 13), rounds = ['2023-05-16', '2023-10-17', '2024-05-14', '2024-10-15', '2025-05-13', '2025-10-14'], season = [.25, 0, .3, .02, .22, -.03];
+  // x east along the flow (the water table falls to the east), y north; source at the former pump island near MW-1
+  const plan = [['MW-0', -20, 15, 1], ['MW-1', 0, 0, 1], ['MW-2', 15, 0, 1], ['MW-3', 30, -1, 1], ['MW-4', 50, 1, 1], ['MW-5', 75, 0, 1], ['MW-6', 105, 0, 1], ['MW-7', 40, -10, 1],
+    ['BH-7', 6, 8, 0], ['BH-8', 22, -12, 0], ['BH-9', 60, 9, 0]];
+  const i = .006, ne = S.co.ne ?? .25, Kg = Math.cbrt(4.6e-5 * 5.5e-5 * 5.0e-5), v = Kg * i / ne * 86400, start = '2021-06-01';
+  const M = { C0: { benzene: 2.4, toluene: 1.5 }, koc: { benzene: 58.9, toluene: 182 } }, R = p => retardation(M.koc[p], .005, 1.7, ne);
+  const gw = (p, x, y, z, date) => domenico({ C0: M.C0[p], v, R: R(p), ax: 2.5, ay: .25, az: 0, Y: 10, Z: 3, x, y, z, t: (Date.parse(date) - Date.parse(start)) / 864e5 });
+  const L = (top, bottom, uscs, mods, consistency, moisture, colour, other, origin, unit) => ({ id: uid('l'), top, bottom, uscs, mods, consistency, moisture, colour, other, origin, unit, texture: '', hz: '' });
+  const W = (date, depth, kind) => ({ id: uid('w'), date, depth: +depth.toFixed(2), measured: +depth.toFixed(2), ref: 'gs', kind });
+  const slug = (date, K) => { const rc = .02625, Rw = .075, Le = 3, H0 = .8, T0 = rc * rc * Math.log(Le / Rw) / (2 * Le * K); return { id: uid('sl'), date, kind: 'rising', rc, R: Rw, Le, H0, data: [0, .25, .5, 1, 1.5, 2, 3].map(k => [+(k * T0).toFixed(2), +(H0 * Math.exp(-k)).toFixed(5)]) }; };
+  const nd = (v, dl) => v < dl ? { v: dl, lt: true } : { v: +v.toPrecision(2), lt: false };
+  return plan.map(([name, x, y, isWell], k) => {
+    const ground = +(520.6 - .0075 * (x + 20) + .15 * Math.sin(x / 25) + (rnd() - .5) * .06).toFixed(2), head = 518.7 - i * x, wt = ground - (head + season[5]);
+    const date = `2023-04-${String(18 + Math.floor(k / 4)).padStart(2, '0')}`, eoh = 6.5;
+    // upper clay till pinches out at MW-6; BH-8's logger called it "Till" (paired with Clay till on the page)
+    const tillB = name === 'MW-6' ? .3 : +(1.6 + rnd() * .4).toFixed(2), sandB = +(4.9 + rnd() * .3).toFixed(2), r2 = Math.hypot(x - 3, y - 2);
+    const layers = [L(0, .3, 'TOP', 'silty', '', 'Moist', 'black', 'rootlets', '', 'Topsoil')];
+    if (tillB > .3) layers.push(L(.3, tillB, 'CL', 'silty, some sand', 'Firm', 'Moist', 'brown', 'oxide staining', 'till', name === 'BH-8' ? 'Till' : 'Clay till'));
+    layers.push(L(tillB, sandB, 'SP', 'fine to medium grained, trace silt', 'Compact', 'Moist to wet', 'grey-brown', r2 < 14 ? 'hydrocarbon odour and grey staining near the water table' : '', 'glaciofluvial', 'Glaciofluvial sand'),
+      L(sandB, eoh, 'CL', 'silty, trace gravel', 'Stiff', 'Moist', 'grey', '', 'till', 'Lower clay till'));
+    // soil: residual hydrocarbon in the smear zone around the source; headspace vapour follows it and the dissolved plume
+    const smear = z => Math.exp(-((z - wt) ** 2) / (2 * .6 * .6)), src = Math.exp(-(r2 * r2) / (2 * 7 * 7));
+    const samples = []; let no = 0;
+    for (let d = .75; d < eoh - .1; d += .75) { no++;
+      const plume = d > wt ? gw('benzene', x, y, Math.max(0, d - wt), '2023-04-20') / M.C0.benzene : 0, cvc = Math.round(8 + 1600 * src * (.25 + .75 * smear(d)) + 250 * plume * smear(d) + rnd() * 6);
+      samples.push({ id: uid('s'), no, depth: +d.toFixed(2), type: no % 2 ? 'A' : 'SS', b1: null, b2: null, b3: null, n: null, rec: null, rqd: null, w: +(d > wt ? 19 + rnd() * 3 : 12 + rnd() * 4).toFixed(1), pl: null, ll: null, pp: null, su: null, so4: null, cvc: cvc < 10 ? cvc : Math.round(cvc / 5) * 5, gsd: [], gravel: null, sand: null, silt: null, clay: null, note: '' }); }
+    for (const sm of [samples.reduce((a, c) => c.cvc > a.cvc ? c : a, samples[0]), samples[samples.length - 1], samples[1]].filter((q, j, a) => a.indexOf(q) === j)) {
+      const f = sm.cvc / 1600; sm.lab = { benzene: nd(9 * f * (.85 + rnd() * .3), .005), toluene: nd(6 * f * (.85 + rnd() * .3), .05), ethylbenzene: nd(2 * f, .01), xylenes: nd(8 * f, .05) };
+      sm.labMeta = { lab: 'Example Analytical Labs', report: `EAL-23-${4100 + k * 3 + sm.no}`, date: '2023-05-02' }; }
+    const water = [W(date, wt + .45, 'strike'), W(date, wt + .2, 'completion')];
+    const b = { ...blankBorehole(name), id: uid('bh-'), name, example: true, project: XS_PROJ, projNo: 'EX-2026-XS', client: 'Example Petroleum Ltd.', location: 'Former service station, Saskatoon, Saskatchewan (fictional site)', contractor: 'Example Drilling Services', rig: 'Track-mounted auger', method: 'Solid-stem auger', diameter: 150, date, dateEnd: date, logger: 'J.K.', reviewer: 'L.M., P.Eng.',
+      easting: +(E0 + x).toFixed(2), northing: +(N0 + y).toFixed(2), crs: 'UTM NAD83(CSRS) Zone 13', elevation: ground, datum: 'Geodetic (CGVD2013)', termination: isWell ? 'Target depth reached; monitoring well installed' : 'Target depth reached; backfilled with bentonite',
+      hammer: 'Automatic trip', er: 80, gamma: 19, rodStick: 1.2, layers, samples, water, gwSamples: [], slug: [], notes: 'Example data (fictional), made to show the Cross-section page. Groundwater results are generated with the Domenico model plus scatter.', events: [], history: [{ at: date + 'T20:00:00.000Z', by: 'J.K.', what: 'Borehole created' }], status: 'draft',
+      well: isWell ? { installed: true, type: 'well', dia: 50, material: '50 mm PVC Sch 40', stickup: .9, screenTop: 2.5, screenBottom: 5.5, slot: '0.25 mm', depth: 5.6, annulus: [{ id: uid('a'), top: 0, bottom: 2.2, mat: 'bentonite' }, { id: uid('a'), top: 2.2, bottom: 5.6, mat: 'sand' }] } : blankWell() };
+    if (isWell) {
+      rounds.forEach((dt, j) => { const wtj = ground - (head + season[j]); water.push(W(dt, wtj + (rnd() - .5) * .02, 'static'));
+        const z = (Math.max(2.5, wtj) + 5.5) / 2 - wtj, res = {};
+        for (const p of ['benzene', 'toluene']) res[p] = nd(gw(p, x, y, z, dt) * (.8 + rnd() * .45), .001);
+        res.ethylbenzene = { v: .001, lt: true }; res.xylenes = { v: .002, lt: true };
+        if (name === 'MW-6' && j === 5) res.benzene = { v: .01, lt: true };   // diluted at the lab: detection limit above the guideline
+        b.gwSamples.push({ id: uid('gs'), date: dt, sid: `${name}-${dt.slice(2, 4)}${dt.slice(5, 7)}`, lab: 'Example Analytical Labs', report: `EAL-${dt.slice(2, 4)}-${5200 + k * 10 + j}`, res, unit0: 'mg/L' }); });
+      if (['MW-2', 'MW-4', 'MW-5'].includes(name)) b.slug.push(slug('2023-05-17', { 'MW-2': 4.6e-5, 'MW-4': 5.5e-5, 'MW-5': 5.0e-5 }[name]));
+    }
+    return b;
+  });
+}
+function loadXsExample() {
+  if (S.readOnly) return;
+  let list = sortedList().filter(b => b.project === XS_PROJ);
+  if (!list.length) { for (const b of xsBoreholes()) { S.bh.set(b.id, normalize(b)); store.save(b); } list = sortedList().filter(b => b.project === XS_PROJ); }
+  const id = n => list.find(b => b.name === n)?.id, view = { date: '2024-05-14', medium: 'groundwater', param: 'benzene', round: true, plume: true, model: true };
+  const pages = REPORT_PRESETS.env[1](); pages.splice(pages.findIndex(p => p.orient === 'land') + 1, 0, newPage('free', { orient: 'land', title: 'CROSS-SECTION A–A′: BENZENE IN GROUNDWATER, MAY 2024', items: [{ ...newItem('section', LB.x, LB.y, { w: LB.w, h: LB.h }), o: { xs: { ...view } } }] }));
+  setSite({ guideSrc: 'Example screening values (fictional): replace with the guideline that applies to the site', guide: { benzene: .046, toluene: .52, ethylbenzene: .073, xylenes: .99 },
+    gwGuide: { benzene: .005, toluene: .024, ethylbenzene: .0024, xylenes: .3 }, xsec: { alias: { [id('BH-8') + '|Till']: 'Clay till' } },
+    model: { param: 'benzene', src: 'gw', srcBh: id('MW-1'), start: '2021-06-01', ax: 2.5, ay: .25 }, report: { pages } }, XS_PROJ);
+  S.sel = id('MW-1'); S.layer = 0; S.round = ''; S.secIds = new Set(); S.xs = { ...S.xs, ...view }; lsSet('bhlog.xs', JSON.stringify(S.xs));
+  S.tab = 'xsec'; S.formStale = true; render();
+  toast('Loaded the cross-section example (fictional): 8 wells, 3 boreholes, 6 monitoring rounds, with plume and forecast.');
+}
 function loadDlExample() {
   if (S.readOnly) return;
   let first = sortedList().find(b => b.project === DL_PROJ);
@@ -9032,6 +9100,7 @@ document.addEventListener('click', e => {
     case 'load-lloyd': loadLloydExample(); break;
     case 'load-sk': loadSkExample(); break;
     case 'load-dl': loadDlExample(); break;
+    case 'load-xs': loadXsExample(); break;
     case 'grid-bh': if (b) { S.gridOne = true; S.tsheet = 'layers'; lsSet('bhlog.tsheet', 'layers'); goTab('table'); setTimeout(() => $('.dgrid input')?.focus(), 0); } break;
     case 'clear-examples': for (const x of [...S.bh.values()]) if (x.example) store.remove(x.id); S.formStale = true; render(); break;
     case 'delete': openDelete(); break;
@@ -9138,7 +9207,7 @@ const MENUS = [
   ['Project', [['New borehole', 'new'], ['Monitoring round…', 'round'], ['Copy details to all boreholes…', 'apply-project'], '-', ['Site drawing…', 'site-img'], ['Import locations…', 'imp-loc'], ['Import shapes…', 'imp-shp'], ['Add imagery…', 'imp-img'], '-', ['Remove example boreholes', 'clear-examples']]],
   ['Boreholes', [['Log step by step', 'qlog', 'Mod+L'], ['Add sample', 'quick'], ['Drilling note', 'quick-note'], '-', ['Check log', 'check-log'], ['Mark ready for review', 'to-review'], ['Issue…', 'issue'], ['Revise', 'revise'], ['Comments', 'comments'], ['History', 'history'], '-',
     ['Duplicate', 'duplicate'], ['Save as template', 'bh-tpl'], ['Delete…', 'delete']]],
-  ['Tools', [['Find anything…', 'find', 'Mod+K'], ['Log columns…', 'log-cols'], ['Graphs…', 'graphs'], ['Company, logo and initials…', 'settings'], '-', ['Load example: oil lease delineation', 'load-lloyd'], ['Load example: service-station plume', 'load-sk'], ['Load example: Dawn Lake excavation', 'load-dl']]],
+  ['Tools', [['Find anything…', 'find', 'Mod+K'], ['Log columns…', 'log-cols'], ['Graphs…', 'graphs'], ['Company, logo and initials…', 'settings'], '-', ['Load example: oil lease delineation', 'load-lloyd'], ['Load example: service-station plume', 'load-sk'], ['Load example: Dawn Lake excavation', 'load-dl'], ['Load example: cross-section and plume', 'load-xs']]],
   ['Reports', [['This log (PDF)', 'pdf-one', 'Mod+P'], ['All logs in the project (PDF)', 'pdf-all'], ['Report appendix (PDF)…', 'appendix'], ['Location plan (PDF)', 'plan-pdf'], '-', ['Report editor', 'tab:compose'], ['Excel workbook…', 'export']]],
   ['Help', [['Keyboard shortcuts', 'shortcuts', 'F1'], ['About Borehole Field Log', 'about']]],
 ];
@@ -9177,7 +9246,7 @@ function menuEnabled(act) {
   if (act === 'revise') return !!b && b.status === 'issued' && !S.readOnly;
   if (act === 'undo') return !!hist.undo.length && !S.readOnly;
   if (act === 'redo') return !!hist.redo.length && !S.readOnly;
-  if (['new', 'new-project', 'import', 'imp-lab', 'round', 'apply-project', 'site-img', 'imp-loc', 'imp-shp', 'imp-img', 'load-lloyd', 'load-sk', 'load-dl', 'qlog'].includes(act)) return !S.readOnly;
+  if (['new', 'new-project', 'import', 'imp-lab', 'round', 'apply-project', 'site-img', 'imp-loc', 'imp-shp', 'imp-img', 'load-lloyd', 'load-sk', 'load-dl', 'load-xs', 'qlog'].includes(act)) return !S.readOnly;
   if (act === 'clear-examples') return !S.readOnly && [...S.bh.values()].some(x => x.example);
   return true;
 }
