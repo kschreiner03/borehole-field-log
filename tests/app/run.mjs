@@ -532,6 +532,27 @@ app.whenReady().then(async () => {
     expect(r.link && !r.old, 'map page links to the section page: ' + JSON.stringify(r));
   });
 
+  await check('cross-section: offsets, interpreted ground and unit pairing', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms));
+      const mk = (name, de, dn, unit) => { const b = blankBorehole(name); Object.assign(b, { project: 'Section test', easting: 500000 + de, northing: 6000000 + dn, crs: 'UTM NAD83(CSRS) Zone 12', elevation: 600, layers: [{ id: uid('l'), top: 0, bottom: 3, uscs: 'cl', unit }] }); const n = normalize(b); S.bh.set(n.id, n); return n; };
+      const A = mk('XA', 0, 0, 'Upper clay'), B = mk('XB', 100, 0, 'Upper clay'), C = mk('XC', 50, 6, 'Clay till'), D = mk('XD', 50, -6, 'Upper clay');
+      S.sel = A.id; S.secIds = new Set(); goTab('xsec'); await w(200);
+      const svg = document.querySelector('#xs-draw svg'), texts = [...svg.querySelectorAll('text')].map(t => t.textContent);
+      const ground = svg.querySelector('[data-ground]'), out = { offC: texts.find(t => /XC|6\\.0/.test(t) && /projected/.test(t)) || texts.filter(t => /projected/.test(t)), ground: ground && { dash: ground.getAttribute('stroke-dasharray'), title: ground.querySelector('title')?.textContent } };
+      const joins = () => [...document.querySelectorAll('#xs-draw svg path[data-unit]')].map(p => p.dataset.unit);
+      out.before = joins();
+      const sel = document.querySelector('[data-xsalias="' + C.id + '|Clay till"]'); out.ui = !!sel; if (sel) { sel.value = 'Upper clay'; sel.dispatchEvent(new Event('change', { bubbles: true })); } await w(100); out.after = joins(); out.saved = siteOf()?.xsec?.alias?.[C.id + '|Clay till'];
+      // RF4: two boreholes at the same place
+      const E = mk('XE', 100, 0, 'Upper clay'); drawXsec(); out.finite = !/NaN|Infinity/.test(document.querySelector('#xs-draw').innerHTML);
+      return out;
+    })()`);
+    expect(JSON.stringify(r.offC).includes('6.0 m') && JSON.stringify(r.offC).includes('projected'), 'off-line label: ' + JSON.stringify(r.offC));
+    expect(r.ground && r.ground.dash && /interpolated between boreholes/.test(r.ground.title || ''), 'ground marked interpolated: ' + JSON.stringify(r.ground));
+    expect(r.ui && r.saved === 'Upper clay' && r.after.filter(u => u === 'join').length > r.before.filter(u => u === 'join').length, 'alias joins units: ' + JSON.stringify(r));
+    expect(r.finite, 'coincident boreholes give NaN/Infinity');
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
