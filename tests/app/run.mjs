@@ -899,6 +899,28 @@ app.whenReady().then(async () => {
     expect(!r.length, r.join(' || '));
   });
 
+  await check('cross-section: borehole names never overlap', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        for (const width of [0, 640]) {
+          const d = document.querySelector('#xs-draw'); if (width) d.style.width = width + 'px'; drawXsec(); await w(100);
+          const svg = d.querySelector('svg'), names = [...svg.querySelectorAll('text[data-bhname]')];
+          want(names.length === sectionList().length, width + ': one name per borehole: ' + names.length);
+          const bb = names.map(t => t.getBBox());
+          for (let a = 0; a < bb.length; a++) for (let c = a + 1; c < bb.length; c++) { const p = bb[a], q = bb[c];
+            if (p.x < q.x + q.width && q.x < p.x + p.width && p.y < q.y + q.height && q.y < p.y + p.height) want(false, width + ': ' + names[a].textContent + ' overlaps ' + names[c].textContent); }
+          const others = [...svg.querySelectorAll('text:not([data-bhname])')].filter(t => t.textContent.trim()).map(t => [t.textContent.slice(0, 30), t.getBBox()]);
+          bb.forEach((p, a) => others.forEach(([lab, q]) => { if (p.x < q.x + q.width && q.x < p.x + p.width && p.y < q.y + q.height && q.y < p.y + p.height) want(false, width + ': ' + names[a].textContent + ' overlaps text "' + lab + '"'); }));
+          const lowest = Math.max(...bb.map(b => b.y + b.height)), colTop = Math.min(...[...svg.querySelectorAll('g > rect')].map(r => r.getBBox().y));
+          want(lowest <= colTop, width + ': names sit above every column and casing: ' + lowest.toFixed(1) + ' > ' + colTop.toFixed(1));
+        }
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('example: cross-section in the project picker and menu', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
