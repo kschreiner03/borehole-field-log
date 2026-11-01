@@ -899,6 +899,25 @@ app.whenReady().then(async () => {
     expect(!r.length, r.join(' || '));
   });
 
+  await check('example: cross-section in the project picker and menu', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        for (const b of [...S.bh.values()].filter(b => b.project === XS_PROJ)) { S.bh.delete(b.id); await store.del?.(b.id); }
+        S.sel = null; render(); await w(200);
+        const sel = document.querySelector('#proj');
+        const opt = [...sel.querySelectorAll('optgroup[label="Examples"] option')].find(o => o.textContent.includes('cross-section'));
+        want(opt, 'the project picker lists the cross-section example');
+        want(document.querySelector('.ribbon [data-act="load-xs"]'), 'the Data tools hold the cross-section example');
+        if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event('change', { bubbles: true })); await w(400); }
+        want(sortedList().some(b => b.project === XS_PROJ) && S.tab === 'xsec', 'choosing it loads the example on the Section page');
+        want(document.querySelector('#proj').value === XS_PROJ, 'the picker then shows the example as the open project');
+        want(![...document.querySelectorAll('#proj optgroup[label="Examples"] option')].some(o => o.textContent.includes('cross-section')), 'once loaded it is listed as a project, not as an example to load');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
