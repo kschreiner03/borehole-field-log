@@ -3912,6 +3912,16 @@ function refreshWellFig(b) { const el = $('#well-fig'); if (el) el.innerHTML = w
 
 /* ---------- groundwater tab ---------- */
 function roundDates() { return [...new Set(projList().flatMap(b => monitoring(b).filter(w => w.date).map(w => w.date)))].sort().reverse(); }
+/* the water level in a borehole as it stood on a date: its latest static reading on or before that date, else the latest
+   completion or seepage reading, else a strike while drilling; no date = latest of all */
+function waterAt(b, date) {
+  const ok = (b.water || []).filter(w => w.depth != null && (!date || (w.date && w.date <= date))).sort(byDate);
+  return ok.filter(w => w.kind === 'static').pop() || ok.filter(w => w.kind !== 'strike').pop() || ok.pop() || null;
+}
+const sameRound = (a, c) => a?.date && c?.date && Math.abs(Date.parse(a.date) - Date.parse(c.date)) <= 7 * 864e5;
+/* Cross-section page state: the date shown, the plume medium and parameter, and which layers are drawn */
+S.xs = { date: '', medium: 'soil', param: '', round: false, plume: true, model: false, ...jsonLS('bhlog.xs', {}) };
+function setXs(k, v) { S.xs = { ...S.xs, [k]: v }; lsSet('bhlog.xs', JSON.stringify(S.xs)); redrawSec(); }
 function readingFor(b) {
   if (!S.round) return latestWater(b);
   const t0 = Date.parse(S.round); let best = null, bd = Infinity;
@@ -4006,6 +4016,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   if (!el) return;
   note = note || {};
   const bhs = (list || projList()).filter(b => (b.layers || []).some(l => l.bottom > l.top) || b.water?.length);
+  const xs = RO.xs || (el.id === 'xs-draw' ? S.xs : null), wOf = b => xs ? waterAt(b, xs.date || null) : readingFor(b);
   if (bhs.length < 2) { el.innerHTML = `<p class="note">Log at least two boreholes to draw a cross-section.</p>`; note.textContent = ''; return; }
   const located = bhs.every(b => b.easting != null && b.northing != null);
   const ordered = located && S.secIds.size >= 2 && bhs.every(b => S.secIds.has(b.id));
@@ -4071,24 +4082,27 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
     rowsEnd[row] = xx + w / 2;
     o.push(`<text x="${xx}" y="${Y(top(p.b) + su(p.b)) - 10 - row * 15}" text-anchor="middle" style="font:600 12px var(--f-label)"><title>${esc(p.b.name)}</title>${esc(short(p.b.name))}</text>`);
   }
-  const wpts = S.sec.water === false ? [] : pos.map(p => ({ p, w: readingFor(p.b) })).filter(x => x.w);
-  if (wpts.length > 1) o.push(`<path d="${wpts.map((x, i) => `${i ? 'L' : 'M'}${X(x.p.d)} ${Y(top(x.p.b) - x.w.depth)}`).join('')}" fill="none" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="7 4"/>`);
+  const wpts = S.sec.water === false ? [] : pos.map(p => ({ p, w: wOf(p.b) })).filter(x => x.w);
+  // the water table is joined only between static readings of the same round (within 7 days); the join is interpolated
+  for (let i = 0; i < wpts.length - 1; i++) { const a = wpts[i], c = wpts[i + 1]; if (!xs) { o.push(`<path d="M${X(a.p.d)} ${Y(top(a.p.b) - a.w.depth)}L${X(c.p.d)} ${Y(top(c.p.b) - c.w.depth)}" fill="none" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="7 4"/>`); continue; }
+    if (a.w.kind === 'static' && c.w.kind === 'static' && sameRound(a.w, c.w)) o.push(`<path data-wjoin="1" d="M${X(a.p.d) + bw / 2} ${Y(top(a.p.b) - a.w.depth)}L${X(c.p.d) - bw / 2} ${Y(top(c.p.b) - c.w.depth)}" fill="none" style="stroke:var(--water)" stroke-width="1.6" stroke-dasharray="7 4"><title>Water table interpolated between ${esc(a.p.b.name)} and ${esc(c.p.b.name)}</title></path>`); }
   const lw = 44;
   wpts.forEach((x, i) => {
     const xx = X(x.p.d), yy = Y(top(x.p.b) - x.w.depth);
     const nextX = i < wpts.length - 1 ? X(wpts[i + 1].p.d) - bw / 2 : W - 4, prevX = i > 0 ? X(wpts[i - 1].p.d) + bw / 2 : m.l;
     const roomR = nextX - (xx + bw / 2 + 4), roomL = (xx - bw / 2 - 4) - prevX;
     const val = noElev ? `−${fx(x.w.depth)}` : fx(top(x.p.b) - x.w.depth);
-    o.push(`<g><title>${esc(`${x.p.b.name}: ${fu(x.w.depth)} below ground${noElev ? '' : `, el. ${fu(top(x.p.b) - x.w.depth)}`} (${x.w.date || 'undated'})`)}</title><path d="M${xx - 6} ${yy - 10}h12l-6 9z" style="fill:var(--water);stroke:var(--panel)"/>`);
+    const kind = x.w.kind || 'static', solid = kind !== 'strike' && kind !== 'seepage', kn = { static: 'static level', completion: 'on completion', seepage: 'seepage while drilling', strike: 'struck while drilling' }[kind] || kind;
+    o.push(`<g data-wkind="${esc(kind)}"><title>${esc(`${x.p.b.name}: ${fu(x.w.depth)} below ground${noElev ? '' : `, el. ${fu(top(x.p.b) - x.w.depth)}`}, ${kn} (${x.w.date || 'undated'})`)}</title>${solid ? `<path data-wtick="1" d="M${xx - bw / 2 - 5} ${yy}h${bw + 10}" style="stroke:var(--water)" stroke-width="2.2"/>` : ''}<path d="M${xx - 6} ${yy - 10}h12l-6 9z" style="fill:${solid ? 'var(--water)' : 'var(--panel)'};stroke:${solid ? 'var(--panel)' : 'var(--water)'}" stroke-width="1.3"/>`);
     if (roomR >= lw) o.push(`<rect x="${xx + bw / 2 + 3}" y="${yy - 15}" width="${lw}" height="14" rx="2" style="fill:var(--panel)" opacity=".92"/><text class="wl" x="${xx + bw / 2 + 5}" y="${yy - 4}">${val}</text>`);
     else if (roomL >= lw) o.push(`<rect x="${xx - bw / 2 - 3 - lw}" y="${yy - 15}" width="${lw}" height="14" rx="2" style="fill:var(--panel)" opacity=".92"/><text class="wl" x="${xx - bw / 2 - 5}" y="${yy - 4}" text-anchor="end">${val}</text>`);
     o.push('</g>');
   });
   o.push('</svg>');
   el.innerHTML = o.join('');
-  const missing = pos.filter(p => !readingFor(p.b)).map(p => p.b.name);
+  const missing = pos.filter(p => !wOf(p.b)).map(p => p.b.name);
   note.textContent = [located ? (ordered ? `Section through ${pos.map(p => p.b.name).join(' → ')}; distances are measured along that line.` : 'Best-fit line through all boreholes; each is projected onto it.') : 'Some boreholes have no coordinates, so all are spaced evenly.', noElev ? 'Some boreholes have no ground elevation; all are drawn from 0.' : '',
-    missing.length ? `No ${S.round ? 'reading near this date' : 'reading'} for ${missing.join(', ')}.` : ''].filter(Boolean).join(' ');
+    missing.length ? `No ${xs?.date ? `water reading on or before ${xs.date}` : S.round ? 'reading near this date' : 'reading'} for ${missing.join(', ')}.` : '', xs ? 'Water: solid ticks are measured levels, hollow triangles are seepage or strikes while drilling; dashed lines join static readings of the same round (interpolated).' : ''].filter(Boolean).join(' ');
 }
 
 /* ---------- Excel import ---------- */
@@ -6430,7 +6444,7 @@ function drawSite() { drawPlan(); drawPlasticity(); }
 /* the Cross-section page: the section line, the drawing and everything drawn on it */
 function xsecHTML() {
   return `<div class="xs-page">
-    <section class="sec"><header><h3>Cross-section A–A′</h3><span class="note">Included in the report package as drawn here</span><label class="note" for="round">Water level</label><select id="round" style="width:auto"><option value="">Latest in each borehole</option>${roundDates().map(d => `<option value="${d}" ${d === S.round ? 'selected' : ''}>Readings near ${d}</option>`).join('')}</select></header><div class="body">${secToolsHTML()}
+    <section class="sec"><header><h3>Cross-section A–A′</h3><span class="sp"></span><label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">${secToolsHTML()}
       <div class="scroll-x" id="xs-draw"></div>
       <div class="legend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--earth)" stroke-width="2" stroke-dasharray="6 3"/></svg>Ground surface (measured at boreholes, interpolated between)</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="6 3"/></svg>Water table (interpolated)</span><span><svg width="22" height="12" aria-hidden="true"><rect x="7" y="0" width="8" height="12" style="fill:var(--panel);stroke:var(--ink)"/><path d="M9 6h4M9 9h4" style="stroke:var(--ink)"/></svg>Slotted interval</span><span><svg width="22" height="12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" style="fill:var(--s-clay);stroke:var(--muted)" fill-opacity=".38" stroke-dasharray="4 2"/></svg>Interpreted between boreholes</span></div>
       <p class="note" id="xs-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
@@ -8660,6 +8674,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.lyr) { setLyr(e.target.dataset.lyr, e.target.checked); return; }
   const t = e.target;
   if (t.id === 'round') { S.round = t.value; redrawSec(); }
+  if (t.id === 'xs-asof') setXs('date', t.value);
   if (t.dataset?.xsalias != null && !S.readOnly) { const x = siteOf()?.xsec || {}, al = { ...(x.alias || {}) }; if (t.value) al[t.dataset.xsalias] = t.value; else delete al[t.dataset.xsalias]; setSite({ ...(siteOf() || {}), xsec: { ...x, alias: al } }); redrawSec(); }
   else if (t.dataset?.lab || t.dataset?.lablt || t.dataset?.labmeta) {
     const b0 = cur(); if (!editable(b0)) return; const sm = b0.samples[+t.dataset.i]; sm.lab ||= {}; sm.labMeta ||= {};
