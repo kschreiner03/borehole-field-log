@@ -7756,6 +7756,8 @@ const LAB_HEAD = { id: ['clientsampleid', 'clientsamplename', 'clientid', 'field
   unit: ['unit', 'units', 'resultunits', 'reportingunits', 'resultunit'], dl: ['rdl', 'dl', 'mdl', 'detectionlimit', 'reportinglimit', 'lor', 'rl', 'loq', 'methoddetectionlimit'], q: ['qualifier', 'resultqualifier', 'flag', 'qual', 'lessthan', 'symbol', 'operator'],
   depth: ['depth', 'sampledepth', 'topdepth', 'depthfrom', 'upperdepth', 'depthtop', 'fromdepth'], date: ['sampledate', 'datesampled', 'collectiondate', 'sampleddate', 'date'], rep: ['workorder', 'reportno', 'reportnumber', 'jobno', 'jobnumber', 'labjob', 'batch', 'certificate'] };
 const findCol = (h, keys) => { for (const k of keys) { const i = h.indexOf(k); if (i >= 0) return i; } return -1; };
+/* saturated-paste extracts are reported per litre but are soil results */
+const PASTE = ['ec', 'sar', 'cl', 'ph'];
 function labUnitConv(p, unit) {
   const u = String(unit || '').toLowerCase().replace(/\s/g, '').replace('µ', 'u');
   if (/^ug\/kg|^µg\/kg/.test(u)) return 1e-3;
@@ -7780,7 +7782,7 @@ function parseLabTable(rows) {
         const p = labParam(r[c.an]); if (p === undefined) { if (String(r[c.an] ?? '').trim()) unknown.add(String(r[c.an]).trim()); continue; } if (!p) continue;
         const x = labCell(r[c.res], c.dl >= 0 ? r[c.dl] : null, c.q >= 0 ? r[c.q] : null); if (!x) continue;
         const sm = add(r[c.id], { depth: c.depth >= 0 ? numv(r[c.depth]) : null, date: c.date >= 0 ? String(r[c.date] ?? '').slice(0, 10) : '', rep: c.rep >= 0 ? String(r[c.rep] ?? '') : '' }); if (!sm) continue;
-        const un = c.unit >= 0 ? String(r[c.unit] ?? '').trim() : ''; x.v = +(x.v * labUnitConv(p, un)).toPrecision(6); sm.res[p] = x; if (/\/\s*l$/i.test(un)) { sm.water = true; sm.unit0 = un; }
+        const un = c.unit >= 0 ? String(r[c.unit] ?? '').trim() : ''; x.v = +(x.v * labUnitConv(p, un)).toPrecision(6); sm.res[p] = x; if (/\/\s*l$/i.test(un) && !PASTE.includes(p)) { sm.water = true; sm.unit0 = un; }
       }
       return { samples: [...out.values()], unknown: [...unknown], form: 'one row per result' };
     }
@@ -7790,7 +7792,7 @@ function parseLabTable(rows) {
       rows[hi].forEach(x => { if (String(x).trim() && labParam(x) === undefined && LAB_HEAD.id.concat(...Object.values(LAB_HEAD)).indexOf(normH(x)) < 0) unknown.add(String(x).trim()); });
       for (const r of rows.slice(hi + (units ? 2 : 1))) {
         const sm = add(r[c.id], { depth: c.depth >= 0 ? numv(r[c.depth]) : null, date: c.date >= 0 ? String(r[c.date] ?? '').slice(0, 10) : '', rep: c.rep >= 0 ? String(r[c.rep] ?? '') : '' }); if (!sm) continue;
-        for (const [j, p] of pcols) { const x = labCell(r[j]); if (x) { x.v = +(x.v * labUnitConv(p, units?.[j])).toPrecision(6); sm.res[p] = x; if (/\/\s*l$/i.test(String(units?.[j] ?? '').trim())) { sm.water = true; sm.unit0 = String(units[j]).trim(); } } }
+        for (const [j, p] of pcols) { const x = labCell(r[j]); if (x) { x.v = +(x.v * labUnitConv(p, units?.[j])).toPrecision(6); sm.res[p] = x; if (/\/\s*l$/i.test(String(units?.[j] ?? '').trim()) && !PASTE.includes(p)) { sm.water = true; sm.unit0 = String(units[j]).trim(); } } }
       }
       return { samples: [...out.values()].filter(x => Object.keys(x.res).length), unknown: [...unknown], form: 'one row per sample' };
     }
