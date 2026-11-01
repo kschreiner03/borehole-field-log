@@ -3922,6 +3922,41 @@ function waterAt(b, date) {
 const sameRound = (a, c) => a?.date && c?.date && Math.abs(Date.parse(a.date) - Date.parse(c.date)) <= 7 * 864e5;
 /* Cross-section page state: the date shown, the plume medium and parameter, and which layers are drawn */
 S.xs = { date: '', medium: 'soil', param: '', round: false, plume: true, model: false, ...jsonLS('bhlog.xs', {}) };
+/* every date the section can be shown at: when soil was sampled (drilling), groundwater samples and water readings */
+const soilDate = b => b.dateEnd || b.date || '';
+function xsDates(list) {
+  const d = new Set();
+  for (const b of list) {
+    if ((b.samples || []).some(sm => sm.cvc != null || Object.keys(sm.lab || {}).length) && soilDate(b)) d.add(soilDate(b));
+    for (const s of b.gwSamples || []) if (s.date) d.add(s.date);
+    for (const w of b.water || []) if (w.date && w.depth != null && w.kind === 'static') d.add(w.date);
+  }
+  return [...d].sort();
+}
+/* the results of one medium and parameter as they stood on a date: the latest at each location on or before it.
+   soil and vapour sit at the sample depth; groundwater spans the well screen below the water table at that date.
+   round: only results within 7 days of the date (or of the newest result when no date is set) */
+function plumePoints(pos, medium, param, date, round) {
+  const out = [], ok = d => d && (!date || d <= date), days = (a, c) => Math.round((Date.parse(a) - Date.parse(c)) / 864e5);
+  for (const { b, d } of pos) {
+    if (medium === 'groundwater') {
+      const w = b.well; if (!w?.installed || w.screenTop == null || w.screenBottom == null) continue;
+      const s = (b.gwSamples || []).filter(s => ok(s.date) && gwVal(s, param)).sort(byDate).pop(); if (!s) continue;
+      const wt = waterAt(b, s.date), top = Math.max(w.screenTop, wt?.depth ?? w.screenTop), bot = w.screenBottom; if (bot <= top) continue;
+      out.push({ b, d, top, bot, ...gwVal(s, param), date: s.date });
+    } else {
+      const sd = soilDate(b); if (!ok(sd)) continue;
+      for (const sm of b.samples || []) {
+        if (sm.depth == null) continue;
+        const r = medium === 'vapour' ? (sm.cvc != null ? { v: sm.cvc, lt: false } : null) : labVal(sm, param); if (!r) continue;
+        out.push({ b, d, top: sm.depth, bot: sm.depth, v: r.v, lt: !!r.lt, date: sd });
+      }
+    }
+  }
+  const ref = date || out.map(p => p.date).sort().pop();
+  for (const p of out) p.age = ref ? days(ref, p.date) : 0;
+  return round ? out.filter(p => p.age <= 7) : out;
+}
 function setXs(k, v) { S.xs = { ...S.xs, [k]: v }; lsSet('bhlog.xs', JSON.stringify(S.xs)); redrawSec(); }
 function readingFor(b) {
   if (!S.round) return latestWater(b);
