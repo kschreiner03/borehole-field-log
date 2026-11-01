@@ -636,6 +636,46 @@ app.whenReady().then(async () => {
     expect(r.oneDates.length === 1, 'one-date project: ' + JSON.stringify(r.oneDates));
   });
 
+  await check('cross-section: plume contours', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadDlExample(); await w(150);
+      setSite({ ...siteOf(), guide: { ...siteOf().guide, benzene: .02 } });   // inside the example's range, so contours cross the data
+      S.secIds = new Set(); S.xs = { ...S.xs, date: '', medium: 'soil', param: 'benzene', round: false, plume: true }; goTab('xsec'); await w(250);
+      const out = {}, g = projGuide().benzene;
+      // independent check: each contour vertex lies on a segment between two plotted points whose log values bracket the level,
+      // at the linear position in log10 concentration
+      const C = plumeContours(xsLastPts(), [g, 10 * g, 100 * g]); out.nseg = C.segs.length; out.bad = []; out.dbg = { n: xsLastPts().length, g, z: xsLastPts().map(p => +p[2].toFixed(2)).slice(0, 30), tris: C.tris.length, xs: S.xs, msg: document.querySelector('#xs-draw')?.textContent.slice(0, 200) };
+      const P = xsLastPts();
+      for (const sgm of C.segs) for (const E of [sgm.a, sgm.b]) {
+        const L = Math.log10(sgm.level); let hit = false;
+        for (let i = 0; i < P.length && !hit; i++) for (let j = 0; j < P.length && !hit; j++) {
+          const A = P[i], B = P[j]; if ((A[2] - L) * (B[2] - L) >= 0) continue;
+          const t = (L - A[2]) / (B[2] - A[2]), x = A[0] + t * (B[0] - A[0]), y = A[1] + t * (B[1] - A[1]);
+          if (Math.hypot(x - E[0], y - E[1]) < 1e-6) hit = true;
+        }
+        if (!hit) out.bad.push(E);
+      }
+      out.drawn = [...document.querySelectorAll('#xs-draw svg path[data-contour]')].map(p => p.dataset.contour);
+      out.pts = document.querySelectorAll('#xs-draw svg [data-pt]').length; out.hollow = document.querySelectorAll('#xs-draw svg [data-pt][data-lt="1"]').length;
+      out.label = [...document.querySelectorAll('#xs-draw svg path[data-contour] title')].map(t => t.textContent)[0];
+      // RF2: nothing to show
+      for (const b of projList()) b.gwSamples = []; setXs('medium', 'groundwater'); await w(100);
+      out.none = document.querySelector('#xs-draw').textContent.includes('No Benzene results in groundwater'); out.noneContours = document.querySelectorAll('#xs-draw svg path[data-contour]').length;
+      // RF3: one date, play disabled; several dates, enabled
+      setXs('medium', 'soil'); renderView(true); await w(100); out.playMany = document.querySelector('#xs-play')?.disabled;
+      const one = []; for (const n of ['OD1', 'OD2']) { const b = blankBorehole(n); Object.assign(b, { project: 'One date', date: '2026-05-05', layers: [{ id: uid('l'), top: 0, bottom: 4, uscs: 'sm' }], samples: [{ id: uid('s'), no: 1, depth: 1, lab: { benzene: { v: 1, lt: false } } }, { id: uid('s'), no: 2, depth: 3, lab: { benzene: { v: .01, lt: true } } }] }); const nb = normalize(b); S.bh.set(nb.id, nb); one.push(nb); }
+      // RF1: no elevations or coordinates still draws the plume on the depth axis
+      S.sel = one[0].id; S.secIds = new Set(); renderView(true); await w(150);
+      out.playOne = document.querySelector('#xs-play')?.disabled; out.depthPts = document.querySelectorAll('#xs-draw svg [data-pt]').length; out.finite = !/NaN/.test(document.querySelector('#xs-draw').innerHTML);
+      return out;
+    })()`);
+    expect(r.nseg > 0 && r.bad.length === 0, 'contour vertices must interpolate between data points in log10: ' + JSON.stringify(r.dbg) + r.nseg + ' segments, bad ' + JSON.stringify(r.bad.slice(0, 3)));
+    expect(r.drawn.includes('1') && r.pts > 0 && r.hollow > 0 && /interpolated/.test(r.label || ''), 'plume drawn: ' + JSON.stringify(r));
+    expect(r.none && r.noneContours === 0, 'no results message: ' + JSON.stringify(r));
+    expect(r.playMany === false && r.playOne === true, 'play enabled only with several dates: ' + JSON.stringify(r));
+    expect(r.depthPts === 4 && r.finite, 'depth-only project draws points: ' + JSON.stringify(r));
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
