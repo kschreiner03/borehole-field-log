@@ -1491,7 +1491,7 @@ function nextName() {
 /* bring older or imported records onto the current model */
 function normalize(b) {
   b.layers ||= []; b.samples ||= []; b.water ||= []; b.history ||= []; b.status ||= 'draft'; b.rev ??= 0; b.issued ??= null;
-  b.events ||= []; b.comments ||= []; b.slug ||= []; b.hammer ??= ''; b.er ??= null; b.noLiners ??= false; b.gamma ??= 19; b.rodStick ??= 1.5;
+  b.events ||= []; b.comments ||= []; b.slug ||= []; b.gwSamples ||= []; b.hammer ??= ''; b.er ??= null; b.noLiners ??= false; b.gamma ??= 19; b.rodStick ??= 1.5;
   for (const l of b.layers) { l.unit ??= ''; l.texture ??= ''; l.hz ??= ''; if (/^usda\|/.test(l.texture)) l.texture = 'cssc|' + l.texture.slice(5); }
   for (const e of b.events) { e.kind ??= ''; e.level ??= ''; e.to ??= null; }
   for (const s of b.samples) { s.lab ||= {}; s.labMeta ||= { lab: '', report: '', date: '' }; }
@@ -2343,6 +2343,7 @@ function wsDecorate(b) {
   const ls = $('#sec-layers'), lsp = ls?.querySelector('.layers-split'); host(lsp, ['layerList']);
   const sm = document.querySelector('.ws [data-t="samples"]'), smb = sm?.querySelector('.body.lf'); host(smb, ['samples', 'tests']); fold(sm, 'samples', smb);
   const wt = document.querySelector('.ws [data-t="water"]'), wtl = wt?.querySelector('.lf'); host(wtl, ['water']); fold(wt, 'water', wtl);
+  if (wt && b.well?.installed) wt.insertAdjacentHTML('afterend', gwSamplesHTML(b));
   wsGrids(); wsWhich();
 }
 function wsGrids() {
@@ -7655,6 +7656,30 @@ function labVal(sm, p) {
 const fmtLab = r => r == null ? '—' : (r.lt ? '<' : '') + (+r.v).toLocaleString('en-CA', { maximumSignificantDigits: 4 });
 const projGuide = () => siteOf()?.guide || {};
 const exceeds = (r, p) => { const g = projGuide()[p]; return r && !r.lt && g != null && r.v > g; };
+/* groundwater lab results: one record per sampling of a well, results in mg/L; the site keeps its own groundwater guideline */
+const GW_PARAMS = ['benzene', 'toluene', 'ethylbenzene', 'xylenes', 'f1', 'f1b', 'f2'];
+const gwVal = (s, p) => labVal({ lab: s.res || {} }, p);
+const gwGuide = () => siteOf()?.gwGuide || {};
+const gwExceeds = (r, p) => { const g = gwGuide()[p]; return r && !r.lt && g != null && r.v > g; };
+function gwSamplesHTML(b) {
+  const ed = editable(b), g = gwGuide(), rows = (b.gwSamples || []).map((s, i) => ({ s, i })).sort((a, c) => (a.s.date || '').localeCompare(c.s.date || ''));
+  const cell = (s, i, p) => { const r = gwVal(s, p); if (LAB_PARAMS[p].computed) return `<td class="r">${fmtLab(r)}</td>`;
+    return `<td class="r ${gwExceeds(r, p) ? 'over' : ''}" ${gwExceeds(r, p) ? 'data-over="1" title="Above the groundwater guideline"' : ''}><span class="lab-in"><label class="check" title="Below the detection limit"><input type="checkbox" data-gwlt="${p}" data-i="${i}" ${r?.lt ? 'checked' : ''} ${ed ? '' : 'disabled'}>&lt;</label><input type="number" step="any" inputmode="decimal" data-gw="${p}" data-i="${i}" value="${r ? r.v : ''}" aria-label="${esc(LAB_PARAMS[p].label)} (mg/L)" ${ed ? '' : 'disabled'}></span></td>`; };
+  return `<section class="sec" data-t="gwlab"><header><h3>Groundwater lab results</h3><span class="note">mg/L · one row per sampling</span><span class="sp"></span>${ed ? '<button class="btn" data-act="gw-new">Add groundwater sample</button>' : ''}</header><div class="body"><div class="scroll-x"><table class="sum lab-t"><thead><tr><th>Date</th><th>Sample ID</th><th>Lab / report</th>${GW_PARAMS.map(p => `<th class="r">${esc(LAB_PARAMS[p].label)}</th>`).join('')}<th></th></tr></thead><tbody>
+    <tr class="guide"><td colspan="3"><b>Guideline</b> <span class="note">(this site, mg/L)</span></td>${GW_PARAMS.map(p => LAB_PARAMS[p].computed && false ? '<td></td>' : `<td class="r"><input type="number" step="any" data-gwguide="${p}" value="${g[p] ?? ''}" aria-label="${esc(LAB_PARAMS[p].label)} groundwater guideline" ${S.readOnly ? 'disabled' : ''}></td>`).join('')}<td></td></tr>
+    ${rows.map(({ s, i }) => `<tr><td><input type="date" data-gwf="date" data-i="${i}" value="${esc(s.date || '')}" ${ed ? '' : 'disabled'}></td><td><input data-gwf="sid" data-i="${i}" value="${esc(s.sid || '')}" ${ed ? '' : 'disabled'}></td><td><input data-gwf="report" data-i="${i}" value="${esc([s.lab, s.report].filter(Boolean).join(' / '))}" ${ed ? '' : 'disabled'}></td>${GW_PARAMS.map(p => cell(s, i, p)).join('')}<td>${ed ? `<button class="btn link" data-act="gw-del" data-i="${i}">Delete</button>` : ''}</td></tr>`).join('')}
+    </tbody></table></div>${rows.length ? '' : '<p class="note">No groundwater samples yet. Add one, or import a lab file (results in µg/L are converted to mg/L).</p>'}<p class="note">Tick &lt; for a non-detect and enter the detection limit. F1 − BTEX is calculated. Results above the guideline are marked.</p></div></section>`;
+}
+function gwChange(t) {
+  const b = cur(); if (t.dataset.gwguide) { if (S.readOnly) return; const g = { ...gwGuide() }, v = numv(t.value); if (v == null) delete g[t.dataset.gwguide]; else g[t.dataset.gwguide] = v; setSite({ ...(siteOf() || {}), gwGuide: g }); renderView(true); return; }
+  if (!b || !editable(b)) return; const s = b.gwSamples[+t.dataset.i]; if (!s) return;
+  if (t.dataset.gwf === 'report') { const [lab, ...rep] = t.value.split('/'); s.lab = lab.trim(); s.report = rep.join('/').trim(); }
+  else if (t.dataset.gwf) s[t.dataset.gwf] = t.value;
+  else { const p = t.dataset.gw || t.dataset.gwlt, r = s.res[p] || {};
+    if (t.dataset.gwlt) { if (r.v != null) s.res[p] = { v: r.v, lt: t.checked }; }
+    else { const v = numv(t.value); if (v == null) delete s.res[p]; else s.res[p] = { v, lt: !!r.lt }; } }
+  logChange(b, 'Groundwater lab results'); store.save(b); renderView(true);
+}
 const labParamsUsed = list => LAB_ORDER.filter(p => list.some(b => (b.samples || []).some(sm => labVal(sm, p))));
 function labFormHTML(b, i) {
   const sm = b.samples[i], L = sm.lab || {}, have = Object.keys(L), ed = editable(b), g = projGuide();
@@ -7734,6 +7759,7 @@ const findCol = (h, keys) => { for (const k of keys) { const i = h.indexOf(k); i
 function labUnitConv(p, unit) {
   const u = String(unit || '').toLowerCase().replace(/\s/g, '').replace('µ', 'u');
   if (/^ug\/kg|^µg\/kg/.test(u)) return 1e-3;
+  if (/^ug\/l$/.test(u)) return 1e-3;   // groundwater in µg/L → mg/L
   if (p === 'ec' && /us\/cm/.test(u)) return 1e-3;
   if (p === 'ec' && /ms\/m/.test(u)) return 1e-2;
   return 1;
@@ -7754,7 +7780,7 @@ function parseLabTable(rows) {
         const p = labParam(r[c.an]); if (p === undefined) { if (String(r[c.an] ?? '').trim()) unknown.add(String(r[c.an]).trim()); continue; } if (!p) continue;
         const x = labCell(r[c.res], c.dl >= 0 ? r[c.dl] : null, c.q >= 0 ? r[c.q] : null); if (!x) continue;
         const sm = add(r[c.id], { depth: c.depth >= 0 ? numv(r[c.depth]) : null, date: c.date >= 0 ? String(r[c.date] ?? '').slice(0, 10) : '', rep: c.rep >= 0 ? String(r[c.rep] ?? '') : '' }); if (!sm) continue;
-        x.v = +(x.v * labUnitConv(p, c.unit >= 0 ? r[c.unit] : '')).toPrecision(6); sm.res[p] = x;
+        const un = c.unit >= 0 ? String(r[c.unit] ?? '').trim() : ''; x.v = +(x.v * labUnitConv(p, un)).toPrecision(6); sm.res[p] = x; if (/\/\s*l$/i.test(un)) { sm.water = true; sm.unit0 = un; }
       }
       return { samples: [...out.values()], unknown: [...unknown], form: 'one row per result' };
     }
@@ -7764,7 +7790,7 @@ function parseLabTable(rows) {
       rows[hi].forEach(x => { if (String(x).trim() && labParam(x) === undefined && LAB_HEAD.id.concat(...Object.values(LAB_HEAD)).indexOf(normH(x)) < 0) unknown.add(String(x).trim()); });
       for (const r of rows.slice(hi + (units ? 2 : 1))) {
         const sm = add(r[c.id], { depth: c.depth >= 0 ? numv(r[c.depth]) : null, date: c.date >= 0 ? String(r[c.date] ?? '').slice(0, 10) : '', rep: c.rep >= 0 ? String(r[c.rep] ?? '') : '' }); if (!sm) continue;
-        for (const [j, p] of pcols) { const x = labCell(r[j]); if (x) { x.v = +(x.v * labUnitConv(p, units?.[j])).toPrecision(6); sm.res[p] = x; } }
+        for (const [j, p] of pcols) { const x = labCell(r[j]); if (x) { x.v = +(x.v * labUnitConv(p, units?.[j])).toPrecision(6); sm.res[p] = x; if (/\/\s*l$/i.test(String(units?.[j] ?? '').trim())) { sm.water = true; sm.unit0 = String(units[j]).trim(); } } }
       }
       return { samples: [...out.values()].filter(x => Object.keys(x.res).length), unknown: [...unknown], form: 'one row per sample' };
     }
@@ -7805,6 +7831,7 @@ async function importLabFile(file) {
   if (!res.samples.length) { toast(`No lab results found in ${file.name}. The file needs a sample ID column and results for BTEX, PHC F1–F4, salinity or metals.`); return; }
   S._labImp = res.samples.map(x => ({ ...x, m: matchLabId(x) }));
   const list = projList(), opts = (x, i) => {
+    if (x.water) return `<select data-labmap="${i}" style="width:100%">${list.filter(b => b.well?.installed).map(b => `<option value="${esc(b.id)}|gw" ${x.m.b === b ? 'selected' : ''} ${editable(b) ? '' : 'disabled'}>Groundwater sample, ${esc(b.name)}${x.date ? ' · ' + esc(x.date) : ''}</option>`).join('')}<option value="" ${x.m.b?.well?.installed ? '' : 'selected'}>Skip this sample</option></select>`;
     const cur0 = x.m.sm ? `${x.m.b.id}|${x.m.sm.id}` : x.m.b && x.m.depth != null ? `${x.m.b.id}|new` : '';
     return `<select data-labmap="${i}" style="width:100%">${x.m.b && x.m.depth != null ? `<option value="${esc(x.m.b.id)}|new" ${cur0.endsWith('|new') ? 'selected' : ''}>New sample in ${esc(x.m.b.name)} at ${fx(x.m.depth)} ${LEN()}</option>` : ''}${list.map(b => `<optgroup label="${esc(b.name)}">${b.samples.map(sm => `<option value="${esc(b.id)}|${esc(sm.id)}" ${cur0 === `${b.id}|${sm.id}` ? 'selected' : ''} ${editable(b) ? '' : 'disabled'}>${esc(b.name)} ${esc(sampleId(sm))} · ${fx(sm.depth)} ${LEN()}</option>`).join('')}</optgroup>`).join('')}<option value="" ${cur0 ? '' : 'selected'}>Skip this sample</option></select>`;
   };
@@ -7820,6 +7847,7 @@ function importLabGo() {
   (S._labImp || []).forEach((x, i) => {
     const v = $(`[data-labmap="${i}"]`)?.value || ''; if (!v) return;
     const [bid, sid] = v.split('|'), b = S.bh.get(bid); if (!b || !editable(b)) return;
+    if (sid === 'gw') { b.gwSamples.push({ id: uid('gs'), date: x.date || today(), sid: x.id, lab, report: rep || x.rep || '', res: x.res, unit0: x.unit0 || 'mg/L' }); n += Object.keys(x.res).length; ns++; touched.add(b); return; }
     let sm = sid === 'new' ? null : b.samples.find(s => s.id === sid);
     if (!sm) { const prev = [...b.samples].sort((a, c) => (a.no || 0) - (c.no || 0)).pop(); sm = { ...SHEETS.samples.blank(b, prev), type: 'G', depth: x.m.depth }; b.samples.push(sm); }
     sm.lab = { ...(sm.lab || {}), ...x.res }; sm.labMeta = { lab: lab || sm.labMeta?.lab || '', report: rep || x.rep || sm.labMeta?.report || '', date: x.date || sm.labMeta?.date || '' };
@@ -8584,6 +8612,8 @@ document.addEventListener('click', e => {
     case 'round': openRound(); break;
     case 'mr-save': saveRound(); break;
     case 'slug-new': openSlug(null); break;
+    case 'gw-new': if (b && editable(b)) { b.gwSamples.push({ id: uid('gs'), date: today(), sid: `${b.name}-GW`, lab: '', report: '', res: {} }); logChange(b, 'Groundwater sample added'); store.save(b); renderView(true); } break;
+    case 'gw-del': if (b && editable(b)) { b.gwSamples.splice(+t.dataset.i, 1); store.save(b); renderView(true); } break;
     case 'site-img': openSiteImg(); break;
     case 'si-save': { const v = id => num($(id).value); if (!S._siteImg) { closeOverlay(); break; } const st = { img: S._siteImg, e0: v('#si-e0'), n0: v('#si-n0'), e1: v('#si-e1'), n1: v('#si-n1') }; if ([st.e0, st.n0, st.e1, st.n1].some(x => x == null) || st.e1 <= st.e0 || st.n1 <= st.n0) { toast('Enter both corners: top-right must be east and north of bottom-left.'); break; } setSite(st); closeOverlay(); renderView(true); break; }
     case 'si-clear': setSite(null); closeOverlay(); renderView(true); break;
@@ -8675,6 +8705,7 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'round') { S.round = t.value; redrawSec(); }
   if (t.id === 'xs-asof') setXs('date', t.value);
+  if (t.dataset?.gw || t.dataset?.gwlt || t.dataset?.gwf || t.dataset?.gwguide) { gwChange(t); return; }
   if (t.dataset?.xsalias != null && !S.readOnly) { const x = siteOf()?.xsec || {}, al = { ...(x.alias || {}) }; if (t.value) al[t.dataset.xsalias] = t.value; else delete al[t.dataset.xsalias]; setSite({ ...(siteOf() || {}), xsec: { ...x, alias: al } }); redrawSec(); }
   else if (t.dataset?.lab || t.dataset?.lablt || t.dataset?.labmeta) {
     const b0 = cur(); if (!editable(b0)) return; const sm = b0.samples[+t.dataset.i]; sm.lab ||= {}; sm.labMeta ||= {};
