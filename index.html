@@ -4167,7 +4167,7 @@ function modelSVG(date, xs = S.xs) {
     g.lv.forEach((l, k) => { const t = `≥ ${l.label}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="9" fill="${MODEL_COLS[k + 1]}" stroke="#54278f" stroke-width=".6"/><text x="${lx + 14}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 24 + t.length * 5.6; });
     o.push('</g>'); }
   const when = P.start ? `on ${P.at || today()} (release from ${P.start})` : 'long-term (steady state)';
-  o.push(`<text x="${G.m.l + 24}" y="${G.m.t - 22}" style="font:700 11px Arial,sans-serif;fill:#54278f">Model, not measured: ${esc(LAB_PARAMS[P.param].label)} in groundwater ${esc(when)}; source ${esc(P.srcBh.name)} ${(+P.C0.toPrecision(3)).toLocaleString('en-CA')} mg/L</text>`);
+  o.push(`<text x="${G.m.l + 24}" y="34" style="font:700 11px Arial,sans-serif;fill:#54278f">Model, not measured: ${esc(LAB_PARAMS[P.param].label)} in groundwater ${esc(when)}; source ${esc(P.srcBh.name)} ${(+P.C0.toPrecision(3)).toLocaleString('en-CA')} mg/L</text>`);
   if (!g.lv.length) o.push(`<text class="lbl2" x="${G.m.l + 24}" y="${G.m.t - 10}" style="fill:#54278f">Enter a groundwater guideline (Water &amp; well) to contour the forecast.</text>`);
   return o.join('');
 }
@@ -4269,6 +4269,8 @@ function gwHTML() {
 function drawGW() { drawHydro(); }
 function fmtDate(t, span) { const d = new Date(t); return span < 120 * 864e5 ? d.toLocaleDateString('en-CA', { day: 'numeric', month: 'short' }) : d.toLocaleDateString('en-CA', { month: 'short', year: 'numeric' }); }
 function niceTicks(min, max, n) { const st = niceStep(max - min || 1, n); const out = []; for (let v = Math.ceil(min / st - 1e-9) * st; v <= max + 1e-9; v += st) out.push(+v.toFixed(6)); return out; }
+let _tw; const textW = (t, font) => { _tw ||= document.createElement('canvas').getContext('2d'); _tw.font = font; return _tw.measureText(t).width; };
+const labelFont = () => getComputedStyle(document.documentElement).getPropertyValue('--f-label').trim() || 'Arial, sans-serif';
 const short = (s, n = 12) => s.length > n ? s.slice(0, n - 1) + '…' : s;
 function drawHydro(el = $('#hydro'), list = projList().filter(b => !S.hidden.has(b.id)), opts = {}) {
   if (!el) return;
@@ -4340,6 +4342,8 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   // room under the drawing for offset labels (three staggered rows) and the plume legend
   const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 20 : 0, mdH = xs?.model ? 20 : 0;
   m.b += offH + plH + mdH; if (!fillH) H += offH + plH + mdH;
+  // the forecast caption gets its own line under the header, above the borehole names
+  if (mdH) { m.t += 16; if (!fillH) H += 16; }
   const maxD = pos[pos.length - 1].d || 1;
   let e1 = Math.max(...pos.map(p => top(p.b) + su(p.b))), e0 = Math.min(...pos.map(p => top(p.b) - depthOf(p.b)));
   const pad = (e1 - e0) * .05; e1 += pad; e0 -= pad;
@@ -4400,12 +4404,15 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
     for (const p of [...pos].sort((a, c) => a.d - c.d)) { if (Math.abs(p.off) < .5) continue; const t = `${fu(Math.abs(p.off), 1)} ${p.dir}`, w = t.length * 5.6, x = X(p.d);
       let row = ends.findIndex(e => x - w / 2 > e + 4); if (row < 0) row = ends.indexOf(Math.min(...ends)); ends[row] = x + w / 2;
       o.push(`<g><line x1="${x}" x2="${x}" y1="${yb + 2}" y2="${yb + 6 + row * 12}" style="stroke:var(--muted)" stroke-width=".6"/><text class="lbl2" x="${x}" y="${yb + 15 + row * 12}" text-anchor="middle">${esc(t)}<title>${esc(p.b.name)} is ${fu(Math.abs(p.off), 1)} ${p.dir} of the section line, projected onto it</title></text></g>`); } }
-  const rowsEnd = [-Infinity, -Infinity, -Infinity];
+  // borehole names in one band above the drawing (up to three rows), placed by their measured width; a name with no room is shortened and keeps its full name on hover
+  const rowsEnd = [-Infinity, -Infinity, -Infinity], colTop = p => Y(top(p.b) + su(p.b));
   for (const p of pos) {
-    const xx = X(p.d), w = Math.min(p.b.name.length, 12) * 7 + 10;
-    let row = rowsEnd.findIndex(end => xx - w / 2 > end + 4); if (row < 0) row = 2;
+    const xx = X(p.d); let t = p.b.name, w = textW(t, '600 12px ' + labelFont());
+    let row = rowsEnd.findIndex(end => xx - w / 2 > end + 6);
+    if (row < 0) { row = rowsEnd.indexOf(Math.min(...rowsEnd)); while (t.length > 2 && xx - textW(t, '600 12px ' + labelFont()) / 2 <= rowsEnd[row] + 6) t = t.slice(0, -2) + '…'; w = textW(t, '600 12px ' + labelFont()); }
     rowsEnd[row] = xx + w / 2;
-    o.push(`<text x="${xx}" y="${Y(top(p.b) + su(p.b)) - 10 - row * 15}" text-anchor="middle" style="font:600 12px var(--f-label)"><title>${esc(p.b.name)}</title>${esc(short(p.b.name))}</text>`);
+    const yy = m.t - 8 - row * 14;
+    o.push(`<line data-bhlead="1" x1="${xx}" x2="${xx}" y1="${yy + 3}" y2="${colTop(p) - 2}" style="stroke:var(--muted)" stroke-width=".6"/><text data-bhname="1" x="${xx}" y="${yy}" text-anchor="middle" style="font:600 12px var(--f-label)"><title>${esc(p.b.name)}</title>${esc(t)}</text>`);
   }
   const wpts = S.sec.water === false ? [] : pos.map(p => ({ p, w: wOf(p.b) })).filter(x => x.w);
   // the water table is joined only between static readings of the same round (within 7 days); the join is interpolated
