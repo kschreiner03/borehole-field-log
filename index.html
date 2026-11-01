@@ -4004,6 +4004,61 @@ function plumeSVG(pos, xs, X, Y, top, bw, W, H, m) {
   o.push(`<circle cx="${lx + 5}" cy="${ly - 4}" r="4" fill="#fff" stroke="#7f0000"/><text x="${lx + 13}" y="${ly}" class="lbl2">not detected · hatched = interpolated</text>`);
   return o.join('');
 }
+/* ---------- forecast: cited properties and transport solutions ---------- */
+/* chemical properties, each with its source. US EPA (1996) Soil Screening Guidance: Technical Background Document, 2nd ed.,
+   EPA/540/R-95/128, Part 5: Table 36 (water solubility S, dimensionless Henry's constant H') and Table 39 (calculated Koc).
+   No first-order half-life is given here: published ranges span orders of magnitude, so the user enters one with its source;
+   without one the forecast assumes no biodegradation (the conservative case). Xylenes are reported as a mixture of isomers
+   with different values (Table 39: o 363, m 407, p 389 L/kg), so their values are entered. F1 and F2 are mixtures of many
+   compounds with no single Koc or half-life (CCME 2008 models them as sub-fractions), so the forecast does not model them. */
+const EPA96 = 'US EPA (1996) Soil Screening Guidance TBD, EPA/540/R-95/128,';
+const CHEM = {
+  benzene: { koc: 58.9, H: .228, sol: 1750, hl: null, src: { koc: EPA96 + ' Table 39 (calculated Koc)', H: EPA96 + ' Table 36', sol: EPA96 + ' Table 36' } },
+  toluene: { koc: 182, H: .272, sol: 526, hl: null, src: { koc: EPA96 + ' Table 39 (calculated Koc)', H: EPA96 + ' Table 36', sol: EPA96 + ' Table 36' } },
+  ethylbenzene: { koc: 363, H: .323, sol: 169, hl: null, src: { koc: EPA96 + ' Table 39 (calculated Koc)', H: EPA96 + ' Table 36', sol: EPA96 + ' Table 36' } },
+  xylenes: { koc: null, H: null, sol: null, hl: null, src: {}, note: 'Xylenes are a mixture of isomers; EPA (1996) Tables 36 and 39 give o-, m- and p-xylene separately (Koc 363, 407, 389 L/kg; H′ 0.213, 0.301, 0.314). Enter the values for the mixture you assume.' },
+  f1: { mixture: true, src: {}, note: 'F1 is a mixture of many hydrocarbons with no single Koc or half-life; model its BTEX components instead.' },
+  f2: { mixture: true, src: {}, note: 'F2 is a mixture of many hydrocarbons with no single Koc or half-life.' },
+};
+const CHEM_NAMES = { koc: 'Koc', H: 'Henry’s constant', sol: 'solubility', hl: 'half-life' };
+/* the properties the forecast uses for a parameter: the cited table, overridden by values the user entered (marked "entered") */
+function modelInputs(param, user = {}) {
+  const c = CHEM[param]; if (!c) return { missing: ['properties (not a modelled compound)'], src: {} };
+  if (c.mixture) return { mixture: true, missing: ['single-compound properties'], note: c.note, src: {} };
+  const out = { src: {}, missing: [], note: c.note };
+  for (const k of ['koc', 'H', 'sol', 'hl']) { const u = user[k]; if (u != null && u !== '') { out[k] = +u; out.src[k] = 'entered'; } else { out[k] = c[k]; out.src[k] = c.src[k] || ''; } }
+  for (const k of ['koc', 'H', 'sol']) if (out[k] == null) out.missing.push(CHEM_NAMES[k]);
+  out.decayNote = out.hl > 0 ? `First-order decay, half-life ${out.hl} days (${out.src.hl})` : 'No biodegradation assumed (no half-life entered): the conservative case';
+  return out;
+}
+/* complementary error function: Numerical Recipes erfcc (Chebyshev fit, fractional error < 1.2e-7); expErfc(a, b) = e^a·erfc(b) without overflow */
+function expErfc(a, b) {
+  if (b < 0) return Math.exp(a) * (2 - expErfc(0, -b));
+  const t = 1 / (1 + .5 * b), p = -1.26551223 + t * (1.00002368 + t * (.37409196 + t * (.09678418 + t * (-.18628806 + t * (.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-.82215223 + t * .17087277))))))));
+  return t * Math.exp(a - b * b + p);
+}
+const erfc = x => expErfc(0, x), erf = x => 1 - erfc(x);
+/* Ogata and Banks (1961): 1-D advection–dispersion from a constant-concentration boundary, both terms */
+function ogataBanks({ C0, v, D, R = 1, x, t }) {
+  if (t <= 0) return 0; const u = v / R, Dr = D / R, s = 2 * Math.sqrt(Dr * t);
+  return C0 / 2 * (erfc((x - u * t) / s) + expErfc(u * x / Dr, (x + u * t) / s));
+}
+/* Domenico (1987) as in BIOSCREEN 1.4 (Newell et al. 1996, revised 1997): vertical plane source Y wide and Z deep at the water
+   table, advection at the retarded velocity v/R, dispersion along (ax), across (ay) and downward only (az), first-order solute
+   decay k and source decay ks (1/day). x downgradient, y across, z depth below the water table (m); t in days. */
+function domenico({ C0, v, R = 1, ax, ay, az, k = 0, ks = 0, Y, Z, x, y = 0, z = 0, t }) {
+  if (x < 0 || z < 0 || t <= 0) return 0;
+  const u = v / R, inSrc = Math.abs(y) <= Y / 2 && z <= Z;
+  if (x === 0) return inSrc ? C0 * Math.exp(-ks * t) : 0;
+  const sq = Math.sqrt(1 + 4 * k * ax / u), src = C0 * Math.exp(-ks * Math.max(0, t - x / u));
+  const lon = expErfc(x / (2 * ax) * (1 - sq), (x - u * t * sq) / (2 * Math.sqrt(ax * u * t)));
+  const lat = ay > 0 ? erf((y + Y / 2) / (2 * Math.sqrt(ay * x))) - erf((y - Y / 2) / (2 * Math.sqrt(ay * x))) : (Math.abs(y) < Y / 2 ? 2 : Math.abs(y) === Y / 2 ? 1 : 0);
+  const ver = az > 0 ? erf((z + Z) / (2 * Math.sqrt(az * x))) - erf((z - Z) / (2 * Math.sqrt(az * x))) : (z < Z ? 2 : z === Z ? 1 : 0);
+  return src / 8 * lon * lat * ver;
+}
+/* default dispersivities: Xu and Eckstein (1995) ax = 0.83 (log10 Lp)^2.414 m; ay = ax/10 (Gelhar et al. 1992); az ≈ 0 (BIOSCREEN default, conservative) */
+const xuEckstein = Lp => .83 * Math.log10(Lp) ** 2.414;
+const retardation = (koc, foc, rhob, n) => 1 + koc * foc * rhob / n;
 function setXs(k, v) { S.xs = { ...S.xs, [k]: v }; lsSet('bhlog.xs', JSON.stringify(S.xs)); redrawSec(); }
 function readingFor(b) {
   if (!S.round) return latestWater(b);
