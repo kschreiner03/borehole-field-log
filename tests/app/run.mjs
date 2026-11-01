@@ -553,6 +553,27 @@ app.whenReady().then(async () => {
     expect(r.finite, 'coincident boreholes give NaN/Infinity');
   });
 
+  await check('cross-section: water by date', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms));
+      const R = (date, depth, kind) => ({ id: uid('w'), date, depth, measured: depth, ref: 'gs', kind });
+      const mk = (name, de, water) => { const b = blankBorehole(name); Object.assign(b, { project: 'Water test', easting: 500000 + de, northing: 6000000, crs: 'UTM NAD83(CSRS) Zone 12', elevation: 600, layers: [{ id: uid('l'), top: 0, bottom: 6, uscs: 'sm' }], water }); const n = normalize(b); S.bh.set(n.id, n); return n; };
+      const A = mk('WA', 0, [R('2026-05-01', 2.0, 'static'), R('2026-08-01', 1.5, 'static')]);
+      const B = mk('WB', 50, [R('2026-05-03', 2.4, 'static'), R('2026-08-02', 1.9, 'static')]);
+      const C = mk('WC', 100, [R('2026-05-02', 3.1, 'strike')]);
+      S.sel = A.id; S.secIds = new Set(); S.xs = { ...S.xs, date: '2026-06-15' }; goTab('xsec'); await w(200);
+      const q = sel => [...document.querySelectorAll('#xs-draw svg ' + sel)];
+      const out = { at: { A: waterAt(A, '2026-06-15')?.date, B: waterAt(B, '2026-06-15')?.depth, early: waterAt(A, '2026-04-01') },
+        ticks: q('[data-wtick]').map(t => t.querySelector('title')?.textContent || t.parentNode.querySelector('title')?.textContent), joins: q('[data-wjoin]').length, strike: q('[data-wkind="strike"]').length };
+      B.water[0].date = '2026-05-20'; drawXsec(); out.joinsFar = q('[data-wjoin]').length;
+      return out;
+    })()`);
+    expect(r.at.A === '2026-05-01' && r.at.B === 2.4 && r.at.early === null, 'waterAt: ' + JSON.stringify(r.at));
+    expect(r.ticks.length === 2 && r.ticks.every(t => /2026-05-0[13]/.test(t || '')), 'static ticks at the earlier round: ' + JSON.stringify(r.ticks));
+    expect(r.joins === 1 && r.strike === 1, 'only static readings of one round are joined: ' + JSON.stringify(r));
+    expect(r.joinsFar === 0, 'readings 19 days apart are not joined: ' + r.joinsFar);
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
