@@ -4070,6 +4070,106 @@ function leachSource({ Cs, koc, foc, H, thw, tha, rhob, K, i, I, L, da, sol }) {
   const d = Math.min(da, Math.sqrt(.0112 * L * L) + da * (1 - Math.exp(-L * I / (K * i * da)))), DF = 1 + K * i * d / (I * L);
   return { Kd, Cw, d, DF, Cgw: Cw / DF, aboveSol, note: aboveSol ? `The calculated leachate (${(+Cw0.toPrecision(3)).toLocaleString('en-CA')} mg/L) is above the solubility (${sol} mg/L): free product is likely and this model does not apply; leachate capped at solubility.` : '' };
 }
+/* ---------- forecast on the section: Domenico from a source at a well, along the fitted flow direction ---------- */
+let XS_GEOM = null;
+/* CCME (2008) PHC CWS scientific rationale, Table C.1 (soil) and Table C.2 (site) defaults, used only when nothing is entered */
+const CCME_SOIL = { coarse: { foc: .005, rhob: 1.7, n: .36, tha: .241, thw: .119, I: .28 }, fine: { foc: .005, rhob: 1.4, n: .47, tha: .302, thw: .168, I: .2 } };
+const CCME_SITE = { Y: 10, Z: 3, L: 10, da: 5 };
+const CCME_SRC = 'CCME (2008) PHC CWS rationale, Tables C.1–C.2 default (assumed)';
+const MODEL_FIELDS = [   // key, label, unit
+  ['Y', 'Source width across flow', 'm'], ['Z', 'Source depth below the water table', 'm'], ['L', 'Source length along flow', 'm'], ['da', 'Aquifer thickness (mixing limit)', 'm'],
+  ['foc', 'Organic carbon fraction, foc', 'g/g'], ['rhob', 'Dry bulk density', 'kg/L'], ['thw', 'Water-filled porosity (unsaturated)', '–'], ['tha', 'Air-filled porosity (unsaturated)', '–'], ['I', 'Recharge (infiltration)', 'm/yr'],
+  ['ax', 'Longitudinal dispersivity', 'm'], ['ay', 'Transverse dispersivity', 'm'], ['az', 'Vertical dispersivity', 'm'],
+  ['hl', 'Solute half-life (blank = no decay)', 'days'], ['srcHl', 'Source half-life (blank = constant source)', 'days'], ['koc', 'Koc', 'L/kg'], ['H', 'Henry’s constant, H′', '–'], ['sol', 'Water solubility', 'mg/L'],
+  ['start', 'Release began (blank = long-term steady state)', 'date'], ['at', 'Forecast date (blank = date shown)', 'date']];
+const MODEL_COLS = ['#efedf5', '#bcbddc', '#807dba', '#54278f'];   // model output: purple family, never the plume oranges or the water blue
+/* everything the forecast needs, each value with where it came from, or the list of what is missing */
+function modelRun(date) {
+  const site = siteOf() || {}, u = site.model || {}, missing = [], P = { src: {} }, G = XS_GEOM;
+  const val = (k, v, src) => { if (u[k] != null && u[k] !== '') { P[k] = +u[k]; P.src[k] = 'entered'; } else { P[k] = v; P.src[k] = src; } };
+  P.param = u.param || (CHEM[S.xs.param] && !CHEM[S.xs.param].mixture ? S.xs.param : 'benzene');
+  const chem = modelInputs(P.param, u); if (chem.mixture) return { ok: false, missing: [chem.note], P };
+  for (const k of ['koc', 'H', 'sol', 'hl']) { P[k] = chem[k]; P.src[k] = chem.src[k]; } missing.push(...chem.missing);
+  const geo = [...(!G || !G.located ? ['The forecast needs borehole coordinates to place the section on the flow direction.'] : []), ...(!G || G.noElev ? ['The forecast needs ground elevations to calculate heads.'] : [])];
+  if (geo.length) return { ok: false, missing: geo, P };
+  const F = gwFlow(); if (F.error) return { ok: false, missing: ['Groundwater flow: ' + F.error], P };
+  if (F.K == null) missing.push('hydraulic conductivity (add a slug test)');
+  const soil = CCME_SOIL[u.soil === 'fine' ? 'fine' : 'coarse'];
+  for (const k of ['foc', 'rhob', 'thw', 'tha', 'I']) val(k, soil[k], CCME_SRC);
+  for (const k of ['Y', 'Z', 'L', 'da']) val(k, CCME_SITE[k], CCME_SRC);
+  const Lp = Math.max(1, G.maxD); val('ax', xuEckstein(Lp), `Xu and Eckstein (1995) for a plume length of ${Lp.toFixed(0)} m (the section length; assumed)`);
+  val('ay', P.ax / 10, 'ax / 10 (Gelhar et al. 1992; assumed)'); val('az', 0, 'about 0: no vertical spreading (BIOSCREEN default; conservative)');
+  val('srcHl', null, 'constant source (conservative)'); P.start = u.start || ''; P.at = u.at || date || '';
+  P.v = F.K != null ? F.v * 86400 : null; P.src.v = F.K != null ? `K·i/nₑ from the flow calculation (${F.nK} slug test${F.nK > 1 ? 's' : ''}, nₑ ${F.ne} assumed)` : '';
+  P.ne = F.ne; P.R = P.koc != null ? retardation(P.koc, P.foc, P.rhob, F.ne) : null; P.src.R = '1 + Koc·foc·ρb/nₑ';
+  P.f = [-F.bx / F.i, -F.by / F.i]; P.fit = F.fit; P.az = F.az;
+  // the source: a well with a measured concentration, or soil results leached by recharge
+  const sb = S.bh.get(u.srcBh) || projList().filter(b => b.easting != null).sort((a, c) => maxAt(c, P.param, u.src) - maxAt(a, P.param, u.src))[0];
+  if (!sb || sb.easting == null) missing.push('a source borehole with coordinates'); else {
+    P.srcBh = sb; P.S = [sb.easting, sb.northing];
+    if ((u.src || 'gw') === 'gw') { const s = (sb.gwSamples || []).filter(s => gwVal(s, P.param) && (!P.at || s.date <= P.at)).sort(byDate).pop() || (sb.gwSamples || []).filter(s => gwVal(s, P.param)).sort(byDate)[0];
+      if (!s) missing.push(`a groundwater ${LAB_PARAMS[P.param].label} result at ${sb.name}`); else { P.C0 = gwVal(s, P.param).v; P.src.C0 = `measured at ${sb.name} on ${s.date}${gwVal(s, P.param).lt ? ' (detection limit)' : ''}`; } }
+    else { const cs = Math.max(0, ...(sb.samples || []).map(sm => labVal(sm, P.param)).filter(r => r && !r.lt).map(r => r.v));
+      if (!(cs > 0)) missing.push(`a soil ${LAB_PARAMS[P.param].label} result at ${sb.name}`);
+      else if (F.K != null && P.koc != null) { const L2 = leachSource({ Cs: cs, koc: P.koc, foc: P.foc, H: P.H, thw: P.thw, tha: P.tha, rhob: P.rhob, K: F.K * 31557600, i: F.i, I: P.I, L: P.L, da: P.da, sol: P.sol });
+        if (L2.missing) missing.push(...L2.missing); else { P.C0 = L2.Cgw; P.leach = L2; P.src.C0 = `calculated from ${cs} mg/kg in soil at ${sb.name} (EPA 1996 SSG Eq. 10–12, DF ${L2.DF.toFixed(2)})${L2.note ? '. ' + L2.note : ''}`; } } }
+  }
+  return { ok: !missing.length, missing, P };
+}
+const maxAt = (b, p, src) => (src || 'gw') === 'gw' ? Math.max(0, ...(b.gwSamples || []).map(s => gwVal(s, p)?.v || 0)) : Math.max(0, ...(b.samples || []).map(sm => labVal(sm, p)?.v || 0));
+/* concentration at a point of the section (easting, northing, elevation) on a date */
+function modelAt(P, E, N, elev, date) {
+  const dx = E - P.S[0], dy = N - P.S[1], xd = dx * P.f[0] + dy * P.f[1], yc = -dx * P.f[1] + dy * P.f[0], z = P.fit({ e: E, n: N }) - elev;
+  if (z < 0) return { xd, c: null };
+  const t = P.start ? (Date.parse(date || today()) - Date.parse(P.start)) / 864e5 : 1e9;
+  return { xd, c: domenico({ C0: P.C0, v: P.v, R: P.R, ax: P.ax, ay: P.ay, az: P.az, k: P.hl > 0 ? Math.LN2 / P.hl : 0, ks: P.srcHl > 0 ? Math.LN2 / P.srcHl : 0, Y: P.Y, Z: P.Z, x: xd, y: yc, z, t }) };
+}
+/* the forecast on a regular grid over the drawing (res px), split into triangles for contouring in log10 */
+function modelGrid(date, res = 6) {
+  const run = modelRun(date), G = XS_GEOM; if (!run.ok) return { run, cells: [], segs: [], reach: 0, len: G?.maxD || 0 };
+  const P = run.P, x0 = G.X(0), x1 = G.X(G.maxD), y0 = G.m.t, y1 = G.m.t + G.plotH, nx = Math.max(2, Math.round((x1 - x0) / res)), ny = Math.max(2, Math.round((y1 - y0) / res));
+  const at = P.at || date, cells = [], pts = [], idx = [];
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) {
+    const x = x0 + (x1 - x0) * i / nx, y = y0 + (y1 - y0) * j / ny, d = (x - x0) / (x1 - x0) * G.maxD, e = G.e1 - (y - G.m.t) / G.plotH * (G.e1 - G.e0), [E, N] = G.pos.at(d), r = modelAt(P, E, N, e, at);
+    cells.push({ x, y, d, xd: r.xd, c: r.c }); idx.push(r.c == null ? -1 : pts.push([x, y, Math.log10(Math.max(r.c, 1e-12))]) - 1);
+  }
+  const tris = []; for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = idx[j * (nx + 1) + i], b = idx[j * (nx + 1) + i + 1], c = idx[(j + 1) * (nx + 1) + i], d = idx[(j + 1) * (nx + 1) + i + 1]; if (a >= 0 && b >= 0 && c >= 0) tris.push([a, b, c]); if (b >= 0 && d >= 0 && c >= 0) tris.push([b, d, c]); }
+  const lv = plumeLevels('groundwater', P.param), segs = lv.flatMap((l, k) => tinLine(pts, tris, Math.log10(l.v)).map(([a, b]) => ({ k, a, b })));
+  const toXd = q => { const d = (q[0] - x0) / (x1 - x0) * G.maxD, [E, N] = G.pos.at(d); return (E - P.S[0]) * P.f[0] + (N - P.S[1]) * P.f[1]; };
+  const reach = Math.max(0, ...segs.filter(s => s.k === 0).flatMap(s => [toXd(s.a), toXd(s.b)]));
+  return { run, cells, pts, tris, segs, lv, reach, len: G.maxD, bands: lv.length ? tinBands(pts, tris, lv.map(l => Math.log10(l.v))) : [] };
+}
+function modelSVG(date) {
+  const G = XS_GEOM, g = modelGrid(date, 6), o = [], P = g.run.P;
+  if (!g.run.ok) return `<text class="lbl2" x="${G.m.l + 24}" y="${G.m.t - 22}" style="fill:#54278f">Forecast not drawn: ${esc(g.run.missing.join('; '))}</text>`;
+  g.bands.forEach((polys, k) => { if (k) for (const pg of polys) o.push(`<path d="${pg.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')}Z" fill="${MODEL_COLS[k]}" opacity=".45"/>`); });
+  g.lv.forEach((l, k) => { const s2 = g.segs.filter(sg => sg.k === k); if (s2.length) o.push(`<path data-model-contour="${[1, 10, 100][k]}" d="${s2.map(sg => `M${sg.a[0].toFixed(1)} ${sg.a[1].toFixed(1)}L${sg.b[0].toFixed(1)} ${sg.b[1].toFixed(1)}`).join('')}" fill="none" stroke="${MODEL_COLS[k + 1]}" stroke-width="${1.4 + k * .4}"><title>Model, not measured: ${esc(LAB_PARAMS[P.param].label)} ${esc(l.label)}</title></path>`); });
+  const when = P.start ? `on ${P.at || today()} (release from ${P.start})` : 'long-term (steady state)';
+  o.push(`<text x="${G.m.l + 24}" y="${G.m.t - 22}" style="font:700 11px Arial,sans-serif;fill:#54278f">Model, not measured: ${esc(LAB_PARAMS[P.param].label)} in groundwater ${esc(when)}; source ${esc(P.srcBh.name)} ${(+P.C0.toPrecision(3)).toLocaleString('en-CA')} mg/L</text>`);
+  if (!g.lv.length) o.push(`<text class="lbl2" x="${G.m.l + 24}" y="${G.m.t - 10}" style="fill:#54278f">Enter a groundwater guideline (Water &amp; well) to contour the forecast.</text>`);
+  return o.join('');
+}
+function xsModelHTML() {
+  const u = siteOf()?.model || {}, run = S.xs.model ? modelRun(S.xs.date || '') : null, P = run?.P || { src: {} }, ro = S.readOnly ? 'disabled' : '';
+  const wellsOpt = projList().filter(b => b.easting != null).map(b => `<option value="${esc(b.id)}" ${P.srcBh?.id === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
+  const fmt = v => v == null || !isFinite(v) ? '' : +(+v).toPrecision(4);
+  return `<section class="sec" id="xs-model-sec"><header><h3>Forecast (model)</h3><span class="note">Domenico (1987) as in BIOSCREEN 1.4 · always labelled “Model, not measured”</span><span class="sp"></span><label class="check"><input type="checkbox" id="xs-model" ${S.xs.model ? 'checked' : ''}> Show on the section</label></header><div class="body">
+    ${S.xs.model ? `${run.missing.length ? `<p class="note" style="color:var(--warn,#a3470b)">Not drawn yet: ${esc(run.missing.join('; '))}.</p>` : ''}
+    <div class="fields" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+      <div class="fld"><label for="mdl-param">Compound</label><select id="mdl-param" data-mdl="param" ${ro}>${Object.keys(CHEM).map(p => `<option value="${p}" ${P.param === p ? 'selected' : ''}>${esc(LAB_PARAMS[p].label)}${CHEM[p].mixture ? ' (mixture, not modelled)' : ''}</option>`).join('')}</select></div>
+      <div class="fld"><label for="mdl-src">Source from</label><select id="mdl-src" data-mdl="src" ${ro}><option value="gw" ${(u.src || 'gw') === 'gw' ? 'selected' : ''}>Groundwater result at a well</option><option value="soil" ${u.src === 'soil' ? 'selected' : ''}>Soil results, leached by recharge</option></select></div>
+      <div class="fld"><label for="mdl-bh">Source borehole</label><select id="mdl-bh" data-mdl="srcBh" ${ro}>${wellsOpt}</select></div>
+      <div class="fld"><label for="mdl-soil">Soil (defaults)</label><select id="mdl-soil" data-mdl="soil" ${ro}><option value="coarse" ${u.soil !== 'fine' ? 'selected' : ''}>Coarse</option><option value="fine" ${u.soil === 'fine' ? 'selected' : ''}>Fine</option></select></div></div>
+    <div class="scroll-x"><table class="sum"><thead><tr><th>Input</th><th class="r">Value</th><th>Unit</th><th>Source</th></tr></thead><tbody>
+      ${MODEL_FIELDS.map(([k, t, un]) => `<tr><td>${esc(t)}</td><td class="r"><input ${un === 'date' ? 'type="date"' : 'type="number" step="any"'} data-mdl="${k}" value="${esc(u[k] ?? '')}" placeholder="${esc(un === 'date' ? '' : String(fmt(P[k])))}" style="width:9em" ${ro}></td><td>${esc(un === 'date' ? '' : un)}</td><td class="note">${esc(u[k] != null && u[k] !== '' ? 'entered' : P.src[k] || (k === 'hl' ? 'no biodegradation (conservative)' : ''))}</td></tr>`).join('')}
+      <tr><td>Groundwater velocity</td><td class="r">${fmt(P.v)}</td><td>m/day</td><td class="note">${esc(P.src.v || '')}</td></tr>
+      <tr><td>Retardation factor, R</td><td class="r">${fmt(P.R)}</td><td>–</td><td class="note">${esc(P.src.R || '')}</td></tr>
+      <tr><td>Source concentration, C₀</td><td class="r">${fmt(P.C0)}</td><td>mg/L</td><td class="note">${esc(P.src.C0 || '')}</td></tr>
+    </tbody></table></div>
+    <p class="note">Assumes uniform soil, steady uniform flow along the fitted direction (${P.az != null ? Math.round(P.az) + '°' : '—'}), no free product. ${esc(modelInputs(P.param, u).decayNote || '')}. Placeholders show the value used; type to replace it.</p>${typeof xsChecksHTML === 'function' ? xsChecksHTML(run) : ''}` : '<p class="note">Tick “Show on the section” to forecast a dissolved plume from a source well or from soil results.</p>'}
+  </div></section>`;
+}
+function setModel(k, v) { if (S.readOnly) return; const m = { ...(siteOf()?.model || {}) }; if (v === '' || v == null) delete m[k]; else m[k] = ['param', 'src', 'srcBh', 'soil', 'start', 'at'].includes(k) ? v : +v; setSite({ ...(siteOf() || {}), model: m }); renderView(true); }
 function setXs(k, v) { S.xs = { ...S.xs, [k]: v }; lsSet('bhlog.xs', JSON.stringify(S.xs)); redrawSec(); }
 function readingFor(b) {
   if (!S.round) return latestWater(b);
@@ -4152,14 +4252,18 @@ function drawHydro(el = $('#hydro'), list = projList().filter(b => !S.hidden.has
    looking along it) for a best-fit line, 0 when the line runs through the picked boreholes; dir = compass side of the line */
 function secPos(bhs) {
   const located = bhs.every(b => b.easting != null && b.northing != null);
-  if (located && S.secIds.size >= 2 && bhs.every(b => S.secIds.has(b.id))) { let d = 0; return bhs.map((b, i) => { if (i) d += Math.hypot(b.easting - bhs[i - 1].easting, b.northing - bhs[i - 1].northing); return { b, d, off: 0 }; }); }
+  if (located && S.secIds.size >= 2 && bhs.every(b => S.secIds.has(b.id))) { let d = 0; const out = bhs.map((b, i) => { if (i) d += Math.hypot(b.easting - bhs[i - 1].easting, b.northing - bhs[i - 1].northing); return { b, d, off: 0 }; });
+    out.at = dd => { for (let i = 1; i < out.length; i++) if (dd <= out[i].d || i === out.length - 1) { const a = out[i - 1], c = out[i], t = c.d > a.d ? (dd - a.d) / (c.d - a.d) : 0; return [a.b.easting + t * (c.b.easting - a.b.easting), a.b.northing + t * (c.b.northing - a.b.northing)]; } return [out[0].b.easting, out[0].b.northing]; };
+    return out; }
   if (!located) return bhs.map((b, i) => ({ b, d: i, off: 0 }));
   const mx = bhs.reduce((s, b) => s + b.easting, 0) / bhs.length, my = bhs.reduce((s, b) => s + b.northing, 0) / bhs.length;
   let sxx = 0, syy = 0, sxy = 0; for (const b of bhs) { const dx = b.easting - mx, dy = b.northing - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
   const ang = .5 * Math.atan2(2 * sxy, sxx - syy), ux = Math.cos(ang), uy = Math.sin(ang);
   const proj = bhs.map(b => { const dx = b.easting - mx, dy = b.northing - my, off = -dx * uy + dy * ux, az = (Math.atan2(-uy * Math.sign(off), ux * Math.sign(off)) * 180 / Math.PI + 360) % 360;
     return { b, p: dx * ux + dy * uy, off, dir: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(az / 45) % 8] }; }).sort((a, c) => a.p - c.p);
-  return proj.map(x => ({ b: x.b, d: x.p - proj[0].p, off: x.off, dir: x.dir }));
+  const out = proj.map(x => ({ b: x.b, d: x.p - proj[0].p, off: x.off, dir: x.dir }));
+  out.at = dd => [mx + ux * (proj[0].p + dd), my + uy * (proj[0].p + dd)];
+  return out;
 }
 function drawSection(el = $('#section'), note = $('#section-note'), forceW, list, vapour, fillH) {
   if (!el) return;
@@ -4226,6 +4330,8 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
       o.push(`<g><title>${esc(`${p.b.name}: slotted ${fx(w.screenTop)}–${fu(w.screenBottom)}`)}</title><rect x="${px}" y="${Y(e + su(p.b))}" width="${pw}" height="${Y(e - w.screenTop) - Y(e + su(p.b))}" style="fill:var(--panel);stroke:var(--ink)" stroke-width=".8"/><rect x="${px}" y="${Y(e - w.screenTop)}" width="${pw}" height="${Y(e - w.screenBottom) - Y(e - w.screenTop)}" style="fill:var(--panel);stroke:var(--ink)" stroke-width=".8" stroke-dasharray="2 1.5"/></g>`);
     }
   }
+  XS_GEOM = { X, Y, m, plotW, plotH, maxD, e0, e1, W, H, pos, located, noElev };
+  if (xs?.model) o.push(modelSVG(xs.date || ''));
   if (xs && xs.plume !== false && (xs.param || xs.medium === 'vapour')) o.push(plumeSVG(pos, xs, X, Y, top, bw, W, H, m));
   // offsets of boreholes projected onto a best-fit line, in up to three staggered rows under the drawing
   { const ends = [-Infinity, -Infinity, -Infinity], yb = m.t + plotH;
@@ -6605,6 +6711,7 @@ function xsecHTML() {
       <div class="scroll-x" id="xs-draw"></div>
       <div class="legend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--earth)" stroke-width="2" stroke-dasharray="6 3"/></svg>Ground surface (measured at boreholes, interpolated between)</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="6 3"/></svg>Water table (interpolated)</span><span><svg width="22" height="12" aria-hidden="true"><rect x="7" y="0" width="8" height="12" style="fill:var(--panel);stroke:var(--ink)"/><path d="M9 6h4M9 9h4" style="stroke:var(--ink)"/></svg>Slotted interval</span><span><svg width="22" height="12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" style="fill:var(--s-clay);stroke:var(--muted)" fill-opacity=".38" stroke-dasharray="4 2"/></svg>Interpreted between boreholes</span></div>
       <p class="note" id="xs-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
+    ${xsModelHTML()}
     ${xsCorrHTML()}
   </div>`;
 }
@@ -6638,7 +6745,7 @@ function xsPlay() {
 }
 function xsSetDate(d) { setXs('date', d); const dates = xsDates(sectionList()); if ($('#xs-date')) $('#xs-date').value = Math.max(0, dates.indexOf(d)); if ($('#xs-date-l')) $('#xs-date-l').textContent = d; if ($('#xs-asof')) $('#xs-asof').value = d; }
 document.addEventListener('input', e => { if (e.target.id === 'xs-date') { const d = xsDates(sectionList())[+e.target.value]; if (d) xsSetDate(d); } });
-function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); }
+function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); const ms = $('#xs-model-sec'); if (ms) ms.outerHTML = xsModelHTML(); }   // the forecast panel reads the drawn section's geometry
 const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
 function drawPlan(el = $('#plan')) { if (!el) return; el.innerHTML = planSVG(Math.max(el.clientWidth, 420), S.mapEdit ? 620 : 460, true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); loadImagery(); }
 /* Delaunay triangulation (Bowyer–Watson) for contouring between boreholes */
@@ -8887,6 +8994,8 @@ document.addEventListener('change', e => {
   if (t.id === 'xs-asof') setXs('date', t.value);
   if (t.id === 'xs-medium' || t.id === 'xs-param') { setXs(t.id.slice(3), t.value); renderView(true); return; }
   if (t.id === 'xs-round' || t.id === 'xs-plume') { setXs(t.id.slice(3), t.checked); return; }
+  if (t.id === 'xs-model') { setXs('model', t.checked); renderView(true); return; }
+  if (t.dataset?.mdl) { setModel(t.dataset.mdl, t.value); return; }
   if (t.dataset?.gw || t.dataset?.gwlt || t.dataset?.gwf || t.dataset?.gwguide) { gwChange(t); return; }
   if (t.dataset?.xsalias != null && !S.readOnly) { const x = siteOf()?.xsec || {}, al = { ...(x.alias || {}) }; if (t.value) al[t.dataset.xsalias] = t.value; else delete al[t.dataset.xsalias]; setSite({ ...(siteOf() || {}), xsec: { ...x, alias: al } }); redrawSec(); }
   else if (t.dataset?.lab || t.dataset?.lablt || t.dataset?.labmeta) {
