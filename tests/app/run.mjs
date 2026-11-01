@@ -759,6 +759,31 @@ app.whenReady().then(async () => {
     expect(r.big.capped && /solubility/i.test(r.big.note || ''), 'above solubility flagged: ' + JSON.stringify(r.big));
   });
 
+  await check('model: drawn on the section', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); await w(150);   // has slug tests, so a hydraulic conductivity
+      const list = sectionList(), wells = list.filter(b => b.well?.installed && b.easting != null), src = wells[0];
+      src.gwSamples = [{ id: 'g1', date: '2026-09-15', sid: 'x', res: { benzene: { v: .5, lt: false } } }];
+      setSite({ ...siteOf(), gwGuide: { benzene: .005 }, model: { param: 'benzene', src: 'gw', srcBh: src.id } });
+      S.secIds = new Set(); S.xs = { ...S.xs, date: '', medium: 'groundwater', param: 'benzene', plume: false, model: true }; goTab('xsec'); await w(300);
+      const out = {}, txt = document.querySelector('#xs-draw').textContent;
+      out.label = txt.includes('Model, not measured'); out.panel = !!document.querySelector('[data-mdl="Y"]'); out.panelOk = !/Not drawn yet/.test(document.querySelector('#xs-model-sec')?.textContent || '') && document.querySelector('[data-mdl="Y"]')?.placeholder === '10';
+      const run0 = modelRun(''); out.ok = run0.ok; out.missing = run0.missing; out.C0 = run0.P?.C0; out.srcNote = run0.P?.src?.C0;
+      const g8 = modelGrid('', 8), g4 = modelGrid('', 4); out.reach = [g8.reach, g4.reach]; out.len = g8.len;
+      out.up = g4.cells.filter(c => c.xd < 0 && c.c != null).every(c => c.c === 0); out.nUp = g4.cells.filter(c => c.xd < 0).length;
+      out.contour = document.querySelectorAll('#xs-draw svg [data-model-contour]').length;
+      // RF1: no elevations: the forecast refuses and says why
+      for (const n of ['OD1', 'OD2', 'OD3']) { const b = blankBorehole(n); Object.assign(b, { project: 'No elev', date: '2026-05-05', layers: [{ id: uid('l'), top: 0, bottom: 4, uscs: 'sm' }] }); const nb = normalize(b); S.bh.set(nb.id, nb); S.sel = nb.id; }
+      S.secIds = new Set(); renderView(true); await w(150); out.noElev = document.querySelector('#xs-draw').textContent;
+      return out;
+    })()`);
+    expect(r.ok && r.C0 === .5 && /measured/.test(r.srcNote || ''), 'model runs from the measured source: ' + JSON.stringify(r));
+    expect(r.label && r.panel && r.panelOk && r.contour > 0, 'forecast drawn, labelled, with inputs panel: ' + JSON.stringify(r));
+    expect(r.reach[0] > 0 && Math.abs(r.reach[0] - r.reach[1]) < .01 * r.len, 'halving the grid moves the ×1 reach < 1 % of the section: ' + JSON.stringify(r));
+    expect(r.nUp > 0 && r.up, 'upgradient of the source is clean: ' + JSON.stringify(r));
+    expect(/forecast needs ground elevations/i.test(r.noElev), 'no-elevation project refuses: ' + r.noElev.slice(0, 200));
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
