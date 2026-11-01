@@ -1812,7 +1812,7 @@ const jsonLS = (k, d) => { try { return JSON.parse(lsGet(k) || 'null') ?? d; } c
 S.offMap = new Set(jsonLS('bhlog.offmap', [])); S.fold = new Set(jsonLS('bhlog.fold', ['lyr'])); S.lyr = { img: true, grid: true, labels: true, wl: true, sec: true, ...jsonLS('bhlog.lyr', {}) };
 const onMap = b => !S.offMap.has(b.id);
 const mapList = () => projList().filter(onMap);
-const MAP_TABS = ['home', 'site', 'gw', 'contam', 'reports', 'compose'];
+const MAP_TABS = ['home', 'site', 'gw', 'contam', 'xsec', 'reports', 'compose'];
 function saveVis() { lsSet('bhlog.offmap', JSON.stringify([...S.offMap])); lsSet('bhlog.lyr', JSON.stringify(S.lyr)); renderList(sortedList()); if (MAP_TABS.includes(S.tab)) renderView(true); }
 function hiddenNote() {
   const n = projList().filter(b => !onMap(b)).length;
@@ -1850,13 +1850,13 @@ function treeGroup(key, label, count, kids, extra = '') {
   return `<li class="tg${open ? ' open' : ''}"><div class="tr">${extra}<button class="tw" data-fold="${key}" aria-expanded="${open}" title="${open ? 'Collapse' : 'Expand'} ${esc(label)}">${TW}<span>${esc(label)}</span></button>${count != null ? `<span class="tc">${count}</span>` : ''}</div>${open ? `<ul class="tk">${kids}</ul>` : ''}</li>`;
 }
 const BH_TABS = ['log', 'edit', 'report'];
-const NAV_LABEL = { home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
-const NAV_ICON = { table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
+const NAV_LABEL = { xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
+const NAV_ICON = { xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const bhGlyph = well => `<svg class="bhg" viewBox="0 0 16 16" aria-hidden="true">${well ? '<circle cx="8" cy="8" r="4.6" fill="#fff" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/>' : '<circle cx="8" cy="8" r="4.6" fill="currentColor"/>'}</svg>`;
 /* the sidebar is the project as a tree: project pages, and each borehole with its own pages nested under it when chosen */
 /* the left side: a rail of project pages, then the project's boreholes as a list with a filter, status chips and a sort */
-const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['compose', 'Reports']];
+const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['xsec', 'Section'], ['compose', 'Reports']];
 const BH_ICON = '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M8 9h8M8 14h8"/>';
 S.bl = { q: '', st: lsGet('bhlog.blSt') || 'all', sort: lsGet('bhlog.blSort') || 'name' };
 const blMeta = b => { const w = latestWater(b), v = vapourMax(b, null, null); return { d: depthOf(b), w: w ? w.depth : null, v: v ? v.cvc : null }; };
@@ -1962,6 +1962,7 @@ const PAGE_TOOLS = {
   table: [['import', 'Import Excel'], ['imp-lab', 'Import lab results']],
   gw: [['round', 'Monitoring round', 1], ['go-slug', 'Slug tests']],
   contam: [['imp-lab', 'Import lab results', 1], ['go-lab', 'Add lab results']],
+  xsec: [['imp-lab', 'Import lab results']],
   compose: [['pdf-all', 'All logs (PDF)'], ['export', 'Excel report']],
   log: [['qlog', 'Edit step by step', 1], ['to-review', 'For review'], ['issue', 'Issue'], ['revise', 'Revise'], ['graphs', 'Graphs…'], ['comments', 'Comments'], ['history', 'History'], ['bh-more', 'More']],
   edit: [['to-review', 'For review'], ['issue', 'Issue'], ['revise', 'Revise'], ['comments', 'Comments'], ['history', 'History'], ['bh-more', 'More']],
@@ -2554,6 +2555,7 @@ function renderView(full) {
   } else if (S.tab === 'gw') { v.innerHTML = gwHTML(); drawGW(); }
   else if (S.tab === 'report') { v.innerHTML = reportHTML(b); }
   else if (S.tab === 'site') { v.innerHTML = siteHTML(); drawSite(); }
+  else if (S.tab === 'xsec') { v.innerHTML = xsecHTML(); drawXsec(); }
   else if (S.tab === 'home') { v.innerHTML = homeHTML(); }
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
   else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); }
@@ -6388,10 +6390,7 @@ function siteHTML() {
     ${S.mapEdit ? `<section class="sec" style="grid-column:1/-1"><header><h3>Map editor</h3><span class="note">Shapes and locations are saved as you go</span></header><div class="body" id="map-ed-wrap">${mapEditorHTML()}</div></section>` : ''}
     <section class="sec" style="grid-column:1/-1" ${S.mapEdit ? 'hidden' : ''}><header><h3>Site plan</h3><span class="note">Drag to move · scroll to zoom · click boreholes to build the section line</span></header><div class="body">${S.mapEdit ? '' : `<div class="map-wrap"><div id="plan" class="map-canvas"></div><aside class="map-layers">${layersPanelHTML()}</aside></div>`}
       ${pts.length < projList().length ? `<p class="note" style="margin-top:6px">${projList().length - pts.length} borehole${projList().length - pts.length > 1 ? 's have' : ' has'} no coordinates and ${projList().length - pts.length > 1 ? 'are' : 'is'} not shown.</p>` : ''}</div></section>
-    <section class="sec" style="grid-column:1/-1"><header><h3>Cross-section A–A′</h3><span class="note">Included in the report package as drawn here</span><label class="note" for="round">Water level</label><select id="round" style="width:auto"><option value="">Latest in each borehole</option>${roundDates().map(d => `<option value="${d}" ${d === S.round ? 'selected' : ''}>Readings near ${d}</option>`).join('')}</select></header><div class="body">${secToolsHTML()}
-      <div class="scroll-x" id="section"></div>
-      <div class="legend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--earth)" stroke-width="2"/></svg>Ground surface</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="6 3"/></svg>Water table (interpolated)</span><span><svg width="22" height="12" aria-hidden="true"><rect x="7" y="0" width="8" height="12" style="fill:var(--panel);stroke:var(--ink)"/><path d="M9 6h4M9 9h4" style="stroke:var(--ink)"/></svg>Slotted interval</span><span><svg width="22" height="12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" style="fill:var(--s-clay);stroke:var(--muted)" fill-opacity=".38" stroke-dasharray="4 2"/></svg>Interpreted between boreholes</span></div>
-      <p class="note" id="section-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
+    <section class="sec" style="grid-column:1/-1"><header><h3>Cross-section A–A′</h3><span class="note">${S.secIds.size >= 2 ? `Runs through ${S.secIds.size} boreholes picked on the plan` : 'Best-fit line through all boreholes'}</span><span class="sp"></span><button class="btn link" data-tab="xsec">Open cross-section</button></header></section>
     <section class="sec"><header><h3>Plasticity chart</h3><span class="note">CFEM / Modified USCS</span></header><div class="body"><div id="pchart" class="scroll-x"></div></div></section>
     <section class="sec"><header><h3>Grain size distribution</h3><span class="note">CFEM size limits</span></header><div class="body scroll-x">${gsdSVG()}</div></section>
     <section class="sec"><header><h3>Soil texture triangle</h3><span class="note">CSSC (Canadian System of Soil Classification)</span></header><div class="body scroll-x">${textureTriSVG()}</div></section>
@@ -6408,7 +6407,7 @@ const SEC_OPTS = {
 };
 S.sec = { h: 'm', ve: 'auto', bw: 'm', units: true, water: true, wells: true, ...jsonLS('bhlog.sec', {}) };
 const secOpt = k => { if (RO[k] != null) return RO[k]; const o = SEC_OPTS[k].opts; return (o[S.sec[k]] || Object.values(o)[k === 've' ? 0 : 1])[1]; };
-function setSec(k, v) { S.sec = { ...S.sec, [k]: v }; lsSet('bhlog.sec', JSON.stringify(S.sec)); if (k === 'units') S.showUnits = v; drawSite(); if (S.tab === 'site') $('#sec-tools').outerHTML = secToolsHTML(); }
+function setSec(k, v) { S.sec = { ...S.sec, [k]: v }; lsSet('bhlog.sec', JSON.stringify(S.sec)); if (k === 'units') S.showUnits = v; redrawSec(); if ($('#sec-tools')) $('#sec-tools').outerHTML = secToolsHTML(); }
 function secToolsHTML() {
   const all = mapList().filter(b => (b.layers || []).some(l => l.bottom > l.top)), picked = [...S.secIds].filter(id => all.some(b => b.id === id));
   const seg = k => `<span class="lay-ctl"><span class="note">${SEC_OPTS[k].label}</span><span class="seg" role="group" aria-label="${SEC_OPTS[k].label}">${Object.entries(SEC_OPTS[k].opts).map(([v, [t]]) => `<button data-secopt="${k}:${v}" aria-pressed="${String(S.sec[k]) === v}">${t}</button>`).join('')}</span></span>`;
@@ -6420,7 +6419,18 @@ function secToolsHTML() {
     <div class="sec-opts">${seg('h')}${seg('ve')}${seg('bw')}<span class="lay-ctl"><span class="note">Show</span>${chk('units', 'Interpreted units')}${chk('water', 'Water table')}${chk('wells', 'Wells')}</span></div>
   </div>`;
 }
-function drawSite() { drawPlan(); drawPlasticity(); drawSection($('#section'), $('#section-note'), undefined, sectionList()); }
+function drawSite() { drawPlan(); drawPlasticity(); }
+/* the Cross-section page: the section line, the drawing and everything drawn on it */
+function xsecHTML() {
+  return `<div class="xs-page">
+    <section class="sec"><header><h3>Cross-section A–A′</h3><span class="note">Included in the report package as drawn here</span><label class="note" for="round">Water level</label><select id="round" style="width:auto"><option value="">Latest in each borehole</option>${roundDates().map(d => `<option value="${d}" ${d === S.round ? 'selected' : ''}>Readings near ${d}</option>`).join('')}</select></header><div class="body">${secToolsHTML()}
+      <div class="scroll-x" id="xs-draw"></div>
+      <div class="legend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--earth)" stroke-width="2"/></svg>Ground surface</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="6 3"/></svg>Water table (interpolated)</span><span><svg width="22" height="12" aria-hidden="true"><rect x="7" y="0" width="8" height="12" style="fill:var(--panel);stroke:var(--ink)"/><path d="M9 6h4M9 9h4" style="stroke:var(--ink)"/></svg>Slotted interval</span><span><svg width="22" height="12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" style="fill:var(--s-clay);stroke:var(--muted)" fill-opacity=".38" stroke-dasharray="4 2"/></svg>Interpreted between boreholes</span></div>
+      <p class="note" id="xs-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
+  </div>`;
+}
+function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); }
+const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
 function drawPlan(el = $('#plan')) { if (!el) return; el.innerHTML = planSVG(Math.max(el.clientWidth, 420), S.mapEdit ? 620 : 460, true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); loadImagery(); }
 /* Delaunay triangulation (Bowyer–Watson) for contouring between boreholes */
 function delaunay(P) {
@@ -8445,7 +8455,7 @@ document.addEventListener('click', e => {
   const qt = e.target.closest('[data-qtype]'); if (qt) { S._qtype = qt.dataset.qtype; document.querySelectorAll('[data-qtype]').forEach(x => x.setAttribute('aria-pressed', String(x === qt))); return; }
   const sl = e.target.closest('[data-slug]'); if (sl) { openSlug(+sl.dataset.slug); return; }
   const sp = e.target.closest('[data-secpick]');
-  if (sp) { const id = sp.dataset.secpick; S.secIds.has(id) ? S.secIds.delete(id) : S.secIds.add(id); drawSite(); if ($('#sec-tools')) $('#sec-tools').outerHTML = secToolsHTML(); return; }
+  if (sp) { const id = sp.dataset.secpick; S.secIds.has(id) ? S.secIds.delete(id) : S.secIds.add(id); redrawSec(); if ($('#sec-tools')) $('#sec-tools').outerHTML = secToolsHTML(); return; }
   const mz = e.target.closest('[data-mz]'); if (mz) { const t = S._plan; if (mz.dataset.mz === 'fit') { S.mv = null; drawPlan(); } else if (t) { zoomAt(t.W / 2, t.H / 2, mz.dataset.mz === 'in' ? 1.6 : 1 / 1.6); clearTimeout(mvT); drawPlan(); } return; }
   const imb = e.target.closest('[data-imzoom], [data-imdel]'); if (imb) { imageryAct(imb); return; }
   const mt = e.target.closest('[data-mtool]'); if (mt) { S.mapTool = mt.dataset.mtool; S.draft = null; S.mapSel = null; if (S.mapTool === 'place' && !S.bh.has(S.placeId)) S.placeId = nextToPlace(); refreshMapEd(); return; }
@@ -8631,7 +8641,7 @@ document.addEventListener('change', e => {
   if (e.target.dataset.visgrp) { const g = e.target.dataset.visgrp; for (const b of projList().filter(b => !!b.well?.installed === (g === 'mw'))) e.target.checked ? S.offMap.delete(b.id) : S.offMap.add(b.id); saveVis(); return; }
   if (e.target.dataset.lyr) { setLyr(e.target.dataset.lyr, e.target.checked); return; }
   const t = e.target;
-  if (t.id === 'round') { S.round = t.value; drawSection($('#section'), $('#section-note'), undefined, sectionList()); }
+  if (t.id === 'round') { S.round = t.value; redrawSec(); }
   else if (t.dataset?.lab || t.dataset?.lablt || t.dataset?.labmeta) {
     const b0 = cur(); if (!editable(b0)) return; const sm = b0.samples[+t.dataset.i]; sm.lab ||= {}; sm.labMeta ||= {};
     if (t.dataset.labmeta) sm.labMeta[t.dataset.labmeta] = t.value;
