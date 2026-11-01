@@ -589,7 +589,7 @@ app.whenReady().then(async () => {
       // issued: no new rows
       S.bh.get(b.id).status = 'issued'; renderView(true); await w(150); const n0 = S.bh.get(b.id).gwSamples.length; document.querySelector('[data-act="gw-new"]')?.click(); await w(100); out.lockedN = S.bh.get(b.id).gwSamples.length - n0;
       S.bh.get(b.id).status = 'draft';
-      renderView(true); await w(100); const nd = S.bh.get(b.id).gwSamples.length; S.bh.get(b.id).gwSamples.push({ id: 'tmp', date: '2020-01-01', res: {} }); renderView(true); await w(100); [...document.querySelectorAll('[data-act="gw-del"]')][0]?.click(); await w(100); out.delOk = S.bh.get(b.id).gwSamples.length === nd && !S.bh.get(b.id).gwSamples.some(s => s.id === 'tmp');
+      renderView(true); await w(100); const nd = S.bh.get(b.id).gwSamples.length; S.bh.get(b.id).gwSamples.push({ id: 'tmp', date: '2020-01-01', res: {} }); renderView(true); await w(100); document.querySelector('[data-act="gw-del"][data-i="' + S.bh.get(b.id).gwSamples.findIndex(s => s.id === 'tmp') + '"]')?.click(); await w(100); out.delOk = S.bh.get(b.id).gwSamples.length === nd && !S.bh.get(b.id).gwSamples.some(s => s.id === 'tmp');
       // RF5: a water sample in ug/L
       const P = parseLabTable([['Sample ID', 'Analyte', 'Result', 'Units', 'Sample date'], ['MW-1', 'Benzene', '12', 'ug/L', '2026-08-01']]); out.parsed = P.samples[0]; out.paste = parseLabTable([['Sample ID', 'Analyte', 'Result', 'Units'], ['MW-1 1.5', 'Chloride', '850', 'mg/L']]).samples[0];
       await importLabFile(new File(['Sample ID,Analyte,Result,Units,Sample date\\nMW-1,Benzene,12,ug/L,2026-08-01\\nMW-1,Toluene,<0.5,ug/L,2026-08-01\\n'], 'gw.csv', { type: 'text/csv' })); await w(150);
@@ -794,13 +794,80 @@ app.whenReady().then(async () => {
       S.secIds = new Set(); S.xs = { ...S.xs, model: true, plume: false }; goTab('xsec'); await w(300);
       const C = modelChecks(modelRun(''));
       return { names: C.checks.map(c => c.name), okTypes: C.checks.every(c => typeof c.ok === 'boolean' && (c.detail || '').length > 10), res: C.residuals.map(x => ({ b: x.b.name, date: x.date, meas: x.meas, pred: x.pred, nd: x.nd, dlog: x.dlog })), ndText: [...(document.querySelector('#xs-checks')?.closest('.scroll-x')?.nextElementSibling?.querySelectorAll('tbody tr') || [])].map(t => t.textContent).find(t => t.includes('<')), limitPill: [...document.querySelectorAll('#xs-checks tbody tr')].find(t => /Stated limits/.test(t.textContent))?.querySelector('.pill')?.textContent,
-        ob: C.checks.find(c => /Ogata/.test(c.name))?.ok, limits: C.checks.find(c => /limit/i.test(c.name))?.detail, shown: !!document.querySelector('#xs-checks') && document.querySelectorAll('#xs-checks tbody tr').length };
+        ob: C.checks.find(c => /Ogata/.test(c.name))?.ok, limits: C.checks.find(c => c.name === 'Stated limits')?.detail, shown: !!document.querySelector('#xs-checks') && document.querySelectorAll('#xs-checks tbody tr').length };
     })()`);
     expect(r.okTypes && r.names.length >= 5, 'every check has ok and a detail: ' + JSON.stringify(r.names));
     expect(r.res.length === 3 && r.res.every(x => x.date === '2026-12-01' && x.pred != null && x.meas != null) && r.res.some(x => x.nd), 'one residual row per well in the later round: ' + JSON.stringify(r.res));
     expect(r.ob === true && /West et al/.test(r.limits || '') && /uniform/.test(r.limits || ''), 'live Ogata–Banks check and stated limits: ' + JSON.stringify(r));
     expect(r.shown >= 5, 'checks panel shown: ' + r.shown);
     expect(r.res.filter(x => x.nd && x.pred <= x.meas).every(x => x.dlog == null) && /below the detection limit/.test(r.ndText || '') && r.limitPill === 'Noted', 'non-detect agreement worded, limits noted: ' + JSON.stringify({ nd: r.ndText, pill: r.limitPill }));
+  });
+
+  await check('cross-section review fixes', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [];
+      const want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+      // C1: Greek mu, ng/L, unknown per-litre units
+      const mu = parseLabTable([['Sample ID', 'Analyte', 'Result', 'Units'], ['MW-1', 'Benzene', '12', 'μg/L']]).samples[0];
+      want(mu && mu.water && mu.res.benzene.v === .012, 'C1 greek mu: ' + JSON.stringify(mu));
+      const ng = parseLabTable([['Sample ID', 'Analyte', 'Result', 'Units'], ['MW-1', 'Benzene', '12', 'ng/L']]).samples[0];
+      want(ng && ng.res.benzene.v === .000012, 'C1 ng/L: ' + JSON.stringify(ng));
+      const mm = parseLabTable([['Sample ID', 'Analyte', 'Result', 'Units'], ['MW-1', 'Benzene', '12', 'mmol/L'], ['MW-1', 'Toluene', '3', 'mg/L']]);
+      want(!mm.samples[0]?.res.benzene && mm.unknown.some(u => u.includes("mmol/L")), 'C1 unknown unit refused: ' + JSON.stringify(mm));
+      // I3: dates parsed to ISO
+      want(typeof isoDate === 'function' && isoDate(46327) === '2026-11-01' && isoDate('15/10/2026') === '2026-10-15' && isoDate('03/04/2026') === '' && isoDate('15-Oct-2026') === '2026-10-15' && isoDate('2026-10-15T08:00') === '2026-10-15', 'I3 isoDate missing or wrong');
+      // I5: crosstab with a units column in ug/L is water
+      const ct = parseLabTable([['Parameter', 'Units', 'MW-1'], ['Benzene', 'ug/L', '40'], ['Toluene', 'ug/L', '<1']]).samples[0];
+      want(ct && ct.water && ct.res.benzene.v === .04, 'I5 crosstab water: ' + JSON.stringify(ct));
+      loadLloydExample(); await w(150);
+      const wells = sectionList().filter(b => b.well?.installed && b.easting != null && b.elevation != null), src = wells[0];
+      // I2: an undated groundwater result stays undated; a new row is not dated today
+      await importLabFile(new File(['Sample ID,Analyte,Result,Units\\n' + src.name + ',Benzene,7,mg/L\\n'], 'gw.csv', { type: 'text/csv' })); await w(100); importLabGo(); await w(100);
+      const und = src.gwSamples.find(s => s.res.benzene?.v === 7); want(und && und.date === '', 'I2 undated import: ' + JSON.stringify(und));
+      S.sel = src.id; S.dtab = 'ww'; goTab('edit'); await w(200); document.querySelector('[data-act="gw-new"]')?.click(); await w(100); want(src.gwSamples[src.gwSamples.length - 1].date === '', 'I2 new row dated: ' + src.gwSamples[src.gwSamples.length - 1].date);
+      // I1: a non-detect above the guideline does not make a contour
+      setSite({ ...siteOf(), gwGuide: { benzene: .005 } }); const tri = wells.slice(0, 3);
+      tri.forEach((b, i) => { b.gwSamples = [{ id: 'n' + i, date: '2026-09-15', sid: 'x', res: { benzene: i === 1 ? { v: .01, lt: true } : { v: [.001, 0, .002][i], lt: false } } }]; });
+      S.secIds = new Set(tri.map(b => b.id)); S.xs = { ...S.xs, date: '', medium: 'groundwater', param: 'benzene', plume: true, model: false, round: false }; goTab('xsec'); await w(250);
+      const d1 = document.querySelector('#xs-draw'); want(!d1.querySelector('path[data-contour]') && /left out of the contours/.test(d1.textContent), 'I1 high-DL non-detect: contours ' + d1.querySelectorAll('path[data-contour]').length);
+      want(!!d1.querySelector('g[clip-path] [data-pt]') || !!d1.querySelector('g[clip-path]'), 'P5 plume clipped to the ground');
+      // I4: undated soil borehole included with no date; counted when a date is set
+      const nb = blankBorehole('UD1'); Object.assign(nb, { project: src.project, easting: src.easting + 5, northing: src.northing, elevation: src.elevation, crs: src.crs, layers: [{ id: uid('l'), top: 0, bottom: 4, uscs: 'sm' }], samples: [{ id: uid('s'), no: 1, depth: 1, lab: { benzene: { v: 3, lt: false } } }] }); const un = normalize(nb); un.date = ''; un.dateEnd = ''; S.bh.set(un.id, un);
+      const pos = secPos([un]); const p0 = plumePoints(pos, 'soil', 'benzene', '', false), p1 = plumePoints(pos, 'soil', 'benzene', '2026-12-31', false);
+      want(p0.length === 1 && p1.length === 0 && p1.undated === 1, 'I4 undated soil: ' + p0.length + '/' + p1.length + '/' + p1.undated); S.bh.delete(un.id);
+      // forecast cases
+      src.gwSamples = [{ id: 'g1', date: '2026-09-15', sid: 'x', res: { benzene: { v: .5, lt: false }, toluene: { v: .3, lt: false } } }];
+      tri.slice(1).forEach(b => b.gwSamples = []);
+      setSite({ ...siteOf(), model: { src: 'gw', srcBh: src.id } }); S.secIds = new Set(); S.xs = { ...S.xs, plume: false, model: true, param: 'benzene' }; goTab('xsec'); await w(250);
+      // I9: a legend for the forecast on the drawing
+      want(!!document.querySelector('#xs-draw svg [data-model-legend]'), 'I9 model legend');
+      // P3: the self-check is named as one
+      want(modelChecks(modelRun('')).checks.some(c => /self-check/i.test(c.name)) && !modelChecks(modelRun('')).checks.some(c => c.name === 'Ogata–Banks (1961) agreement'), 'P3 self-check name');
+      // I8: the front error is the exact dropped term at the front u·t
+      setSite({ ...siteOf(), model: { src: 'gw', srcBh: src.id, start: '2016-09-15', at: '2026-09-15' } }); drawXsec();
+      { const run0 = modelRun(''), P = run0.P, t = (Date.parse('2026-09-15') - Date.parse('2016-09-15')) / 864e5, x = P.v / P.R * t, exact = ogataBanks({ C0: 1, v: P.v, D: P.ax * P.v, R: P.R, x, t }) - domenico({ C0: 1, v: P.v, R: P.R, ax: P.ax, ay: 0, az: 0, Y: 1e9, Z: 1e9, x, t });
+        const c = modelChecks(run0).checks.find(c => /front/i.test(c.name)); want(c && Math.abs(c.value - exact) < 1e-9 && c.detail.includes((exact * 100).toFixed(1)), 'I8 front error: ' + JSON.stringify({ c, exact, x })); }
+      // P1: a report item keeps its own compound
+      { const it = { ...newItem('section'), o: { xs: { ...S.xs, model: true, param: 'toluene', plume: false } } }; setSite({ ...siteOf(), model: { src: 'gw', srcBh: src.id } }); S.xs = { ...S.xs, param: 'benzene' };
+        const svg = itemInner(it, 900, 420); want(/Model, not measured: Toluene/.test(svg), 'P1 report item compound: ' + (svg.match(/Model, not measured: [A-Za-z]+/) || [])[0]); }
+      goTab('xsec'); await w(150);
+      // P2: no source result on or before the forecast date: refuse, not use later data
+      setSite({ ...siteOf(), model: { src: 'gw', srcBh: src.id, at: '2026-01-01' } }); drawXsec(); want(modelRun('').missing.some(m => /on or before 2026-01-01/.test(m)), 'P2 future source: ' + modelRun('').missing);
+      // I1b: a non-detect source is refused
+      src.gwSamples = [{ id: 'g2', date: '2026-09-15', sid: 'x', res: { benzene: { v: .01, lt: true } } }]; setSite({ ...siteOf(), model: { src: 'gw', srcBh: src.id } }); drawXsec(); want(modelRun('').missing.some(m => /not detected/.test(m)), 'I1 non-detect source: ' + modelRun('').missing);
+      src.gwSamples = [{ id: 'g1', date: '2026-09-15', sid: 'x', res: { benzene: { v: .5, lt: false } } }];
+      // I7: a source half-life needs a release date
+      setSite({ ...siteOf(), model: { src: 'gw', srcBh: src.id, srcHl: 365 } }); drawXsec(); want(modelRun('').missing.some(m => /release date/i.test(m)), 'I7 source half-life: ' + modelRun('').missing);
+      // P4: leachate above solubility is refused
+      src.samples[0].lab = { benzene: { v: 1e6, lt: false } }; setSite({ ...siteOf(), model: { src: 'soil', srcBh: src.id } }); drawXsec(); want(modelRun('').missing.some(m => /solubility/i.test(m)), 'P4 solubility: ' + modelRun('').missing);
+      // I6: a flat water table has no flow direction
+      for (const b of projList()) if (b.well?.installed && b.elevation != null) b.water = [{ id: uid('w'), date: '2026-09-01', depth: b.elevation - 640, measured: b.elevation - 640, ref: 'gs', kind: 'static' }];
+      setSite({ ...siteOf(), model: { src: 'gw', srcBh: src.id } }); drawXsec(); want(modelRun('').missing.some(m => /flat/i.test(m)), 'I6 flat: ' + modelRun('').missing);
+      } catch (e) { F.push('THREW: ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
   });
 
   await check('dates are local, not UTC', async run => {
