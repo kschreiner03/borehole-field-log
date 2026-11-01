@@ -574,6 +574,38 @@ app.whenReady().then(async () => {
     expect(r.joinsFar === 0, 'readings 19 days apart are not joined: ' + r.joinsFar);
   });
 
+  await check('groundwater results: entry, guideline, import and lock', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), out = {};
+      const b0 = blankBorehole('MW-1'); Object.assign(b0, { project: 'GW test', well: { ...blankWell(), installed: true, type: 'well', screenTop: 2, screenBottom: 5 } }); const b = normalize(b0); S.bh.set(b.id, b); store.save(b);
+      S.sel = b.id; S.dtab = 'ww'; goTab('edit'); await w(250);
+      out.section = !!document.querySelector('[data-t="gwlab"]');
+      document.querySelector('[data-act="gw-new"]')?.click(); await w(150);
+      out.n = S.bh.get(b.id).gwSamples.length;
+      const inp = document.querySelector('[data-gw="benzene"][data-i="0"]'); if (inp) { inp.value = '0.02'; inp.dispatchEvent(new Event('change', { bubbles: true })); } await w(150);
+      out.benz = S.bh.get(b.id).gwSamples[0]?.res?.benzene;
+      const g = document.querySelector('[data-gwguide="benzene"]'); if (g) { g.value = '0.005'; g.dispatchEvent(new Event('change', { bubbles: true })); } await w(150);
+      out.guide = siteOf()?.gwGuide?.benzene; out.over = !!document.querySelector('[data-t="gwlab"] .over, [data-t="gwlab"] [data-over]');
+      // issued: no new rows
+      S.bh.get(b.id).status = 'issued'; renderView(true); await w(150); const n0 = S.bh.get(b.id).gwSamples.length; document.querySelector('[data-act="gw-new"]')?.click(); await w(100); out.lockedN = S.bh.get(b.id).gwSamples.length - n0;
+      S.bh.get(b.id).status = 'draft';
+      renderView(true); await w(100); const nd = S.bh.get(b.id).gwSamples.length; S.bh.get(b.id).gwSamples.push({ id: 'tmp', date: '2020-01-01', res: {} }); renderView(true); await w(100); [...document.querySelectorAll('[data-act="gw-del"]')][0]?.click(); await w(100); out.delOk = S.bh.get(b.id).gwSamples.length === nd && !S.bh.get(b.id).gwSamples.some(s => s.id === 'tmp');
+      // RF5: a water sample in ug/L
+      const P = parseLabTable([['Sample ID', 'Analyte', 'Result', 'Units', 'Sample date'], ['MW-1', 'Benzene', '12', 'ug/L', '2026-08-01']]); out.parsed = P.samples[0];
+      await importLabFile(new File(['Sample ID,Analyte,Result,Units,Sample date\\nMW-1,Benzene,12,ug/L,2026-08-01\\nMW-1,Toluene,<0.5,ug/L,2026-08-01\\n'], 'gw.csv', { type: 'text/csv' })); await w(150);
+      out.dest = document.querySelector('[data-labmap="0"]')?.value; importLabGo(); await w(150);
+      out.imported = S.bh.get(b.id).gwSamples.find(s => s.date === '2026-08-01');
+      return out;
+    })()`);
+    expect(r.section && r.n === 1, 'groundwater section and new row: ' + JSON.stringify(r));
+    expect(r.benz && r.benz.v === 0.02 && r.benz.lt === false, 'typed result saved: ' + JSON.stringify(r.benz));
+    expect(r.guide === 0.005 && r.over, 'guideline saved and exceedance marked: ' + JSON.stringify(r));
+    expect(r.lockedN === 0, 'issued borehole took a new row');
+    expect(r.delOk, 'delete removes the clicked row');
+    expect(r.parsed && r.parsed.res.benzene.v === 0.012 && r.parsed.water && r.parsed.unit0 === 'ug/L', 'ug/L converted: ' + JSON.stringify(r.parsed));
+    expect(/\|gw$/.test(r.dest || '') && r.imported && r.imported.res.benzene.v === 0.012 && r.imported.res.toluene.lt === true && r.imported.unit0 === 'ug/L', 'imported as a groundwater sample: ' + JSON.stringify(r));
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
