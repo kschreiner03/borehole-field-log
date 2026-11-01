@@ -607,6 +607,35 @@ app.whenReady().then(async () => {
     expect(/\|gw$/.test(r.dest || '') && r.imported && r.imported.res.benzene.v === 0.012 && r.imported.res.toluene.lt === true && r.imported.unit0 === 'ug/L', 'imported as a groundwater sample: ' + JSON.stringify(r));
   });
 
+  await check('cross-section: plume points by date', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadDlExample(); await w(150);
+      const list = sectionList(), pos = secPos(list.filter(b => (b.layers || []).some(l => l.bottom > l.top) || b.water?.length));
+      const want = list.flatMap(b => b.samples.filter(sm => labVal(sm, 'benzene') && sm.depth != null).map(sm => b.id + '@' + sm.depth)).sort();
+      const all = plumePoints(pos, 'soil', 'benzene', '', false), got = all.map(p => p.b.id + '@' + p.top).sort();
+      const drill = list.map(b => b.dateEnd || b.date).sort(), first = drill[0];
+      const dates = xsDates(list);
+      const before = plumePoints(pos, 'soil', 'benzene', '2026-01-01', false).length;
+      const late = new Date(Date.parse(drill[drill.length - 1]) + 30 * 864e5).toISOString().slice(0, 10);
+      const roundLate = plumePoints(pos, 'soil', 'benzene', late, true).length, anyLate = plumePoints(pos, 'soil', 'benzene', late, false).length;
+      const vap = plumePoints(pos, 'vapour', '', '', false);
+      const ages = plumePoints(pos, 'soil', 'benzene', late, false).every(p => p.age >= 30);
+      // a groundwater sample at a well: drawn over the screen below the water table
+      const mw = list.find(b => b.well?.installed); mw.gwSamples = [{ id: 'g1', date: '2026-09-15', sid: 'x', res: { benzene: { v: .03, lt: false } } }];
+      const gp = plumePoints(pos, 'groundwater', 'benzene', '', false), wt = waterAt(mw, '2026-09-15');
+      // one date only
+      const one = blankBorehole('OD1'); Object.assign(one, { project: 'One date', date: '2026-05-05', samples: [{ id: 's', no: 1, depth: 1, lab: { benzene: { v: 1, lt: false } } }] });
+      return { want, got, dates, first, before, roundLate, anyLate, vap: vap.length, vapWant: list.flatMap(b => b.samples.filter(sm => sm.cvc != null && sm.depth != null)).length, ages, gp: gp.map(p => ({ id: p.b.id, top: p.top, bot: p.bot, v: p.v })), mw: mw.id, wt: wt?.depth, scr: [mw.well.screenTop, mw.well.screenBottom], oneDates: xsDates([normalize(one)]) };
+    })()`);
+    expect(r.got.length > 0 && JSON.stringify(r.got) === JSON.stringify(r.want), 'soil benzene points: ' + r.got.length + ' vs ' + r.want.length);
+    expect(r.dates.includes(r.first) && r.dates.every((d, i) => !i || d > r.dates[i - 1]), 'sorted unique dates incl. drilling: ' + JSON.stringify(r.dates.slice(0, 5)));
+    expect(r.before === 0, 'no results before sampling');
+    expect(r.anyLate > 0 && r.roundLate === 0 && r.ages, 'round hides results older than 7 days: ' + JSON.stringify(r));
+    expect(r.vap === r.vapWant, 'vapour points: ' + r.vap + '/' + r.vapWant);
+    expect(r.gp.length === 1 && r.gp[0].id === r.mw && Math.abs(r.gp[0].top - Math.max(r.scr[0], r.wt)) < 1e-9 && r.gp[0].bot === r.scr[1] && r.gp[0].v === .03, 'groundwater over the saturated screen: ' + JSON.stringify(r));
+    expect(r.oneDates.length === 1, 'one-date project: ' + JSON.stringify(r.oneDates));
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
