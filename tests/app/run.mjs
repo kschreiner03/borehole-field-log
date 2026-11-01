@@ -676,6 +676,25 @@ app.whenReady().then(async () => {
     expect(r.depthPts === 4 && r.finite, 'depth-only project draws points: ' + JSON.stringify(r));
   });
 
+  await check('report: section item carries date and plume', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadDlExample(); await w(150); S.secIds = new Set();
+      const dates = xsDates(sectionList()), d = dates[Math.floor(dates.length / 2)];
+      S.xs = { ...S.xs, date: d, medium: 'vapour', plume: true, round: false };
+      goTab('compose'); await w(150); const L = repLayout(), pg = newPage('free', { orient: 'land', items: [] }); L.pages.push(pg); S.cpage = L.pages.length - 1; rerenderCompose(); await w(150);
+      document.querySelector('[data-cadd="section"]').click(); await w(150);
+      const it = curPage().items.find(x => x.t === 'section');
+      const stored = structuredClone(it.o.xs);
+      S.xs = { ...S.xs, date: '', medium: 'soil' };   // the page keeps what was placed, not the live view
+      const svg = itemInner(it, 900, 420), txt = svg.replace(/<[^>]+>/g, ' ');
+      S.csel = it.id; rerenderCompose(); await w(100); const btn = !!document.querySelector('[data-act="cmp-xs-use"]'); S.xs = { ...S.xs, date: dates[0], medium: 'soil', param: 'benzene' }; document.querySelector('[data-act="cmp-xs-use"]')?.click(); await w(100); const used = curPage().items.find(x => x.t === 'section').o.xs;
+      return { stored, d, hasDate: txt.includes(d), interp: /interpolated/.test(svg), vapour: /Headspace vapour/.test(txt), btn, used, d0: dates[0], link: !!document.querySelector('#cmp-props [data-tab="xsec"]') };
+    })()`);
+    expect(r.stored && r.stored.date === r.d && r.stored.medium === 'vapour', 'section item stores the view: ' + JSON.stringify(r.stored));
+    expect(r.hasDate && r.interp && r.vapour, 'printed section shows its date, plume and interpolated labels: ' + JSON.stringify(r));
+    expect(r.btn && r.link && r.used?.date === r.d0 && r.used?.medium === 'soil', 'panel offers Use current view and links to the section page: ' + JSON.stringify(r));
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
