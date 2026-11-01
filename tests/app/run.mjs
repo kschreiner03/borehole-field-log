@@ -784,6 +784,25 @@ app.whenReady().then(async () => {
     expect(/forecast needs ground elevations/i.test(r.noElev), 'no-elevation project refuses: ' + r.noElev.slice(0, 200));
   });
 
+  await check('model: checks', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); await w(150);
+      const wells = sectionList().filter(b => b.well?.installed && b.easting != null), src = wells[0];
+      src.gwSamples = [{ id: 'g1', date: '2026-09-15', sid: 'x', res: { benzene: { v: .5, lt: false } } }];
+      wells.slice(1, 4).forEach((b, i) => { b.gwSamples = [{ id: 'l' + i, date: '2026-12-01', sid: 'y', res: { benzene: { v: [.02, .004, .001][i], lt: i === 2 } } }]; });
+      setSite({ ...siteOf(), gwGuide: { benzene: .005 }, model: { param: 'benzene', src: 'gw', srcBh: src.id } });
+      S.secIds = new Set(); S.xs = { ...S.xs, model: true, plume: false }; goTab('xsec'); await w(300);
+      const C = modelChecks(modelRun(''));
+      return { names: C.checks.map(c => c.name), okTypes: C.checks.every(c => typeof c.ok === 'boolean' && (c.detail || '').length > 10), res: C.residuals.map(x => ({ b: x.b.name, date: x.date, meas: x.meas, pred: x.pred, nd: x.nd, dlog: x.dlog })), ndText: [...(document.querySelector('#xs-checks')?.closest('.scroll-x')?.nextElementSibling?.querySelectorAll('tbody tr') || [])].map(t => t.textContent).find(t => t.includes('<')), limitPill: [...document.querySelectorAll('#xs-checks tbody tr')].find(t => /Stated limits/.test(t.textContent))?.querySelector('.pill')?.textContent,
+        ob: C.checks.find(c => /Ogata/.test(c.name))?.ok, limits: C.checks.find(c => /limit/i.test(c.name))?.detail, shown: !!document.querySelector('#xs-checks') && document.querySelectorAll('#xs-checks tbody tr').length };
+    })()`);
+    expect(r.okTypes && r.names.length >= 5, 'every check has ok and a detail: ' + JSON.stringify(r.names));
+    expect(r.res.length === 3 && r.res.every(x => x.date === '2026-12-01' && x.pred != null && x.meas != null) && r.res.some(x => x.nd), 'one residual row per well in the later round: ' + JSON.stringify(r.res));
+    expect(r.ob === true && /West et al/.test(r.limits || '') && /uniform/.test(r.limits || ''), 'live Ogata–Banks check and stated limits: ' + JSON.stringify(r));
+    expect(r.shown >= 5, 'checks panel shown: ' + r.shown);
+    expect(r.res.filter(x => x.nd && x.pred <= x.meas).every(x => x.dlog == null) && /below the detection limit/.test(r.ndText || '') && r.limitPill === 'Noted', 'non-detect agreement worded, limits noted: ' + JSON.stringify({ nd: r.ndText, pill: r.limitPill }));
+  });
+
   await check('dates are local, not UTC', async run => {
     const r = await run(`(() => { const d = new Date(); return [today(), d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')]; })()`);
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
