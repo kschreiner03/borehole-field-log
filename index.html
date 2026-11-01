@@ -3957,6 +3957,50 @@ function plumePoints(pos, medium, param, date, round) {
   for (const p of out) p.age = ref ? days(ref, p.date) : 0;
   return round ? out.filter(p => p.age <= 7) : out;
 }
+/* contours of a plume: linear interpolation of log10 concentration on a triangulated network of the plotted points
+   (section drawing coordinates, so the triangles follow the exaggeration as drawn); inside the data only */
+function plumeContours(P, levels) {
+  const tris = delaunay(P).filter(([a, b, c]) => Math.abs((P[b][0] - P[a][0]) * (P[c][1] - P[a][1]) - (P[c][0] - P[a][0]) * (P[b][1] - P[a][1])) > 1e-6);
+  const segs = levels.flatMap(level => tinLine(P, tris, Math.log10(level)).map(([a, b]) => ({ level, a, b })));
+  return { tris, segs, bands: tinBands(P, tris, levels.map(Math.log10)) };
+}
+let XS_LAST = [];
+const xsLastPts = () => XS_LAST;
+const XS_RAMP = ['#fdd49e', '#fc8d59', '#d7301f', '#7f0000'];   // below the first level, ×1–10, ×10–100, over ×100 (sequential, not the water blue)
+/* the levels a plume is contoured at: the guideline ×1, 10, 100; vapour at the app's 10, 100 and 1,000 ppm classes */
+function plumeLevels(medium, param) {
+  if (medium === 'vapour') return [10, 100, 1000].map(v => ({ v, label: `${v.toLocaleString('en-CA')} ppm` }));
+  const g = (medium === 'groundwater' ? gwGuide() : projGuide())[param]; if (!(g > 0)) return [];
+  return [1, 10, 100].map(k => ({ v: g * k, label: `guideline${k > 1 ? ' ×' + k : ''} (${(+(g * k).toPrecision(3)).toLocaleString('en-CA')} ${medium === 'groundwater' ? 'mg/L' : LAB_PARAMS[param]?.unit || ''})` }));
+}
+function plumeSVG(pos, xs, X, Y, top, bw, W, H, m) {
+  const medium = xs.medium || 'soil', param = medium === 'vapour' ? '' : xs.param, name = medium === 'vapour' ? 'Headspace vapour' : LAB_PARAMS[param]?.label || 'No parameter';
+  const pts = plumePoints(pos, medium, param, xs.date || '', !!xs.round), o = [];
+  XS_LAST = [];
+  if (!pts.length) { o.push(`<text class="lbl2" x="${m.l + 24}" y="${m.t - 8}" style="fill:var(--warn,#a3470b)">No ${esc(name)} results in ${medium}${xs.date ? ` on or before ${esc(xs.date)}` : ''}.</text>`); return o.join(''); }
+  const lv = plumeLevels(medium, param), cls = v => lv.length ? lv.filter(l => v >= l.v).length : 0, uid2 = 'ph' + Math.random().toString(36).slice(2, 7);
+  const P = [], seen = new Map();
+  for (const p of pts) for (const dep of p.top === p.bot ? [p.top] : [p.top, p.bot]) {
+    const x = X(p.d), y = Y(top(p.b) - dep), k = x.toFixed(3) + ',' + y.toFixed(3), z = Math.log10(Math.max(p.v, 1e-12));
+    if (seen.has(k)) { const q = seen.get(k); q[2] = Math.max(q[2], z); } else { const q = [x, y, z]; seen.set(k, q); P.push(q); }
+  }
+  XS_LAST = P;
+  if (lv.length && P.length >= 3) {
+    const C = plumeContours(P, lv.map(l => l.v));
+    o.push(`<defs>${[1, 2, 3].map(k => `<pattern id="${uid2}${k}" width="${8 - k * 1.5}" height="${8 - k * 1.5}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0v${8 - k * 1.5}" stroke="${XS_RAMP[k]}" stroke-width="1.1"/></pattern>`).join('')}</defs>`);
+    C.bands.forEach((polys, k) => { if (k) for (const pg of polys) o.push(`<path d="${pg.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')}Z" fill="url(#${uid2}${k})" opacity=".8"/>`); });
+    lv.forEach((l, i) => { const segs = C.segs.filter(sg => sg.level === l.v); if (segs.length) o.push(`<path data-contour="${[1, 10, 100][i]}" d="${segs.map(sg => `M${sg.a[0].toFixed(1)} ${sg.a[1].toFixed(1)}L${sg.b[0].toFixed(1)} ${sg.b[1].toFixed(1)}`).join('')}" fill="none" stroke="${XS_RAMP[i + 1]}" stroke-width="${1.2 + i * .4}" stroke-dasharray="5 3"><title>${esc(name)} ${esc(l.label)}, interpolated between samples</title></path>`); });
+  }
+  for (const p of pts) {
+    const x = X(p.d), y1 = Y(top(p.b) - p.top), y2 = Y(top(p.b) - p.bot), c = XS_RAMP[cls(p.v)], tip = `${p.b.name}: ${name} ${p.lt ? '<' : ''}${(+p.v).toLocaleString('en-CA', { maximumSignificantDigits: 4 })} ${medium === 'vapour' ? 'ppm' : medium === 'groundwater' ? 'mg/L' : LAB_PARAMS[param]?.unit || ''}${p.lt ? ' (not detected)' : ''}, ${p.top === p.bot ? fu(p.top) : `${fx(p.top)}–${fu(p.bot)}`} · sampled ${p.date}${p.age > 0 ? `, ${p.age} days before the date shown` : ''}`;
+    if (p.top === p.bot) o.push(`<circle data-pt="1" data-lt="${p.lt ? 1 : 0}" cx="${x + bw / 2 + 7}" cy="${y1}" r="4.2" fill="${p.lt ? '#fff' : c}" stroke="${p.lt ? '#7f0000' : '#3a1a00'}" stroke-width="1"><title>${esc(tip)}</title></circle>`);
+    else o.push(`<rect data-pt="1" data-lt="${p.lt ? 1 : 0}" x="${x + bw / 2 + 3}" y="${y1}" width="8" height="${Math.max(2, y2 - y1)}" fill="${p.lt ? '#fff' : c}" stroke="#3a1a00" stroke-width="1"><title>${esc(tip)}</title></rect>`);
+  }
+  const lg = [[`${name} · ${medium}${xs.date ? ` · as of ${xs.date}` : ' · latest'}${xs.round ? ' · this round only' : ''}`]];
+  o.push(`<g transform="translate(${W - m.r - 250} ${m.t - 50})"><rect width="250" height="${16 + Math.max(1, lv.length + 1) * 13}" fill="var(--panel)" opacity=".92" stroke="var(--line)"/><text x="6" y="12" class="lbl2" style="font-weight:600">${esc(lg[0][0])}</text>
+    ${(lv.length ? [`Below ${lv[0].label}`, ...lv.map((l, i) => i < lv.length - 1 ? `${l.label} to ${lv[i + 1].label.split(' (')[0]}` : `Over ${l.label}`)] : ['No guideline set: no contours']).map((t, i) => `<rect x="6" y="${18 + i * 13}" width="10" height="9" fill="${lv.length ? XS_RAMP[i] : '#fff'}" stroke="#3a1a00" stroke-width=".6"/><text x="20" y="${26 + i * 13}" class="lbl2">${esc(t)}</text>`).join('')}</g>`);
+  return o.join('');
+}
 function setXs(k, v) { S.xs = { ...S.xs, [k]: v }; lsSet('bhlog.xs', JSON.stringify(S.xs)); redrawSec(); }
 function readingFor(b) {
   if (!S.round) return latestWater(b);
@@ -4111,6 +4155,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
       o.push(`<g><title>${esc(`${p.b.name}: slotted ${fx(w.screenTop)}–${fu(w.screenBottom)}`)}</title><rect x="${px}" y="${Y(e + su(p.b))}" width="${pw}" height="${Y(e - w.screenTop) - Y(e + su(p.b))}" style="fill:var(--panel);stroke:var(--ink)" stroke-width=".8"/><rect x="${px}" y="${Y(e - w.screenTop)}" width="${pw}" height="${Y(e - w.screenBottom) - Y(e - w.screenTop)}" style="fill:var(--panel);stroke:var(--ink)" stroke-width=".8" stroke-dasharray="2 1.5"/></g>`);
     }
   }
+  if (xs && xs.plume !== false && (xs.param || xs.medium === 'vapour')) o.push(plumeSVG(pos, xs, X, Y, top, bw, W, H, m));
   const rowsEnd = [-Infinity, -Infinity, -Infinity];
   for (const p of pos) {
     const xx = X(p.d), w = Math.min(p.b.name.length, 12) * 7 + 10;
@@ -6480,7 +6525,7 @@ function drawSite() { drawPlan(); drawPlasticity(); }
 /* the Cross-section page: the section line, the drawing and everything drawn on it */
 function xsecHTML() {
   return `<div class="xs-page">
-    <section class="sec"><header><h3>Cross-section A–A′</h3><span class="sp"></span><label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">${secToolsHTML()}
+    <section class="sec"><header><h3>Cross-section A–A′</h3><span class="sp"></span><label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">${xsPlumeCtl()}${secToolsHTML()}
       <div class="scroll-x" id="xs-draw"></div>
       <div class="legend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--earth)" stroke-width="2" stroke-dasharray="6 3"/></svg>Ground surface (measured at boreholes, interpolated between)</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="6 3"/></svg>Water table (interpolated)</span><span><svg width="22" height="12" aria-hidden="true"><rect x="7" y="0" width="8" height="12" style="fill:var(--panel);stroke:var(--ink)"/><path d="M9 6h4M9 9h4" style="stroke:var(--ink)"/></svg>Slotted interval</span><span><svg width="22" height="12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" style="fill:var(--s-clay);stroke:var(--muted)" fill-opacity=".38" stroke-dasharray="4 2"/></svg>Interpreted between boreholes</span></div>
       <p class="note" id="xs-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
@@ -6497,6 +6542,26 @@ function xsCorrHTML() {
     ${rows.map(([b, u]) => { const k = b.id + '|' + u; return `<tr><td>${esc(b.name)}</td><td>${esc(u)}</td><td><select data-xsalias="${esc(k)}" aria-label="${esc(`${b.name} ${u} joined as`)}" ${S.readOnly ? 'disabled' : ''}><option value="">${esc(u)} (as logged)</option>${names.filter(n => n !== u).map(n => `<option value="${esc(n)}" ${al[k] === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></td></tr>`; }).join('')}
     </tbody></table></div><p class="note">Pairings are an interpretation and are drawn dashed like every other link between boreholes.</p></div></section>`;
 }
+function xsPlumeCtl() {
+  const list = sectionList(), dates = xsDates(list), xs = S.xs, idx = xs.date ? Math.max(0, dates.filter(d => d <= xs.date).length - 1) : dates.length - 1;
+  const has = m => LAB_ORDER.filter(p => m === 'groundwater' ? list.some(b => (b.gwSamples || []).some(s => gwVal(s, p))) : list.some(b => (b.samples || []).some(sm => labVal(sm, p))));
+  const params = has(xs.medium); if (xs.medium !== 'vapour' && !params.includes(xs.param) && params.length) xs.param = params.includes('benzene') ? 'benzene' : params[0];
+  return `<div class="xs-ctl sec-opts"><span class="lay-ctl"><label class="check"><input type="checkbox" id="xs-plume" ${xs.plume !== false ? 'checked' : ''}> Plume</label>
+    <select id="xs-medium" aria-label="Medium" style="width:auto">${[['soil', 'Soil (lab)'], ['groundwater', 'Groundwater (lab)'], ['vapour', 'Headspace vapour']].map(([v, t]) => `<option value="${v}" ${xs.medium === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+    ${xs.medium === 'vapour' ? '' : `<select id="xs-param" aria-label="Parameter" style="width:auto">${params.length ? params.map(p => `<option value="${p}" ${xs.param === p ? 'selected' : ''}>${esc(LAB_PARAMS[p].label)}</option>`).join('') : '<option value="">No results</option>'}</select>`}
+    <label class="check" title="Show only results within 7 days of the date"><input type="checkbox" id="xs-round" ${xs.round ? 'checked' : ''}> This round only</label></span>
+    <span class="lay-ctl"><span class="note">Date</span><input type="range" id="xs-date" min="0" max="${Math.max(0, dates.length - 1)}" step="1" value="${Math.max(0, idx)}" ${dates.length ? '' : 'disabled'} aria-label="Date shown" style="width:180px"><span id="xs-date-l" class="note">${esc(xs.date || (dates.length ? `latest (${dates[dates.length - 1]})` : 'no dated data'))}</span>
+    <button class="btn" id="xs-play" data-act="xs-play" ${dates.length < 2 ? 'disabled title="Needs results or readings on two or more dates"' : ''}>Play</button></span></div>`;
+}
+let xsTimer = null;
+function xsPlay() {
+  if (xsTimer) { clearInterval(xsTimer); xsTimer = null; $('#xs-play') && ($('#xs-play').textContent = 'Play'); return; }
+  const dates = xsDates(sectionList()); if (dates.length < 2) return; let i = 0; $('#xs-play').textContent = 'Stop';
+  const step = () => { if (S.tab !== 'xsec' || i >= dates.length) { clearInterval(xsTimer); xsTimer = null; if ($('#xs-play')) $('#xs-play').textContent = 'Play'; return; } xsSetDate(dates[i++]); };
+  step(); xsTimer = setInterval(step, 900);
+}
+function xsSetDate(d) { setXs('date', d); const dates = xsDates(sectionList()); if ($('#xs-date')) $('#xs-date').value = Math.max(0, dates.indexOf(d)); if ($('#xs-date-l')) $('#xs-date-l').textContent = d; if ($('#xs-asof')) $('#xs-asof').value = d; }
+document.addEventListener('input', e => { if (e.target.id === 'xs-date') { const d = xsDates(sectionList())[+e.target.value]; if (d) xsSetDate(d); } });
 function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); }
 const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
 function drawPlan(el = $('#plan')) { if (!el) return; el.innerHTML = planSVG(Math.max(el.clientWidth, 420), S.mapEdit ? 620 : 460, true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); loadImagery(); }
@@ -8649,6 +8714,7 @@ document.addEventListener('click', e => {
     case 'round': openRound(); break;
     case 'mr-save': saveRound(); break;
     case 'slug-new': openSlug(null); break;
+    case 'xs-play': xsPlay(); break;
     case 'gw-new': if (b && editable(b)) { b.gwSamples.push({ id: uid('gs'), date: today(), sid: `${b.name}-GW`, lab: '', report: '', res: {} }); logChange(b, 'Groundwater sample added'); store.save(b); renderView(true); } break;
     case 'gw-del': if (b && editable(b)) { b.gwSamples.splice(+t.dataset.i, 1); store.save(b); renderView(true); } break;
     case 'site-img': openSiteImg(); break;
@@ -8742,6 +8808,8 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'round') { S.round = t.value; redrawSec(); }
   if (t.id === 'xs-asof') setXs('date', t.value);
+  if (t.id === 'xs-medium' || t.id === 'xs-param') { setXs(t.id.slice(3), t.value); renderView(true); return; }
+  if (t.id === 'xs-round' || t.id === 'xs-plume') { setXs(t.id.slice(3), t.checked); return; }
   if (t.dataset?.gw || t.dataset?.gwlt || t.dataset?.gwf || t.dataset?.gwguide) { gwChange(t); return; }
   if (t.dataset?.xsalias != null && !S.readOnly) { const x = siteOf()?.xsec || {}, al = { ...(x.alias || {}) }; if (t.value) al[t.dataset.xsalias] = t.value; else delete al[t.dataset.xsalias]; setSite({ ...(siteOf() || {}), xsec: { ...x, alias: al } }); redrawSec(); }
   else if (t.dataset?.lab || t.dataset?.lablt || t.dataset?.labmeta) {
