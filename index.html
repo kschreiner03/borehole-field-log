@@ -3937,15 +3937,16 @@ function xsDates(list) {
    soil and vapour sit at the sample depth; groundwater spans the well screen below the water table at that date.
    round: only results within 7 days of the date (or of the newest result when no date is set) */
 function plumePoints(pos, medium, param, date, round) {
-  const out = [], ok = d => d && (!date || d <= date), days = (a, c) => Math.round((Date.parse(a) - Date.parse(c)) / 864e5);
+  const out = [], ok = d => d && (!date || d <= date), days = (a, c) => Math.round((Date.parse(a) - Date.parse(c)) / 864e5); let undated = 0;
   for (const { b, d } of pos) {
     if (medium === 'groundwater') {
       const w = b.well; if (!w?.installed || w.screenTop == null || w.screenBottom == null) continue;
+      undated += (b.gwSamples || []).filter(s => !s.date && gwVal(s, param)).length;
       const s = (b.gwSamples || []).filter(s => ok(s.date) && gwVal(s, param)).sort(byDate).pop(); if (!s) continue;
       const wt = waterAt(b, s.date), top = Math.max(w.screenTop, wt?.depth ?? w.screenTop), bot = w.screenBottom; if (bot <= top) continue;
       out.push({ b, d, top, bot, ...gwVal(s, param), date: s.date });
     } else {
-      const sd = soilDate(b); if (!ok(sd)) continue;
+      const sd = soilDate(b); if (sd ? !ok(sd) : !!date) { if (!sd) undated += (b.samples || []).filter(sm => sm.depth != null && (medium === 'vapour' ? sm.cvc != null : labVal(sm, param))).length; continue; }   // undated boreholes count when no date is chosen
       for (const sm of b.samples || []) {
         if (sm.depth == null) continue;
         const r = medium === 'vapour' ? (sm.cvc != null ? { v: sm.cvc, lt: false } : null) : labVal(sm, param); if (!r) continue;
@@ -3953,9 +3954,9 @@ function plumePoints(pos, medium, param, date, round) {
       }
     }
   }
-  const ref = date || out.map(p => p.date).sort().pop();
-  for (const p of out) p.age = ref ? days(ref, p.date) : 0;
-  return round ? out.filter(p => p.age <= 7) : out;
+  const ref = date || out.map(p => p.date).filter(Boolean).sort().pop();
+  for (const p of out) p.age = ref && p.date ? days(ref, p.date) : 0;
+  const res = round ? out.filter(p => p.date && p.age <= 7) : out; res.undated = undated; return res;
 }
 /* contours of a plume: linear interpolation of log10 concentration on a triangulated network of the plotted points
    (section drawing coordinates, so the triangles follow the exaggeration as drawn); inside the data only */
@@ -3979,8 +3980,8 @@ function plumeSVG(pos, xs, X, Y, top, bw, W, H, m) {
   XS_LAST = [];
   if (!pts.length) { o.push(`<text class="lbl2" x="${m.l + 24}" y="${m.t - 8}" style="fill:var(--warn,#a3470b)">No ${esc(name)} results in ${medium}${xs.date ? ` on or before ${esc(xs.date)}` : ''}.</text>`); return o.join(''); }
   const lv = plumeLevels(medium, param), cls = v => lv.length ? lv.filter(l => v >= l.v).length : 0, uid2 = 'ph' + Math.random().toString(36).slice(2, 7);
-  const P = [], seen = new Map();
-  for (const p of pts) for (const dep of p.top === p.bot ? [p.top] : [p.top, p.bot]) {
+  const P = [], seen = new Map(), hiND = lv.length ? pts.filter(p => p.lt && p.v >= lv[0].v) : [];
+  for (const p of pts) for (const dep of hiND.includes(p) ? [] : p.top === p.bot ? [p.top] : [p.top, p.bot]) {
     const x = X(p.d), y = Y(top(p.b) - dep), k = x.toFixed(3) + ',' + y.toFixed(3), z = Math.log10(Math.max(p.v, 1e-12));
     if (seen.has(k)) { const q = seen.get(k); q[2] = Math.max(q[2], z); } else { const q = [x, y, z]; seen.set(k, q); P.push(q); }
   }
@@ -3988,9 +3989,13 @@ function plumeSVG(pos, xs, X, Y, top, bw, W, H, m) {
   if (lv.length && P.length >= 3) {
     const C = plumeContours(P, lv.map(l => l.v));
     o.push(`<defs>${[1, 2, 3].map(k => `<pattern id="${uid2}${k}" width="${8 - k * 1.5}" height="${8 - k * 1.5}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0v${8 - k * 1.5}" stroke="${XS_RAMP[k]}" stroke-width="1.1"/></pattern>`).join('')}</defs>`);
+    o.push(`<g clip-path="url(#${XS_GEOM?.gclip})">`);
     C.bands.forEach((polys, k) => { if (k) for (const pg of polys) o.push(`<path d="${pg.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')}Z" fill="url(#${uid2}${k})" opacity=".8"/>`); });
     lv.forEach((l, i) => { const segs = C.segs.filter(sg => sg.level === l.v); if (segs.length) o.push(`<path data-contour="${[1, 10, 100][i]}" d="${segs.map(sg => `M${sg.a[0].toFixed(1)} ${sg.a[1].toFixed(1)}L${sg.b[0].toFixed(1)} ${sg.b[1].toFixed(1)}`).join('')}" fill="none" stroke="${XS_RAMP[i + 1]}" stroke-width="${1.2 + i * .4}" stroke-dasharray="5 3"><title>${esc(name)} ${esc(l.label)}, interpolated between samples</title></path>`); });
+    o.push('</g>');
   }
+  const notes = [hiND.length ? `${hiND.length} non-detect${hiND.length > 1 ? 's' : ''} with a detection limit at or above the ${lv[0]?.label.split(' (')[0]} left out of the contours` : '', pts.undated ? `${pts.undated} undated result${pts.undated > 1 ? 's' : ''} not shown` : ''].filter(Boolean);
+  if (notes.length) o.push(`<text class="lbl2" x="${m.l + 24}" y="${m.t - 8}" style="fill:var(--warn,#a3470b)">${esc(notes.join('; '))}.</text>`);
   for (const p of pts) {
     const x = X(p.d), y1 = Y(top(p.b) - p.top), y2 = Y(top(p.b) - p.bot), c = XS_RAMP[cls(p.v)], tip = `${p.b.name}: ${name} ${p.lt ? '<' : ''}${(+p.v).toLocaleString('en-CA', { maximumSignificantDigits: 4 })} ${medium === 'vapour' ? 'ppm' : medium === 'groundwater' ? 'mg/L' : LAB_PARAMS[param]?.unit || ''}${p.lt ? ' (not detected)' : ''}, ${p.top === p.bot ? fu(p.top) : `${fx(p.top)}–${fu(p.bot)}`} · sampled ${p.date}${p.age > 0 ? `, ${p.age} days before the date shown` : ''}`;
     if (p.top === p.bot) o.push(`<circle data-pt="1" data-lt="${p.lt ? 1 : 0}" cx="${x + bw / 2 + 7}" cy="${y1}" r="4.2" fill="${p.lt ? '#fff' : c}" stroke="${p.lt ? '#7f0000' : '#3a1a00'}" stroke-width="1"><title>${esc(tip)}</title></circle>`);
@@ -4084,15 +4089,16 @@ const MODEL_FIELDS = [   // key, label, unit
   ['start', 'Release began (blank = long-term steady state)', 'date'], ['at', 'Forecast date (blank = date shown)', 'date']];
 const MODEL_COLS = ['#efedf5', '#bcbddc', '#807dba', '#54278f'];   // model output: purple family, never the plume oranges or the water blue
 /* everything the forecast needs, each value with where it came from, or the list of what is missing */
-function modelRun(date) {
+function modelRun(date, xs = S.xs) {
   const site = siteOf() || {}, u = site.model || {}, missing = [], P = { src: {} }, G = XS_GEOM;
   const val = (k, v, src) => { if (u[k] != null && u[k] !== '') { P[k] = +u[k]; P.src[k] = 'entered'; } else { P[k] = v; P.src[k] = src; } };
-  P.param = u.param || (CHEM[S.xs.param] && !CHEM[S.xs.param].mixture ? S.xs.param : 'benzene');
+  P.param = u.param || (CHEM[xs?.param] && !CHEM[xs.param].mixture ? xs.param : 'benzene');
   const chem = modelInputs(P.param, u); if (chem.mixture) return { ok: false, missing: [chem.note], P };
   for (const k of ['koc', 'H', 'sol', 'hl']) { P[k] = chem[k]; P.src[k] = chem.src[k]; } missing.push(...chem.missing);
   const geo = [...(!G || !G.located ? ['The forecast needs borehole coordinates to place the section on the flow direction.'] : []), ...(!G || G.noElev ? ['The forecast needs ground elevations to calculate heads.'] : [])];
   if (geo.length) return { ok: false, missing: geo, P };
   const F = gwFlow(); if (F.error) return { ok: false, missing: ['Groundwater flow: ' + F.error], P };
+  if (F.flat || !(F.i > 0)) return { ok: false, missing: ['The water table is too flat to define a flow direction.'], P };
   if (F.K == null) missing.push('hydraulic conductivity (add a slug test)');
   const soil = CCME_SOIL[u.soil === 'fine' ? 'fine' : 'coarse'];
   for (const k of ['foc', 'rhob', 'thw', 'tha', 'I']) val(k, soil[k], CCME_SRC);
@@ -4100,6 +4106,7 @@ function modelRun(date) {
   const Lp = Math.max(1, G.maxD); val('ax', xuEckstein(Lp), `Xu and Eckstein (1995) for a plume length of ${Lp.toFixed(0)} m (the section length; assumed)`);
   val('ay', P.ax / 10, 'ax / 10 (Gelhar et al. 1992; assumed)'); val('az', 0, 'about 0: no vertical spreading (BIOSCREEN default; conservative)');
   val('srcHl', null, 'constant source (conservative)'); P.start = u.start || ''; P.at = u.at || date || '';
+  if (P.srcHl > 0 && !P.start) missing.push('a release date: a source half-life needs one (at steady state a decaying source would be gone)');
   P.v = F.K != null ? F.v * 86400 : null; P.src.v = F.K != null ? `K·i/nₑ from the flow calculation (${F.nK} slug test${F.nK > 1 ? 's' : ''}, nₑ ${F.ne} assumed)` : '';
   P.ne = F.ne; P.R = P.koc != null ? retardation(P.koc, P.foc, P.rhob, F.ne) : null; P.src.R = '1 + Koc·foc·ρb/nₑ';
   P.f = [-F.bx / F.i, -F.by / F.i]; P.fit = F.fit; P.az = F.az;
@@ -4107,12 +4114,14 @@ function modelRun(date) {
   const sb = S.bh.get(u.srcBh) || projList().filter(b => b.easting != null).sort((a, c) => maxAt(c, P.param, u.src) - maxAt(a, P.param, u.src))[0];
   if (!sb || sb.easting == null) missing.push('a source borehole with coordinates'); else {
     P.srcBh = sb; P.S = [sb.easting, sb.northing];
-    if ((u.src || 'gw') === 'gw') { const s = (sb.gwSamples || []).filter(s => gwVal(s, P.param) && (!P.at || s.date <= P.at)).sort(byDate).pop() || (sb.gwSamples || []).filter(s => gwVal(s, P.param)).sort(byDate)[0];
-      if (!s) missing.push(`a groundwater ${LAB_PARAMS[P.param].label} result at ${sb.name}`); else { P.C0 = gwVal(s, P.param).v; P.src.C0 = `measured at ${sb.name} on ${s.date}${gwVal(s, P.param).lt ? ' (detection limit)' : ''}`; } }
+    if ((u.src || 'gw') === 'gw') { const s = (sb.gwSamples || []).filter(s => s.date && gwVal(s, P.param) && (!P.at || s.date <= P.at)).sort(byDate).pop();
+      if (!s) missing.push(`a dated groundwater ${LAB_PARAMS[P.param].label} result at ${sb.name}${P.at ? ` on or before ${P.at}` : ''}`);
+      else if (gwVal(s, P.param).lt) missing.push(`a detected source: ${LAB_PARAMS[P.param].label} was not detected at ${sb.name} on ${s.date} (<${gwVal(s, P.param).v} mg/L)`);
+      else { P.C0 = gwVal(s, P.param).v; P.src.C0 = `measured at ${sb.name} on ${s.date}`; } }
     else { const cs = Math.max(0, ...(sb.samples || []).map(sm => labVal(sm, P.param)).filter(r => r && !r.lt).map(r => r.v));
       if (!(cs > 0)) missing.push(`a soil ${LAB_PARAMS[P.param].label} result at ${sb.name}`);
       else if (F.K != null && P.koc != null) { const L2 = leachSource({ Cs: cs, koc: P.koc, foc: P.foc, H: P.H, thw: P.thw, tha: P.tha, rhob: P.rhob, K: F.K * 31557600, i: F.i, I: P.I, L: P.L, da: P.da, sol: P.sol });
-        if (L2.missing) missing.push(...L2.missing); else { P.C0 = L2.Cgw; P.leach = L2; P.src.C0 = `calculated from ${cs} mg/kg in soil at ${sb.name} (EPA 1996 SSG Eq. 10–12, DF ${L2.DF.toFixed(2)})${L2.note ? '. ' + L2.note : ''}`; } } }
+        if (L2.missing) missing.push(...L2.missing); else if (L2.aboveSol) missing.push(L2.note.replace('; leachate capped at solubility.', '.')); else { P.C0 = L2.Cgw; P.leach = L2; P.src.C0 = `calculated from ${cs} mg/kg in soil at ${sb.name} (EPA 1996 SSG Eq. 10–12, DF ${L2.DF.toFixed(2)})${L2.note ? '. ' + L2.note : ''}`; } } }
   }
   return { ok: !missing.length, missing, P };
 }
@@ -4125,8 +4134,8 @@ function modelAt(P, E, N, elev, date) {
   return { xd, c: domenico({ C0: P.C0, v: P.v, R: P.R, ax: P.ax, ay: P.ay, az: P.az, k: P.hl > 0 ? Math.LN2 / P.hl : 0, ks: P.srcHl > 0 ? Math.LN2 / P.srcHl : 0, Y: P.Y, Z: P.Z, x: xd, y: yc, z, t }) };
 }
 /* the forecast on a regular grid over the drawing (res px), split into triangles for contouring in log10 */
-function modelGrid(date, res = 6) {
-  const run = modelRun(date), G = XS_GEOM; if (!run.ok) return { run, cells: [], segs: [], reach: 0, len: G?.maxD || 0 };
+function modelGrid(date, res = 6, xs = S.xs) {
+  const run = modelRun(date, xs), G = XS_GEOM; if (!run.ok) return { run, cells: [], segs: [], reach: 0, len: G?.maxD || 0 };
   const P = run.P, x0 = G.X(0), x1 = G.X(G.maxD), y0 = G.m.t, y1 = G.m.t + G.plotH, nx = Math.max(2, Math.round((x1 - x0) / res)), ny = Math.max(2, Math.round((y1 - y0) / res));
   const at = P.at || date, cells = [], pts = [], idx = [];
   for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) {
@@ -4139,11 +4148,17 @@ function modelGrid(date, res = 6) {
   const reach = Math.max(0, ...segs.filter(s => s.k === 0).flatMap(s => [toXd(s.a), toXd(s.b)]));
   return { run, cells, pts, tris, segs, lv, reach, len: G.maxD, bands: lv.length ? tinBands(pts, tris, lv.map(l => Math.log10(l.v))) : [] };
 }
-function modelSVG(date) {
-  const G = XS_GEOM, g = modelGrid(date, 6), o = [], P = g.run.P;
+function modelSVG(date, xs = S.xs) {
+  const G = XS_GEOM, g = modelGrid(date, 6, xs), o = [], P = g.run.P;
   if (!g.run.ok) return `<text class="lbl2" x="${G.m.l + 24}" y="${G.m.t - 22}" style="fill:#54278f">Forecast not drawn: ${esc(g.run.missing.join('; '))}</text>`;
+  o.push(`<g clip-path="url(#${G.gclip})">`);
   g.bands.forEach((polys, k) => { if (k) for (const pg of polys) o.push(`<path d="${pg.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')}Z" fill="${MODEL_COLS[k]}" opacity=".45"/>`); });
   g.lv.forEach((l, k) => { const s2 = g.segs.filter(sg => sg.k === k); if (s2.length) o.push(`<path data-model-contour="${[1, 10, 100][k]}" d="${s2.map(sg => `M${sg.a[0].toFixed(1)} ${sg.a[1].toFixed(1)}L${sg.b[0].toFixed(1)} ${sg.b[1].toFixed(1)}`).join('')}" fill="none" stroke="${MODEL_COLS[k + 1]}" stroke-width="${1.4 + k * .4}"><title>Model, not measured: ${esc(LAB_PARAMS[P.param].label)} ${esc(l.label)}</title></path>`); });
+  o.push('</g>');
+  if (g.lv.length) { let lx = G.m.l; const ly = G.H - 8 - G.plH, head = 'Model, not measured (forecast):';
+    o.push(`<g data-model-legend="1"><text x="${lx}" y="${ly}" class="lbl2" style="font-weight:600;fill:#54278f">${head}</text>`); lx += head.length * 6 + 10;
+    g.lv.forEach((l, k) => { const t = `≥ ${l.label}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="9" fill="${MODEL_COLS[k + 1]}" stroke="#54278f" stroke-width=".6"/><text x="${lx + 14}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 24 + t.length * 5.6; });
+    o.push('</g>'); }
   const when = P.start ? `on ${P.at || today()} (release from ${P.start})` : 'long-term (steady state)';
   o.push(`<text x="${G.m.l + 24}" y="${G.m.t - 22}" style="font:700 11px Arial,sans-serif;fill:#54278f">Model, not measured: ${esc(LAB_PARAMS[P.param].label)} in groundwater ${esc(when)}; source ${esc(P.srcBh.name)} ${(+P.C0.toPrecision(3)).toLocaleString('en-CA')} mg/L</text>`);
   if (!g.lv.length) o.push(`<text class="lbl2" x="${G.m.l + 24}" y="${G.m.t - 10}" style="fill:#54278f">Enter a groundwater guideline (Water &amp; well) to contour the forecast.</text>`);
@@ -4179,17 +4194,18 @@ function modelChecks(run) {
   checks.push({ name: 'Units and ranges', ok: ok && !bad.length, detail: !ok ? 'Inputs incomplete: ' + run.missing.join('; ') : bad.length ? 'Out of range: ' + bad.join(', ') : 'All inputs in range; lengths in m, time in days, velocity in m/day, concentration in mg/L, Koc in L/kg, ρb in kg/L.' });
   // 2. Domenico in its 1-D limit equals the first Ogata–Banks (1961) term at this site's velocity and dispersivity
   if (ok) { const D = P.ax * P.v, errs = []; for (const f of [.5, 1, 2]) for (const x of [2, 5, 10].map(k => k * P.ax)) { const t = f * x / P.v, ob = erfc((x - P.v * t) / (2 * Math.sqrt(D * t))) / 2, dm = domenico({ C0: 1, v: P.v, R: 1, ax: P.ax, ay: 0, az: 0, Y: 1e9, Z: 1e9, x, t }); if (ob > .01) errs.push(Math.abs(dm - ob) / ob); }
-    const e = Math.max(0, ...errs); checks.push({ name: 'Ogata–Banks (1961) agreement', ok: e < .01, detail: `1-D limit of the code against the first Ogata–Banks term at v = ${P.v.toPrecision(3)} m/day, αx = ${P.ax.toPrecision(3)} m: largest difference ${(e * 100).toPrecision(2)} % over ${errs.length} points.` }); }
-  else checks.push({ name: 'Ogata–Banks (1961) agreement', ok: false, detail: 'Not run: the forecast inputs are incomplete.' });
+    const e = Math.max(0, ...errs); checks.push({ name: 'Code self-check: 1-D limit equals the first Ogata–Banks (1961) term', ok: e < .01, detail: `1-D limit of the code against the first Ogata–Banks term at v = ${P.v.toPrecision(3)} m/day, αx = ${P.ax.toPrecision(3)} m: largest difference ${(e * 100).toPrecision(2)} % over ${errs.length} points.` }); }
+  else checks.push({ name: 'Code self-check: 1-D limit equals the first Ogata–Banks (1961) term', ok: false, detail: 'Not run: the forecast inputs are incomplete.' });
   // 3. published values reproduced: BIOSCREEN Example 1 (Keesler AFB)
   const a = xuEckstein(280 * .3048) / .3048, R1 = retardation(38, .000057, 1.7, .3), pub = +a.toFixed(1) === 13.3 && +(a / 10).toFixed(1) === 1.3 && +R1.toFixed(1) === 1;
   checks.push({ name: 'Published example', ok: pub, detail: `BIOSCREEN User’s Manual (EPA/600/R-96/087) Example 1: αx ${a.toFixed(1)} ft (printed 13.3), αy ${(a / 10).toFixed(1)} ft (printed 1.3), R ${R1.toFixed(2)} (printed 1.0).` });
-  // 4. the approximation itself: the dropped Ogata–Banks term near the front, about 1/√(π x/αx) of C0 (West et al. 2007)
-  if (ok) { const x = Math.max(P.ax, XS_GEOM?.maxD || P.ax), gap = 1 / Math.sqrt(Math.PI * x / P.ax), steady = !P.start;
-    checks.push({ name: 'Approximation error at the front', ok: steady || gap < .05, detail: steady ? 'Steady state: the Domenico and exact solutions agree away from the source; no moving front.' : `Near the moving front at ${x.toFixed(0)} m the Domenico solution can differ from the exact solution by about ${(gap * 100).toFixed(0)} % of C₀ (West et al. 2007, Ground Water 45(2)); treat the front position as approximate.` }); }
+  // 4. the approximation itself: at the moving front x = (v/R)·t Domenico drops the second Ogata–Banks term (West et al. 2007); computed exactly here
+  if (ok) { const steady = !P.start, t = steady ? 0 : (Date.parse(P.at || today()) - Date.parse(P.start)) / 864e5, x = P.v / P.R * t;
+    const gap = steady || !(t > 0) ? 0 : ogataBanks({ C0: 1, v: P.v, D: P.ax * P.v, R: P.R, x, t }) - domenico({ C0: 1, v: P.v, R: P.R, ax: P.ax, ay: 0, az: 0, Y: 1e9, Z: 1e9, x, t });
+    checks.push({ name: 'Approximation error at the front', value: gap, ok: steady || gap < .05, detail: steady ? 'Steady state: no moving front, so the dropped Ogata–Banks term does not apply.' : `On ${P.at || today()} the front is about ${x.toFixed(1)} m from the source; there the Domenico solution is ${(gap * 100).toFixed(1)} % of C₀ below the exact Ogata–Banks solution (West et al. 2007, Ground Water 45(2)). Treat the front position as approximate.` }); }
   // 5. the forecast against later sampling rounds at each well
   if (ok) {
-    const t0 = (P.src.C0 || '').match(/\d{4}-\d{2}-\d{2}/)?.[0] || '';
+    const t0 = (P.src.C0 || '').match(/\d{4}-\d{2}-\d{2}/)?.[0] || P.start || '9999';   // a soil source has no sampling date of its own: compare only after the release date
     for (const b of projList()) { const w = b.well; if (!w?.installed || b.easting == null || b.elevation == null || w.screenBottom == null) continue;
       for (const sm of (b.gwSamples || []).filter(sm => sm.date > t0 && gwVal(sm, P.param))) {
         const wt = waterAt(b, sm.date), top = Math.max(w.screenTop ?? 0, wt?.depth ?? 0), mid = (top + w.screenBottom) / 2, pr = modelAt(P, b.easting, b.northing, b.elevation - mid, sm.date), r = gwVal(sm, P.param);
@@ -4315,8 +4331,8 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const su = b => b.well?.installed && b.well.stickup > 0 ? b.well.stickup : 0;
   let W = forceW || Math.max(el.clientWidth, 600), H = fillH || secOpt('h'); const m = { l: 62, r: 64, t: 70, b: 30 };
   // room under the drawing for offset labels (three staggered rows) and the plume legend
-  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 20 : 0;
-  m.b += offH + plH; if (!fillH) H += offH + plH;
+  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 20 : 0, mdH = xs?.model ? 20 : 0;
+  m.b += offH + plH + mdH; if (!fillH) H += offH + plH + mdH;
   const maxD = pos[pos.length - 1].d || 1;
   let e1 = Math.max(...pos.map(p => top(p.b) + su(p.b))), e0 = Math.min(...pos.map(p => top(p.b) - depthOf(p.b)));
   const pad = (e1 - e0) * .05; e1 += pad; e0 -= pad;
@@ -4353,7 +4369,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
     }
     const seen = new Map(); U2.flat().forEach(u => seen.has(u.u) || seen.set(u.u, u.fill));
     let lx = m.l;
-    for (const [u, fl] of seen) { o.push(`<rect x="${lx}" y="${H - 16 - plH}" width="12" height="9" style="fill:var(--${fl});stroke:var(--muted)" fill-opacity=".6"/><text x="${lx + 16}" y="${H - 8 - plH}" class="lbl2">${esc(u)}</text>`); lx += 26 + u.length * 5.6; }
+    for (const [u, fl] of seen) { o.push(`<rect x="${lx}" y="${H - 16 - plH - mdH}" width="12" height="9" style="fill:var(--${fl});stroke:var(--muted)" fill-opacity=".6"/><text x="${lx + 16}" y="${H - 8 - plH - mdH}" class="lbl2">${esc(u)}</text>`); lx += 26 + u.length * 5.6; }
   }
   for (const p of pos) {
     const x = X(p.d) - bw / 2, e = top(p.b);
@@ -4366,8 +4382,11 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
       o.push(`<g><title>${esc(`${p.b.name}: slotted ${fx(w.screenTop)}–${fu(w.screenBottom)}`)}</title><rect x="${px}" y="${Y(e + su(p.b))}" width="${pw}" height="${Y(e - w.screenTop) - Y(e + su(p.b))}" style="fill:var(--panel);stroke:var(--ink)" stroke-width=".8"/><rect x="${px}" y="${Y(e - w.screenTop)}" width="${pw}" height="${Y(e - w.screenBottom) - Y(e - w.screenTop)}" style="fill:var(--panel);stroke:var(--ink)" stroke-width=".8" stroke-dasharray="2 1.5"/></g>`);
     }
   }
-  XS_GEOM = { X, Y, m, plotW, plotH, maxD, e0, e1, W, H, pos, located, noElev };
-  if (xs?.model) o.push(modelSVG(xs.date || ''));
+  // interpreted and modelled concentrations stay below the ground line
+  const gclip = 'gc' + Math.random().toString(36).slice(2, 8), gl = pos.map(p => [X(p.d), Y(top(p.b))]);
+  o.push(`<defs><clipPath id="${gclip}"><path d="M0 ${gl[0][1]}${gl.map(q => `L${q[0]} ${q[1]}`).join('')}L${W} ${gl[gl.length - 1][1]}L${W} ${H}L0 ${H}Z"/></clipPath></defs>`);
+  XS_GEOM = { X, Y, m, plotW, plotH, maxD, e0, e1, W, H, pos, located, noElev, plH, mdH, gclip };
+  if (xs?.model) o.push(modelSVG(xs.date || '', xs));
   if (xs && xs.plume !== false && (xs.param || xs.medium === 'vapour')) o.push(plumeSVG(pos, xs, X, Y, top, bw, W, H, m));
   // offsets of boreholes projected onto a best-fit line, in up to three staggered rows under the drawing
   { const ends = [-Infinity, -Infinity, -Infinity], yb = m.t + plotH;
@@ -7987,7 +8006,7 @@ function gwSamplesHTML(b) {
     return `<td class="r ${gwExceeds(r, p) ? 'over' : ''}" ${gwExceeds(r, p) ? 'data-over="1" title="Above the groundwater guideline"' : ''}><span class="lab-in"><label class="check" title="Below the detection limit"><input type="checkbox" data-gwlt="${p}" data-i="${i}" ${r?.lt ? 'checked' : ''} ${ed ? '' : 'disabled'}>&lt;</label><input type="number" step="any" inputmode="decimal" data-gw="${p}" data-i="${i}" value="${r ? r.v : ''}" aria-label="${esc(LAB_PARAMS[p].label)} (mg/L)" ${ed ? '' : 'disabled'}></span></td>`; };
   return `<section class="sec" data-t="gwlab"><header><h3>Groundwater lab results</h3><span class="note">mg/L · one row per sampling</span><span class="sp"></span>${ed ? '<button class="btn" data-act="gw-new">Add groundwater sample</button>' : ''}</header><div class="body"><div class="scroll-x"><table class="sum lab-t"><thead><tr><th>Date</th><th>Sample ID</th><th>Lab / report</th>${GW_PARAMS.map(p => `<th class="r">${esc(LAB_PARAMS[p].label)}</th>`).join('')}<th></th></tr></thead><tbody>
     <tr class="guide"><td colspan="3"><b>Guideline</b> <span class="note">(this site, mg/L)</span></td>${GW_PARAMS.map(p => LAB_PARAMS[p].computed && false ? '<td></td>' : `<td class="r"><input type="number" step="any" data-gwguide="${p}" value="${g[p] ?? ''}" aria-label="${esc(LAB_PARAMS[p].label)} groundwater guideline" ${S.readOnly ? 'disabled' : ''}></td>`).join('')}<td></td></tr>
-    ${rows.map(({ s, i }) => `<tr><td><input type="date" data-gwf="date" data-i="${i}" value="${esc(s.date || '')}" ${ed ? '' : 'disabled'}></td><td><input data-gwf="sid" data-i="${i}" value="${esc(s.sid || '')}" ${ed ? '' : 'disabled'}></td><td><input data-gwf="report" data-i="${i}" value="${esc([s.lab, s.report].filter(Boolean).join(' / '))}" ${ed ? '' : 'disabled'}></td>${GW_PARAMS.map(p => cell(s, i, p)).join('')}<td>${ed ? `<button class="btn link" data-act="gw-del" data-i="${i}">Delete</button>` : ''}</td></tr>`).join('')}
+    ${rows.map(({ s, i }) => `<tr><td><input type="date" data-gwf="date" data-i="${i}" value="${esc(s.date || '')}" ${ed ? '' : 'disabled'} ${s.date ? '' : 'aria-invalid="true" title="Undated: enter the sampling date. Undated results are not shown on the cross-section."'}>${s.date ? '' : '<span class="note" style="color:var(--warn,#a3470b)"> undated</span>'}</td><td><input data-gwf="sid" data-i="${i}" value="${esc(s.sid || '')}" ${ed ? '' : 'disabled'}></td><td><input data-gwf="report" data-i="${i}" value="${esc([s.lab, s.report].filter(Boolean).join(' / '))}" ${ed ? '' : 'disabled'}></td>${GW_PARAMS.map(p => cell(s, i, p)).join('')}<td>${ed ? `<button class="btn link" data-act="gw-del" data-i="${i}">Delete</button>` : ''}</td></tr>`).join('')}
     </tbody></table></div>${rows.length ? '' : '<p class="note">No groundwater samples yet. Add one, or import a lab file (results in µg/L are converted to mg/L).</p>'}<p class="note">Tick &lt; for a non-detect and enter the detection limit. F1 − BTEX is calculated. Results above the guideline are marked.</p></div></section>`;
 }
 function gwChange(t) {
@@ -8078,10 +8097,21 @@ const LAB_HEAD = { id: ['clientsampleid', 'clientsamplename', 'clientid', 'field
 const findCol = (h, keys) => { for (const k of keys) { const i = h.indexOf(k); if (i >= 0) return i; } return -1; };
 /* saturated-paste extracts are reported per litre but are soil results */
 const PASTE = ['ec', 'sar', 'cl', 'ph'];
+/* lab dates to yyyy-mm-dd: ISO text, Excel serial numbers, day/month/year when unambiguous, and written months; anything else is undated ('') */
+function isoDate(v) {
+  if (v == null || v === '') return '';
+  const iso = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, t = String(v).trim(); let m;
+  if (typeof v === 'number' || /^\d{5}(\.\d+)?$/.test(t)) { const n = +v; return n > 20000 && n < 80000 ? new Date(Date.UTC(1899, 11, 30) + Math.floor(n) * 864e5).toISOString().slice(0, 10) : ''; }
+  if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(t))) return iso(m[1], m[2], m[3]);
+  if ((m = /^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})$/.exec(t))) { const a = +m[1], b = +m[2]; return a === b || (a > 12 && b <= 12) ? iso(m[3], b, a) : b > 12 && a <= 12 ? iso(m[3], a, b) : ''; }
+  if (/[a-z]/i.test(t)) { const d = new Date(t.replace(/-/g, ' ')); if (!isNaN(d)) return iso(d.getFullYear(), d.getMonth() + 1, d.getDate()); }
+  return '';
+}
+/* a result's unit → factor to the app's unit, or null when the unit is not understood (the result is then not imported) */
 function labUnitConv(p, unit) {
-  const u = String(unit || '').toLowerCase().replace(/\s/g, '').replace('µ', 'u');
+  const u = String(unit || '').normalize('NFKC').toLowerCase().replace(/\s/g, '').replace(/[µμ]/g, 'u');
+  if (/\/l$/.test(u)) return { 'mg/l': 1, 'ug/l': 1e-3, 'ng/l': 1e-6, 'g/l': 1e3 }[u] ?? null;   // per litre: groundwater, or a saturated-paste extract
   if (/^ug\/kg|^µg\/kg/.test(u)) return 1e-3;
-  if (/^ug\/l$/.test(u)) return 1e-3;   // groundwater in µg/L → mg/L
   if (p === 'ec' && /us\/cm/.test(u)) return 1e-3;
   if (p === 'ec' && /ms\/m/.test(u)) return 1e-2;
   return 1;
@@ -8101,18 +8131,18 @@ function parseLabTable(rows) {
       for (const r of rows.slice(hi + 1)) {
         const p = labParam(r[c.an]); if (p === undefined) { if (String(r[c.an] ?? '').trim()) unknown.add(String(r[c.an]).trim()); continue; } if (!p) continue;
         const x = labCell(r[c.res], c.dl >= 0 ? r[c.dl] : null, c.q >= 0 ? r[c.q] : null); if (!x) continue;
-        const sm = add(r[c.id], { depth: c.depth >= 0 ? numv(r[c.depth]) : null, date: c.date >= 0 ? String(r[c.date] ?? '').slice(0, 10) : '', rep: c.rep >= 0 ? String(r[c.rep] ?? '') : '' }); if (!sm) continue;
-        const un = c.unit >= 0 ? String(r[c.unit] ?? '').trim() : ''; x.v = +(x.v * labUnitConv(p, un)).toPrecision(6); sm.res[p] = x; if (/\/\s*l$/i.test(un) && !PASTE.includes(p)) { sm.water = true; sm.unit0 = un; }
+        const sm = add(r[c.id], { depth: c.depth >= 0 ? numv(r[c.depth]) : null, date: c.date >= 0 ? isoDate(r[c.date]) : '', rep: c.rep >= 0 ? String(r[c.rep] ?? '') : '' }); if (!sm) continue;
+        const un = c.unit >= 0 ? String(r[c.unit] ?? '').trim() : '', f = labUnitConv(p, un); if (f == null) { unknown.add(`${r[c.an]} in ${un}`); continue; } x.v = +(x.v * f).toPrecision(6); sm.res[p] = x; if (/\/\s*l$/i.test(un) && !PASTE.includes(p)) { sm.water = true; sm.unit0 = un; }
       }
       return { samples: [...out.values()], unknown: [...unknown], form: 'one row per result' };
     }
     const pcols = rows[hi].map((x, j) => [j, labParam(x)]).filter(([, p]) => p);
     if (c.id >= 0 && pcols.length >= 1) {   // wide: one row per sample, a column per parameter (a units row may follow)
-      const units = rows[hi + 1] && rows[hi + 1].some(x => /mg\/|ug\/|µg\/|ds\/m|us\/cm|%/i.test(String(x))) ? rows[hi + 1] : null;
+      const units = rows[hi + 1] && rows[hi + 1].some(x => /mg\/|[uµμn]g\/|ds\/m|us\/cm|%/i.test(String(x))) ? rows[hi + 1] : null;
       rows[hi].forEach(x => { if (String(x).trim() && labParam(x) === undefined && LAB_HEAD.id.concat(...Object.values(LAB_HEAD)).indexOf(normH(x)) < 0) unknown.add(String(x).trim()); });
       for (const r of rows.slice(hi + (units ? 2 : 1))) {
-        const sm = add(r[c.id], { depth: c.depth >= 0 ? numv(r[c.depth]) : null, date: c.date >= 0 ? String(r[c.date] ?? '').slice(0, 10) : '', rep: c.rep >= 0 ? String(r[c.rep] ?? '') : '' }); if (!sm) continue;
-        for (const [j, p] of pcols) { const x = labCell(r[j]); if (x) { x.v = +(x.v * labUnitConv(p, units?.[j])).toPrecision(6); sm.res[p] = x; if (/\/\s*l$/i.test(String(units?.[j] ?? '').trim()) && !PASTE.includes(p)) { sm.water = true; sm.unit0 = String(units[j]).trim(); } } }
+        const sm = add(r[c.id], { depth: c.depth >= 0 ? numv(r[c.depth]) : null, date: c.date >= 0 ? isoDate(r[c.date]) : '', rep: c.rep >= 0 ? String(r[c.rep] ?? '') : '' }); if (!sm) continue;
+        for (const [j, p] of pcols) { const x = labCell(r[j]), f = labUnitConv(p, units?.[j]); if (x && f == null) unknown.add(`${rows[hi][j]} in ${units[j]}`); if (x && f != null) { x.v = +(x.v * f).toPrecision(6); sm.res[p] = x; if (/\/\s*l$/i.test(String(units?.[j] ?? '').trim()) && !PASTE.includes(p)) { sm.water = true; sm.unit0 = String(units[j]).trim(); } } }
       }
       return { samples: [...out.values()].filter(x => Object.keys(x.res).length), unknown: [...unknown], form: 'one row per sample' };
     }
@@ -8123,7 +8153,7 @@ function parseLabTable(rows) {
     const hi = rows.findIndex((r, i) => i < pr[0][0] && r.slice(1).filter(x => String(x).trim()).length >= 1 && r.slice(1).some(x => /[a-z]/i.test(String(x))));
     if (hi >= 0) {
       const ucol = rows[hi].findIndex(x => /^units?$/i.test(String(x).trim()));
-      rows[hi].forEach((id, j) => { if (j === 0 || j === ucol || !String(id).trim()) return; const sm = add(id, { depth: null, date: '', rep: '' }); for (const [i, p] of pr) { if (!p) continue; const x = labCell(rows[i][j]); if (x) { x.v = +(x.v * labUnitConv(p, ucol >= 0 ? rows[i][ucol] : '')).toPrecision(6); sm.res[p] = x; } } });
+      rows[hi].forEach((id, j) => { if (j === 0 || j === ucol || !String(id).trim()) return; const sm = add(id, { depth: null, date: '', rep: '' }); for (const [i, p] of pr) { if (!p) continue; const x = labCell(rows[i][j]), un = ucol >= 0 ? String(rows[i][ucol] ?? '').trim() : '', f = labUnitConv(p, un); if (x && f == null) unknown.add(`${rows[i][0]} in ${un}`); if (x && f != null) { x.v = +(x.v * f).toPrecision(6); sm.res[p] = x; if (/\/\s*l$/i.test(un) && !PASTE.includes(p)) { sm.water = true; sm.unit0 = un; } } } });
       rows.forEach((r, i) => { if (i > hi && labParam(r[0]) === undefined && String(r[0]).trim() && /[a-z]{3}/i.test(r[0])) unknown.add(String(r[0]).trim()); });
       return { samples: [...out.values()].filter(x => Object.keys(x.res).length), unknown: [...unknown].slice(0, 40), form: 'one column per sample' };
     }
@@ -8169,7 +8199,7 @@ function importLabGo() {
   (S._labImp || []).forEach((x, i) => {
     const v = $(`[data-labmap="${i}"]`)?.value || ''; if (!v) return;
     const [bid, sid] = v.split('|'), b = S.bh.get(bid); if (!b || !editable(b)) return;
-    if (sid === 'gw') { b.gwSamples.push({ id: uid('gs'), date: x.date || today(), sid: x.id, lab, report: rep || x.rep || '', res: x.res, unit0: x.unit0 || 'mg/L' }); n += Object.keys(x.res).length; ns++; touched.add(b); return; }
+    if (sid === 'gw') { b.gwSamples.push({ id: uid('gs'), date: x.date || '', sid: x.id, lab, report: rep || x.rep || '', res: x.res, unit0: x.unit0 || 'mg/L' }); n += Object.keys(x.res).length; ns++; touched.add(b); return; }
     let sm = sid === 'new' ? null : b.samples.find(s => s.id === sid);
     if (!sm) { const prev = [...b.samples].sort((a, c) => (a.no || 0) - (c.no || 0)).pop(); sm = { ...SHEETS.samples.blank(b, prev), type: 'G', depth: x.m.depth }; b.samples.push(sm); }
     sm.lab = { ...(sm.lab || {}), ...x.res }; sm.labMeta = { lab: lab || sm.labMeta?.lab || '', report: rep || x.rep || sm.labMeta?.report || '', date: x.date || sm.labMeta?.date || '' };
@@ -8935,7 +8965,7 @@ document.addEventListener('click', e => {
     case 'mr-save': saveRound(); break;
     case 'slug-new': openSlug(null); break;
     case 'xs-play': xsPlay(); break;
-    case 'gw-new': if (b && editable(b)) { b.gwSamples.push({ id: uid('gs'), date: today(), sid: `${b.name}-GW`, lab: '', report: '', res: {} }); logChange(b, 'Groundwater sample added'); store.save(b); renderView(true); } break;
+    case 'gw-new': if (b && editable(b)) { b.gwSamples.push({ id: uid('gs'), date: '', sid: `${b.name}-GW`, lab: '', report: '', res: {} }); logChange(b, 'Groundwater sample added'); store.save(b); renderView(true); } break;
     case 'gw-del': if (b && editable(b)) { b.gwSamples.splice(+t.dataset.i, 1); store.save(b); renderView(true); } break;
     case 'site-img': openSiteImg(); break;
     case 'si-save': { const v = id => num($(id).value); if (!S._siteImg) { closeOverlay(); break; } const st = { img: S._siteImg, e0: v('#si-e0'), n0: v('#si-n0'), e1: v('#si-e1'), n1: v('#si-n1') }; if ([st.e0, st.n0, st.e1, st.n1].some(x => x == null) || st.e1 <= st.e0 || st.n1 <= st.n0) { toast('Enter both corners: top-right must be east and north of bottom-left.'); break; } setSite(st); closeOverlay(); renderView(true); break; }
