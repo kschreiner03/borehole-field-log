@@ -4121,7 +4121,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const datum = commonDatum(bhs);
   const o = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Cross-section">`];
   o.push(`<text class="lbl" x="${m.l}" y="16">${noElev ? `Depth (${LEN()})` : `Elevation (${LEN()}${datum ? ', ' + esc(datum) : ''})`}</text>`);
-  o.push(`<text class="lbl2" x="${W - m.r}" y="16" text-anchor="end">${located ? `Length ${fu(maxD, 0)}${ve ? ` · vertical exaggeration ×${ve >= 10 ? Math.round(ve) : ve.toFixed(1)}` : ''}` : 'Not to horizontal scale'}</text>`);
+  o.push(`<text class="lbl2" x="${W - m.r}" y="16" text-anchor="end">${xs?.date ? `As of ${esc(xs.date)} · ` : ''}${located ? `Length ${fu(maxD, 0)}${ve ? ` · vertical exaggeration ×${ve >= 10 ? Math.round(ve) : ve.toFixed(1)}` : ''}` : 'Not to horizontal scale'}</text>`);
   for (const v of ticks) { const yy = Y(fromD(v)); o.push(`<line x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}" style="stroke:var(--grid)"/><text class="tick" x="${m.l - 8}" y="${yy + 4}" text-anchor="end">${+v.toFixed(2)}</text>`); }
   o.push(`<path data-ground="1" d="${pos.map((p, i) => `${i ? 'L' : 'M'}${X(p.d)} ${Y(top(p.b))}`).join('')}" fill="none" style="stroke:var(--earth)" stroke-width="2" stroke-dasharray="6 3"><title>Ground surface interpolated between boreholes (measured at each borehole)</title></path>`);
   const bw = secOpt('bw');
@@ -7246,7 +7246,7 @@ function itemInner(it, w, h) {
   if (it.t === 'shape') return shapeSVG(it, w, h);
   const out = withRO(ro, () => {
     if (it.t === 'plan') { const r = planSVG(w, h, false); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
-    if (it.t === 'section') return fromEl(el => drawSection(el, {}, w, sectionList(), false, h), 'Log at least two boreholes to draw a cross-section.');
+    if (it.t === 'section') return fromEl(el => { if (o.xs) RO.xs = o.xs; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
     if (it.t === 'wt') return wtMapSVG(w, h)?.svg || msg('Needs water levels in at least 3 wells with coordinates and ground elevations.');
     if (it.t === 'vap') { const r = vapourMapSVG(w, h); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'flow') { const F = gwFlow(); return F.error ? msg(F.error) : flowPlanSVG(F, w, h); }
@@ -7469,7 +7469,7 @@ function propsHTML() {
     <label class="cmp-lbl" for="cp-cap">Caption</label><input id="cp-cap" data-cprop="cap" value="${esc(it.cap || '')}" placeholder="Figure 1 – Site plan">
     <label class="check"><input type="checkbox" data-cprop="frame" ${it.frame !== false ? 'checked' : ''}> Frame around it</label>
     ${(ROPTS[it.t] || []).map(([k, l, list]) => sel(k, l, list)).join('')}
-    ${it.t === 'section' ? `<p class="note">Follows the section line chosen on <button class="btn link" data-tab="site">Site plan &amp; sections</button>.</p>` : ''}
+    ${it.t === 'section' ? `<p class="note">Follows the section line chosen on the <button class="btn link" data-tab="xsec">Cross-section</button> page.${it.o?.xs ? ` Shows ${esc(it.o.xs.date ? 'the date ' + it.o.xs.date : 'the latest data')}${it.o.xs.plume !== false && (it.o.xs.param || it.o.xs.medium === 'vapour') ? ` with the ${esc(it.o.xs.medium === 'vapour' ? 'vapour' : (LAB_PARAMS[it.o.xs.param]?.label || '') + ' ' + it.o.xs.medium)} plume` : ''}.` : ''}</p><button class="btn" data-act="cmp-xs-use" ${S.readOnly ? 'disabled' : ''}>Use the Cross-section page's current view</button>` : ''}
     ${it.t === 'plan' || it.t === 'wt' || it.t === 'vap' ? '<p class="note">A fixed scale is true on the printed Letter page; resize the frame to show more or less of the site.</p>' : ''}
     ${it.t === 'scalebar' ? (() => { const maps = pg.items.filter(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); return `<label class="cmp-lbl" for="co-link">Measures</label><select id="co-link" data-copt="link"><option value="">Choose a map…</option>${maps.map(m => `<option value="${m.id}" ${it.o?.link === m.id ? 'selected' : ''}>${esc(m.cap || RITEMS[m.t][0])}</option>`).join('')}</select>
       <label class="cmp-lbl" for="co-units">Units</label><select id="co-units" data-copt="units">${[['auto', 'As the project (m or ft)'], ['m', 'Metres'], ['ft', 'Feet']].map(([v, t]) => `<option value="${v}" ${(it.o?.units || 'auto') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
@@ -7541,6 +7541,7 @@ function composeAct(act, el) {
     if (p.kind === 'pdf') p.rot = ((p.rot || 0) + (act === 'cmp-rot-r' ? 90 : 270)) % 360;
     else if (p.kind === 'free') { p.orient = p.orient === 'land' ? undefined : 'land'; for (const x of p.items || []) clampIt(x, p); }
   }
+  if (act === 'cmp-xs-use' && it?.t === 'section') { it.o = { ...it.o, xs: structuredClone(S.xs) }; }
   if (act === 'cmp-del' && it) { pg.items = pg.items.filter(x => x !== it); S.csel = null; }
   if (act === 'cmp-front' && it) { pg.items = [...pg.items.filter(x => x !== it), it]; }
   if (act === 'cmp-copy' && it) { const c = { ...structuredClone(it), id: uid('it'), x: it.x + 18, y: it.y + 18 }; clampIt(c); pg.items.push(c); S.csel = c.id; }
@@ -8631,7 +8632,7 @@ document.addEventListener('click', e => {
     rerenderCompose(); return;
   }
   const cp = e.target.closest('[data-cpage]'); if (cp) { S.cpage = +cp.dataset.cpage; S.csel = null; rerenderCompose(); return; }
-  const ca = e.target.closest('[data-cadd]'); if (ca) { const pg = curPage(), k = ca.dataset.cadd, bd = bodyOf(pg), low = Math.max(bd.y, ...pg.items.map(x => x.y + x.h + 12)), it = newItem(k, bd.x, low + RITEMS[k][2] <= bd.y + bd.h ? low : bd.y); if (RITEMS[k][1] === BODY.w) it.w = bd.w;
+  const ca = e.target.closest('[data-cadd]'); if (ca) { const pg = curPage(), k = ca.dataset.cadd, bd = bodyOf(pg), low = Math.max(bd.y, ...pg.items.map(x => x.y + x.h + 12)), it = newItem(k, bd.x, low + RITEMS[k][2] <= bd.y + bd.h ? low : bd.y); if (RITEMS[k][1] === BODY.w) it.w = bd.w; if (k === 'section') it.o.xs = structuredClone(S.xs);
     if (k === 'scalebar') { const m = pg.items.find(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); it.frame = false; if (m) { it.o = { link: m.id }; it.x = m.x + 10; it.y = m.y + m.h - it.h - 10; } }   // inside its map's bottom-left corner
     clampIt(it); pg.items.push(it); S.csel = it.id; commit(); return; }
   const co = e.target.closest('[data-corient]'); if (co) { const pg = curPage(), was = bodyOf(pg); pg.orient = co.dataset.corient === 'land' ? 'land' : undefined; const now = bodyOf(pg); for (const it of pg.items) { if (Math.round(it.w) === Math.round(was.w)) it.w = now.w; clampIt(it, pg); } commit(); return; }
@@ -8674,7 +8675,7 @@ document.addEventListener('click', e => {
     case 'go-details': if (b) { S.dtab = 'details'; lsSet('bhlog.dtab', 'details'); goTab('edit'); } break;
     case 'go-slug': if (S.tab !== 'gw') goTab('gw'); setTimeout(() => [...document.querySelectorAll('#view h3')].find(h => /slug/i.test(h.textContent))?.closest('section')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60); break;
     case 'cmp-import': case 'cmp-rot-l': case 'cmp-rot-r':
-    case 'cmp-pdf': case 'cmp-up': case 'cmp-down': case 'cmp-dup': case 'cmp-delpage': case 'cmp-del': case 'cmp-front': case 'cmp-copy': case 'cmp-img':
+    case 'cmp-xs-use': case 'cmp-pdf': case 'cmp-up': case 'cmp-down': case 'cmp-dup': case 'cmp-delpage': case 'cmp-del': case 'cmp-front': case 'cmp-copy': case 'cmp-img':
     case 'cmp-tpl-apply': case 'cmp-tpl-save': case 'cmp-tpl-save-go': case 'cmp-tpl-del': case 'cmp-tpl-del-go': composeAct(act); break;
     case 'bh-tpl': saveBhTemplate(); break;
     case 'map-edit': case 'imp-loc': case 'imp-shp': case 'imp-img': case 'img-add-go': case 'loc-imp-go': case 'shp-imp-go': case 'mf-del': case 'mf-done': case 'mf-clear': mapAct(act); break;
