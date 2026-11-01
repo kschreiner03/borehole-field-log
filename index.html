@@ -4169,6 +4169,42 @@ function xsModelHTML() {
     <p class="note">Assumes uniform soil, steady uniform flow along the fitted direction (${P.az != null ? Math.round(P.az) + '°' : '—'}), no free product. ${esc(modelInputs(P.param, u).decayNote || '')}. Placeholders show the value used; type to replace it.</p>${typeof xsChecksHTML === 'function' ? xsChecksHTML(run) : ''}` : '<p class="note">Tick “Show on the section” to forecast a dissolved plume from a source well or from soil results.</p>'}
   </div></section>`;
 }
+/* verification of a forecast, run live with the site's own numbers */
+function modelChecks(run) {
+  const P = run.P || {}, checks = [], residuals = [], ok = run.ok;
+  // 1. inputs within physical ranges, in the units the equations expect
+  const bad = [];
+  if (ok) { if (!(P.foc > 0 && P.foc < 1)) bad.push('foc'); for (const k of ['thw', 'tha']) if (!(P[k] >= 0 && P[k] < 1)) bad.push(k); if (!(P.rhob > .5 && P.rhob < 2.8)) bad.push('bulk density');
+    if (!(P.v > 0)) bad.push('velocity'); if (!(P.ax > 0)) bad.push('ax'); if (P.ay < 0 || P.az < 0) bad.push('dispersivity'); if (!(P.Y > 0 && P.Z > 0)) bad.push('source size'); if (!(P.R >= 1)) bad.push('R'); }
+  checks.push({ name: 'Units and ranges', ok: ok && !bad.length, detail: !ok ? 'Inputs incomplete: ' + run.missing.join('; ') : bad.length ? 'Out of range: ' + bad.join(', ') : 'All inputs in range; lengths in m, time in days, velocity in m/day, concentration in mg/L, Koc in L/kg, ρb in kg/L.' });
+  // 2. Domenico in its 1-D limit equals the first Ogata–Banks (1961) term at this site's velocity and dispersivity
+  if (ok) { const D = P.ax * P.v, errs = []; for (const f of [.5, 1, 2]) for (const x of [2, 5, 10].map(k => k * P.ax)) { const t = f * x / P.v, ob = erfc((x - P.v * t) / (2 * Math.sqrt(D * t))) / 2, dm = domenico({ C0: 1, v: P.v, R: 1, ax: P.ax, ay: 0, az: 0, Y: 1e9, Z: 1e9, x, t }); if (ob > .01) errs.push(Math.abs(dm - ob) / ob); }
+    const e = Math.max(0, ...errs); checks.push({ name: 'Ogata–Banks (1961) agreement', ok: e < .01, detail: `1-D limit of the code against the first Ogata–Banks term at v = ${P.v.toPrecision(3)} m/day, αx = ${P.ax.toPrecision(3)} m: largest difference ${(e * 100).toPrecision(2)} % over ${errs.length} points.` }); }
+  else checks.push({ name: 'Ogata–Banks (1961) agreement', ok: false, detail: 'Not run: the forecast inputs are incomplete.' });
+  // 3. published values reproduced: BIOSCREEN Example 1 (Keesler AFB)
+  const a = xuEckstein(280 * .3048) / .3048, R1 = retardation(38, .000057, 1.7, .3), pub = +a.toFixed(1) === 13.3 && +(a / 10).toFixed(1) === 1.3 && +R1.toFixed(1) === 1;
+  checks.push({ name: 'Published example', ok: pub, detail: `BIOSCREEN User’s Manual (EPA/600/R-96/087) Example 1: αx ${a.toFixed(1)} ft (printed 13.3), αy ${(a / 10).toFixed(1)} ft (printed 1.3), R ${R1.toFixed(2)} (printed 1.0).` });
+  // 4. the approximation itself: the dropped Ogata–Banks term near the front, about 1/√(π x/αx) of C0 (West et al. 2007)
+  if (ok) { const x = Math.max(P.ax, XS_GEOM?.maxD || P.ax), gap = 1 / Math.sqrt(Math.PI * x / P.ax), steady = !P.start;
+    checks.push({ name: 'Approximation error at the front', ok: steady || gap < .05, detail: steady ? 'Steady state: the Domenico and exact solutions agree away from the source; no moving front.' : `Near the moving front at ${x.toFixed(0)} m the Domenico solution can differ from the exact solution by about ${(gap * 100).toFixed(0)} % of C₀ (West et al. 2007, Ground Water 45(2)); treat the front position as approximate.` }); }
+  // 5. the forecast against later sampling rounds at each well
+  if (ok) {
+    const t0 = (P.src.C0 || '').match(/\d{4}-\d{2}-\d{2}/)?.[0] || '';
+    for (const b of projList()) { const w = b.well; if (!w?.installed || b.easting == null || b.elevation == null || w.screenBottom == null) continue;
+      for (const sm of (b.gwSamples || []).filter(sm => sm.date > t0 && gwVal(sm, P.param))) {
+        const wt = waterAt(b, sm.date), top = Math.max(w.screenTop ?? 0, wt?.depth ?? 0), mid = (top + w.screenBottom) / 2, pr = modelAt(P, b.easting, b.northing, b.elevation - mid, sm.date), r = gwVal(sm, P.param);
+        const agreeND = r.lt && pr.c != null && pr.c <= r.v; residuals.push({ b, date: sm.date, meas: r.v, nd: !!r.lt, agreeND, pred: pr.c, dlog: agreeND || !(pr.c > 0) ? null : Math.log10(r.v / pr.c) }); } }
+    const within = residuals.filter(x => x.agreeND || (x.dlog != null && Math.abs(x.dlog) <= 1)).length;
+    checks.push({ name: 'Later sampling rounds', ok: residuals.length > 0 && within === residuals.length, detail: residuals.length ? `${within} of ${residuals.length} later results within a factor of 10 of the forecast (non-detects: forecast at or below the detection limit).` : 'No groundwater results after the source sample yet; the forecast cannot be compared with measurements.' });
+  }
+  checks.push({ name: 'Stated limits', ok: true, info: true, detail: 'Assumes uniform soil, steady uniform flow along the fitted direction, a vertical plane source at the water table, linear sorption and first-order decay, and no free product. The Domenico (1987) solution is approximate near the moving front, especially at high dispersivity (West et al. 2007). It is a screening model: it is not a substitute for monitoring.' });
+  return { checks, residuals };
+}
+function xsChecksHTML(run) {
+  const C = modelChecks(run), sig = v => v == null ? '—' : v > 0 && v < 1e-6 ? '< 0.000001' : (+(+v).toPrecision(3)).toLocaleString('en-CA');
+  return `<h4 style="margin:14px 0 6px">Checks</h4><div class="scroll-x"><table class="sum" id="xs-checks"><thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead><tbody>${C.checks.map(c => `<tr><td>${esc(c.name)}</td><td><span class="pill ${c.info ? 'draft' : c.ok ? 'issued' : 'review'}">${c.info ? 'Noted' : c.ok ? 'Passed' : 'Look at this'}</span></td><td class="note">${esc(c.detail)}</td></tr>`).join('')}</tbody></table></div>
+    ${C.residuals.length ? `<div class="scroll-x"><table class="sum" style="margin-top:8px"><thead><tr><th>Well</th><th>Date</th><th class="r">Measured (mg/L)</th><th class="r">Forecast (mg/L)</th><th class="r">log₁₀ measured/forecast</th></tr></thead><tbody>${C.residuals.map(x => `<tr><td>${esc(x.b.name)}</td><td>${esc(x.date)}</td><td class="r">${x.nd ? '&lt;' : ''}${sig(x.meas)}</td><td class="r">${sig(x.pred)}</td><td class="r">${x.agreeND ? 'both below the detection limit' : x.dlog == null ? '—' : x.dlog.toFixed(2)}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
+}
 function setModel(k, v) { if (S.readOnly) return; const m = { ...(siteOf()?.model || {}) }; if (v === '' || v == null) delete m[k]; else m[k] = ['param', 'src', 'srcBh', 'soil', 'start', 'at'].includes(k) ? v : +v; setSite({ ...(siteOf() || {}), model: m }); renderView(true); }
 function setXs(k, v) { S.xs = { ...S.xs, [k]: v }; lsSet('bhlog.xs', JSON.stringify(S.xs)); redrawSec(); }
 function readingFor(b) {
