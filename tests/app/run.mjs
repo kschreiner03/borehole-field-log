@@ -1654,6 +1654,53 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('report editor: settings typed in the panel take effect', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(300); S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {} }; S.csort = false;
+        goTab('compose'); await w(300); const L = repLayout(); L.pages.push(newPage('free', { orient: 'port', items: [newItem('text', 40, 120, { w: 300, h: 100 })] })); S.cpage = L.pages.length - 1;
+        S.csel = curPage().items[0].id; rerenderCompose(); await w(200);
+        const set = (sel, v) => { const el = document.querySelector('#ctl ' + sel); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+        set('[data-cprop="cap"]', 'Figure 9 – Test'); await w(200); want(curPage().items[0].cap === 'Figure 9 – Test', 'caption typed in the panel is saved: ' + curPage().items[0].cap);
+        set('#cmp-title', 'MY PAGE'); await w(200); want(curPage().title === 'MY PAGE', 'page title typed in the panel is saved: ' + curPage().title);
+        set('#cmp-paper-size', 'a4'); await w(200); want(curPage().paper === 'a4', 'paper chosen in the panel is saved: ' + curPage().paper);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('report editor: frame toolbar review fixes', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(300); S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {} }; S.csort = false; S.cmulti = new Set();
+        goTab('compose'); await w(300); const L = repLayout();
+        L.pages.push(newPage('free', { orient: 'port', items: [newItem('north', 60, 200, {}), newItem('text', 300, 400, { w: 300, h: 100 }), newItem('legend', 300, 600, {})] })); S.cpage = L.pages.length - 1; S.csel = null; rerenderCompose(); await w(200);
+        const [A, B, C] = curPage().items, box = id => document.querySelector('.cmp-box[data-box="' + id + '"]'), down = (el, o = {}) => el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: el.getBoundingClientRect().left + 5, clientY: el.getBoundingClientRect().top + 5, pointerId: 1, ...o }));
+        /* I1: clicking an item with the panel collapsed */
+        S.ui.ctlOpen = false; rerenderCompose(); await w(150); try { down(box(A.id)); window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); } catch (e) { F.push('click with the panel collapsed throws: ' + e.message); }
+        want(S.csel === A.id, 'item selected with the panel collapsed'); S.ui.ctlOpen = true; rerenderCompose(); await w(150);
+        /* I2: the toolbar acts on the box it sits on */
+        S.cmulti = new Set([A.id, B.id]); S.csel = B.id; rerenderCompose(); await w(150);
+        const bA = box(A.id).querySelector('[data-act="cmp-front"]'); down(bA); bA.click(); await w(200);
+        want(curPage().items[curPage().items.length - 1].id === A.id, 'Bring to front on A raises A');
+        /* I3: a stale single selection after changing page does not throw on Delete */
+        S.cmulti = new Set([C.id]); S.csel = C.id; document.querySelector('[data-cpage="0"]').click(); await w(150); document.querySelector('[data-cpage="' + (L.pages.length - 1) + '"]').click(); await w(150);
+        want(!document.querySelector('.cmp-box[aria-selected="true"]'), 'changing page clears the selection');
+        /* I4: the toolbar sits outside the frame, so small items can still be grabbed */
+        S.cmulti = new Set(); S.csel = A.id; rerenderCompose(); await w(150);
+        const bb = box(A.id).querySelector('.cmp-bar').getBoundingClientRect(), fb = box(A.id).getBoundingClientRect();
+        want(bb.bottom <= fb.top + 1 || bb.top >= fb.bottom - 1, 'toolbar is outside the item frame: ' + JSON.stringify({ bar: [bb.top, bb.bottom], box: [fb.top, fb.bottom] }));
+        /* C1: Rotate still works on the page list */
+        const P = L.pages[S.cpage]; P.rot = 0; composeAct; const rot = document.querySelector('.cmp-side [data-act="cmp-rot-r"]'); if (rot) { rot.click(); await w(150); }
+        /* M1: read-only projects get no toolbar */
+        S.readOnly = true; rerenderCompose(); await w(150); want(!document.querySelector('.cmp-bar'), 'no frame toolbar when read-only'); S.readOnly = false; rerenderCompose(); await w(100);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
