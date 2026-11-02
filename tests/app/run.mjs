@@ -899,6 +899,28 @@ app.whenReady().then(async () => {
     expect(!r.length, r.join(' || '));
   });
 
+  await check('plumes: forecast on the dated water table', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        const date = '2024-05-14', mw1 = sectionList().find(b => b.name === 'MW-1'), lvl = mw1.elevation - waterAt(mw1, date).depth;
+        const run1 = modelRun(date); want(run1.ok, 'runs: ' + run1.missing);
+        const fit = run1.P.fit({ e: mw1.easting, n: mw1.northing });
+        want(Math.abs(fit - lvl) < .08, 'water table from the round on or before the date: fit ' + fit.toFixed(2) + ' vs measured ' + lvl.toFixed(2));
+        want(run1.P.az === 0 && /BIOSCREEN/.test(run1.P.src.az), 'vertical dispersivity defaults to 0 (BIOSCREEN): ' + run1.P.az + ' ' + run1.P.src.az);
+        want(document.querySelector('#mdl-azrule'), 'a vertical spreading choice in the inputs');
+        setModel('azRule', 'astm'); let P = modelRun(date).P;
+        want(Math.abs(P.az - .05 * P.ax) < 1e-9 && /ASTM/.test(P.src.az), 'ASTM 1995: az = 0.05 ax: ' + P.az + ' ' + P.src.az);
+        setModel('azRule', 'epa'); P = modelRun(date).P;
+        want(Math.abs(P.az - .025 * P.ax) < 1e-9 && /EPA/.test(P.src.az), 'EPA 1986 low end: az = 0.025 ax');
+        setModel('azRule', ''); setModel('az', 0.3); P = modelRun(date).P; want(P.az === .3 && P.src.az === 'entered', 'a typed value wins');
+        setModel('az', '');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
