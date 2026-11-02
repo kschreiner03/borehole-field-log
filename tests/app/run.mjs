@@ -1475,6 +1475,22 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('tutorial: opens the panel at the step control', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(300); S.ui = { ctlOpen: false, ctlW: 300, sideOpen: true, fold: { 'xs-plume': true } }; goTab('xsec'); await w(300);
+        tutStart('xsec'); await w(400);
+        const i = TUTORIALS.xsec.steps.findIndex(st => st.sel === '#xs-style'); S.tut.i = i; tutShow(); await w(500);
+        const el = document.querySelector('#xs-style'), r1 = el?.getBoundingClientRect(), h = document.querySelector('#tut-hole')?.getBoundingClientRect();
+        want(S.ui.ctlOpen && !el.closest('.ctl-gb').hidden && r1.width > 0, 'panel opened and the group unfolded for the step');
+        want(h && h.left <= r1.left + 1 && h.right >= r1.right - 1 && h.top <= r1.top + 1 && h.bottom >= r1.bottom - 1, 'highlight covers the control: ' + JSON.stringify({ h, r1 }));
+        tutClose();
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
