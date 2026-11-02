@@ -1701,6 +1701,41 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('log: type a layer as text, buttons stay in step', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        /* the reader */
+        const a = parseLayerText('1.2-3.5 SP fine to medium grained, trace silt, compact, moist, brown, rootlets');
+        want(a.top === 1.2 && a.bottom === 3.5 && a.uscs === 'SP' && /fine to medium grained/.test(a.mods) && /trace silt/.test(a.mods) && a.consistency === 'Compact' && a.moisture === 'Moist' && a.colour === 'brown' && a.other === 'rootlets', 'reads a sand layer: ' + JSON.stringify(a));
+        const c = parseLayerText('CLAY (CI), silty, firm, moist, grey, with odd pebbles (TILL)');
+        want(c.top == null && c.uscs === 'CI' && c.mods === 'silty' && c.consistency === 'Firm' && c.colour === 'grey' && c.origin === 'till' && c.other === 'with odd pebbles', 'reads a clay till, keeps unknown words: ' + JSON.stringify(c));
+        loadDlExample(); await w(300); const b = cur();
+        const keys = ['uscs', 'mods', 'consistency', 'moisture', 'colour', 'origin', 'other'], bad = [];
+        for (const bh of projList()) for (const l of bh.layers.filter(l => l.uscs && !l.texture)) { const was = composeDesc(l).text, now = composeDesc({ ...l, ...parseLayerText(was) }).text; if (now !== was) bad.push(bh.name + ': ' + was + ' -> ' + now); }
+        want(!bad.length, 'reading back the app\\'s own descriptions gives the same description: ' + bad.slice(0, 4).join(' | '));
+        /* the drawer's type line */
+        goTab('log'); await w(300); openDrawer('layer', 1); await w(200);
+        const tl = document.querySelector('#drawer #lt-type'); want(tl, 'layer panel has a type line');
+        tl.value = 'SM silty sand, some gravel, dense, wet, grey'; tl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(250);
+        const l1 = cur().layers[1]; want(l1.uscs === 'SM' && l1.consistency === 'Dense' && l1.moisture === 'Wet' && /some gravel/.test(l1.mods), 'type line sets the layer: ' + JSON.stringify(l1));
+        want(document.querySelector('#drawer [aria-pressed="true"]') && /SM/.test(document.querySelector('#drawer').textContent), 'buttons in the panel show what was typed');
+        closeDrawer(); await w(150);
+        /* add a layer by typing, under the log */
+        const n0 = cur().layers.length, bot = Math.max(...cur().layers.map(l => l.bottom || 0)), nb = document.querySelector('#lt-new'); want(nb, 'add-by-typing box under the log');
+        nb.value = 'CL silty clay, stiff, moist, brown'; nb.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(250);
+        const nl = cur().layers[cur().layers.length - 1]; want(cur().layers.length === n0 + 1 && nl.uscs === 'CL' && Math.abs(nl.top - bot) < 1e-6 && document.querySelector('#lt-new')?.value === '', 'new layer starts at the bottom, box clears: ' + JSON.stringify(nl));
+        /* typing on the log itself */
+        const zr = document.querySelector('#log [data-desc][data-i="0"]'); want(zr, 'description area is clickable for typing');
+        zr?.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: zr.getBoundingClientRect().left + 20, clientY: zr.getBoundingClientRect().top + 5 })); await w(250);
+        const ta = document.querySelector('#lt-inline'); want(ta && document.querySelector('#drawer #lt-type'), 'clicking the description opens the text box on the log and the buttons panel');
+        if (ta) { ta.value = 'OL organic silt, soft, wet, black'; ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(250); }
+        want(cur().layers[0].uscs === 'OL' && cur().layers[0].moisture === 'Wet' && !document.querySelector('#lt-inline'), 'Enter applies the text typed on the log');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
