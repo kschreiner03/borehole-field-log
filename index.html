@@ -4891,7 +4891,7 @@ function gwmHTML() {
   const T = S.gwm.trans;
   return `<div class="gw-page">
     <section class="sec"><header><h3>Groundwater model</h3><button class="btn link" data-act="tut-gwm">Tutorial</button><span class="note">${GW_ENGINE} · public domain · labelled “Model (MODFLOW 6), not measured” wherever it is drawn</span><span class="sp"></span>
-      <button class="btn" data-act="gw-run" ${ro}>Run model</button><button class="btn primary" data-act="gw-cal" ${ro}>Calibrate (steady)</button><button class="btn" data-act="gw-calt" ${ro || !c ? 'disabled' : ''} title="${c ? 'Specific yield and recharge per period, against every round' : 'Calibrate the steady model first'}">Calibrate (all rounds)</button><button class="btn" data-act="gw-trans" ${ro}>Run transport</button><button class="btn" data-act="gw-export" ${S.gwm.busy ? 'disabled' : ''}>Export model files</button></header>
+      <button class="btn" data-act="gw-run" ${ro}>Run model</button><button class="btn primary" data-act="gw-cal" ${ro}>Calibrate (steady)</button><button class="btn" data-act="gw-calt" ${ro || !c ? 'disabled' : ''} title="${c ? 'Specific yield and recharge per period, against every round' : 'Calibrate the steady model first'}">Calibrate (all rounds)</button><button class="btn" data-act="gw-trans" ${ro}>Run transport</button><button class="btn" data-act="gw-export" ${S.gwm.busy ? 'disabled' : ''}>Export model files</button><button class="btn" data-act="gw-report" ${S.readOnly ? 'disabled' : ''}>Add model pages to the report</button></header>
       <div class="body">
       ${!desk ? `<p class="note" style="color:var(--warn,#a3470b)">The groundwater model runs MODFLOW 6 on this computer, so it needs the desktop app. The cross-section keeps the Domenico forecast.</p>` : ''}
       ${S.gwm.msg ? `<p class="note"><b>${esc(S.gwm.msg)}</b></p>` : ''}${S.gwm.err ? `<p class="note" style="color:var(--warn,#a3470b)">MODFLOW 6: ${esc(S.gwm.err)}</p>` : ''}
@@ -4930,7 +4930,7 @@ function v3dHTML() {
   const off = S.v3dOff || {};
   return `<div class="v3d-page"><section class="sec"><header><h3>3D view</h3><span class="note">drag to rotate · shift-drag to pan · scroll to zoom</span><span class="sp"></span>
     <label class="note" for="v3d-ve">Vertical exaggeration</label><select id="v3d-ve" style="width:auto">${[[0, 'Auto'], [1, '×1'], [2, '×2'], [5, '×5'], [10, '×10']].map(([v, t]) => `<option value="${v}" ${(S.v3dVe || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-    <button class="btn" data-act="v3d-reset">Reset view</button><button class="btn" data-act="v3d-png">Save image</button><button class="btn" data-act="v3d-vtk" title="VTK files for ParaView, in real coordinates">Export for ParaView</button></header>
+    <button class="btn" data-act="v3d-reset">Reset view</button><button class="btn" data-act="v3d-report" ${S.readOnly ? 'disabled' : ''}>Add view to report</button><button class="btn" data-act="v3d-png">Save image</button><button class="btn" data-act="v3d-vtk" title="VTK files for ParaView, in real coordinates">Export for ParaView</button></header>
     <div class="body"><div class="sec-opts" style="display:flex;flex-wrap:wrap;gap:4px 14px;margin-bottom:8px">${V3D_LAYERS.map(([k, t]) => `<label class="check"><input type="checkbox" id="v3d-lyr-${k}" ${off[k] ? '' : 'checked'}> ${t}</label>`).join('')}</div>
     <div id="v3d" style="position:relative;height:560px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#f7f8fa;touch-action:none"></div>
     <p class="note" id="v3d-legend" style="margin-top:6px"></p></div></section></div>`;
@@ -5065,6 +5065,87 @@ function gwVtkFiles() {
   f['README.txt'] = readme.join('\n') + '\n';
   return f;
 }
+/* ---------- the model in reports: summary, calibration, parameters and limits, written out so the output explains itself ---------- */
+function gwReportPages() {
+  const xs = { ...S.xs, plume: true, model: true, shape: S.xs.shape || 'guided', style: S.xs.style || 'graded', medium: 'groundwater', param: siteOf()?.model?.param || S.xs.param || 'benzene' };
+  const sec = xsecPage(); sec.title = 'CROSS-SECTION A–A′ WITH MODEL RESULTS (MODFLOW 6)'; sec.items.find(x => x.t === 'section').o = { xs };
+  const note = sec.items.find(x => x.t === 'text'); if (note) note.o.text = 'Measured: logs, water levels and results. Interpreted between boreholes: units and the measured-data plume. Model (MODFLOW 6), not measured: purple water table, head contours, flow arrows and the forecast plume. See the model summary for calibration and limits.';
+  return [newPage('free', { title: 'GROUNDWATER MODEL (MODFLOW 6): SET-UP AND RESULTS', items: [fullBody('gwsum')] }),
+    newPage('free', { title: 'GROUNDWATER MODEL: CALIBRATION', items: [newItem('gwcal', BODY.x, BODY.y, { h: 560 }), newItem('gwpar', BODY.x, BODY.y + 576, { h: BODY.h - 576 })] }),
+    sec, newPage('free', { title: 'MODELLED WATER TABLE AND FLOW PATHS (MODFLOW 6)', items: [fullBody('plan')] }),
+    newPage('free', { title: 'GROUNDWATER MODEL: LIMITS AND REFERENCES', items: [fullBody('gwlim')] })];
+}
+/* a simple flowing layout of headings, paragraphs and tables in SVG; what does not fit says so */
+function gwBlocksSVG(blocks, w, h) {
+  const o = [], fs = 10, lh = 13, pad = 10, cw = fs * .5; let y = pad + 4, cut = false;
+  const line = (t, x, yy, st = '') => o.push(`<text x="${x.toFixed(1)}" y="${yy.toFixed(1)}" style="font:${st}${fs}px Arial,sans-serif;fill:#1c2329">${esc(t)}</text>`);
+  for (const b of blocks) { if (cut) break;
+    if (b.h) { if (y + 18 > h - pad) { cut = true; break; } y += 6; o.push(`<text x="${pad}" y="${(y + 8).toFixed(1)}" style="font:700 11.5px Arial,sans-serif;fill:#1c2329">${esc(b.h)}</text>`); y += 16; continue; }
+    if (b.p) { const L = String(b.p).split('\n').flatMap(q => wrap(q, Math.floor((w - 2 * pad) / cw))); for (const t of L) { if (y + lh > h - pad) { cut = true; break; } line(t, pad, y + 9, b.warn ? 'italic ' : ''); y += lh; } y += 3; if (b.warn) o.splice(o.length - L.length, L.length, ...o.slice(o.length - L.length).map(x => x.replace('fill:#1c2329', 'fill:#b4451a'))); continue; }
+    if (b.t) { const W0 = w - 2 * pad, ws = b.cols.map(c => c * W0), xsOf = ws.map((_, i) => pad + ws.slice(0, i).reduce((a, v) => a + v, 0));
+      b.t.forEach((row, ri) => { const cells = row.map((c, i) => wrap(String(c ?? '–'), Math.max(4, Math.floor((ws[i] - 6) / cw)))), n = Math.max(...cells.map(c => c.length)), rh = n * lh + 3;
+        if (y + rh > h - pad) { cut = true; return; } if (cut) return;
+        if (ri === 0) o.push(`<rect x="${pad}" y="${(y - 1).toFixed(1)}" width="${W0}" height="${rh}" fill="#eef1f4"/>`);
+        cells.forEach((c, i) => c.forEach((t, k) => line(t, xsOf[i] + 3, y + 9 + k * lh, ri === 0 ? '600 ' : ''))); y += rh; o.push(`<path d="M${pad} ${y.toFixed(1)}h${W0}" stroke="#d4dae0" stroke-width=".6"/>`); });
+      y += 6; } }
+  if (cut) o.push(`<text x="${pad}" y="${h - 4}" style="font:italic 9.5px Arial,sans-serif;fill:#b4451a">More follows: enlarge this frame or add another model item.</text>`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#fff"/>${o.join('')}</svg>`;
+}
+const gwF = (v, d = 3) => v == null || !Number.isFinite(+v) ? '–' : (+v).toPrecision(d);
+function gwScatterSVG(C, size = 260) { const pts = C.residuals.filter(q => Number.isFinite(q.sim)), lo = Math.min(...pts.flatMap(q => [q.h, q.sim])), hi = Math.max(...pts.flatMap(q => [q.h, q.sim])), pad = (hi - lo) * .08 || .1, a = lo - pad, b = hi + pad, s = size - 60, X = v => 46 + (v - a) / (b - a) * s, Y = v => 14 + s - (v - a) / (b - a) * s;
+  return `<rect x="46" y="14" width="${s}" height="${s}" fill="#fff" stroke="#bbb"/><path d="M${X(a)} ${Y(a)}L${X(b)} ${Y(b)}" stroke="#888" stroke-dasharray="4 3"/>${pts.map(q => `<circle cx="${X(q.h).toFixed(1)}" cy="${Y(q.sim).toFixed(1)}" r="3" fill="#756bb1" stroke="#3f007d"/>`).join('')}
+    <text x="${46 + s / 2}" y="${size - 18}" text-anchor="middle" style="font:10px Arial,sans-serif">Measured head (m)</text><text x="12" y="${14 + s / 2}" transform="rotate(-90 12 ${14 + s / 2})" text-anchor="middle" style="font:10px Arial,sans-serif">Simulated head (m)</text>
+    <text x="48" y="${size - 4}" style="font:9px Arial,sans-serif;fill:#555">${a.toFixed(2)}–${b.toFixed(2)} m; dashed = perfect fit (1:1)</text>`; }
+function gwReportSVG(kind, w, h) {
+  const M = gwModel(), g = gwSaved(), c = g.calibT || g.calib, cs = g.calib, T = S.gwm?.trans, pv = gwPv();
+  if (!M || M.error) return gwBlocksSVG([{ h: 'Groundwater model (MODFLOW 6)' }, { p: 'The model cannot be built for this project: ' + (M?.error || 'no boreholes') }], w, h);
+  const stale = cs && cs.key !== gwInputsKey(M);
+  if (kind === 'gwsum') {
+    const B = [{ h: 'Groundwater model: MODFLOW 6.8.1 (U.S. Geological Survey, public domain)' },
+      { p: 'Everything on this page and in the model figures is model output (MODFLOW 6), not measured. It is a screening-to-intermediate model built from this project’s borehole logs, water levels, slug tests and laboratory results, and calibrated to the measured heads.' },
+      ...(stale ? [{ p: `The project data or model settings changed after the calibration of ${cs.at.slice(0, 10)}: the model must be calibrated again before these results are relied on.`, warn: true }] : []),
+      { h: 'Set-up' },
+      { t: [['Item', 'Value', 'Basis'],
+        ['Grid', `${M.grid.nrow} rows × ${M.grid.ncol} columns × ${M.grid.nlay} layers; ${M.grid.cell} m cells; ${(M.grid.nrow * M.grid.cell).toFixed(0)} × ${(M.grid.ncol * M.grid.cell).toFixed(0)} m`, `Columns turned ${M.grid.angrot.toFixed(1)}° to follow the fitted flow direction (${M.F.az.toFixed(0)}° from north)`],
+        ['Layers', M.units.map(u => u.u).join(', '), 'One layer per unit paired on the cross-section; surfaces interpolated between boreholes (inverse distance); units missing at a borehole thin out'],
+        ['Boundaries', `Fixed heads on the upgradient and downgradient faces; no flow on the sides and base${M.features.length ? '; ' + M.features.map(f => `${f.name || f.type} (${{ riv: 'river', drn: 'drain', wel: 'well', chd: 'fixed head' }[f.type]})`).join(', ') : ''}`, `Fitted water-table plane of the ${M.round} round`],
+        ['Recharge', `${gwF(pv.rch ?? M.rch)} m/day (${gwF((pv.rch ?? M.rch) * 365.25 * 1000, 3)} mm/year)`, pv.rch != null ? 'Calibrated' : M.params.find(p => p.key === 'rch')?.src || 'entered'],
+        ['Effective porosity', gwF(S.co.ne ?? .25, 2), 'Assumed (app settings)']], cols: [.18, .42, .40] },
+      { t: [['Unit (layer)', 'K (m/day)', 'Source of K', 'Kv/Kh'], ...M.units.map(u => [u.u, gwF(pv['k:' + u.u] ?? u.k), pv['k:' + u.u] != null ? `Calibrated (start: ${u.kSrc})` : u.kSrc, `${u.kv} (${u.kvSrc})`])], cols: [.22, .14, .46, .18] },
+      { h: 'Calibration' },
+      ...(cs ? [{ t: [['Statistic', 'Value', 'What it means'],
+        ['Calibration round', `${cs.round}${g.calibT ? `; also all ${g.calibT.rounds.length} rounds (transient)` : ''}`, 'The measured water levels the model was fitted to'],
+        ['Observations', String(c.stats.n), 'Wells (and rounds) compared'],
+        ['Mean error', `${gwF(c.stats.me)} m`, 'Average of measured − simulated: near 0 means no overall bias'],
+        ['Mean absolute error', `${gwF(c.stats.mae)} m`, 'Typical size of a miss at a well'],
+        ['RMSE', `${gwF(c.stats.rmse)} m`, 'Root-mean-square miss'],
+        ['RMSE ÷ head range', `${gwF(c.stats.srms)} % of ${gwF(c.stats.range)} m`, 'The miss compared with the spread of heads across the site'],
+        ['Mass-balance discrepancy', `${gwF(c.stats.disc)} %`, 'MODFLOW’s water budget error; close to 0 means the solution is consistent'],
+        ['Runs', `${c.iterations} iterations, ${c.runs} MODFLOW runs, ${c.at.slice(0, 10)}`, 'Levenberg–Marquardt (as in PEST); statistics after Hill and Tiedeman (2007)']], cols: [.24, .30, .46] },
+        ...(c.warnings || []).map(x => ({ p: x, warn: true }))] : [{ p: 'Not calibrated: the results use the start values (slug tests where available, CCME recharge). Calibrate on the Model page before relying on them.', warn: true }]),
+      { h: 'Transport' },
+      { p: T?.ok ? `${LAB_PARAMS[T.param].label} moved by MODFLOW 6 transport (GWT) on the calibrated flow: constant source of ${gwF(T.c0)} mg/L at ${T.P.srcBh.name} (${T.c0Src}) from ${T.start}; dispersivities αL ${gwF(T.P.ax)} m, αT ${gwF(T.P.ay)} m, αV ${gwF(T.P.az)} m; sorption Kd ${gwF(T.kd)} L/kg; ${T.P.hl > 0 ? `half-life ${T.P.hl} days` : 'no decay (the conservative case)'}. Fit to ${T.fit.n} measured results: log RMS ${gwF(T.fit.rmsLog)} (1 = a factor of 10), mean log error ${gwF(T.fit.meLog)}. Transport mass-balance discrepancy ${gwF(T.disc)} %.` : 'Not run.' },
+      { h: 'How to read the model output' },
+      { p: '• Purple lines and shading are model output (MODFLOW 6), never measurements; blue ticks, columns and coloured result markers are measured.\n• Water table (dotted purple): where the model puts the water surface between wells. Head contours (thin purple, metres): water flows across them from high to low. Arrows: the direction of flow in the plane of the section, drawn with the vertical exaggeration.\n• Forecast plume: concentrations above 1×, 10× and 100× the guideline on the date shown. The model-guided measured plume uses this shape but equals every measured result at its well screen.\n• Flow paths (plan): where water leaving the source travels, with 1, 5, 10 and 25-year marks (water; a sorbing contaminant is slower by its retardation factor).\n• Use the calibration statistics, the residuals and the limits page to judge how far the results can be relied on.' }];
+    return gwBlocksSVG(B, w, h);
+  }
+  if (kind === 'gwcal') {
+    if (!c) return gwBlocksSVG([{ h: 'Model calibration' }, { p: 'Not calibrated yet (Model page › Calibrate).', warn: true }], w, h);
+    const size = Math.min(300, h - 10), tbl = gwBlocksSVG([{ h: 'Residuals (measured − simulated)' }, { t: [['Well', 'Date', 'Measured (m)', 'Simulated (m)', 'Residual (m)'], ...c.residuals.map(q => [q.b, q.date || c.round, gwF(q.h, 6), gwF(q.sim, 6), Number.isFinite(q.res) ? (q.res > 0 ? '+' : '') + q.res.toFixed(3) : 'dry'])], cols: [.18, .22, .2, .2, .2] }], w - size - 10, h);
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#fff"/><g>${gwScatterSVG(c, size)}<text x="46" y="10" style="font:600 10px Arial,sans-serif">Simulated against measured heads (MODFLOW 6), ${esc(c.mode === 'transient' ? 'all rounds' : c.round)}</text></g><g transform="translate(${size + 10} 0)">${tbl.replace(/^<svg[^>]*>|<\/svg>$/g, '')}</g></svg>`;
+  }
+  if (kind === 'gwpar') {
+    if (!c) return gwBlocksSVG([{ h: 'Model parameters' }, { p: 'Not calibrated yet.', warn: true }], w, h);
+    const Cs = [cs, g.calibT].filter(Boolean);
+    return gwBlocksSVG(Cs.flatMap(C => [{ h: `Calibrated parameters (${C.mode === 'transient' ? 'all rounds' : 'steady state, ' + C.round})` },
+      { t: [['Parameter', 'Start', 'Calibrated', '95 % interval', 'Sensitivity (CSS)', 'Prior'], ...C.params.map(p => [p.label, `${gwF(p.start)} ${p.unit}`, `${gwF(p.value)} ${p.unit}`, `${gwF(p.lo95)} – ${gwF(p.hi95)}`, gwF(C.css[p.key]), p.prior != null ? `slug tests ${gwF(10 ** p.prior)} m/day` : '–'])], cols: [.26, .14, .14, .2, .12, .14] },
+      ...(C.warnings || []).map(x => ({ p: x, warn: true }))]), w, h);
+  }
+  return gwBlocksSVG([{ h: 'Model limits' },
+    { p: '• Layers are interpolated between boreholes (inverse distance) and each layer is uniform; the base of the logs is treated as impermeable.\n• The boundaries come from the fitted water-table plane of one monitoring round unless rivers, drains, wells or fixed heads were added; results near the edges reflect that choice.\n• Heads alone cannot separate recharge from hydraulic conductivity: slug tests (prior information) or flow measurements are needed, and the calibration warns when values cannot be separated.\n• Transport assumes steady flow, a constant source from the release date, linear sorption and no free product (NAPL).\n• A model is a tool for judgement, not a measurement: check the residuals and compare with later monitoring.' },
+    { h: 'References' },
+    { p: 'Langevin, C.D., Hughes, J.D., Provost, A.M., Russcher, M.J., Banta, E.R., Niswonger, R.G., Panday, S., Merrick, D., Morway, E.D., and Bakker, M. MODFLOW 6 Modular Hydrologic Model, version 6.8.1. U.S. Geological Survey Software.\nHill, M.C., and Tiedeman, C.R. (2007). Effective Groundwater Model Calibration. Wiley.\nCCME (2008). Canada-Wide Standard for Petroleum Hydrocarbons in Soil: Scientific Rationale, Supporting Technical Document (recharge and soil defaults).\nUS EPA (1996). Soil Screening Guidance: Technical Background Document, EPA/540/R-95/128 (chemical properties).' }], w, h);
+}
 /* ---------- tutorials: a guided walk through the Section and Model pages on the cross-section example ----------
    Each step can switch page, highlights one real control, and explains what it does and why. Nothing is changed for the
    user except loading the (fictional) example project if it is not open. */
@@ -5094,6 +5175,8 @@ const TUTORIALS = {
     { tab: 'gwm', sel: '#gwm-trans-sec', title: 'Contaminant transport', body: '<p><b>Run transport</b> moves the contaminant with MODFLOW 6’s transport model, using the compound, source well, release date and dispersivities from the Forecast panel, with sorption and (if you enter a half-life) decay.</p><p>Each measured result is compared with the model. Tick “Calibrate the source concentration” to fit the source strength.</p>' },
     { tab: 'xsec', sel: '#xs-draw', title: 'See it on the section', body: '<p>After a run, the section adds the model’s water table (dotted purple), head contours (thin purple lines, in metres) and flow arrows.</p><p>The forecast becomes the MODFLOW 6 plume, and the model-guided shape follows it while still matching every measured result.</p>' },
     { tab: 'site', sel: '#plan', title: 'And on the map', body: '<p>The map shows the model area, its simulated water-table contours and flow paths from the source with 1, 5, 10 and 25-year marks. Turn them off under Layers › Groundwater model.</p>' },
+    { tab: 'v3d', sel: '#v3d', title: 'See everything in 3D', body: '<p>The 3D page shows the boreholes in soil colours, the wells with their screens and water levels, the results, the see-through interpolated surfaces, the water table, the model plume and the flow paths. Drag to turn it, shift-drag to move, scroll to zoom; the vertical exaggeration is always stated.</p><p><b>Export for ParaView</b> saves the same scene in real coordinates for presentation-quality 3D.</p>' },
+    { tab: 'gwm', sel: '[data-act="gw-report"]', title: 'Put the model in the report', body: '<p><b>Add model pages to the report</b> adds a model summary (set-up, conductivities with sources, calibration statistics with what each means, transport, how to read the output), the calibration plot and parameters, a cross-section and a plan with the model results, and the limits with references.</p><p>When you export the report, the calibrated model is run again so every figure carries current results. The 3D page’s <b>Add view to report</b> adds a dated picture with its legend.</p>' },
     { tab: 'gwm', sel: '[data-act="gw-export"]', title: 'Hand it to a reviewer', body: '<p><b>Export model files</b> saves the MODFLOW 6 input files and outputs as a zip with a short read-me, so a hydrogeologist can rerun and check them in standard tools.</p>' },
     { tab: 'gwm', sel: '#gwm-limits', title: 'Know the limits', body: '<p>Layers are interpolated between boreholes and each is uniform; heads alone cannot separate recharge from conductivity; transport uses steady flow and a constant source. Read the warnings and residuals before relying on a result.</p>' },
   ] },
@@ -8359,6 +8442,7 @@ const xsecPage = () => newPage('free', { orient: 'land', title: 'CROSS-SECTION A
 const RITEMS = {
   plan: ['Site plan', BODY.w, 560], section: ['Cross-section', BODY.w, 440], wt: ['Water-table map', BODY.w, 520], vap: ['Vapour map', BODY.w, 520],
   flow: ['Groundwater flow', BODY.w, 460], hydro: ['Hydrograph', BODY.w, 320], text: ['Text box', 360, 110], image: ['Picture', 360, 260],
+  gwsum: ['Model summary', BODY.w, BODY.h], gwcal: ['Model calibration plot', BODY.w, 560], gwpar: ['Model parameters', BODY.w, 300], gwlim: ['Model limits', BODY.w, 300],
   scalebar: ['Scale bar', 300, 56], north: ['North arrow', 80, 96], legend: ['Legend', 220, 110], shape: ['Shape', 160, 100],
 };
 const RPAGES = { pdf: 'Imported page', free: 'Free page', xsec: 'Cross-section page (landscape)', key: 'Key to symbols', logs: 'Borehole logs', lab: 'Summary of tests', chem: 'Soil analytical results', gw: 'Groundwater observations', photos: 'Photographs' };
@@ -8390,6 +8474,7 @@ const REPORT_PRESETS = {
     newPage('free', { title: 'VAPOUR (HEADSPACE) MAP', items: [fullBody('vap')] }), xsecPage(),
     newPage('logs'), newPage('chem'), newPage('gw'), newPage('photos')]],
   logs: ['Logs only', () => [newPage('logs')]],
+  gwm: ['Groundwater model report (MODFLOW 6)', () => gwReportPages()],
 };
 /* outside documents in a report: an imported PDF is stored once (like a photo, so it travels in project files) and each of
    its pages becomes a page of kind 'pdf' that points at it; a picture becomes a page holding one picture */
@@ -8484,6 +8569,7 @@ function itemInner(it, w, h) {
   if (it.t === 'north') return northSVG(it, w, h);
   if (it.t === 'legend') return legendSVG(it, w, h);
   if (it.t === 'shape') return shapeSVG(it, w, h);
+  if (['gwsum', 'gwcal', 'gwpar', 'gwlim'].includes(it.t)) return gwReportSVG(it.t, w, h);
   const out = withRO(ro, () => {
     if (it.t === 'plan') { const r = planSVG(w, h, false); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'section') return fromEl(el => { if (o.xs) RO.xs = o.xs.shape ? o.xs : { ...o.xs, shape: 'data' }; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
@@ -8590,6 +8676,8 @@ async function layoutPages(L = repLayout()) {
 /* the whole package as one PDF: imported pages are copied in as real PDF pages (text and drawings intact, with the
    user's rotation added to their own); the app's pages go in as 300 dpi images at their paper size */
 async function buildReportBytes(L = repLayout()) {
+  // model results on any page come from a fresh run of the calibrated model, not from a stale session
+  if (window.desktop?.mf6Run && (gwSaved().calib || gwSaved().transport?.on) && L.pages.some(p => p.items?.some(it => ['gwsum', 'gwcal', 'gwpar', 'section', 'plan'].includes(it.t)))) { gwModel(); if (!S.gwm.run) await gwEnsure(true); }
   const { PDFDocument, degrees } = PDFLib, out = await PDFDocument.create(), src = new Map();
   if (basemapKey() !== 'none') { await layoutPages(L); await basemapIdle(); }   // first pass asks for the map tiles the pages need
   const all = await layoutPages(L); if (!all.length) throw new Error('empty');
@@ -10105,6 +10193,10 @@ document.addEventListener('click', e => {
     case 'load-xs': loadXsExample(); break;
     case 'tut-xsec': tutStart('xsec'); break;
     case 'v3d-reset': v3dView(true); break;
+    case 'v3d-report': if (S.v3d?.ok && !S.readOnly) { v3dRender(); const img = S.v3d.renderer.domElement.toDataURL('image/png'), L = repLayout(), leg = $('#v3d-legend')?.textContent || '';
+      L.pages.push(newPage('free', { orient: 'land', title: '3D VIEW OF THE SITE', items: [newItem('image', LB.x, LB.y, { w: LB.w, h: LB.h - 92, o: { img } }), newItem('text', LB.x, LB.y + LB.h - 84, { w: LB.w, h: 84, o: { size: 9, text: `View saved ${new Date().toISOString().slice(0, 10)}. ${leg}` } })] }));
+      saveLayout(L); toast('3D view added to the report as a page.'); } break;
+    case 'gw-report': if (!S.readOnly) { const L = repLayout(); L.pages.push(...gwReportPages()); saveLayout(L); toast('Model pages added to the report: summary, calibration, cross-section, plan and limits.'); } break;
     case 'v3d-png': v3dPng(); break;
     case 'v3d-vtk': saveFile(`site-3d-paraview-${(projKey(cur()) || 'project').replace(/[^\w-]+/g, '-').slice(0, 40)}.zip`, zipFiles(Object.entries(gwVtkFiles()).map(([name, data]) => ({ name, data })))); break;
     case 'tut-gwm': tutStart('gwm'); break;
