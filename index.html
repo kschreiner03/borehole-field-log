@@ -3683,6 +3683,11 @@ const MOD_CHIPS = ['silty', 'sandy', 'clayey', 'gravelly', 'some silt', 'some sa
 const OTHER_CHIPS = ['trace coal', 'oxide staining', 'gypsum crystals', 'rootlets', 'trace organics', 'sand lenses', 'silt laminations', 'cobbles', 'boulders', 'slickensided', 'fissured', 'blocky'];
 const splitTerms = v => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
 const chips = (k, v, list) => `<div class="chips">${list.map(t => `<button type="button" class="chip" data-chip="${k}" data-term="${esc(t)}" aria-pressed="${splitTerms(v).includes(t)}">${esc(t)}</button>`).join('')}</div>`;
+/* a borehole's logged units, paired by name (or by the alias set on the Cross-section page), neighbouring layers of one unit merged */
+function xsUnits(b) { const alias = siteOf()?.xsec?.alias || {}, out = [];
+  for (const l of (b.layers || []).filter(l => l.top != null && l.bottom > l.top).sort((a, c) => a.top - c.top)) { const u = alias[b.id + '|' + defaultUnit(l)] || defaultUnit(l), last = out[out.length - 1];
+    if (last && last.u === u && Math.abs(last.bot - l.top) < 1e-6) last.bot = l.bottom; else out.push({ u, top: l.top, bot: l.bottom, fill: soilOf(l.uscs)?.fill || 'panel-2' }); }
+  return out; }
 const defaultUnit = l => l.unit || (l.origin && l.origin !== 'bedrock' ? ORIGINS[l.origin] : '') || (soilOf(l.uscs)?.group === 'rock' ? 'Bedrock' : soilOf(l.uscs)?.p ? soilOf(l.uscs).p[0] + soilOf(l.uscs).p.slice(1).toLowerCase() : '');
 const descHTML = l => { const d = composeDesc(l); return d.name ? `<b>${esc(d.name)}</b>${d.body ? ', ' + esc(d.body) : ''}` : esc(d.text); };
 function waterOut(b, w) {
@@ -4340,7 +4345,8 @@ function modelSVG(date, xs = S.xs) {
    A number is written as CONSTANT, an array (row by row) as INTERNAL. */
 function mf6Arr(v, ncol) {
   if (typeof v === 'number') return `    CONSTANT ${mf6Num(v)}`;
-  const out = ['    INTERNAL FACTOR 1.0']; for (let i = 0; i < v.length; i += Math.min(ncol, 10)) out.push('      ' + Array.from(v.slice(i, i + Math.min(ncol, 10)), mf6Num).join(' '));
+  // each row starts on a new line: MODFLOW reads an array row by row
+  const out = ['    INTERNAL FACTOR 1'], w = v.length % ncol === 0 ? ncol : v.length; for (let r = 0; r < v.length; r += w) for (let i = r; i < r + w; i += 10) out.push('      ' + Array.from(v.slice(i, Math.min(i + 10, r + w)), x => mf6Num(x)).join(' '));
   return out.join('\n');
 }
 const mf6Num = x => Number.isInteger(x) ? String(x) : (+x).toPrecision(10).replace(/\.?0+(e|$)/, '$1');
@@ -4357,7 +4363,8 @@ function mf6Files(spec) {
   f['sim.ims'] = ims;
   f['gwf.dis'] = `BEGIN options\n  LENGTH_UNITS meters\n${d.xorigin != null ? `  XORIGIN ${mf6Num(d.xorigin)}\n  YORIGIN ${mf6Num(d.yorigin)}\n  ANGROT ${mf6Num(d.angrot || 0)}\n` : ''}END options\nBEGIN dimensions\n  NLAY ${d.nlay}\n  NROW ${d.nrow}\n  NCOL ${nc}\nEND dimensions\nBEGIN griddata\n  DELR\n${mf6Arr(d.delr, nc)}\n  DELC\n${mf6Arr(d.delc, nc)}\n  TOP\n${mf6Arr(d.top, nc)}\n${mf6Layered('BOTM', d.botm, nc)}\n${d.idomain ? mf6Layered('IDOMAIN', d.idomain, nc) + '\n' : ''}END griddata\n`; pk.push('DIS6 gwf.dis dis');
   f['gwf.npf'] = `BEGIN options\n  SAVE_SPECIFIC_DISCHARGE\n  SAVE_FLOWS\nEND options\nBEGIN griddata\n${mf6Layered('ICELLTYPE', spec.npf.icelltype, nc)}\n${mf6Layered('K', spec.npf.k, nc)}\n${mf6Layered('K33', spec.npf.k33, nc)}\nEND griddata\n`; pk.push('NPF6 gwf.npf npf');
-  f['gwf.ic'] = `BEGIN griddata\n  STRT\n${mf6Arr(spec.ic, nc)}\nEND griddata\n`; pk.push('IC6 gwf.ic ic');
+  // starting heads: one value, one plan-view array used in every layer, or one array per layer
+  f['gwf.ic'] = `BEGIN griddata\n${typeof spec.ic === 'number' ? `  STRT\n${mf6Arr(spec.ic, nc)}` : mf6Layered('STRT', Array.isArray(spec.ic) && spec.ic.length === d.nlay ? spec.ic : Array.from({ length: d.nlay }, () => spec.ic), nc)}\nEND griddata\n`; pk.push('IC6 gwf.ic ic');
   if (spec.sto) { f['gwf.sto'] = `BEGIN options\n  SAVE_FLOWS\nEND options\nBEGIN griddata\n${mf6Layered('ICONVERT', spec.npf.icelltype, nc)}\n${mf6Layered('SS', spec.sto.ss, nc)}\n${mf6Layered('SY', spec.sto.sy, nc)}\nEND griddata\n` + spec.steady.map((st, i) => `BEGIN period ${i + 1}\n  ${st ? 'STEADY-STATE' : 'TRANSIENT'}\nEND period ${i + 1}\n`).join(''); pk.push('STO6 gwf.sto sto'); }
   if (spec.chd?.some(Boolean)) { f['gwf.chd'] = mf6List('chd', spec.chd, 1); pk.push('CHD6 gwf.chd chd'); }
   if (spec.riv?.some(Boolean)) { f['gwf.riv'] = mf6List('riv', spec.riv, 3, '  BOUNDNAMES\n  SAVE_FLOWS\n'); pk.push('RIV6 gwf.riv riv'); }
@@ -4419,6 +4426,105 @@ function mf6ReadBudget(u8, want) {
 function mf6ReadObs(csv) { const [head, ...rows] = csv.trim().split(/\r?\n/), cols = head.split(','), out = {}; cols.forEach(c => { out[c.toUpperCase()] = []; }); for (const r of rows) r.split(',').forEach((v, i) => out[cols[i].toUpperCase()].push(+v)); return out; }
 /* the largest percent discrepancy of any time step in a listing file */
 function mf6Discrepancy(lst) { const v = [...lst.matchAll(/PERCENT DISCREPANCY\s*=\s*(-?[\d.]+(?:E[+-]?\d+)?)/gi)].map(m => +m[1]); return v.length ? v.reduce((a, b) => Math.abs(b) > Math.abs(a) ? b : a, 0) : null; }
+/* ---------- the site groundwater model (MODFLOW 6) ----------
+   A 3D structured grid over the boreholes plus a margin, rotated so columns run along the fitted flow direction (rows are
+   numbered from the far side, as MODFLOW does). One layer per correlated unit; unit surfaces interpolated between boreholes by
+   inverse distance (power 2); a unit missing at a borehole thins to nothing there and cells under 0.1 m become vertical
+   pass-through cells (IDOMAIN −1). The base of the logs is the model bottom (no flow). Fixed heads on the upgradient and
+   downgradient faces from the calibration round's fitted water-table plane; no flow on the faces parallel to flow. */
+const GW_MIN_TH = .1, GW_DAY = 86400;
+function gwIdw(pts, x, y) { let sw = 0, sv = 0; for (const [px, py, v] of pts) { const d2 = (px - x) ** 2 + (py - y) ** 2; if (d2 < 1e-6) return v; const w = 1 / d2; sw += w; sv += w * v; } return sv / sw; }
+function gwModelSpec(list, site = siteOf() || {}, opts = {}) {
+  const u0 = site.gwModel || {}, located = list.filter(b => b.easting != null && b.northing != null && b.elevation != null);
+  if (located.length < 3) return { error: 'The model needs at least 3 boreholes with coordinates and a ground elevation.' };
+  const round = opts.round || u0.round || gwHeads(located).round;
+  const F0 = gwFlow(located, round); if (F0.error) return { error: 'Groundwater flow: ' + F0.error };
+  if (!(F0.i > 0)) return { error: 'The water table is too flat to define a flow direction.' };
+  const f = [-F0.bx / F0.i, -F0.by / F0.i], F = { ...F0, f }, ang = Math.atan2(f[1], f[0]), cs = Math.cos(ang), sn = Math.sin(ang);
+  const E0 = located.reduce((a, b) => a + b.easting, 0) / located.length, N0 = located.reduce((a, b) => a + b.northing, 0) / located.length;
+  const loc = (E, N) => [(E - E0) * cs + (N - N0) * sn, -(E - E0) * sn + (N - N0) * cs];
+  const P = located.map(b => loc(b.easting, b.northing)), xs = P.map(p => p[0]), ys = P.map(p => p[1]);
+  const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 20), margin = u0.margin ?? Math.max(20, .5 * span);
+  const xa = Math.min(...xs) - margin, xb = Math.max(...xs) + margin, ya = Math.min(...ys) - margin, yb = Math.max(...ys) + margin;
+  const cell = u0.cell || opts.cell || Math.max(1, Math.ceil(Math.max((xb - xa) / 80, (yb - ya) / 60))), ncol = Math.ceil((xb - xa) / cell), nrow = Math.ceil((yb - ya) / cell);
+  const xorigin = E0 + xa * cs - ya * sn, yorigin = N0 + xa * sn + ya * cs, Lv = nrow * cell;
+  const toWorld = (x, y) => [xorigin + x * cs - y * sn, yorigin + x * sn + y * cs], toLocal = (E, N) => [(E - xorigin) * cs + (N - yorigin) * sn, -(E - xorigin) * sn + (N - yorigin) * cs];
+  const cellCentre = (r, c) => toWorld((c + .5) * cell, Lv - (r + .5) * cell);
+  const cellOf = (E, N) => { const [x, y] = toLocal(E, N), c = Math.floor(x / cell), r = Math.floor((Lv - y) / cell); return r >= 0 && r < nrow && c >= 0 && c < ncol ? [r, c] : null; };
+  // units in order of depth (mean middle depth where present)
+  const byB = new Map(located.map(b => [b, xsUnits(b)])), names = [...new Set([...byB.values()].flatMap(us => us.map(u => u.u)))];
+  if (!names.length) return { error: 'The boreholes have no logged soil layers to build model layers from.' };
+  const mean = n => { const v = [...byB.values()].flatMap(us => us.filter(u => u.u === n).map(u => (u.top + u.bot) / 2)); return v.reduce((a, b) => a + b, 0) / v.length; };
+  names.sort((a, b) => mean(a) - mean(b));
+  // the base of each unit at each borehole (elevation); a unit missing has zero thickness at the base of the unit above; known only down to the base of the log
+  const pts = names.map(() => []), topPts = located.map((b, i) => [P[i][0] - xa, P[i][1] - ya, b.elevation]);
+  located.forEach((b, i) => { const us = byB.get(b), logBot = Math.max(0, ...us.map(u => u.bot)); let prev = 0, deepest = -1;
+    names.forEach((n, k) => { const u = us.find(x => x.u === n); if (u) deepest = k; });
+    names.forEach((n, k) => { const u = us.find(x => x.u === n), base = u ? Math.max(u.bot, prev) : prev; if (k <= deepest || u) pts[k].push([P[i][0] - xa, P[i][1] - ya, b.elevation - Math.min(base, logBot)]); prev = Math.max(prev, base); }); });
+  const n2 = nrow * ncol, top = new Float64Array(n2), botm = names.map(() => new Float64Array(n2)), idomain = names.map(() => new Int32Array(n2).fill(1));
+  for (let r = 0; r < nrow; r++) for (let c = 0; c < ncol; c++) {
+    const x = (c + .5) * cell, y = Lv - (r + .5) * cell, i = r * ncol + c; top[i] = gwIdw(topPts, x, y); let above = top[i];
+    names.forEach((n, k) => { let z = pts[k].length ? Math.min(gwIdw(pts[k], x, y), above) : above;
+      if (above - z < GW_MIN_TH) { z = above - .01; idomain[k][i] = -1; } botm[k][i] = z; above = z; });
+    // the bottom layer always carries flow
+    if (idomain[names.length - 1][i] === -1) { botm[names.length - 1][i] = Math.min(botm[names.length - 1][i], top[i] - GW_MIN_TH * names.length) ; idomain[names.length - 1][i] = 1; }
+  }
+  // hydraulic conductivity per unit: slug tests screened in the unit (geometric mean), else estimated by calibration
+  const slugIn = n => located.flatMap(b => { const w = b.well; if (!w?.installed || w.screenTop == null) return []; const mid = (w.screenTop + w.screenBottom) / 2, u = byB.get(b).find(x => mid >= x.top && mid <= x.bot);
+    return u?.u === n ? (b.slug || []).map(hvorslev).filter(r => r && r.valid && r.K > 0).map(r => r.K * GW_DAY) : []; });
+  const allK = located.flatMap(b => (b.slug || []).map(hvorslev).filter(r => r && r.valid && r.K > 0).map(r => r.K * GW_DAY)), gm = a => Math.exp(a.reduce((t, k) => t + Math.log(k), 0) / a.length);
+  const units = names.map((n, k) => { const e = (u0.units || {})[n] || {}, ks = slugIn(n);
+    const k0 = e.k != null ? +e.k : ks.length ? gm(ks) : allK.length ? gm(allK) : 1;
+    return { u: n, k: k0, kSrc: e.k != null ? 'entered' : ks.length ? `slug test${ks.length > 1 ? 's' : ''} (${ks.length}, geometric mean)` : 'estimated by calibration (start value: ' + (allK.length ? 'site slug-test mean' : '1 m/day') + ')',
+      prior: e.k == null && ks.length ? Math.log10(gm(ks)) : null, calib: e.k == null, kv: e.kv ?? .1, kvSrc: e.kv != null ? 'entered' : 'assumed Kv/Kh = 0.1',
+      sy: e.sy ?? null, ne: e.ne ?? (S.co.ne ?? .25) }; });
+  const rch = u0.rch != null ? +u0.rch : CCME_SOIL[u0.soil === 'fine' ? 'fine' : 'coarse'].I / 365.25, rchSrc = u0.rch != null ? 'entered' : `${CCME_SRC} (infiltration ${CCME_SOIL[u0.soil === 'fine' ? 'fine' : 'coarse'].I} m/year; start value)`;
+  // head observations: each well read in the round, in the layer holding its screen middle
+  const layerAt = (r, c, z) => { let k = 0; while (k < names.length - 1 && (z < botm[k][r * ncol + c] || idomain[k][r * ncol + c] !== 1)) k++; return k; };
+  const obs = gwHeads(located, round).wells.map((w, j) => { const rc = cellOf(w.e, w.n); if (!rc) return null; const sc = w.b.well, z = sc?.screenTop != null ? w.b.elevation - (sc.screenTop + sc.screenBottom) / 2 : w.h;
+    const [x, y] = toLocal(w.e, w.n); return { name: 'h' + (j + 1), b: w.b, r: rc[0], c: rc[1], l: layerAt(rc[0], rc[1], z), x, y, h: w.h, date: w.w.date }; }).filter(Boolean);
+  const grid = { xorigin, yorigin, angrot: ang * 180 / Math.PI, cs, sn, cell, nrow, ncol, nlay: names.length, top, botm, idomain, toWorld, toLocal, cellCentre, cellOf, layerAt, Lv };
+  const params = [...units.filter(u => u.calib).map(u => ({ key: 'k:' + u.u, label: `K, ${u.u}`, unit: 'm/day', value: u.k, prior: u.prior, src: u.kSrc })),
+    { key: 'rch', label: 'Recharge', unit: 'm/day', value: rch, prior: null, src: rchSrc }];
+  const M = { round, F, grid, units, obs, params, rch, features: u0.features || [], notes: [] }; M.spec = gwSpec(M); return M;
+}
+/* the MODFLOW 6 spec of a model with parameter values applied (pv: {key: value}); steady state unless periods are given */
+function gwSpec(M, pv = {}, extra = {}) {
+  const g = M.grid, val = p => pv[p.key] ?? p.value, K = M.units.map(u => pv['k:' + u.u] ?? u.k), R = pv.rch ?? M.rch, shift = pv.shift ?? 0, n2 = g.nrow * g.ncol;
+  const chd = []; for (let r = 0; r < g.nrow; r++) for (const c of [0, g.ncol - 1]) { const [E, N] = g.cellCentre(r, c), h = M.F.fit({ e: E, n: N }) + shift;
+    for (let k = 0; k < g.nlay; k++) if (g.idomain[k][r * g.ncol + c] === 1 && h > g.botm[k][r * g.ncol + c]) chd.push([k, r, c, h]); }
+  const strt = new Float64Array(n2); for (let r = 0; r < g.nrow; r++) for (let c = 0; c < g.ncol; c++) { const [E, N] = g.cellCentre(r, c); strt[r * g.ncol + c] = M.F.fit({ e: E, n: N }); }
+  const feat = { riv: [], drn: [], wel: [] };
+  for (const ft of M.features || []) { const cells = gwFeatureCells(g, ft); for (const [r, c] of cells) {
+    const k = ft.type === 'wel' ? g.layerAt(r, c, ft.z ?? -Infinity) : g.layerAt(r, c, Infinity), each = 1 / cells.length;
+    if (ft.type === 'riv') feat.riv.push([k, r, c, +ft.stage, +ft.cond, +ft.rbot, ft.name ? `'${String(ft.name).replace(/\W/g, '').slice(0, 30)}'` : undefined]);
+    if (ft.type === 'drn') feat.drn.push([k, r, c, +ft.elev, +ft.cond, ft.name ? `'${String(ft.name).replace(/\W/g, '').slice(0, 30)}'` : undefined]);
+    if (ft.type === 'wel') feat.wel.push([k, r, c, +ft.rate * each, ft.name ? `'${String(ft.name).replace(/\W/g, '').slice(0, 30)}'` : undefined]); } }
+  return { nper: 1, periods: [[1, 1, 1]], steady: [true], saveAll: true,
+    dis: { nlay: g.nlay, nrow: g.nrow, ncol: g.ncol, delr: g.cell, delc: g.cell, top: g.top, botm: g.botm, idomain: g.idomain, xorigin: g.xorigin, yorigin: g.yorigin, angrot: g.angrot },
+    npf: { icelltype: M.units.map(() => 1), k: K, k33: K.map((k, i) => k * M.units[i].kv) }, ic: strt,
+    chd: [chd], rch: [R], riv: feat.riv.length ? [feat.riv] : null, drn: feat.drn.length ? [feat.drn] : null, wel: feat.wel.length ? [feat.wel] : null, ...extra };
+}
+/* the cells a feature touches: a point, or a polyline sampled every half cell */
+function gwFeatureCells(g, ft) { const pts = (ft.pts || []).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1])), out = new Map();
+  const add = (E, N) => { const rc = g.cellOf(E, N); if (rc) out.set(rc.join(','), rc); };
+  if (pts.length === 1) add(...pts[0]); for (let i = 1; i < pts.length; i++) { const [a, b] = [pts[i - 1], pts[i]], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / (g.cell / 2))); for (let j = 0; j <= n; j++) add(a[0] + (b[0] - a[0]) * j / n, a[1] + (b[1] - a[1]) * j / n); }
+  return [...out.values()]; }
+/* a head at a point in one layer: bilinear between cell centres (inactive or dry cells left out) */
+function gwHeadAt(g, layers, k, x, y) {
+  const fc = x / g.cell - .5, fr = (g.Lv - y) / g.cell - .5, c0 = Math.max(0, Math.min(g.ncol - 2, Math.floor(fc))), r0 = Math.max(0, Math.min(g.nrow - 2, Math.floor(fr))), tx = Math.max(0, Math.min(1, fc - c0)), ty = Math.max(0, Math.min(1, fr - r0));
+  let s = 0, w = 0; for (const [r, c, ww] of [[r0, c0, (1 - tx) * (1 - ty)], [r0, c0 + 1, tx * (1 - ty)], [r0 + 1, c0, (1 - tx) * ty], [r0 + 1, c0 + 1, tx * ty]]) {
+    let kk = k; while (kk < g.nlay - 1 && g.idomain[kk][r * g.ncol + c] !== 1) kk++; const h = layers[kk]?.[r * g.ncol + c]; if (h == null || Math.abs(h) > 1e20 || ww <= 0) continue; s += h * ww; w += ww; }
+  return w > 0 ? s / w : null;
+}
+/* one run: heads, simulated heads at the observations, mass balance */
+async function gwRun(M, pv = {}, extra = {}) {
+  if (!window.desktop?.mf6Run) return { ok: false, error: 'The groundwater model runs MODFLOW 6, which needs the desktop app.' };
+  const spec = gwSpec(M, pv, extra), { files, outputs } = mf6Files(spec), res = await window.desktop.mf6Run({ files, outputs });
+  if (!res.ok) return { ok: false, error: res.error || 'MODFLOW 6 did not finish.', files };
+  const H = mf6ReadHeads(res.files['gwf.hds']), last = mf6Layers(H), sim = M.obs.map(o => gwHeadAt(M.grid, last.layers, o.l, o.x, o.y));
+  return { ok: true, spec, files, out: res.files, heads: H, layers: last.layers, sim, discrepancy: mf6Discrepancy(new TextDecoder().decode(res.files['gwf.lst'])), seconds: res.seconds };
+}
 function xsModelHTML() {
   const u = siteOf()?.model || {}, run = S.xs.model ? modelRun(S.xs.date || '') : null, P = run?.P || { src: {} }, ro = S.readOnly ? 'disabled' : '';
   const wellsOpt = projList().filter(b => b.easting != null).map(b => `<option value="${esc(b.id)}" ${P.srcBh?.id === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
@@ -4618,7 +4724,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const plumeOn = xs && ((xs.plume !== false && (xs.param || xs.medium === 'vapour')) || xs.model), soilStyle = plumeOn && !xs.soilColour ? 'filter:grayscale(1) opacity(.75)' : '';
   if (S.sec.units !== false) {
     o.push(`<g data-soil="1" style="${soilStyle}">`);
-    const alias = siteOf()?.xsec?.alias || {}, units = b => { const out = []; for (const l of (b.layers || []).filter(l => l.top != null && l.bottom > l.top).sort((a, c) => a.top - c.top)) { const u = alias[b.id + '|' + defaultUnit(l)] || defaultUnit(l); const last = out[out.length - 1]; if (last && last.u === u && Math.abs(last.bot - l.top) < 1e-6) last.bot = l.bottom; else out.push({ u, top: l.top, bot: l.bottom, fill: soilOf(l.uscs)?.fill || 'panel-2' }); } return out; };
+    const units = xsUnits;
     const U2 = pos.map(p => units(p.b));
     for (let i = 0; i < pos.length - 1; i++) {
       const A = pos[i], B = pos[i + 1], xa = X(A.d) + bw / 2, xb = X(B.d) - bw / 2, xm = xa + (xb - xa) / 3, xm2 = xb - (xb - xa) / 3, ea = top(A.b), eb = top(B.b);
