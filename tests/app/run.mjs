@@ -1831,6 +1831,22 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('borehole views: one switch between log and data, full log and PDF', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300);
+        for (const [from, to] of [['log', 'edit'], ['edit', 'log'], ['log', 'report'], ['report', 'edit']]) {
+          goTab(from); await w(250); const sw = document.querySelector('.bh-views');
+          want(sw && sw.querySelector('[data-tab="' + from + '"]')?.getAttribute('aria-pressed') === 'true', from + ': switch shows where you are');
+          sw?.querySelector('[data-tab="' + to + '"]')?.click(); await w(250); want(S.tab === to, from + ' -> ' + to + ' with one click: ' + S.tab);
+        }
+        goTab('xsec'); await w(200); want(!document.querySelector('.bh-views'), 'no borehole switch on other pages');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };

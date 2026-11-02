@@ -1291,6 +1291,7 @@ body.side-off .shell { --sidebar-width: 0px; } body.side-off .side { display: no
 .lt-box input, .lt-new input { width: 100%; font: 13px var(--f-mono, monospace); } .lt-box .note { margin: 0; font-size: 12px; }
 .lt-new { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 10px; margin: 0 0 8px; } .lt-new .note { grid-column: 2; font-size: 12px; min-height: 1em; }
 #lt-inline { position: absolute; z-index: 40; padding: 6px 8px; font: 13px/1.35 var(--f-body); color: var(--ink); background: var(--surface); border: 2px solid var(--accent); border-radius: var(--r-sm); box-shadow: 0 6px 18px rgba(16, 24, 40, .18); resize: vertical; }
+.bh-views { margin-right: 10px; } .bh-views button { white-space: nowrap; }
 .ctl.min { overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; }
 .ctl.min .tb { width: 30px; min-height: 30px; justify-content: center; }
 /* toolbar: project switcher and the find box */
@@ -2235,7 +2236,9 @@ function renderBar(b) {
   cr.hidden = false;
   cr.innerHTML = parts.map(([t, go], i) => (i ? '<span class="sep" aria-hidden="true">›</span>' : '') + (go && i < parts.length - 1 ? `<button class="btn link" data-tab="${go}">${esc(t)}</button>` : `<span aria-current="${i === parts.length - 1 ? 'page' : 'false'}">${esc(t)}</span>`)).join('');
   updateRibbon();
-  tl.innerHTML = (PAGE_TOOLS[tab] || []).filter(([a]) => a === 'revise' ? st === 'issued' : a === 'to-review' ? st === 'draft' : a === 'issue' ? st !== 'issued' : true).map(([a, label, primary]) => {
+  // the three views of a borehole, one click apart and always in the same place
+  const views = onBh ? `<span class="seg bh-views" role="group" aria-label="Borehole view">${[['edit', 'Log & data', 'Ctrl+1'], ['log', 'Full log', 'Ctrl+2'], ['report', 'PDF preview', 'Ctrl+3']].map(([k, t, key]) => `<button type="button" data-tab="${k}" aria-pressed="${tab === k}" title="${t} (${key})">${t}</button>`).join('')}</span>` : '';
+  tl.innerHTML = views + (PAGE_TOOLS[tab] || []).filter(([a]) => a === 'revise' ? st === 'issued' : a === 'to-review' ? st === 'draft' : a === 'issue' ? st !== 'issued' : true).map(([a, label, primary]) => {
     const rb = document.querySelector(`.ribbon [data-act="${a}"]`), lb = a === 'map-edit' && S.mapEdit ? 'Done editing' : label;
     return `<button class="btn${primary ? ' primary' : ''}${S.hlAct === a ? ' hl' : ''}" data-act="${a}" ${rb?.disabled ? 'disabled' : ''} ${rb?.title ? `title="${esc(rb.title)}"` : ''}>${esc(lb)}</button>`;
   }).join('');
