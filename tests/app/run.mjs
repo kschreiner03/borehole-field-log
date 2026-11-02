@@ -1757,7 +1757,7 @@ app.whenReady().then(async () => {
         /* bottom above top is refused */
         const d2 = JSON.stringify(b.layers[1]); await typeIn(1, '3.5-1.2 SP'); want(JSON.stringify(b.layers[1]) === d2 && /above|below|top/i.test(document.querySelector('#lt-read').textContent), 'bottom above top refused with a note: ' + document.querySelector('#lt-read')?.textContent);
         /* code-like words and units */
-        want(parseLayerText('Sand with coal fragments').uscs === '' && parseLayerText('fill over clay (CL)').uscs === 'CL' && parseLayerText('Silty sand with ml lenses').other.includes('ml lenses') || parseLayerText('Silty sand with ml lenses').mods.includes('ml lenses'), 'code-like words inside text do not set the soil');
+        want(parseLayerText('Sand with coal fragments').uscs !== 'COAL' && parseLayerText('fill over clay (CL)').uscs === 'CL' && parseLayerText('Silty sand with ml lenses').other.includes('ml lenses') || parseLayerText('Silty sand with ml lenses').mods.includes('ml lenses'), 'code-like words inside text do not set the soil');
         want(parseLayerText('SANDSTONE, weathered').uscs === 'SDST' && parseLayerText('ORGANIC SILT, soft').uscs === 'OL', 'whole soil names are recognised');
         const fu4 = parseLayerText('4-10 ft SAND (SP)'); want(Math.abs(fu4.top - 4 / 3.28084) < 1e-3 && Math.abs(fu4.bottom - 10 / 3.28084) < 1e-3, 'a unit typed with the depths is used: ' + JSON.stringify(fu4));
         want(parseLayerText('1.2-3.5SP').uscs === 'SP' && parseLayerText('1.2-3.5SP').bottom === 3.5, 'depths with no space before the code');
@@ -1790,6 +1790,22 @@ app.whenReady().then(async () => {
         const e = add('Pit A', 'Empty job'); S.sel = e.id; want(nextName() === 'BH01', 'no numbered boreholes yet: BH01: ' + nextName());
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       finally { for (const id of made) S.bh.delete(id); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('log: typed words assign the soil type', async run => {
+    const r = await run(`(async () => {
+      const F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, P = t => parseLayerText(t);
+      const cases = [['silty sand, compact, moist', 'SM'], ['clayey sand, loose', 'SC'], ['sand, fine grained, loose', 'SP'], ['well graded sand, dense', 'SW'], ['sand, some silt, compact', 'SP-SM'],
+        ['sand, some clay, loose', 'SP-SC'], ['gravel, dense', 'GP'], ['well graded gravel', 'GW'], ['silty gravel', 'GM'], ['clay, stiff, moist', 'CL'], ['clay, high plastic, stiff', 'CH'],
+        ['clay, intermediate plastic', 'CI'], ['silty clay, firm', 'CL'], ['silt, soft, wet', 'ML'], ['silt, high plastic', 'MH'], ['organic silt, soft', 'OL'], ['organic clay', 'OH'],
+        ['sandy clay, stiff', 'CL'], ['gravelly sand', 'SP'], ['sand and gravel, compact', 'SP'], ['CI silty clay, firm', 'CI'], ['2.4-3.1 clay, stiff, moist, brown', 'CL']];
+      for (const [t, u] of cases) { const q = P(t); want(q.uscs === u, t + ' -> ' + q.uscs + ' (wanted ' + u + ')'); }
+      want(P('silty sand, compact').mods === '' && P('sandy clay, stiff').mods === 'sandy' && P('gravelly sand').mods === 'gravelly' && P('sand and gravel').mods === 'gravelly', 'modifiers kept, the soil\\'s own word not repeated: ' + [P('silty sand').mods, P('sandy clay').mods, P('gravelly sand').mods, P('sand and gravel').mods]);
+      want(P('silty sand').inferred && !P('SM silty sand').inferred, 'assigned symbols are marked as from the words');
+      want(/from the words/.test(ltRead('silty sand, compact')), 'the Reads as line says it was assigned: ' + ltRead('silty sand, compact'));
+      want(P('sand with coal fragments').uscs === 'SP' && /coal fragments/.test(P('sand with coal fragments').mods + P('sand with coal fragments').other), 'other words kept');
       return F;
     })()`);
     expect(!r.length, r.join(' || '));
