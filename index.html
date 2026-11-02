@@ -5332,6 +5332,10 @@ function tutGo(d) { if (!S.tut) return; const N = TUTORIALS[S.tut.k].steps.lengt
 function tutShow() {
   if (!S.tut) return; const T = TUTORIALS[S.tut.k], st = T.steps[S.tut.i], N = T.steps.length;
   if (st.tab && S.tab !== st.tab) goTab(st.tab);
+  // a step pointing at a setting opens the panel and the setting's group first
+  if (st.sel && !document.querySelector(st.sel) && S.ui.ctlOpen === false && !$('#ctl')?.hidden) { S.ui.ctlOpen = true; uiSave(); workResized(); }
+  const tgb = st.sel && document.querySelector(st.sel)?.closest('.ctl-gb[hidden]'); if (tgb) { const k = tgb.closest('[data-ctlg]').dataset.ctlg; S.ui.fold = { ...S.ui.fold, [k]: false }; uiSave(); tgb.hidden = false; tgb.previousElementSibling.setAttribute('aria-expanded', 'true'); }
+  if (st.sel) document.querySelector('#ctl ' + st.sel)?.scrollIntoView({ block: 'nearest' });
   let card = $('#tut'); if (!card) { card = document.createElement('div'); card.id = 'tut'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-live', 'polite'); document.body.append(card); }
   card.setAttribute('aria-label', `${T.title} tutorial`);
   card.innerHTML = `<button class="tut-x" data-act="tut-close" aria-label="Close the tutorial">×</button><div class="tut-k">${esc(T.title)} tutorial · Step ${S.tut.i + 1} of ${N}</div><h4>${esc(st.title)}</h4>${st.body}
