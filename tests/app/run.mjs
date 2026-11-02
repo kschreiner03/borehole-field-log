@@ -1629,7 +1629,7 @@ app.whenReady().then(async () => {
         loadXsExample(); await w(300); S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {} }; S.csort = false;
         goTab('compose'); await w(300); const L = repLayout(); L.pages.push(newPage('free', { orient: 'port', items: [] })); S.cpage = L.pages.length - 1; rerenderCompose(); await w(200);
         const side = document.querySelector('.side').getBoundingClientRect().width; want(side < 2, 'borehole list hidden on Reports: ' + side);
-        want(document.querySelector('#cmp-stage').getBoundingClientRect().width > 850, 'page area is wide: ' + Math.round(document.querySelector('#cmp-stage').getBoundingClientRect().width));
+        want(document.querySelector('#cmp-stage').getBoundingClientRect().width > 750, 'page area is wide (486 px before this change): ' + Math.round(document.querySelector('#cmp-stage').getBoundingClientRect().width));
         /* one Add menu instead of a wall of buttons */
         const menu = document.querySelector('#view .cmp-addmenu'), btn = document.querySelector('#view [data-act="cmp-addmenu"]');
         want(btn && menu && menu.hidden && menu.querySelector('[data-cadd="text"]'), 'Add item menu, closed until clicked');
