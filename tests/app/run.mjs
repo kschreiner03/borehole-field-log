@@ -214,7 +214,7 @@ app.whenReady().then(async () => {
       return { has, added, focusedCell: fresh?.dataset?.c, top, prevBottom, nl: { bottom: nl.bottom, uscs: nl.uscs }, logHasSand: /SAND/.test(logText), focusedRow, sheets, which: document.querySelector('[data-which="samples"]')?.textContent, sel: S.dsel.samples };
     })()`);
     expect(r.has.grid && r.has.log, 'workspace parts: ' + JSON.stringify(r.has));
-    expect(r.has.tree.join() === 'Overview,Borehole,Map,Tables,Water,Lab,Section,Model,Reports' && r.has.cur === 'Borehole' && r.has.rows === r.has.want, 'rail and list: ' + JSON.stringify(r.has));
+    expect(r.has.tree.join() === 'Overview,Borehole,Map,Tables,Water,Lab,Section,Model,3D,Reports' && r.has.cur === 'Borehole' && r.has.rows === r.has.want, 'rail and list: ' + JSON.stringify(r.has));
     expect(r.added === 1 && r.top === r.prevBottom, 'Enter on the last row: ' + JSON.stringify(r));
     expect(r.nl.uscs === 'SP' && Math.abs(r.nl.bottom - (r.prevBottom + 1.2)) < 1e-6 && r.logHasSand, 'typed interval: ' + JSON.stringify(r.nl) + ' log has sand ' + r.logHasSand);
     expect(r.focusedRow === 0, 'log click focused row ' + r.focusedRow);
@@ -529,7 +529,7 @@ app.whenReady().then(async () => {
       goTab('site'); await w(200); const link = !!document.querySelector('#view [data-tab="xsec"]'), old = !!document.querySelector('#section');
       return { tabs, svg, chips, link, old };
     })()`);
-    expect(r.tabs.indexOf('xsec') === r.tabs.indexOf('contam') + 1 && r.tabs.indexOf('gwm') === r.tabs.indexOf('xsec') + 1 && r.tabs.indexOf('compose') === r.tabs.indexOf('gwm') + 1, 'rail order: ' + r.tabs);
+    expect(r.tabs.indexOf('xsec') === r.tabs.indexOf('contam') + 1 && r.tabs.indexOf('gwm') === r.tabs.indexOf('xsec') + 1 && r.tabs.indexOf('v3d') === r.tabs.indexOf('gwm') + 1 && r.tabs.indexOf('compose') === r.tabs.indexOf('v3d') + 1, 'rail order: ' + r.tabs);
     expect(r.svg && r.chips >= 2, 'section page draws: ' + JSON.stringify(r));
     expect(r.link && !r.old, 'map page links to the section page: ' + JSON.stringify(r));
   });
@@ -1405,6 +1405,57 @@ app.whenReady().then(async () => {
         const keepSrc = siteOf().model.srcBh; setSite({ ...siteOf(), model: { ...siteOf().model, srcBh: '' } });
         const r7 = await gwRun(gwModel()); want(gwSourcePaths(gwModel(), r7).length === 0, 'no paths without a source well');
         setSite({ ...siteOf(), model: { ...siteOf().model, srcBh: keepSrc } });
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
+  await check('3d: view of boreholes, wells, layers and water', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        want(document.querySelector('#prail [data-tab="v3d"]'), 'a 3D page on the rail');
+        goTab('v3d'); await w(800);
+        const V = S.v3d; want(V && V.ok, '3D scene built: ' + (V && V.error));
+        if (V && V.ok) {
+          const located = projList().filter(b => b.easting != null && b.elevation != null);
+          want(V.groups.boreholes.children.length === located.length, 'one column per located borehole: ' + V.groups.boreholes.children.length + ' / ' + located.length);
+          want(V.groups.wells.children.length === located.filter(b => b.well?.installed).length, 'a casing and screen per well');
+          want(V.groups.layers.children.length === gwModel().units.length && V.groups.ground.children.length === 1, 'interpolated unit surfaces and ground');
+          want(V.groups.water.children.length >= 1 && V.groups.samples.children.length >= 5, 'water table and results');
+          want(document.querySelector('#v3d canvas'), 'a canvas');
+          const leg = document.querySelector('#v3d-legend').textContent; want(/interpolated/i.test(leg) && /exaggeration/i.test(leg), 'legend labels interpolation and exaggeration');
+          const t = document.querySelector('#v3d-lyr-layers'); t.click(); await w(150); want(!V.groups.layers.visible, 'layer switch hides surfaces');
+          const ve = document.querySelector('#v3d-ve'); ve.value = '10'; ve.dispatchEvent(new Event('change', { bubbles: true })); await w(400);
+          want(S.v3d.ve === 10 && /×10/.test(document.querySelector('#v3d-legend').textContent), 'exaggeration ×10 applied and stated');
+          let saved = null; window.saveFile = (n, d) => { saved = { n, size: d.size ?? d.length }; }; document.querySelector('[data-act="v3d-png"]').click(); await w(400);
+          want(saved && /\\.png$/.test(saved.n) && saved.size > 1000, 'saves a PNG: ' + JSON.stringify(saved));
+        }
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('3d: model layers and ParaView export', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400); setGwm({ transport: { on: true } }); await gwEnsure(true);
+        want(S.gwm.run?.ok && S.gwm.trans?.ok, 'model and transport ran');
+        goTab('v3d'); await w(900); const V = S.v3d;
+        want(V.ok && V.groups.plume.children.length >= 1 && V.groups.paths.children.length >= 1, '3D shows the MODFLOW 6 plume and flow paths');
+        want(/MODFLOW 6/.test(document.querySelector('#v3d-legend').textContent), 'legend names MODFLOW 6');
+        const files = gwVtkFiles(), names = Object.keys(files);
+        for (const n of ['boreholes.vtp', 'wells.vtp', 'samples.vtp', 'surfaces.vtp', 'model.vtu', 'paths.vtp', 'concentration.pvd', 'README.txt']) want(names.includes(n), 'file ' + n);
+        for (const [n, t] of Object.entries(files)) if (/\\.(vtp|vtu|pvd)$/.test(n)) { const x = new DOMParser().parseFromString(t, 'application/xml'); want(!x.querySelector('parsererror') && x.documentElement.nodeName === 'VTKFile', n + ' is valid VTK XML'); }
+        const mx = new DOMParser().parseFromString(files['model.vtu'], 'application/xml'), cells = +mx.querySelector('Piece').getAttribute('NumberOfCells');
+        const g = gwModel().grid, active = g.idomain.reduce((t, L) => t + Array.from(L).filter(v => v === 1).length, 0); want(cells === active, 'model.vtu has every active cell: ' + cells + ' / ' + active);
+        const bx = new DOMParser().parseFromString(files['boreholes.vtp'], 'application/xml'), pts = bx.querySelector('Points DataArray').textContent.trim().split(/\\s+/).map(Number);
+        const b0 = gwModel().list[0]; want(pts.some((v, i) => i % 3 === 0 && Math.abs(v - b0.easting) < .01), 'real UTM coordinates, no exaggeration');
+        const pvd = new DOMParser().parseFromString(files['concentration.pvd'], 'application/xml'); want(pvd.querySelectorAll('DataSet').length === S.gwm.trans.times.length, 'a time step per transport output');
+        let saved = null; window.saveFile = (n, d) => { saved = { n, size: d.size ?? d.length }; }; document.querySelector('[data-act="v3d-vtk"]').click(); await w(500);
+        want(saved && /\\.zip$/.test(saved.n), 'exports the zip');
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
       return F;
     })()`);
