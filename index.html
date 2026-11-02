@@ -3998,22 +3998,39 @@ function plumeField(pos, xs, G, cell = 4) {
   if (medium === 'groundwater') {
     const wtE = byD(pos.map(p => { const w = waterAt(p.b, date); return w && p.b.elevation != null ? [p.d, p.b.elevation - w.depth] : null; }).filter(Boolean));
     const mid = p => p.b.elevation - (p.top + p.bot) / 2;
-    let run = null;
+    // screens grouped by position along the section: the shallowest and the deepest at each position make two levels, so a
+    // nested well keeps its own result; a third screen at the same spot is named in the note
+    const levels = list => { const at = []; for (const p of [...list].sort((q, r) => q.d - r.d)) { const g = at.find(x => Math.abs(x.d - p.d) < .5); g ? g.ps.push(p) : at.push({ d: p.d, ps: [p] }); }
+      at.forEach(g => g.ps.sort((q, r) => mid(r) - mid(q))); return { at, top: at.map(g => g.ps[0]), bot: at.map(g => g.ps[g.ps.length - 1]), extra: at.flatMap(g => g.ps.slice(1, -1)) }; };
+    const twoLevel = (Lv, val) => { const s0 = smooth(byD(Lv.top.map(p => [p.d, val(p)]))), s1 = smooth(byD(Lv.bot.map(p => [p.d, val(p)]))), m0 = byD(Lv.top.map(p => [p.d, mid(p)])), m1 = byD(Lv.bot.map(p => [p.d, mid(p)]));
+      return (d, e) => { const a0 = lerp(m0, d), a1 = lerp(m1, d); if (a0 - a1 < .1) return s0(d); const t = Math.max(0, Math.min(1, (a0 - e) / (a0 - a1))); return s0(d) + (s1(d) - s0(d)) * t; }; };
+    const extraNote = L => L.extra.length ? ` ${L.extra.map(p => p.b.name).join(', ')} left out (a third screen at the same spot).` : '';
+    let run = null, guided = null;
     if (method === 'guided') {
       run = modelRun(date, xs);
-      const why = !run.ok ? run.missing.join('; ') : run.P.param !== param ? `the forecast is set up for ${LAB_PARAMS[run.P.param]?.label || run.P.param}` : !pts.length ? 'no results to match' : '';
-      if (why) { method = 'data'; note = `Shown as data only: the forecast can't shape this plume (${why}).`; }
+      let why = !run.ok ? run.missing.join('; ') : run.P.param !== param ? `the forecast is set up for ${LAB_PARAMS[run.P.param]?.label || run.P.param}` : !pts.length ? 'no results to match' : '';
+      if (!why) {
+        const P = run.P, when = P.at || date, cAt = (d, e) => { const [E, N] = G.pos.at(d); return modelAt(P, E, N, e, when).c; };
+        // every result, including non-detects with a high detection limit: their limit is an upper bound on the plume
+        const all = plumePoints(pos, medium, param, date, !!xs.round), res = new Map(), off = [];
+        for (const p of all) { const m = cAt(p.d, mid(p)) || 0;
+          if (p.lt) res.set(p, m > 0 ? Math.min(0, lg(p.v) - lg(m)) : 0);   // capped at the detection limit, never raised
+          else if (!(m > 1e-6) || Math.abs(lg(p.v) - lg(m)) > PF_CLAMP) off.push(p.b.name);
+          else res.set(p, lg(p.v) - lg(m)); }
+        if (off.length) why = `the forecast is near zero or more than 100× off at ${off.join(', ')}, so its shape can't be matched to the result${off.length > 1 ? 's' : ''} there`;
+        else { const Lv = levels(all), rAt = twoLevel(Lv, p => res.get(p));
+          at = (d, e) => { const c = cAt(d, e); return c == null ? [0, 0] : [c * Math.pow(10, rAt(d, e)), fade(d)]; };
+          guided = 'Interpreted: forecast shape matched to measured results' + extraNote(Lv); }
+      }
+      if (why) { method = 'data'; note = `Shown as data only, because the forecast can't shape this plume: ${why.replace(/[.\s]+$/, '')}.`; }
     }
-    if (method === 'guided') {
-      const P = run.P, when = P.at || date, cAt = (d, e) => { const [E, N] = G.pos.at(d); return modelAt(P, E, N, e, when).c; };
-      const res = byD(pts.map(p => { const m = cAt(p.d, mid(p)) || 0; return [p.d, p.lt && m <= p.v ? 0 : Math.max(-PF_CLAMP, Math.min(PF_CLAMP, lg(p.v) - lg(Math.max(m, 1e-6))))]; }));
-      const rAt = smooth(res); at = (d, e) => { const c = cAt(d, e); return c == null ? [0, 0] : [c * Math.pow(10, rAt(d)), fade(d)]; };
-      note = 'Interpreted: forecast shape matched to measured results';
-    } else {
-      const lc = byD(pts.map(p => [p.d, lg(p.v)])), tE = byD(pts.map(p => [p.d, p.b.elevation - p.top])), bE = byD(pts.map(p => [p.d, p.b.elevation - p.bot]));
-      at = (d, e) => { if (!pts.length || (wtE.length && e > lerp(wtE, d) + 1e-9)) return [0, 0]; const top = lerp(tE, d), bot = lerp(bE, d), out = e > top ? e - top : e < bot ? bot - e : 0;
-        return out >= PF_SCREEN ? [0, 0] : [Math.pow(10, lerp(lc, d)), fade(d) * (1 - out / PF_SCREEN)]; };
-      note = (note ? note + ' ' : '') + 'No data above or below the well screens';
+    if (method === 'guided') note = guided;
+    else {
+      const Lv = levels(pts), band = sel => { const ps = Lv[sel], lc = byD(ps.map(p => [p.d, lg(p.v)])), tE = byD(ps.map(p => [p.d, p.b.elevation - p.top])), bE = byD(ps.map(p => [p.d, p.b.elevation - p.bot]));
+        return (d, e) => { const top = lerp(tE, d), bot = lerp(bE, d), out = e > top ? e - top : e < bot ? bot - e : 0; return out >= PF_SCREEN ? [0, 0] : [Math.pow(10, lerp(lc, d)), fade(d) * (1 - out / PF_SCREEN)]; }; };
+      const b0 = pts.length ? band('top') : null, b1 = pts.length ? band('bot') : null;
+      at = (d, e) => { if (!pts.length || (wtE.length && e > lerp(wtE, d) + 1e-9)) return [0, 0]; const u = b0(d, e), v = b1(d, e); return v[1] > u[1] || (v[1] === u[1] && v[0] > u[0]) ? v : u; };
+      note = (note ? note + ' ' : '') + 'No data above or below the well screens.' + extraNote(Lv);
     }
   } else {
     // soil and vapour: barycentric interpolation of log10 on the triangulated samples, in drawing coordinates
@@ -4071,9 +4088,9 @@ function fieldSVG(g, { style = 'graded', family = 'meas', dashed = false, name =
     : (v, w) => v >= lv[0].v && w > .3 ? [cols[1], Math.round(.25 * w * 10) / 10] : null;
   const attr = style === 'graded' ? 'data-cell' : style === 'bands' ? 'data-band' : 'data-tint';
   if (!dashed) {
-    o.push(`<g clip-path="url(#${G.gclip})" ${family === 'model' ? 'data-model-fill="1"' : ''}>`);
+    o.push(`<g clip-path="url(#${G.gclip})" shape-rendering="crispEdges" ${family === 'model' ? 'data-model-fill="1"' : ''}>`);
     for (let j = 0; j < ny; j++) { let run = null;
-      const flush = () => { if (run && run.col) o.push(`<rect ${attr}="1" x="${(x0 + run.i * sx).toFixed(1)}" y="${(y0 + j * sy).toFixed(1)}" width="${((run.n) * sx + .4).toFixed(1)}" height="${(sy + .4).toFixed(1)}" fill="${run.col[0]}" fill-opacity="${run.col[1]}"/>`); };
+      const flush = () => { if (run && run.col) o.push(`<rect ${attr}="1" x="${(x0 + run.i * sx).toFixed(2)}" y="${(y0 + j * sy).toFixed(2)}" width="${(run.n * sx).toFixed(2)}" height="${sy.toFixed(2)}" fill="${run.col[0]}" fill-opacity="${run.col[1]}"/>`); };
       for (let i = 0; i < nx; i++) { const [v, w] = cell(i, j), col = colourOf(v, w), k = col ? col.join('|') : '';
         if (run && run.k === k) run.n++; else { flush(); run = { i, n: 1, k, col }; } }
       flush(); }
@@ -4123,23 +4140,25 @@ function plumeSVG(pos, xs, X, Y, top, bw, W, H, m) {
   if (notes.length) o.push(`<text class="lbl2" x="${m.l + 24}" y="${m.t - 8}" style="fill:var(--warn,#a3470b)">${esc(notes.join('; '))}.</text>`);
   const over = (XS_GEOM.over ||= []), unit = medium === 'vapour' ? 'ppm' : medium === 'groundwater' ? 'mg/L' : LAB_PARAMS[param]?.unit || '', R = PLUME_RAMP.meas;
   for (const p of pts) {
-    const x = X(p.d), y = Y(top(p.b) - (p.top + p.bot) / 2), k = cls(p.v), c = k ? R[k] : '#fff7ec', val = `${p.lt ? '<' : ''}${(+p.v).toLocaleString('en-CA', { maximumSignificantDigits: 3 })}`;
+    const x = X(p.d), y = Y(top(p.b) - (p.top + p.bot) / 2), k = cls(p.v), c = R[k], val = `${p.lt ? '<' : ''}${(+p.v).toLocaleString('en-CA', { maximumSignificantDigits: 3 })}`;
     const tip = `${p.b.name}: ${name} ${val} ${unit}${p.lt ? ' (not detected)' : ''}, ${p.top === p.bot ? fu(p.top) : `screen ${fx(p.top)}–${fu(p.bot)}, shown at its middle`} · sampled ${p.date}${p.age > 0 ? `, ${p.age} days before the date shown` : ''}`;
-    over.push(`<circle data-pt="1" data-lt="${p.lt ? 1 : 0}" cx="${x}" cy="${y.toFixed(1)}" r="${medium === 'groundwater' ? 4.6 : 3.8}" fill="${p.lt ? '#fff' : c}" stroke="#4d0000" stroke-width="1.1"><title>${esc(tip)}</title></circle>`);
+    over.push(`<circle data-pt="1" data-lt="${p.lt ? 1 : 0}" cx="${x}" cy="${y.toFixed(1)}" r="${medium === 'groundwater' ? 4.6 : 3.8}" fill="${p.lt ? '#fff' : c}" stroke="#4d0000" stroke-width="${p.lt ? 1.3 : 1.1}"${p.lt ? ' stroke-dasharray="2 1.5"' : ''}><title>${esc(tip)}</title></circle>`);
     if (medium === 'groundwater') over.push(`<text x="${x + bw / 2 + 4}" y="${(y + 3.5).toFixed(1)}" style="font:600 10px Arial,sans-serif;fill:#4d0000;paint-order:stroke;stroke:#fff;stroke-width:3px">${esc(val)}</text>`);
   }
   // legend: what is shown, in the chosen style, and how it was shaped
-  const style = xs.style || 'graded', gid = 'pg' + Math.random().toString(36).slice(2, 7); let lx = m.l; const ly = H - 8;
+  const style = xs.style || 'graded', gid = 'pg' + Math.random().toString(36).slice(2, 7); let lx = m.l; const ly = H - 22;
   const head = `${name}${medium === 'vapour' ? '' : ', ' + medium}${xs.date ? `, as of ${xs.date}` : ', latest'}${xs.round ? ', this round only' : ''}:`;
   o.push(`<text x="${lx}" y="${ly}" class="lbl2" style="font-weight:600">${esc(head)}</text>`); lx += textW(head, '600 11px ' + labelFont()) + 10;
   const sw = (t, el) => { o.push(el(lx), `<text x="${lx + 22}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 30 + textW(t, '11px ' + labelFont()); };
   if (!lv.length) sw('no guideline set, so no contours', x => `<rect x="${x}" y="${ly - 9}" width="16" height="9" fill="#fff" stroke="#3a1a00" stroke-width=".6"/>`);
   else if (style === 'graded') { o.push(`<defs><linearGradient id="${gid}">${R.map((c, i) => `<stop offset="${i / (R.length - 1)}" stop-color="${c}"/>`).join('')}</linearGradient></defs>`);
-    const t = `${fmtLevel(lv[0].v)} → ${fmtLevel(lv[0].v * 300)} ${unit} (log scale); lines at ${lv.map(l => l.label.split(' (')[0]).join(', ')}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="60" height="9" fill="url(#${gid})" stroke="#3a1a00" stroke-width=".6"/><text x="${lx + 66}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 74 + textW(t, '11px ' + labelFont()); }
+    const t = `${fmtLevel(lv[0].v)} → ${fmtLevel(lv[0].v * 300)} ${unit} (log scale), lines at ${lv.map(l => fmtLevel(l.v)).join(' / ')}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="60" height="9" fill="url(#${gid})" stroke="#3a1a00" stroke-width=".6"/><text x="${lx + 66}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 74 + textW(t, '11px ' + labelFont()); }
   else if (style === 'bands') lv.forEach((l, i) => sw(`≥ ${l.label}`, x => `<rect x="${x}" y="${ly - 9}" width="16" height="9" fill="${R[i + 1]}" stroke="#3a1a00" stroke-width=".6"/>`));
   else sw(`lines at ${lv.map(l => fmtLevel(l.v)).join(', ')} ${unit} (${lv.map(l => l.label.split(' (')[0]).join(', ')})`, x => `<path d="M${x} ${ly - 4}h16" stroke="#7f0000" stroke-width="1.6"/>`);
-  sw('not detected', x => `<circle cx="${x + 8}" cy="${ly - 4}" r="4" fill="#fff" stroke="#4d0000"/>`);
-  if (g?.note) o.push(`<text data-fnote="1" x="${W - m.r}" y="34" text-anchor="end" class="lbl2" style="font-style:italic">${esc(g.note)}</text>`);
+  sw('below first level', x => `<circle cx="${x + 8}" cy="${ly - 4}" r="4" fill="${R[0]}" stroke="#4d0000"/>`);
+  sw('not detected', x => `<circle cx="${x + 8}" cy="${ly - 4}" r="4" fill="#fff" stroke="#4d0000" stroke-width="1.3" stroke-dasharray="2 1.5"/>`);
+  if (g?.note) { const room = W - m.l - 8, f = 'italic 11px ' + labelFont(); let t = g.note; while (t.length > 8 && textW(t, f) > room) t = t.slice(0, -2).trimEnd() + '…';
+    o.push(`<text data-fnote="1" x="${m.l}" y="${H - 8}" class="lbl2" style="font-style:italic"><title>${esc(g.note)}</title>${esc(t)}</text>`); }
   return o.join('');
 }
 /* ---------- forecast: cited properties and transport solutions ---------- */
@@ -4483,7 +4502,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const su = b => b.well?.installed && b.well.stickup > 0 ? b.well.stickup : 0;
   let W = forceW || Math.max(el.clientWidth, 600), H = fillH || secOpt('h'); const m = { l: 62, r: 64, t: 70, b: 30 };
   // room under the drawing for offset labels (three staggered rows) and the plume legend
-  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 20 : 0, mdH = xs?.model ? 20 : 0;
+  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 34 : 0, mdH = xs?.model ? 20 : 0;
   m.b += offH + plH + mdH; if (!fillH) H += offH + plH + mdH;
   // the forecast caption gets its own line under the header, above the borehole names
   if (mdH) { m.t += 16; if (!fillH) H += 16; }
@@ -4532,6 +4551,8 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const gclip = 'gc' + Math.random().toString(36).slice(2, 8), gl = pos.map(p => [X(p.d), Y(top(p.b))]);
   o.push(`<defs><clipPath id="${gclip}"><path d="M0 ${gl[0][1]}${gl.map(q => `L${q[0]} ${q[1]}`).join('')}L${W} ${gl[gl.length - 1][1]}L${W} ${H}L0 ${H}Z"/></clipPath></defs>`);
   XS_GEOM = { X, Y, m, plotW, plotH, maxD, e0, e1, W, H, pos, located, noElev, plH, mdH, gclip, labels: [] };
+  if (xs && S.sec.water !== false) { const sat = pos.map(p => ({ p, w: wOf(p.b) })).filter(x => x.w && x.w.kind !== 'strike' && x.w.depth != null);
+    if (sat.length >= 2) o.push(`<path data-sat="1" d="M${X(sat[0].p.d)} ${Y(e0)}${sat.map(x => `L${X(x.p.d)} ${Y(top(x.p.b) - x.w.depth)}`).join('')}L${X(sat[sat.length - 1].p.d)} ${Y(e0)}Z" clip-path="url(#${gclip})" style="fill:var(--water)" fill-opacity=".07"><title>Below the water table on the date shown</title></path>`); }
   if (xs?.model) o.push(modelSVG(xs.date || '', xs));
   if (xs && xs.plume !== false && (xs.param || xs.medium === 'vapour')) o.push(plumeSVG(pos, xs, X, Y, top, bw, W, H, m));
   const colsSVG = []; { const o = colsSVG;
@@ -7651,7 +7672,7 @@ function itemInner(it, w, h) {
   if (it.t === 'shape') return shapeSVG(it, w, h);
   const out = withRO(ro, () => {
     if (it.t === 'plan') { const r = planSVG(w, h, false); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
-    if (it.t === 'section') return fromEl(el => { if (o.xs) RO.xs = o.xs; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
+    if (it.t === 'section') return fromEl(el => { if (o.xs) RO.xs = o.xs.shape ? o.xs : { ...o.xs, shape: 'data' }; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
     if (it.t === 'wt') return wtMapSVG(w, h)?.svg || msg('Needs water levels in at least 3 wells with coordinates and ground elevations.');
     if (it.t === 'vap') { const r = vapourMapSVG(w, h); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'flow') { const F = gwFlow(); return F.error ? msg(F.error) : flowPlanSVG(F, w, h); }
@@ -9065,7 +9086,7 @@ function loadXsExample() {
   if (S.readOnly) return;
   let list = sortedList().filter(b => b.project === XS_PROJ);
   if (!list.length) { for (const b of xsBoreholes()) { S.bh.set(b.id, normalize(b)); store.save(b); } list = sortedList().filter(b => b.project === XS_PROJ); }
-  const id = n => list.find(b => b.name === n)?.id, view = { date: '2024-05-14', medium: 'groundwater', param: 'benzene', round: true, plume: true, model: true };
+  const id = n => list.find(b => b.name === n)?.id, view = { date: '2024-05-14', medium: 'groundwater', param: 'benzene', round: true, plume: true, model: true, shape: 'guided', style: 'graded' };
   const pages = REPORT_PRESETS.env[1](); pages.splice(pages.findIndex(p => p.orient === 'land') + 1, 0, newPage('free', { orient: 'land', title: 'CROSS-SECTION A–A′: BENZENE IN GROUNDWATER, MAY 2024', items: [{ ...newItem('section', LB.x, LB.y, { w: LB.w, h: LB.h }), o: { xs: { ...view } } }] }));
   setSite({ guideSrc: 'Example screening values (fictional): replace with the guideline that applies to the site', guide: { benzene: .046, toluene: .52, ethylbenzene: .073, xylenes: .99 },
     gwGuide: { benzene: .005, toluene: .024, ethylbenzene: .0024, xylenes: .3 }, xsec: { alias: { [id('BH-8') + '|Till']: 'Clay till' } },
