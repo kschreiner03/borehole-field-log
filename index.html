@@ -1252,7 +1252,9 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .ctl-gb .sec-opts, .ctl-gb .xs-ctl, .ctl-gb .rep-cols { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin: 0; padding: 0; border: 0; }
 .ctl-gb .lay-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ctl-gb select, .ctl-gb input[type="number"], .ctl-gb input[type="text"] { max-width: 100%; }
-.ctl-gb section.sec { border: 0; box-shadow: none; margin: 0; background: none; } .ctl-gb section.sec > header { display: none; } .ctl-gb section.sec > .body { padding: 0; }
+.ctl-gb section.sec { border: 0; box-shadow: none; margin: 0; background: none; } .ctl-gb section.sec > header { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 6px; border: 0; background: none; min-height: 0; } .ctl-gb section.sec > header h3, .ctl-gb section.sec > header .sp { display: none; } .ctl-gb section.sec > .body { padding: 0; }
+.ctl-gb .scroll-x, .ctl-gb table { max-width: 100%; } .ctl-gb .scroll-x { overflow-x: auto; } .ctl-gb table { font-size: 12px; }
+.xs-dates input[type="range"] { width: 160px; }
 .ctl.min { overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; }
 .ctl.min .tb { width: 30px; min-height: 30px; justify-content: center; }
 /* toolbar: project switcher and the find box */
@@ -7935,14 +7937,17 @@ function drawSite() { drawPlan(); drawPlasticity(); }
 /* the Cross-section page: the section line, the drawing and everything drawn on it */
 function xsecHTML() {
   return `<div class="xs-page">
-    <section class="sec"><header><h3>Cross-section A–A′</h3><button class="btn link" data-act="tut-xsec">Tutorial</button><span class="sp"></span><label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">${xsPlumeCtl()}${secToolsHTML()}
+    <section class="sec"><header><h3>Cross-section A–A′</h3><button class="btn link" data-act="tut-xsec">Tutorial</button><span class="sp"></span>${xsDateCtl()}<label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">
       <div class="scroll-x" id="xs-draw"></div>
       <div class="legend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--earth)" stroke-width="2" stroke-dasharray="6 3"/></svg>Ground surface (measured at boreholes, interpolated between)</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="6 3"/></svg>Water table (interpolated)</span><span><svg width="22" height="12" aria-hidden="true"><rect x="7" y="0" width="8" height="12" style="fill:var(--panel);stroke:var(--ink)"/><path d="M9 6h4M9 9h4" style="stroke:var(--ink)"/></svg>Slotted interval</span><span><svg width="22" height="12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" style="fill:var(--s-clay);stroke:var(--muted)" fill-opacity=".38" stroke-dasharray="4 2"/></svg>Interpreted between boreholes</span></div>
       <p class="note" id="xs-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
-    ${xsModelHTML()}
-    ${xsCorrHTML()}
   </div>`;
 }
+CTL.xsec = () => [
+  { id: 'xs-plume', title: 'Plume and layers', icon: NAV_ICON.contam, html: xsPlumeCtl() },
+  { id: 'xs-line', title: 'Section line and drawing', icon: NAV_ICON.xsec, html: secToolsHTML() },
+  { id: 'xs-model', title: 'Forecast (model)', icon: NAV_ICON.gwm, html: xsModelHTML() },
+  { id: 'xs-corr', title: 'Layer correlation', icon: '<path d="M4 7h6l4 4h6M4 17h6l4-4"/>', html: xsCorrHTML() }];
 /* layer correlation: the section joins units of the same name; a unit can be paired with a differently named one by hand */
 function xsCorrHTML() {
   const al = siteOf()?.xsec?.alias || {}, rows = [];
@@ -7964,9 +7969,13 @@ function xsPlumeCtl() {
     <span class="lay-ctl"><select id="xs-layer" aria-label="Layers" style="width:auto">${[['meas', 'Measured'], ['model', 'Forecast'], ['both', 'Compare measured and forecast']].map(([v, t]) => `<option value="${v}" ${(xs.plume !== false && xs.model ? 'both' : xs.model ? 'model' : 'meas') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
     ${xs.medium === 'groundwater' ? `<select id="xs-shape" aria-label="Plume shape" style="width:auto" title="Model-guided: the forecast's shape, matched to every measured result. Data only: blended between wells across the screens."><option value="guided" ${xs.shape !== 'data' ? 'selected' : ''}>Shape: model-guided</option><option value="data" ${xs.shape === 'data' ? 'selected' : ''}>Shape: data only</option></select>` : '<input type="hidden" id="xs-shape" value="data">'}
     <select id="xs-style" aria-label="Drawing style" style="width:auto">${[['graded', 'Graded shading'], ['lines', 'Contour lines'], ['bands', 'Filled bands']].map(([v, t]) => `<option value="${v}" ${(xs.style || 'graded') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-    <label class="check"><input type="checkbox" id="xs-soilcol" ${xs.soilColour ? 'checked' : ''}> Keep soil colours</label></span>
-    <span class="lay-ctl"><span class="note">Date</span><input type="range" id="xs-date" min="0" max="${Math.max(0, dates.length - 1)}" step="1" value="${Math.max(0, idx)}" ${dates.length ? '' : 'disabled'} aria-label="Date shown" style="width:180px"><span id="xs-date-l" class="note">${esc(xs.date || (dates.length ? `latest (${dates[dates.length - 1]})` : 'no dated data'))}</span>
-    <button class="btn" id="xs-play" data-act="xs-play" ${dates.length < 2 ? 'disabled title="Needs results or readings on two or more dates"' : ''}>Play</button></span></div>`;
+    <label class="check"><input type="checkbox" id="xs-soilcol" ${xs.soilColour ? 'checked' : ''}> Keep soil colours</label></span></div>`;
+}
+/* the date strip stays with the drawing: scrub through time without opening the panel */
+function xsDateCtl() {
+  const dates = xsDates(sectionList()), xs = S.xs, idx = xs.date ? Math.max(0, dates.filter(d => d <= xs.date).length - 1) : dates.length - 1;
+  return `<span class="lay-ctl xs-dates"><span class="note">Date</span><input type="range" id="xs-date" min="0" max="${Math.max(0, dates.length - 1)}" step="1" value="${Math.max(0, idx)}" ${dates.length ? '' : 'disabled'} aria-label="Date shown" style="width:180px"><span id="xs-date-l" class="note">${esc(xs.date || (dates.length ? `latest (${dates[dates.length - 1]})` : 'no dated data'))}</span>
+    <button class="btn" id="xs-play" data-act="xs-play" ${dates.length < 2 ? 'disabled title="Needs results or readings on two or more dates"' : ''}>Play</button></span>`;
 }
 let xsTimer = null;
 function xsPlay() {
