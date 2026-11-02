@@ -4486,7 +4486,7 @@ function gwModelSpec(list, site = siteOf() || {}, opts = {}) {
   const grid = { xorigin, yorigin, angrot: ang * 180 / Math.PI, cs, sn, cell, nrow, ncol, nlay: names.length, top, botm, idomain, toWorld, toLocal, cellCentre, cellOf, layerAt, Lv };
   const params = [...units.filter(u => u.calib).map(u => ({ key: 'k:' + u.u, label: `K, ${u.u}`, unit: 'm/day', value: u.k, prior: u.prior, src: u.kSrc })),
     { key: 'rch', label: 'Recharge', unit: 'm/day', value: rch, prior: null, src: rchSrc }];
-  const M = { round, F, grid, units, obs, params, rch, features: u0.features || [], notes: [] }; M.spec = gwSpec(M); return M;
+  const M = { round, F, grid, units, obs, params, rch, features: u0.features || [], notes: [], list: located }; M.spec = gwSpec(M); return M;
 }
 /* the MODFLOW 6 spec of a model with parameter values applied (pv: {key: value}); steady state unless periods are given */
 function gwSpec(M, pv = {}, extra = {}) {
@@ -4525,6 +4525,38 @@ async function gwRun(M, pv = {}, extra = {}) {
   const H = mf6ReadHeads(res.files['gwf.hds']), last = mf6Layers(H), sim = M.obs.map(o => gwHeadAt(M.grid, last.layers, o.l, o.x, o.y));
   return { ok: true, spec, files, out: res.files, heads: H, layers: last.layers, sim, discrepancy: mf6Discrepancy(new TextDecoder().decode(res.files['gwf.lst'])), seconds: res.seconds };
 }
+/* ---------- transient flow across the monitoring rounds ----------
+   Period 1 is steady state at the first round; each later round ends a transient period (time steps of about 10 days).
+   The fixed heads on the two faces follow each round's fitted water-table plane; recharge is the calibrated rate times a
+   multiplier per period ('rch@<i>', 1 unless calibrated); specific yield 'sy' (start 0.2, assumed) and specific storage
+   1e-5 /m (assumed) in every layer. */
+function gwTransientSetup(M) {
+  if (M.T) return M.T;
+  const cands = [...new Set(M.list.flatMap(b => monitoring(b).filter(w => w.date && w.depth != null).map(w => w.date)))].sort(), rounds = [];
+  for (const d of cands) { if (rounds.length && (Date.parse(d) - Date.parse(rounds[rounds.length - 1])) / 864e5 <= 7) continue; if (gwHeads(M.list, d, true).wells.length >= 3) rounds.push(d); }
+  const periods = rounds.map((d, i) => i ? (() => { const L = (Date.parse(d) - Date.parse(rounds[i - 1])) / 864e5; return [L, Math.max(2, Math.ceil(L / 10)), 1]; })() : [1, 1, 1]);
+  const planes = rounds.map(d => gwFlow(M.list, d, true)), g = M.grid;
+  M.obsT = rounds.flatMap((d, per) => gwHeads(M.list, d, true).wells.map((w, j) => { const rc = g.cellOf(w.e, w.n); if (!rc) return null; const sc = w.b.well, z = sc?.screenTop != null ? w.b.elevation - (sc.screenTop + sc.screenBottom) / 2 : w.h, [x, y] = g.toLocal(w.e, w.n);
+    return { name: `h${per + 1}_${j + 1}`, b: w.b, r: rc[0], c: rc[1], l: g.layerAt(rc[0], rc[1], z), x, y, h: w.h, date: d, per }; }).filter(Boolean));
+  let t = 0; const ends = periods.map(p => (t += p[0]));
+  return (M.T = { rounds, periods, planes, ends });
+}
+function gwSpecTransient(M, pv = {}) {
+  const T = gwTransientSetup(M), g = M.grid, base = gwSpec(M, pv), shift = pv.shift ?? 0;
+  const chd = T.planes.map(F => { if (F.error) return null; const out = []; for (let r = 0; r < g.nrow; r++) for (const c of [0, g.ncol - 1]) { const [E, N] = g.cellCentre(r, c), h = F.fit({ e: E, n: N }) + shift;
+    for (let k = 0; k < g.nlay; k++) if (g.idomain[k][r * g.ncol + c] === 1 && h > g.botm[k][r * g.ncol + c]) out.push([k, r, c, h]); } return out; });
+  const R = pv.rch ?? M.rch, sy = pv.sy ?? null;
+  return { ...base, nper: T.periods.length, periods: T.periods, steady: T.periods.map((_, i) => i === 0), chd, rch: T.periods.map((_, i) => R * (pv['rch@' + i] ?? 1)),
+    riv: base.riv, drn: base.drn, wel: base.wel, sto: { ss: M.units.map(() => 1e-5), sy: M.units.map(u => sy ?? u.sy ?? .2) } };
+}
+async function gwRunTransient(M, pv = {}) {
+  if (!window.desktop?.mf6Run) return { ok: false, error: 'The groundwater model runs MODFLOW 6, which needs the desktop app.' };
+  const T = gwTransientSetup(M), spec = gwSpecTransient(M, pv), { files, outputs } = mf6Files(spec), res = await window.desktop.mf6Run({ files, outputs });
+  if (!res.ok) return { ok: false, error: res.error || 'MODFLOW 6 did not finish.', files };
+  const H = mf6ReadHeads(res.files['gwf.hds']), byPer = T.ends.map(t => mf6Layers(H, H.reduce((b, r) => Math.abs(r.totim - t) < Math.abs(b - t) ? r.totim : b, H[0].totim)).layers);
+  const sim = M.obsT.map(o => gwHeadAt(M.grid, byPer[o.per], o.l, o.x, o.y));
+  return { ok: true, spec, files, out: res.files, heads: H, byPer, layers: byPer[byPer.length - 1], sim, discrepancy: mf6Discrepancy(new TextDecoder().decode(res.files['gwf.lst'])), seconds: res.seconds };
+}
 /* ---------- calibration: Levenberg–Marquardt on log10 parameters (as in PEST and UCODE), by repeated MODFLOW 6 runs ----------
    Objective: Σ ((h_obs − h_sim)/σh)² + Σ ((log10 K_slug − log10 K)/σlogK)² over parameters with slug-test prior information.
    σh = 0.1 m (head measurement and model error), σlogK = 0.5 (a factor of about 3). Statistics after Hill and Tiedeman (2007),
@@ -4547,22 +4579,26 @@ function gwEig(A) { const n = A.length, a = A.map(r => [...r]), V = a.map((r, i)
 const gwT975 = nu => { const z = 1.959964; return nu > 0 ? z + (z ** 3 + z) / (4 * nu) + (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * nu * nu) + (3 * z ** 7 + 19 * z ** 5 + 17 * z ** 3 - 15 * z) / (384 * nu ** 3) : Infinity; };
 async function gwCalibrate(M, opts = {}) {
   const keys = opts.keys || M.params.map(p => p.key), prior = opts.prior !== false, maxIter = opts.maxIter ?? 12, tick = opts.onProgress || (() => {});
+  if (opts.transient) gwTransientSetup(M);
+  const OBS = opts.transient ? M.obsT : M.obs, runner = opts.transient ? gwRunTransient : gwRun, fixed = opts.fixed || {};
   const def = k => { if (k === 'rch') return { key: k, label: 'Recharge', unit: 'm/day', start: M.rch, prior: null, b: GW_BOUNDS.rch };
+    if (k === 'sy') return { key: k, label: 'Specific yield', unit: '–', start: .2, prior: null, b: [-3, -.3] };
+    if (/^rch@\d+$/.test(k)) return { key: k, label: `Recharge multiplier, period ${+k.slice(4) + 1}`, unit: '×', start: 1, prior: null, b: [-1.5, 1.5] };
     if (k === 'shift') return { key: k, label: 'Boundary head shift', unit: 'm', start: 0, prior: null, lin: true };
     const u = M.units.find(x => 'k:' + x.u === k); return u ? { key: k, label: `K, ${u.u}`, unit: 'm/day', start: u.k, prior: prior ? u.prior : null, b: GW_BOUNDS.k } : null; };
   const P = keys.map(def).filter(Boolean); if (!P.length) return { ok: false, error: 'Nothing to calibrate.' };
-  if (!M.obs.length) return { ok: false, error: 'No measured heads in the calibration round.' };
+  if (!OBS.length) return { ok: false, error: 'No measured heads in the calibration round.' };
   const toV = x => Object.fromEntries(P.map((p, j) => [p.key, p.lin ? x[j] : 10 ** x[j]]));
   let x = P.map(p => { const v = opts.start?.[p.key] ?? p.start; return p.lin ? v : Math.log10(v); });
   const clamp = x => x.map((v, j) => P[j].b ? Math.max(P[j].b[0], Math.min(P[j].b[1], v)) : v);
-  let runs = 0; const sim = async x => { runs++; const r = await gwRun(M, toV(x)); if (!r.ok) throw new Error(r.error); return r; };
+  let runs = 0; const sim = async x => { runs++; const r = await runner(M, { ...fixed, ...toV(x) }); if (!r.ok) throw new Error(r.error); return r; };
   // residual vector (weighted): heads, then prior information
-  const resid = r => [...M.obs.map((o, i) => r.sim[i] == null ? 0 : (o.h - r.sim[i]) / GW_SIG_H), ...P.flatMap((p, j) => p.prior != null ? [(p.prior - x[j]) / GW_SIG_LOGK] : [])];
+  const resid = r => [...OBS.map((o, i) => r.sim[i] == null ? 0 : (o.h - r.sim[i]) / GW_SIG_H), ...P.flatMap((p, j) => p.prior != null ? [(p.prior - x[j]) / GW_SIG_LOGK] : [])];
   const phiOf = (r, xx) => { const old = x; x = xx; const e = resid(r); x = old; return e.reduce((a, v) => a + v * v, 0); };
   try {
     let cur = await sim(x), phi = phiOf(cur, x), lam = .01, it = 0, J = null;
     const jac = async (x, base) => { const h = P.map(p => p.lin ? .05 : .02), rs = await Promise.all(P.map((p, j) => { const xx = [...x]; xx[j] += h[j]; return sim(xx); }));
-      return M.obs.map((o, i) => P.map((p, j) => base.sim[i] == null || rs[j].sim[i] == null ? 0 : (rs[j].sim[i] - base.sim[i]) / h[j])); };
+      return OBS.map((o, i) => P.map((p, j) => base.sim[i] == null || rs[j].sim[i] == null ? 0 : (rs[j].sim[i] - base.sim[i]) / h[j])); };
     for (; it < maxIter; it++) {
       tick({ it, phi, runs }); J = await jac(x, cur);
       const r = resid(cur), Jw = [...J.map(row => row.map(v => v / GW_SIG_H)), ...P.flatMap((p, j) => p.prior != null ? [P.map((_, k) => k === j ? 1 / GW_SIG_LOGK : 0)] : [])];
@@ -4579,7 +4615,7 @@ async function gwCalibrate(M, opts = {}) {
     }
     J = await jac(x, cur);
     // statistics
-    const res = M.obs.map((o, i) => ({ name: o.name, b: o.b.name, h: o.h, sim: cur.sim[i], res: cur.sim[i] == null ? NaN : o.h - cur.sim[i] })), ok = res.filter(q => Number.isFinite(q.res)), n = ok.length;
+    const res = OBS.map((o, i) => ({ name: o.name, b: o.b.name, date: o.date, h: o.h, sim: cur.sim[i], res: cur.sim[i] == null ? NaN : o.h - cur.sim[i] })), ok = res.filter(q => Number.isFinite(q.res)), n = ok.length;
     const me = ok.reduce((a, q) => a + q.res, 0) / n, mae = ok.reduce((a, q) => a + Math.abs(q.res), 0) / n, rmse = Math.sqrt(ok.reduce((a, q) => a + q.res * q.res, 0) / n), hs = ok.map(q => q.h), range = Math.max(...hs) - Math.min(...hs);
     const Jw = [...J.map(row => row.map(v => v / GW_SIG_H)), ...P.flatMap((p, j) => p.prior != null ? [P.map((_, k) => k === j ? 1 / GW_SIG_LOGK : 0)] : [])];
     const JtJ = P.map((_, a) => P.map((_, b) => Jw.reduce((t, row) => t + row[a] * row[b], 0))), nd = Jw.length, dof = nd - P.length, s2 = dof > 0 ? phi / dof : NaN, inv = gwInv(JtJ.map((row, a) => row.map((v, b) => a === b ? v + 1e-12 : v)));
@@ -4587,7 +4623,7 @@ async function gwCalibrate(M, opts = {}) {
     const corr = P.map((_, a) => P.map((_, b) => cov ? cov[a][b] / Math.sqrt(Math.abs(cov[a][a] * cov[b][b])) : NaN));
     // composite scaled sensitivity (per log10 unit ÷ ln 10 gives the sensitivity to a 1 % change, scaled by the head weight)
     const css = Object.fromEntries(P.map((p, j) => [p.key, Math.sqrt(J.reduce((t, row) => t + (row[j] / (p.lin ? 1 : Math.LN10) / GW_SIG_H) ** 2, 0) / n)]));
-    const pv = toV(x), params = P.map((p, j) => { const sd = cov ? Math.sqrt(Math.abs(cov[j][j])) : NaN; return { key: p.key, label: p.label, unit: p.unit, start: p.start, value: pv[p.key], prior: p.prior,
+    const pv = { ...fixed, ...toV(x) }, params = P.map((p, j) => { const sd = cov ? Math.sqrt(Math.abs(cov[j][j])) : NaN; return { key: p.key, label: p.label, unit: p.unit, start: p.start, value: pv[p.key], prior: p.prior,
       lo95: p.lin ? x[j] - tq * sd : 10 ** (x[j] - tq * sd), hi95: p.lin ? x[j] + tq * sd : 10 ** (x[j] + tq * sd) }; });
     const warnings = [];
     P.forEach((p, a) => P.forEach((q, b) => { if (b > a && Math.abs(corr[a][b]) > .95) warnings.push(`${p.label} and ${q.label.toLowerCase()} cannot be separated by these heads (correlation ${corr[a][b].toFixed(2)}): fix one from a measurement (a slug test, or a recharge estimate) or add flow data.`); }));
@@ -7464,18 +7500,18 @@ function gsdSVG(W = 640, H = 320) {
    Gradient i = √(bx² + by²); flow is down the gradient, azimuth = atan2(−bx, −by) clockwise from grid north.
    With hydraulic conductivity K (geometric mean of this project's slug tests): Darcy flux q = K·i, average linear velocity v = K·i / nₑ. */
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-function gwFlow(list = mapList(), asOf) {
+function gwFlow(list = mapList(), asOf, exact) {
   // one set of levels from one round: the chosen date, else the latest round (on or before asOf, when given) with at least 3 standpipe readings
-  const { round, wells } = gwHeads(list, asOf);
+  const { round, wells } = gwHeads(list, asOf, exact);
   const out = { wells, n: wells.length, method: wells.length === 3 ? 'Three-point problem' : 'Least-squares planar fit' };
   if (wells.length < 3) return { ...out, error: `Needs a water level in at least 3 boreholes that have coordinates and a ground elevation (${wells.length} available${S.round ? ' for this date' : ''}).` };
   return gwFlowFit(list, out, round, wells);
 }
 /* one set of hydraulic heads from one round: the chosen date, else the latest round with at least 3 standpipe readings */
-function gwHeads(list = mapList(), asOf) {
+function gwHeads(list = mapList(), asOf, exact) {
   const located = list.filter(b => b.easting != null && b.northing != null && b.elevation != null);
   const near = (b, d) => { const t0 = Date.parse(d); let best = null, bd = Infinity; for (const w of monitoring(b)) { if (!w.date || w.depth == null) continue; const dd = Math.abs(Date.parse(w.date) - t0); if (dd < bd) { bd = dd; best = w; } } return bd <= 31 * 864e5 ? best : null; };
-  const round = S.round || roundDates().filter(d => !asOf || d <= asOf).find(d => located.filter(b => near(b, d)).length >= 3) || '';
+  const round = exact ? asOf : S.round || roundDates().filter(d => !asOf || d <= asOf).find(d => located.filter(b => near(b, d)).length >= 3) || '';
   const wells = located.map(b => {
     const w = round ? near(b, round) : (b.water || []).filter(x => x.depth != null && x.kind !== 'strike').sort(byDate).pop();
     return w ? { b, w, e: b.easting, n: b.northing, h: b.elevation - w.depth } : null;
