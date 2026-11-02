@@ -4557,6 +4557,47 @@ async function gwRunTransient(M, pv = {}) {
   const sim = M.obsT.map(o => gwHeadAt(M.grid, byPer[o.per], o.l, o.x, o.y));
   return { ok: true, spec, files, out: res.files, heads: H, byPer, layers: byPer[byPer.length - 1], sim, discrepancy: mf6Discrepancy(new TextDecoder().decode(res.files['gwf.lst'])), seconds: res.seconds };
 }
+/* ---------- transport (MODFLOW 6 GWT) on the calibrated steady flow ----------
+   Chemistry, source and dispersivities come from the forecast panel (the same cited table and entries the Domenico forecast
+   uses). The source is a constant concentration C0 from the release date in the source well's cells: across flow over the
+   source width Y, and from the water table down the source depth Z. TVD advection; linear sorption Kd = Koc·foc with the bulk
+   density; first-order decay only with an entered half-life. Output at every sampling round and yearly to the horizon. */
+async function gwTransport(M, pv = {}, opts = {}) {
+  if (!window.desktop?.mf6Run) return { ok: false, error: 'The groundwater model runs MODFLOW 6, which needs the desktop app.' };
+  const run = modelRun(opts.date || S.xs.date || '', { ...S.xs, param: opts.param || siteOf()?.model?.param || S.xs.param });
+  if (!run.ok) return { ok: false, error: 'Transport needs the forecast inputs: ' + run.missing.join('; ') };
+  const P = run.P; if (!P.start) return { ok: false, error: 'Transport needs a release date (Forecast panel).' };
+  const g = M.grid, param = P.param, src = P.srcBh, rc = g.cellOf(src.easting, src.northing); if (!rc) return { ok: false, error: `The source well ${src.name} is outside the model.` };
+  const samples = M.list.flatMap(b => (b.gwSamples || []).filter(s => s.date && s.date >= P.start && gwVal(s, param)).map(s => ({ b, s, r: gwVal(s, param) })));
+  const last = samples.reduce((a, x) => x.s.date > a ? x.s.date : a, S.xs.date || today()), horizon = new Date(Date.parse(last) + (opts.years ?? 5) * 365.25 * 864e5).toISOString().slice(0, 10);
+  const dates = new Set(samples.map(x => x.s.date)); for (let y = +P.start.slice(0, 4) + 1; `${y}${P.start.slice(4)}` <= horizon; y++) dates.add(`${y}${P.start.slice(4)}`); (opts.dates || []).forEach(d => d > P.start && dates.add(d));
+  const out = [...dates].filter(d => d > P.start).sort(), days = d => (Date.parse(d) - Date.parse(P.start)) / 864e5;
+  const periods = out.map((d, i) => { const L = days(d) - (i ? days(out[i - 1]) : 0); return [L, Math.max(1, Math.ceil(L / 15)), 1]; });
+  // source cells
+  const wt = M.F.fit({ e: src.easting, n: src.northing }), half = Math.max(0, Math.floor(P.Y / 2 / g.cell)), cnc = [], c0 = (opts.c0 ?? P.C0);
+  for (let r = rc[0] - half; r <= rc[0] + half; r++) { if (r < 0 || r >= g.nrow) continue;
+    for (let k = 0; k < g.nlay; k++) { const i = r * g.ncol + rc[1], tp = k ? g.botm[k - 1][i] : g.top[i], bt = g.botm[k][i]; if (g.idomain[k][i] === 1 && bt < wt && tp > wt - P.Z) cnc.push([k, r, rc[1], c0]); } }
+  if (!cnc.length) return { ok: false, error: 'No active model cells at the source depth.' };
+  const base = gwSpec(M, pv), kd = P.koc != null ? P.koc * P.foc : 0;
+  const spec = { ...base, nper: periods.length, periods, steady: periods.map(() => true), saveAll: false,
+    gwt: { porosity: M.units.map(u => u.ne), rhob: P.rhob, kd, decay: P.hl > 0 ? Math.LN2 / P.hl : 0, al: P.ax, ath: P.ay, atv: P.az, cnc: [cnc], savePeriods: periods.map((_, i) => i) } };
+  const { files, outputs } = mf6Files(spec), res = await window.desktop.mf6Run({ files, outputs });
+  if (!res.ok) return { ok: false, error: res.error || 'MODFLOW 6 did not finish.', files };
+  const U = mf6ReadHeads(res.files['gwt.ucn']), tset = [...new Set(U.map(r => r.totim))];
+  const times = out.map((d, i) => { const t = days(d), tt = tset.reduce((b, x) => Math.abs(x - t) < Math.abs(b - t) ? x : b, tset[0]); return { date: d, totim: tt, layers: mf6Layers(U, tt).layers }; });
+  const obs = samples.map(({ b, s, r }) => { const rcb = g.cellOf(b.easting, b.northing); if (!rcb || !b.well?.screenTop) return null; const z = b.elevation - (b.well.screenTop + b.well.screenBottom) / 2, k = g.layerAt(rcb[0], rcb[1], z), [x, y] = g.toLocal(b.easting, b.northing);
+    const T = times.find(q => q.date === s.date); const sim = T ? Math.max(0, gwHeadAt(g, T.layers, k, x, y) ?? 0) : NaN; return { b, name: b.name, date: s.date, meas: r.v, lt: !!r.lt, sim }; }).filter(Boolean);
+  const lr = obs.map(o => o.lt ? (o.sim > o.meas ? Math.log10(o.sim / o.meas) : 0) : o.sim > 1e-9 ? Math.log10(o.sim / o.meas) : null).filter(v => v != null);
+  const fit = { n: lr.length, meLog: lr.reduce((a, v) => a + v, 0) / (lr.length || 1), rmsLog: Math.sqrt(lr.reduce((a, v) => a + v * v, 0) / (lr.length || 1)) };
+  const result = { ok: true, P, c0, kd, cells: cnc, times, obs, fit, disc: mf6Discrepancy(new TextDecoder().decode(res.files['gwt.lst'])), files, param, start: P.start };
+  if (opts.calibrate) {
+    // concentrations scale with C0, so the best source concentration in log terms is the measured/simulated geometric mean ratio
+    const det = obs.filter(o => !o.lt && o.sim > 1e-9); if (!det.length) return { ...result, warnings: ['No detected results to calibrate the source against.'] };
+    const m = 10 ** (det.reduce((a, o) => a + Math.log10(o.meas / o.sim), 0) / det.length), T2 = await gwTransport(M, pv, { ...opts, calibrate: false, c0: c0 * m });
+    return T2.ok && T2.fit.rmsLog <= fit.rmsLog ? { ...T2, c0Src: `calibrated (×${m.toPrecision(3)} the measured ${(+P.C0.toPrecision(3))} mg/L)` } : { ...result, c0Src: 'measured at the source (calibration did not improve the fit)' };
+  }
+  return { ...result, c0Src: P.src.C0 || 'measured at the source' };
+}
 /* ---------- calibration: Levenberg–Marquardt on log10 parameters (as in PEST and UCODE), by repeated MODFLOW 6 runs ----------
    Objective: Σ ((h_obs − h_sim)/σh)² + Σ ((log10 K_slug − log10 K)/σlogK)² over parameters with slug-test prior information.
    σh = 0.1 m (head measurement and model error), σlogK = 0.5 (a factor of about 3). Statistics after Hill and Tiedeman (2007),
