@@ -1333,6 +1333,32 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('tutorial: cross-section and groundwater model', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        want(MENUS.some(([n, items]) => n === 'Help' && items.some(x => x[1] === 'tut-xsec') && items.some(x => x[1] === 'tut-gwm')), 'Help menu lists both tutorials');
+        for (const k of ['xsec', 'gwm']) {
+          tutStart(k); await w(700);
+          const N = TUTORIALS[k].steps.length; want(N >= 8, k + ': at least 8 steps: ' + N);
+          for (let i = 0; i < N; i++) {
+            const card = document.querySelector('#tut'), st = TUTORIALS[k].steps[i];
+            want(card && card.textContent.includes('Step ' + (i + 1) + ' of ' + N) && card.textContent.includes(st.title), k + ' step ' + (i + 1) + ' card');
+            if (st.sel) { const el = document.querySelector(st.sel), hole = document.querySelector('#tut-hole');
+              want(el, k + ' step ' + (i + 1) + ': target ' + st.sel + ' exists');
+              if (el && hole) { const a = el.getBoundingClientRect(), b = hole.getBoundingClientRect(); want(b.left <= a.left + 1 && b.top <= a.top + 1 && b.width >= Math.min(a.width, innerWidth - 40) - 2, k + ' step ' + (i + 1) + ': highlight covers the target'); } }
+            if (i < N - 1) { document.querySelector('#tut [data-act="tut-next"]').click(); await w(500); }
+          }
+          document.querySelector('#tut [data-act="tut-back"]').click(); await w(400); want(document.querySelector('#tut').textContent.includes('Step ' + (N - 1) + ' of ' + N), k + ': back');
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); await w(200); want(!document.querySelector('#tut') && !document.querySelector('#tut-hole'), k + ': Esc closes');
+        }
+        goTab('xsec'); await w(300); want(document.querySelector('#view [data-act="tut-xsec"]'), 'Tutorial button on the Section page');
+        goTab('gwm'); await w(300); want(document.querySelector('#view [data-act="tut-gwm"]'), 'Tutorial button on the Model page');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
