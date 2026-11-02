@@ -4525,6 +4525,80 @@ async function gwRun(M, pv = {}, extra = {}) {
   const H = mf6ReadHeads(res.files['gwf.hds']), last = mf6Layers(H), sim = M.obs.map(o => gwHeadAt(M.grid, last.layers, o.l, o.x, o.y));
   return { ok: true, spec, files, out: res.files, heads: H, layers: last.layers, sim, discrepancy: mf6Discrepancy(new TextDecoder().decode(res.files['gwf.lst'])), seconds: res.seconds };
 }
+/* ---------- calibration: Levenberg–Marquardt on log10 parameters (as in PEST and UCODE), by repeated MODFLOW 6 runs ----------
+   Objective: Σ ((h_obs − h_sim)/σh)² + Σ ((log10 K_slug − log10 K)/σlogK)² over parameters with slug-test prior information.
+   σh = 0.1 m (head measurement and model error), σlogK = 0.5 (a factor of about 3). Statistics after Hill and Tiedeman (2007),
+   Effective Groundwater Model Calibration: composite scaled sensitivities, the parameter correlation matrix and linear 95 %
+   intervals from the covariance s²(JᵀWJ)⁻¹. */
+const GW_SIG_H = .1, GW_SIG_LOGK = .5, GW_BOUNDS = { k: [-5, 4], rch: [-6, -2], shift: null };
+function gwSolve(A, b) { const n = b.length, M = A.map((r, i) => [...r, b[i]]);
+  for (let i = 0; i < n; i++) { let p = i; for (let r = i + 1; r < n; r++) if (Math.abs(M[r][i]) > Math.abs(M[p][i])) p = r; [M[i], M[p]] = [M[p], M[i]]; if (Math.abs(M[i][i]) < 1e-300) return null;
+    for (let r = 0; r < n; r++) if (r !== i) { const f = M[r][i] / M[i][i]; for (let c = i; c <= n; c++) M[r][c] -= f * M[i][c]; } }
+  return M.map((r, i) => r[n] / r[i]); }
+function gwInv(A) { const n = A.length; return Array.from({ length: n }, (_, j) => gwSolve(A, Array.from({ length: n }, (_, i) => i === j ? 1 : 0))).reduce((m, col, j) => { if (!col || !m) return null; col.forEach((v, i) => { m[i][j] = v; }); return m; }, Array.from({ length: n }, () => new Array(n).fill(0))); }
+/* eigenvalues and vectors of a small symmetric matrix (Jacobi rotations) */
+function gwEig(A) { const n = A.length, a = A.map(r => [...r]), V = a.map((r, i) => r.map((_, j) => i === j ? 1 : 0));
+  for (let sweep = 0; sweep < 60; sweep++) { let off = 0; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) off += a[i][j] ** 2; if (off < 1e-20) break;
+    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) { if (Math.abs(a[p][q]) < 1e-300) continue; const th = (a[q][q] - a[p][p]) / (2 * a[p][q]), t = Math.sign(th || 1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), s = t * c;
+      for (let k = 0; k < n; k++) { const akp = a[k][p], akq = a[k][q]; a[k][p] = c * akp - s * akq; a[k][q] = s * akp + c * akq; }
+      for (let k = 0; k < n; k++) { const apk = a[p][k], aqk = a[q][k]; a[p][k] = c * apk - s * aqk; a[q][k] = s * apk + c * aqk; }
+      for (let k = 0; k < n; k++) { const vkp = V[k][p], vkq = V[k][q]; V[k][p] = c * vkp - s * vkq; V[k][q] = s * vkp + c * vkq; } } }
+  return { val: a.map((r, i) => r[i]), vec: V }; }
+const gwT975 = nu => { const z = 1.959964; return nu > 0 ? z + (z ** 3 + z) / (4 * nu) + (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * nu * nu) + (3 * z ** 7 + 19 * z ** 5 + 17 * z ** 3 - 15 * z) / (384 * nu ** 3) : Infinity; };
+async function gwCalibrate(M, opts = {}) {
+  const keys = opts.keys || M.params.map(p => p.key), prior = opts.prior !== false, maxIter = opts.maxIter ?? 12, tick = opts.onProgress || (() => {});
+  const def = k => { if (k === 'rch') return { key: k, label: 'Recharge', unit: 'm/day', start: M.rch, prior: null, b: GW_BOUNDS.rch };
+    if (k === 'shift') return { key: k, label: 'Boundary head shift', unit: 'm', start: 0, prior: null, lin: true };
+    const u = M.units.find(x => 'k:' + x.u === k); return u ? { key: k, label: `K, ${u.u}`, unit: 'm/day', start: u.k, prior: prior ? u.prior : null, b: GW_BOUNDS.k } : null; };
+  const P = keys.map(def).filter(Boolean); if (!P.length) return { ok: false, error: 'Nothing to calibrate.' };
+  if (!M.obs.length) return { ok: false, error: 'No measured heads in the calibration round.' };
+  const toV = x => Object.fromEntries(P.map((p, j) => [p.key, p.lin ? x[j] : 10 ** x[j]]));
+  let x = P.map(p => { const v = opts.start?.[p.key] ?? p.start; return p.lin ? v : Math.log10(v); });
+  const clamp = x => x.map((v, j) => P[j].b ? Math.max(P[j].b[0], Math.min(P[j].b[1], v)) : v);
+  let runs = 0; const sim = async x => { runs++; const r = await gwRun(M, toV(x)); if (!r.ok) throw new Error(r.error); return r; };
+  // residual vector (weighted): heads, then prior information
+  const resid = r => [...M.obs.map((o, i) => r.sim[i] == null ? 0 : (o.h - r.sim[i]) / GW_SIG_H), ...P.flatMap((p, j) => p.prior != null ? [(p.prior - x[j]) / GW_SIG_LOGK] : [])];
+  const phiOf = (r, xx) => { const old = x; x = xx; const e = resid(r); x = old; return e.reduce((a, v) => a + v * v, 0); };
+  try {
+    let cur = await sim(x), phi = phiOf(cur, x), lam = .01, it = 0, J = null;
+    const jac = async (x, base) => { const h = P.map(p => p.lin ? .05 : .02), rs = await Promise.all(P.map((p, j) => { const xx = [...x]; xx[j] += h[j]; return sim(xx); }));
+      return M.obs.map((o, i) => P.map((p, j) => base.sim[i] == null || rs[j].sim[i] == null ? 0 : (rs[j].sim[i] - base.sim[i]) / h[j])); };
+    for (; it < maxIter; it++) {
+      tick({ it, phi, runs }); J = await jac(x, cur);
+      const r = resid(cur), Jw = [...J.map(row => row.map(v => v / GW_SIG_H)), ...P.flatMap((p, j) => p.prior != null ? [P.map((_, k) => k === j ? 1 / GW_SIG_LOGK : 0)] : [])];
+      // note: the prior rows' residual falls as x rises, matching the head rows (h_obs − h_sim)
+      const JtJ = P.map((_, a) => P.map((_, b) => Jw.reduce((t, row) => t + row[a] * row[b], 0))), Jtr = P.map((_, a) => Jw.reduce((t, row, i) => t + row[a] * r[i], 0));
+      let improved = false;
+      for (let tries = 0; tries < 8; tries++) {
+        const A = JtJ.map((row, a) => row.map((v, b) => a === b ? v * (1 + lam) + 1e-12 : v)), d = gwSolve(A, Jtr); if (!d) { lam *= 10; continue; }
+        const xn = clamp(x.map((v, j) => v + d[j])), rn = await sim(xn), pn = phiOf(rn, xn);
+        if (pn < phi) { const rel = (phi - pn) / Math.max(phi, 1e-12); x = xn; cur = rn; phi = pn; lam = Math.max(lam / 10, 1e-6); improved = true; if (rel < 1e-4) it = maxIter; break; }
+        lam *= 10;
+      }
+      if (!improved) break;
+    }
+    J = await jac(x, cur);
+    // statistics
+    const res = M.obs.map((o, i) => ({ name: o.name, b: o.b.name, h: o.h, sim: cur.sim[i], res: cur.sim[i] == null ? NaN : o.h - cur.sim[i] })), ok = res.filter(q => Number.isFinite(q.res)), n = ok.length;
+    const me = ok.reduce((a, q) => a + q.res, 0) / n, mae = ok.reduce((a, q) => a + Math.abs(q.res), 0) / n, rmse = Math.sqrt(ok.reduce((a, q) => a + q.res * q.res, 0) / n), hs = ok.map(q => q.h), range = Math.max(...hs) - Math.min(...hs);
+    const Jw = [...J.map(row => row.map(v => v / GW_SIG_H)), ...P.flatMap((p, j) => p.prior != null ? [P.map((_, k) => k === j ? 1 / GW_SIG_LOGK : 0)] : [])];
+    const JtJ = P.map((_, a) => P.map((_, b) => Jw.reduce((t, row) => t + row[a] * row[b], 0))), nd = Jw.length, dof = nd - P.length, s2 = dof > 0 ? phi / dof : NaN, inv = gwInv(JtJ.map((row, a) => row.map((v, b) => a === b ? v + 1e-12 : v)));
+    const cov = inv && Number.isFinite(s2) ? inv.map(row => row.map(v => v * s2)) : null, tq = gwT975(dof);
+    const corr = P.map((_, a) => P.map((_, b) => cov ? cov[a][b] / Math.sqrt(Math.abs(cov[a][a] * cov[b][b])) : NaN));
+    // composite scaled sensitivity (per log10 unit ÷ ln 10 gives the sensitivity to a 1 % change, scaled by the head weight)
+    const css = Object.fromEntries(P.map((p, j) => [p.key, Math.sqrt(J.reduce((t, row) => t + (row[j] / (p.lin ? 1 : Math.LN10) / GW_SIG_H) ** 2, 0) / n)]));
+    const pv = toV(x), params = P.map((p, j) => { const sd = cov ? Math.sqrt(Math.abs(cov[j][j])) : NaN; return { key: p.key, label: p.label, unit: p.unit, start: p.start, value: pv[p.key], prior: p.prior,
+      lo95: p.lin ? x[j] - tq * sd : 10 ** (x[j] - tq * sd), hi95: p.lin ? x[j] + tq * sd : 10 ** (x[j] + tq * sd) }; });
+    const warnings = [];
+    P.forEach((p, a) => P.forEach((q, b) => { if (b > a && Math.abs(corr[a][b]) > .95) warnings.push(`${p.label} and ${q.label.toLowerCase()} cannot be separated by these heads (correlation ${corr[a][b].toFixed(2)}): fix one from a measurement (a slug test, or a recharge estimate) or add flow data.`); }));
+    // a combination of several parameters the heads cannot pin down (for example every K and the recharge scaled together)
+    if (P.length > 2) { const sc = JtJ.map((row, a) => row.map((v, b) => v / Math.sqrt(JtJ[a][a] * JtJ[b][b] || 1))), E = gwEig(sc), i0 = E.val.indexOf(Math.min(...E.val));
+      if (E.val[i0] < 1e-3 && !warnings.length) warnings.push(`${P.filter((_, j) => Math.abs(E.vec[j][i0]) > .25).map(p => p.label).join(', ')} cannot be separated by these heads together (they can change together without changing the heads): fix one from a measurement or add flow data.`); }
+    if (dof <= 0) warnings.push('There are no more observations than parameters, so the fit statistics and intervals are not meaningful.');
+    P.forEach(p => { if (p.b && (Math.abs(Math.log10(pv[p.key]) - p.b[0]) < 1e-6 || Math.abs(Math.log10(pv[p.key]) - p.b[1]) < 1e-6)) warnings.push(`${p.label} stopped at its limit (${pv[p.key].toPrecision(2)} ${p.unit}).`); });
+    return { ok: true, pv, params, stats: { n, me, mae, rmse, range, srms: range > 0 ? rmse / range * 100 : NaN, disc: cur.discrepancy, phi, dof }, residuals: res, css, corr, warnings, iterations: it, runs, run: cur, round: M.round };
+  } catch (e) { return { ok: false, error: String(e.message || e) }; }
+}
 function xsModelHTML() {
   const u = siteOf()?.model || {}, run = S.xs.model ? modelRun(S.xs.date || '') : null, P = run?.P || { src: {} }, ro = S.readOnly ? 'disabled' : '';
   const wellsOpt = projList().filter(b => b.easting != null).map(b => `<option value="${esc(b.id)}" ${P.srcBh?.id === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
