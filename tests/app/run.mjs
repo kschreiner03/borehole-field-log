@@ -1802,10 +1802,31 @@ app.whenReady().then(async () => {
         ['clay, intermediate plastic', 'CI'], ['silty clay, firm', 'CL'], ['silt, soft, wet', 'ML'], ['silt, high plastic', 'MH'], ['organic silt, soft', 'OL'], ['organic clay', 'OH'],
         ['sandy clay, stiff', 'CL'], ['gravelly sand', 'SP'], ['sand and gravel, compact', 'SP'], ['CI silty clay, firm', 'CI'], ['2.4-3.1 clay, stiff, moist, brown', 'CL']];
       for (const [t, u] of cases) { const q = P(t); want(q.uscs === u, t + ' -> ' + q.uscs + ' (wanted ' + u + ')'); }
-      want(P('silty sand, compact').mods === '' && P('sandy clay, stiff').mods === 'sandy' && P('gravelly sand').mods === 'gravelly' && P('sand and gravel').mods === 'gravelly', 'modifiers kept, the soil\\'s own word not repeated: ' + [P('silty sand').mods, P('sandy clay').mods, P('gravelly sand').mods, P('sand and gravel').mods]);
+      const D = t => composeDesc({ uscs: '', mods: '', texture: '', ...P(t) }).text.toLowerCase(); want(!/silty.*silty/.test(D('silty sand, compact')) && /sandy/.test(D('sandy clay, stiff')) && /gravelly/.test(D('gravelly sand')) && /gravel/.test(D('sand and gravel')), 'modifiers kept in the description, the soil\\'s own word not repeated: ' + [D('silty sand'), D('sandy clay'), D('gravelly sand'), D('sand and gravel')]);
       want(P('silty sand').inferred && !P('SM silty sand').inferred, 'assigned symbols are marked as from the words');
       want(/from the words/.test(ltRead('silty sand, compact')), 'the Reads as line says it was assigned: ' + ltRead('silty sand, compact'));
       want(P('sand with coal fragments').uscs === 'SP' && /coal fragments/.test(P('sand with coal fragments').mods + P('sand with coal fragments').other), 'other words kept');
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('log: typed soil names set the texture too', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); for (const b of projList()) for (const l of b.layers) l.texture = '';
+        const a = parseLayerText('silty sand, compact, moist, brown');
+        want(a.uscs === 'SM' && a.texture === 'cfem|silty SAND', 'silty sand gets SM and the CFEM name: ' + JSON.stringify([a.uscs, a.texture]));
+        const b2 = parseLayerText('Sandy loam, friable, moist'); want(b2.texture === 'cssc|Sandy loam', 'a CSSC texture is recognised: ' + b2.texture);
+        const c = parseLayerText('Silty sand with gravel, dense'); want(c.texture === 'astm|Silty sand with gravel' && c.uscs === 'SM', 'an ASTM group name: ' + JSON.stringify([c.texture, c.uscs]));
+        goTab('log'); await w(300); openDrawer('layer', 1); await w(150); const t = document.querySelector('#drawer #lt-type'); t.value = 'silty sand, compact, moist'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(250);
+        const l = cur().layers[1]; want(l.texture === 'cfem|silty SAND' && l.uscs === 'SM' && /^silty SAND \\(SM\\)/.test(composeDesc(l).text), 'typed in the panel, the log reads silty SAND (SM): ' + composeDesc(l).text);
+        /* the project's own system wins next time */
+        cur().layers[0].texture = 'bs|SAND'; const d = parseLayerText('silty sand'); want(d.texture === 'bs|silty SAND', 'the project\\'s naming system is used: ' + d.texture);
+        /* Enter on the shown text keeps the texture */
+        openDrawer('layer', 1); await w(150); const before = JSON.stringify(cur().layers[1]); document.querySelector('#drawer #lt-type').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(200);
+        want(JSON.stringify(cur().layers[1]) === before, 'unchanged text keeps the texture: ' + JSON.stringify(cur().layers[1]));
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       return F;
     })()`);
     expect(!r.length, r.join(' || '));

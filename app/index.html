@@ -1582,6 +1582,15 @@ function ltInfer(head, all) {
   if (!SOILS[code]) code = code.slice(0, 2);
   return SOILS[code] ? { code, mods, rest: head.slice(0, m.index) + head.slice(m.index + m[0].length) } : null;
 }
+/* a soil name from one of the naming lists ("silty SAND", "Sandy loam", "Silty sand with gravel"): the layer's own system first,
+   then the one the project uses most, then CFEM, ASTM, BS 5930, CSSC, AASHTO. A bare SAND, CLAY… is left to the group symbol. */
+function ltTexture(head, prev) {
+  const h = head.replace(/\s+/g, ' ').trim().toLowerCase(), cands = [h, h.replace(/\s*\([^)]*\)\s*$/, '')]; if (!h || /^(sand|gravel|silt|clay)$/.test(cands[1]) || Object.values(SOILS).some(v => v.p && v.p.toLowerCase() === cands[1])) return '';   // TOPSOIL, PEAT, FILL… are soil types of their own
+  const count = {}; for (const b of projList()) for (const l of b.layers || []) { const k = (l.texture || '').split('|')[0]; if (TEXTURES[k]) count[k] = (count[k] || 0) + 1; }
+  const order = [...new Set([prev?.texture?.split('|')[0], ...Object.keys(count).sort((a, c) => count[c] - count[a]), 'cfem', 'astm', 'bs', 'cssc', 'aashto'])].filter(k => TEXTURES[k]);
+  for (const k of order) for (const c of cands) { const n = TEXTURES[k].list.find(x => x.toLowerCase() === c); if (n) return `${k}|${n}`; }
+  return '';
+}
 function parseLayerText(text, prev) {
   let t = String(text || '').replace(/\s+/g, ' ').trim(); const o = { uscs: '', mods: '', consistency: '', moisture: '', colour: '', origin: '', other: '', hz: '' }, mods = [], other = [];
   const toM = (v, u) => u ? (/^f/i.test(u) || u === "'" ? v / FT : v) : fromD(v);
@@ -1597,7 +1606,9 @@ function parseLayerText(text, prev) {
   let code = /\(([A-Za-z]{1,4}(?:-[A-Za-z]{2})?)\)/.exec(head)?.[1], first = /^([A-Za-z]{1,4}(?:-[A-Za-z]{2})?)(?=[\s:]|$)/.exec(head)?.[1];
   if (code && isCode(code)) head = head.replace(`(${code})`, ''); else if (first && isCode(first) && (first === first.toUpperCase() || head.trim().split(' ').length <= 3)) { code = first; head = head.slice(first.length); } else code = null;
   if (code) o.uscs = code.toUpperCase();
-  else { const hits = Object.entries(SOILS).filter(([, v]) => v.p && new RegExp(`\\b${v.p.replace(/[,]/g, '\\,')}\\b`, 'i').test(head)), long = Math.max(0, ...hits.map(([, v]) => v.p.length)), top = hits.filter(([, v]) => v.p.length === long);
+  const tex = ltTexture(head, prev);
+  if (tex) { o.texture = tex; if (!o.uscs) { const inf = ltInfer(tex.slice(tex.indexOf('|') + 1).replace(/\s*\(.*$/, ''), t); if (inf) { o.uscs = inf.code; o.inferred = true; } } head = ''; }
+  else if (!code) { const hits = Object.entries(SOILS).filter(([, v]) => v.p && new RegExp(`\\b${v.p.replace(/[,]/g, '\\,')}\\b`, 'i').test(head)), long = Math.max(0, ...hits.map(([, v]) => v.p.length)), top = hits.filter(([, v]) => v.p.length === long);
     if (top.length === 1) o.uscs = top[0][0];
     else { const inf = ltInfer(head, t); if (inf) { o.uscs = inf.code; o.inferred = true; head = inf.rest; mods.push(...inf.mods); } } }
   const s = soilOf(o.uscs); if (s?.p) head = head.replace(new RegExp(`\\b${s.p.replace(/[,]/g, '\\,')}\\b`, 'i'), ''); head = head.replace(/^[\s:–-]+|[\s:–-]+$/g, '');
@@ -1621,8 +1632,8 @@ function parseLayerText(text, prev) {
   return o;
 }
 const LT_KEYS = ['uscs', 'mods', 'consistency', 'moisture', 'colour', 'origin', 'other', 'hz'];
-/* the text shown for typing: the symbol-based description (a texture keeps its own button), depths in the display unit */
-const ltDesc = l => { const c = composeDesc({ ...l, texture: '' }); return c.name || c.body ? c.text : ''; };
+/* the text shown for typing: the layer's description as the log prints it, depths in the display unit */
+const ltDesc = l => { const c = composeDesc(l); return c.name || c.body ? c.text : ''; };   // the texture name is read back as typed
 const layerText = l => `${l.top != null && l.bottom != null ? `${fx(l.top)}-${fx(l.bottom)} ` : ''}${ltDesc(l)}`;
 /* apply typed text to a layer: returns an error to show instead of applying, else ''. A new layer (o.add) takes its depths from the text or o.top/o.bottom
    and must not overlap; an existing one moves its neighbours with it, as when a depth is typed in its box, if they stay the right way up. */
@@ -1642,7 +1653,7 @@ function layerApplyText(b, l, text, o = {}) {
   if (!q.depthOnly) {
     for (const k of LT_KEYS) l[k] = q[k];
     if (!q.origin && (!ORIGIN_TAG[was.origin] || (was.origin === 'fill' && l.uscs === 'FILL'))) l.origin = was.origin || '';   // origins the description doesn't print (topsoil, bedrock, fill on FILL) keep their value
-    if (q.uscs && q.uscs !== was.uscs) l.texture = '';
+    if (q.texture) l.texture = q.texture; else if (q.uscs && q.uscs !== was.uscs) l.texture = '';
   }
   b.layers.sort((a, c) => (a.top ?? 0) - (c.top ?? 0)); logChange(b, 'Soil layers'); store.save(b); return '';
 }
