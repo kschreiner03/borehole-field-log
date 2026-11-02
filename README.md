@@ -28,7 +28,7 @@ Borehole logging, groundwater and reporting, as a Windows and Mac desktop app (E
    cd borehole-field-log
    npm ci
    ```
-3. Build the installer: `npm run dist:win`. It downloads MODFLOW 6 for Windows (checked against its published SHA-256), runs both test suites and writes `dist\Borehole Field Log Setup <version>.exe`. To skip the tests: `node scripts/fetch-mf6.mjs win32-x64 && npm run build && npx electron-builder --win`.
+3. Build the installer: `npm run dist:win`. It downloads MODFLOW 6 for Windows (checked against its published SHA-256), runs both test suites and writes the NSIS installer `dist\Borehole-Field-Log-Setup-<version>.exe`. It is a normal setup wizard: install for just this user or for everyone, choose the folder, Desktop and Start-menu shortcuts, an uninstaller in Settings › Apps, and `.bhp` / `.bhlog` files open in the app. Saved boreholes are kept when the app is uninstalled. The installer can also be built on a Mac with `npx electron-builder --win` after `node scripts/fetch-mf6.mjs win32-x64` and `npm run build`. To skip the tests: `node scripts/fetch-mf6.mjs win32-x64 && npm run build && npx electron-builder --win`.
 4. Send the `.exe`. It is unsigned, so Windows shows "Windows protected your PC" the first time; choose **More info › Run anyway** (see Signing below to remove the warning).
 
 To update later: `git pull`, then build again.

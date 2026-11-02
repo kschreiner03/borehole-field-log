@@ -8,9 +8,9 @@ import { tmpdir } from 'node:os';
 
 const VERSION = '6.8.1';
 const BUILDS = {
-  'darwin-arm64': { zip: `mf6.${VERSION}_macarm.zip`, sha256: '2167d553d8f0c57c6c356156cb158b14e60684199785a82031b5c6cccf0b1e4c', bin: 'mf6' },
-  'win32-x64': { zip: `mf6.${VERSION}_win64.zip`, sha256: 'de54d0d78f2c3e5aa2104ec688c458e85ac4cbc770feff24015df4ba7d027837', bin: 'mf6.exe' },
-  'linux-x64': { zip: `mf6.${VERSION}_linux.zip`, sha256: '439a29f3e60f8e88b0ac083db10c92e3474b203d18ca6583863d8464b811ba90', bin: 'mf6' },
+  'darwin-arm64': { zip: `mf${VERSION}_macarm.zip`, sha256: '2167d553d8f0c57c6c356156cb158b14e60684199785a82031b5c6cccf0b1e4c', bin: 'mf6' },
+  'win32-x64': { zip: `mf${VERSION}_win64.zip`, sha256: 'de54d0d78f2c3e5aa2104ec688c458e85ac4cbc770feff24015df4ba7d027837', bin: 'mf6.exe' },
+  'linux-x64': { zip: `mf${VERSION}_linux.zip`, sha256: '439a29f3e60f8e88b0ac083db10c92e3474b203d18ca6583863d8464b811ba90', bin: 'mf6' },
 };
 const targets = process.argv.slice(2).length ? process.argv.slice(2) : [`${process.platform}-${process.arch}`];
 for (const t of targets) {
