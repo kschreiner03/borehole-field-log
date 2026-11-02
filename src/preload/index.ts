@@ -11,6 +11,8 @@ const desktop = {
   onMenu: (cb: (act: string) => void) => { ipcRenderer.on('menu', (_e, act: string) => cb(act)); },
   onOpenFile: (cb: (f: OpenedFile) => void) => { ipcRenderer.on('open-file', (_e, f: OpenedFile) => cb(f)); },
   ready: () => ipcRenderer.send('renderer-ready'),
+  // MODFLOW 6, run on this computer: model files in, listed outputs (bytes) back
+  mf6Run: (o: { files: Record<string, string>; outputs?: string[] }): Promise<{ ok: boolean; error?: string; stdout?: string; seconds?: number; files?: Record<string, Uint8Array> }> => ipcRenderer.invoke('mf6:run', o),
 };
 contextBridge.exposeInMainWorld('desktop', desktop);
 export type Desktop = typeof desktop;

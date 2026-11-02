@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from 'electron';
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
+import { mf6Binary, runMf6 } from './mf6run.mjs';
 
 /* The desktop shell. The current interface ("classic") runs from resources/legacy; the React interface is being
    built alongside it and opens from View > New interface (preview). Project files are ordinary files on disk. */
@@ -77,6 +78,12 @@ ipcMain.handle('file:save', async (_e, o: { name: string; data: ArrayBuffer; pat
   await writeFile(path, Buffer.from(o.data));
   if (/\.(bhp|bhlog)$/i.test(path)) app.addRecentDocument(path);
   return { path, name: basename(path) };
+});
+
+/* MODFLOW 6: the page sends model files (plain names, text only) and gets the listed outputs back; nothing else reaches the shell */
+ipcMain.handle('mf6:run', async (e, o: { files: Record<string, string>; outputs?: string[] }) => {
+  if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' };
+  return runMf6({ bin: mf6Binary(app.getAppPath()), files: o?.files, outputs: Array.isArray(o?.outputs) ? o.outputs : [] });
 });
 
 ipcMain.handle('file:open', async () => {

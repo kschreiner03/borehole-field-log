@@ -1,6 +1,7 @@
 /* End-to-end checks of the classic interface (resources/legacy, the offline build) in a real Electron window, with the
    network blocked. Run with `npm run test:app`; exits non-zero when any check fails. Each check gets a fresh profile. */
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, session, ipcMain } from 'electron';
+import { mf6Binary, runMf6 } from '../../src/main/mf6run.mjs';
 import { resolve } from 'node:path';
 
 const PAGE = resolve('resources/legacy/index.html');
@@ -9,10 +10,11 @@ const results = [];
 let n = 0;
 app.on('window-all-closed', () => {});   // each check closes its window; without this Electron quits between checks
 
-async function withPage(fn) {
+ipcMain.handle('mf6:run', (_e, o) => runMf6({ bin: mf6Binary(resolve('.')), files: o?.files, outputs: o?.outputs || [] }));
+async function withPage(fn, opts = {}) {
   const ses = session.fromPartition('check-' + ++n);   // in memory: a fresh profile that survives reloads within the check
   ses.webRequest.onBeforeRequest((d, cb) => cb({ cancel: /^https?:/.test(d.url) }));   // offline: nothing from the internet
-  const win = new BrowserWindow({ show: false, width: 1440, height: 920, webPreferences: { session: ses } });
+  const win = new BrowserWindow({ show: false, width: 1440, height: 920, webPreferences: { session: ses, ...(opts.mf6 ? { preload: resolve('tests/app/preload-mf6.cjs') } : {}) } });
   const load = async () => {
     await win.loadFile(PAGE); await wait(1500);
     await run(`window.__errs = []; addEventListener('error', e => __errs.push(e.message)); addEventListener('unhandledrejection', e => __errs.push(String(e.reason?.stack || e.reason))); window.confirm = () => true; 1`);
@@ -22,9 +24,9 @@ async function withPage(fn) {
   finally { win.destroy(); }
 }
 
-async function check(name, fn) {
+async function check(name, fn, opts) {
   if (process.env.ONLY && !name.includes(process.env.ONLY)) return;   // ONLY=<text> runs the checks whose name contains it
-  try { await withPage(async (run, load) => { await fn(run, load); const errs = await run('window.__errs'); if (errs.length) throw new Error('page errors: ' + errs.join(' | ')); }); results.push([name, null]); }
+  try { await withPage(async (run, load) => { await fn(run, load); const errs = await run('window.__errs'); if (errs.length) throw new Error('page errors: ' + errs.join(' | ')); }, opts); results.push([name, null]); }
   catch (e) { results.push([name, e.message || String(e)]); }
 }
 const expect = (ok, msg) => { if (!ok) throw new Error(msg); };
@@ -1071,6 +1073,32 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('mf6: bridge runs a model', async run => {
+    const r = await run(`(async () => {
+      const F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        want(typeof window.desktop?.mf6Run === 'function', 'bridge present');
+        const files = {
+          'mfsim.nam': 'BEGIN options\\nEND options\\nBEGIN timing\\n  TDIS6 sim.tdis\\nEND timing\\nBEGIN models\\n  gwf6 gwf.nam gwf\\nEND models\\nBEGIN exchanges\\nEND exchanges\\nBEGIN solutiongroup 1\\n  ims6 sim.ims gwf\\nEND solutiongroup\\n',
+          'sim.tdis': 'BEGIN options\\n  TIME_UNITS days\\nEND options\\nBEGIN dimensions\\n  NPER 1\\nEND dimensions\\nBEGIN perioddata\\n  1.0 1 1.0\\nEND perioddata\\n',
+          'sim.ims': 'BEGIN nonlinear\\n  OUTER_DVCLOSE 1e-6\\nEND nonlinear\\nBEGIN linear\\n  INNER_DVCLOSE 1e-8\\n  INNER_RCLOSE 1e-6\\nEND linear\\n',
+          'gwf.nam': 'BEGIN packages\\n  DIS6 gwf.dis\\n  NPF6 gwf.npf\\n  IC6 gwf.ic\\n  CHD6 gwf.chd\\n  OC6 gwf.oc\\nEND packages\\n',
+          'gwf.dis': 'BEGIN dimensions\\n  NLAY 1\\n  NROW 1\\n  NCOL 5\\nEND dimensions\\nBEGIN griddata\\n  DELR\\n    CONSTANT 10\\n  DELC\\n    CONSTANT 10\\n  TOP\\n    CONSTANT 10\\n  BOTM\\n    CONSTANT 0\\nEND griddata\\n',
+          'gwf.npf': 'BEGIN griddata\\n  ICELLTYPE\\n    CONSTANT 0\\n  K\\n    CONSTANT 1\\nEND griddata\\n',
+          'gwf.ic': 'BEGIN griddata\\n  STRT\\n    CONSTANT 5\\nEND griddata\\n',
+          'gwf.chd': 'BEGIN dimensions\\n  MAXBOUND 2\\nEND dimensions\\nBEGIN period 1\\n  1 1 1 6\\n  1 1 5 4\\nEND period 1\\n',
+          'gwf.oc': 'BEGIN options\\n  HEAD FILEOUT gwf.hds\\nEND options\\nBEGIN period 1\\n  SAVE HEAD ALL\\nEND period 1\\n' };
+        const res = await window.desktop.mf6Run({ files, outputs: ['gwf.hds', 'gwf.lst'] });
+        want(res.ok, 'runs: ' + res.error);
+        want(/Normal termination/.test(res.stdout), 'normal termination');
+        want(res.files['gwf.hds'] instanceof Uint8Array && res.files['gwf.hds'].length === 24 + 16 + 12 + 5 * 8, 'head file returned: ' + res.files['gwf.hds']?.length);
+        const bad = await window.desktop.mf6Run({ files: { ...files, '../x': 'no' } });
+        want(!bad.ok && /plain names/.test(bad.error), 'refuses paths: ' + bad.error);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };

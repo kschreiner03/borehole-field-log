@@ -8,13 +8,14 @@
   "private": true,
   "scripts": {
     "sync-legacy": "node scripts/sync-legacy.mjs",
+    "fetch-mf6": "node scripts/fetch-mf6.mjs",
     "dev": "npm run sync-legacy && electron-vite dev",
     "build": "npm run sync-legacy && electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:app": "npm run sync-legacy && node scripts/test-app.mjs",
-    "dist:win": "npm test && npm run test:app && npm run build && electron-builder --win",
-    "dist:mac": "npm test && npm run test:app && npm run build && electron-builder --mac"
+    "dist:win": "node scripts/fetch-mf6.mjs win32-x64 && npm test && npm run test:app && npm run build && electron-builder --win",
+    "dist:mac": "node scripts/fetch-mf6.mjs darwin-arm64 && npm test && npm run test:app && npm run build && electron-builder --mac"
   },
   "build": {
     "appId": "ca.boreholefieldlog.app",
@@ -26,6 +27,9 @@
     "files": [
       "out/**",
       "resources/**"
+    ],
+    "asarUnpack": [
+      "resources/mf6/**"
     ],
     "fileAssociations": [
       {

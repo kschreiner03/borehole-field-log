@@ -4,3 +4,5 @@ dist/
 resources/legacy/
 .DS_Store
 *.log
+resources/mf6/*/mf6
+resources/mf6/*/mf6.exe
