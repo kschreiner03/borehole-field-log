@@ -1258,6 +1258,18 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .ctl-gb section.sec { border: 0; box-shadow: none; margin: 0; background: none; } .ctl-gb section.sec > header { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 6px; border: 0; background: none; min-height: 0; } .ctl-gb section.sec > header h3, .ctl-gb section.sec > header .sp { display: none; } .ctl-gb section.sec > .body { padding: 0; }
 .ctl-gb .scroll-x, .ctl-gb table { max-width: 100%; } .ctl-gb .scroll-x { overflow-x: auto; } .ctl-gb table { font-size: 12px; }
 .xs-dates input[type="range"] { width: 160px; }
+.ctl-gb .fields { grid-template-columns: minmax(0, 1fr) !important; gap: 8px; }
+.gwm-act { display: flex; flex-direction: column; gap: 6px; } .gwm-act .btn, .ctl-gb > .btn { justify-content: center; }
+/* wide model tables become one card per row in the panel; each value keeps a short label */
+.ctl-gb #gwm-units thead, .ctl-gb #gwm-feat thead { display: none; }
+.ctl-gb #gwm-units, .ctl-gb #gwm-units tbody, .ctl-gb #gwm-feat, .ctl-gb #gwm-feat tbody { display: block; width: 100%; }
+.ctl-gb #gwm-units tr, .ctl-gb #gwm-feat tr { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.ctl-gb #gwm-units td, .ctl-gb #gwm-feat td { display: block; border: 0; padding: 0; text-align: left; }
+.ctl-gb #gwm-units td:first-child { flex-basis: 100%; font-weight: 600; }
+.ctl-gb #gwm-units td.note { flex-basis: 100%; font-size: 11.5px; }
+.ctl-gb #gwm-units td:nth-child(2)::before { content: "K "; color: var(--muted); } .ctl-gb #gwm-units td:nth-child(5)::before { content: "Kv/Kh "; color: var(--muted); } .ctl-gb #gwm-units td:nth-child(7)::before { content: "nₑ "; color: var(--muted); }
+.ctl-gb #gwm-feat td { flex-basis: calc(50% - 4px); } .ctl-gb #gwm-feat td:nth-child(3) { flex-basis: 100%; } .ctl-gb #gwm-feat input, .ctl-gb #gwm-feat select { width: 100% !important; }
+.ctl-gb h4 { margin: 4px 0 !important; font-size: 12.5px; }
 .ctl.min { overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; }
 .ctl.min .tb { width: 30px; min-height: 30px; justify-content: center; }
 /* toolbar: project switcher and the find box */
@@ -2019,6 +2031,9 @@ function mapGoTo(q) {
 }
 document.addEventListener('submit', e => { const f = e.target.closest?.('[data-mapgo]'); if (!f) return; e.preventDefault(); mapGoTo(f.querySelector('input').value); });
 /* map layers and which boreholes the maps draw: a panel beside the map */
+CTL.site = () => [
+  ...(S.mapEdit ? [] : [{ id: 'map-layers', title: 'Map layers', icon: NAV_ICON.site, html: `<div class="map-layers">${layersPanelHTML()}</div>` }]),
+  { id: 'map-sec', title: 'Section line', icon: NAV_ICON.xsec, html: secToolsHTML() }];
 function layersPanelHTML() {
   const site = siteOf(), F = gwFlow(), ps = projList();
   const rows = LAYER_DEFS.map(([k, label, sw]) => {
@@ -4933,7 +4948,7 @@ async function gwEnsure(force) {
 }
 const gwWantedBy = L => !!window.desktop?.mf6Run && !!(gwSaved().calib || gwSaved().transport?.on) && (L?.pages || []).some(p => p.items?.some(it => ['gwsum', 'gwcal', 'gwpar', 'section', 'plan'].includes(it.t)));
 function gwComposeEnsure() { if (!gwWantedBy(repLayout())) return; gwModel(); if (S.gwm.run || S.gwm.busy || S.gwm.tried || S.gwm.M?.error) return; S.gwm.tried = true; gwEnsure(true); }
-function gwRefresh() { if (S.tab === 'gwm') { const v = $('#view'); if (v) v.innerHTML = gwmHTML(); } else if (S.tab === 'xsec') drawXsec(); else if (S.tab === 'site') drawSite?.(); else if (S.tab === 'compose' && !S.gwm.busy) rerenderCompose(); }
+function gwRefresh() { if (S.tab === 'gwm') { const v = $('#view'); if (v) v.innerHTML = gwmHTML(); ctlRender(); } else if (S.tab === 'xsec') drawXsec(); else if (S.tab === 'site') drawSite?.(); else if (S.tab === 'compose' && !S.gwm.busy) rerenderCompose(); }
 async function gwAct(act, t) {
   if (S.readOnly && act !== 'gw-export') return;
   const M = gwModel(); if (M.error) { toast(M.error); return; }
@@ -4961,7 +4976,7 @@ async function gwAct(act, t) {
 }
 function gwmHTML() {
   const desk = !!window.desktop?.mf6Run, M = gwModel(), g = gwSaved(), c = g.calib, ct = g.calibT, pv = gwPv(), ro = S.readOnly || !desk || S.gwm.busy ? 'disabled' : '', f3 = v => v == null || !Number.isFinite(+v) ? '–' : (+v).toPrecision(3), f2 = v => v == null || !Number.isFinite(+v) ? '–' : (+v).toFixed(2);
-  if (M.error) return `<div class="gw-page"><section class="sec"><header><h3>Groundwater model</h3><span class="note">${GW_ENGINE}</span></header><div class="body"><p class="note" style="color:var(--warn,#a3470b)">The model can't be built yet: ${esc(M.error)}</p></div></section></div>`;
+  if (M.error) { S._gwmCtl = null; return `<div class="gw-page"><section class="sec"><header><h3>Groundwater model</h3><span class="note">${GW_ENGINE}</span></header><div class="body"><p class="note" style="color:var(--warn,#a3470b)">The model can't be built yet: ${esc(M.error)}</p></div></section></div>`; }
   const stale = c && c.key !== gwInputsKey(M), rounds = [...new Set(M.list.flatMap(b => monitoring(b).filter(w => w.date).map(w => w.date)))].sort();
   const unitRow = u => { const cal = pv['k:' + u.u]; return `<tr><td>${esc(u.u)}</td><td class="r"><input type="number" step="any" data-gwu="${esc(u.u)}|k" value="${esc(g.units?.[u.u]?.k ?? '')}" placeholder="${f3(cal ?? u.k)}" style="width:7em" ${S.readOnly ? 'disabled' : ''}></td><td>m/day</td><td class="note">${esc(cal != null ? `calibrated (${GW_ENGINE.split(' (')[0]}); start: ${u.kSrc}` : u.kSrc)}</td><td class="r"><input type="number" step="any" data-gwu="${esc(u.u)}|kv" value="${esc(g.units?.[u.u]?.kv ?? '')}" placeholder="${u.kv}" style="width:5em" ${S.readOnly ? 'disabled' : ''}></td><td class="note">${esc(u.kvSrc)}</td><td class="r">${f2(u.ne)}</td></tr>`; };
   const featRow = (ft, i) => `<tr><td><select data-gwft="${i}|type" ${S.readOnly ? 'disabled' : ''}>${[['riv', 'River or creek'], ['drn', 'Drain'], ['wel', 'Pumping well'], ['chd', 'Fixed head']].map(([v, t]) => `<option value="${v}" ${ft.type === v ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
@@ -4982,14 +4997,9 @@ function gwmHTML() {
       <text x="140" y="245" text-anchor="middle">Measured head (m)</text><text x="12" y="120" transform="rotate(-90 12 120)" text-anchor="middle">Simulated head (m)</text><text x="44" y="32">${a.toFixed(1)}–${b.toFixed(1)} m; dashed = 1:1</text></svg></div>`; };
   const resT = C => !C ? '' : `<div class="scroll-x" style="max-height:260px;overflow:auto"><table class="sum" id="gwm-res"><thead><tr><th>Well</th><th>Date</th><th class="r">Measured (m)</th><th class="r">Simulated (m)</th><th class="r">Residual (m)</th></tr></thead><tbody>${C.residuals.map(q => `<tr><td>${esc(q.b)}</td><td>${esc(q.date || C.round)}</td><td class="r">${f2(q.h)}</td><td class="r">${f2(q.sim)}</td><td class="r">${Number.isFinite(q.res) ? (q.res > 0 ? '+' : '') + q.res.toFixed(3) : 'dry'}</td></tr>`).join('')}</tbody></table></div>`;
   const T = S.gwm.trans;
-  return `<div class="gw-page">
-    <section class="sec"><header><h3>Groundwater model</h3><button class="btn link" data-act="tut-gwm">Tutorial</button><span class="note">${GW_ENGINE} · public domain · labelled “Model (MODFLOW 6), not measured” wherever it is drawn</span><span class="sp"></span>
-      <button class="btn" data-act="gw-run" ${ro}>Run model</button><button class="btn primary" data-act="gw-cal" ${ro}>Calibrate (steady)</button><button class="btn" data-act="gw-calt" ${ro || !c ? 'disabled' : ''} title="${c ? 'Specific yield and recharge per period, against every round' : 'Calibrate the steady model first'}">Calibrate (all rounds)</button><button class="btn" data-act="gw-trans" ${ro}>Run transport</button><button class="btn" data-act="gw-export" ${S.gwm.busy ? 'disabled' : ''}>Export model files</button><button class="btn" data-act="gw-report" ${S.readOnly ? 'disabled' : ''}>Add model pages to the report</button></header>
-      <div class="body">
-      ${!desk ? `<p class="note" style="color:var(--warn,#a3470b)">The groundwater model runs MODFLOW 6 on this computer, so it needs the desktop app. The cross-section keeps the Domenico forecast.</p>` : ''}
-      ${S.gwm.msg ? `<p class="note"><b>${esc(S.gwm.msg)}</b></p>` : ''}${S.gwm.err ? `<p class="note" style="color:var(--warn,#a3470b)">MODFLOW 6: ${esc(S.gwm.err)}</p>` : ''}
-      ${stale ? `<p class="note" style="color:var(--warn,#a3470b)">The inputs changed after the last calibration (${esc(c.at.slice(0, 10))}): calibrate again before relying on the results.</p>` : ''}
-      <p class="note" id="gwm-grid">Grid ${M.grid.nrow} rows × ${M.grid.ncol} columns × ${M.grid.nlay} layers of ${M.grid.cell} m, rotated ${M.grid.angrot.toFixed(1)}° so columns follow the fitted flow direction (${M.F.az.toFixed(0)}° from north). Fixed heads on the upgradient and downgradient faces from the ${esc(M.round)} water-table plane; no flow on the sides and through the base of the logs. ${S.gwm.run ? `Last run: ${f3(S.gwm.run.seconds)} s, mass-balance discrepancy ${f3(S.gwm.run.discrepancy)} %.` : ''}</p>
+  S._gwmCtl = [
+    { id: 'gwm-act', title: 'Run', icon: '<path d="M7 5l12 7-12 7z"/>', html: `<div class="gwm-act"><button class="btn" data-act="gw-run" ${ro}>Run model</button><button class="btn primary" data-act="gw-cal" ${ro}>Calibrate (steady)</button><button class="btn" data-act="gw-calt" ${ro || !c ? 'disabled' : ''} title="${c ? 'Specific yield and recharge per period, against every round' : 'Calibrate the steady model first'}">Calibrate (all rounds)</button><button class="btn" data-act="gw-trans" ${ro}>Run transport</button><button class="btn" data-act="gw-export" ${S.gwm.busy ? 'disabled' : ''}>Export model files</button><button class="btn" data-act="gw-report" ${S.readOnly ? 'disabled' : ''}>Add model pages to the report</button></div>` },
+    { id: 'gwm-set', title: 'Model setup', icon: CTL_ICON, html: `<p class="note" id="gwm-grid">Grid ${M.grid.nrow} rows × ${M.grid.ncol} columns × ${M.grid.nlay} layers of ${M.grid.cell} m, rotated ${M.grid.angrot.toFixed(1)}° so columns follow the fitted flow direction (${M.F.az.toFixed(0)}° from north). Fixed heads on the upgradient and downgradient faces from the ${esc(M.round)} water-table plane; no flow on the sides and through the base of the logs. ${S.gwm.run ? `Last run: ${f3(S.gwm.run.seconds)} s, mass-balance discrepancy ${f3(S.gwm.run.discrepancy)} %.` : ''}</p>
       <div class="fields" id="gwm-setup" style="grid-template-columns:repeat(5,minmax(0,1fr))">
         <div class="fld"><label for="gwm-round">Calibration round</label><select id="gwm-round" data-gwm="round" ${S.readOnly ? 'disabled' : ''}>${rounds.map(d => `<option value="${d}" ${d === M.round ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
         <div class="fld"><label for="gwm-cell">Cell size (m)</label><input id="gwm-cell" type="number" step="any" data-gwm="cell" value="${esc(g.cell ?? '')}" placeholder="${M.grid.cell}" ${S.readOnly ? 'disabled' : ''}></div>
@@ -4997,12 +5007,22 @@ function gwmHTML() {
         <div class="fld"><label for="gwm-rch">Recharge (m/day)</label><input id="gwm-rch" type="number" step="any" data-gwm="rch" value="${esc(g.rch ?? '')}" placeholder="${f3(pv.rch ?? M.rch)}" ${S.readOnly ? 'disabled' : ''}></div>
         <div class="fld"><label for="gwm-prior">Slug tests in calibration</label><select id="gwm-prior" data-gwm="prior" ${S.readOnly ? 'disabled' : ''}><option value="1" ${g.prior !== false ? 'selected' : ''}>As prior information</option><option value="0" ${g.prior === false ? 'selected' : ''}>Not used</option></select></div></div>
       <p class="note">Recharge: ${esc(pv.rch != null ? 'calibrated; start ' : '')}${esc(M.params.find(p => p.key === 'rch')?.src || '')}. Effective porosity ${f2(S.co.ne ?? .25)} (assumed; Settings).</p>
-      <h4 style="margin:12px 0 6px">Layers</h4>
+      ` },
+    { id: 'gwm-lay', title: 'Layers', icon: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>', html: `
       <div class="scroll-x"><table class="sum" id="gwm-units"><thead><tr><th>Unit (model layer)</th><th class="r">K</th><th>Unit</th><th>Source</th><th class="r">Kv/Kh</th><th>Source</th><th class="r">nₑ</th></tr></thead><tbody>${M.units.map(unitRow).join('')}</tbody></table></div>
-      <h4 style="margin:12px 0 6px">Boundary features <button class="btn" data-act="gw-feat-add" ${S.readOnly ? 'disabled' : ''}>Add</button></h4>
+      ` },
+    { id: 'gwm-bnd', title: 'Boundary features', icon: '<path d="M3 17c3-3 6 0 9-3s6-3 9 0"/><path d="M3 21h18"/>', html: `<h4 style="margin:12px 0 6px">Boundary features <button class="btn" data-act="gw-feat-add" ${S.readOnly ? 'disabled' : ''}>Add</button></h4>
       <div class="scroll-x"><table class="sum" id="gwm-feat"><thead><tr><th>Type</th><th>Name</th><th>Location</th><th>Stage / elevation / head</th><th>Conductance</th><th>Bed bottom</th><th>Rate</th><th></th></tr></thead><tbody>${(g.features || []).map(featRow).join('')}</tbody></table></div>
       ${M.notes.length ? `<p class="note" style="color:var(--warn,#a3470b)">${M.notes.map(esc).join(' ')}</p>` : ''}
-      ${!(g.features || []).length ? '<p class="note">None: the model is driven by the two fixed-head faces and recharge. Add a creek, drain or pumping well where one controls the water table.</p>' : ''}
+      ${!(g.features || []).length ? '<p class="note">None: the model is driven by the two fixed-head faces and recharge. Add a creek, drain or pumping well where one controls the water table.</p>' : ''}` }];
+  return `<div class="gw-page">
+    <section class="sec"><header><h3>Groundwater model</h3><button class="btn link" data-act="tut-gwm">Tutorial</button><span class="note">${GW_ENGINE} · public domain · labelled “Model (MODFLOW 6), not measured” wherever it is drawn</span><span class="sp"></span>
+      </header>
+      <div class="body">
+      ${!desk ? `<p class="note" style="color:var(--warn,#a3470b)">The groundwater model runs MODFLOW 6 on this computer, so it needs the desktop app. The cross-section keeps the Domenico forecast.</p>` : ''}
+      ${S.gwm.msg ? `<p class="note"><b>${esc(S.gwm.msg)}</b></p>` : ''}${S.gwm.err ? `<p class="note" style="color:var(--warn,#a3470b)">MODFLOW 6: ${esc(S.gwm.err)}</p>` : ''}
+      ${stale ? `<p class="note" style="color:var(--warn,#a3470b)">The inputs changed after the last calibration (${esc(c.at.slice(0, 10))}): calibrate again before relying on the results.</p>` : ''}
+      
       </div></section>
     <section class="sec" id="gwm-cal-sec"><header><h3>Calibration</h3><span class="note">Levenberg–Marquardt on log parameters; statistics after Hill and Tiedeman (2007)</span></header><div class="body">
       ${!c ? '<p class="note">Not calibrated yet. Calibrate (steady) fits the layers without slug tests and the recharge to the measured heads of the calibration round.</p>' : `<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start"><div style="flex:1;min-width:420px">${statsT(c, `Steady state, ${c.round}`)}${statsT(ct, `All rounds (${(ct?.rounds || []).length})`)}</div>${scatter(ct || c)}</div>${resT(ct || c)}`}
@@ -5018,14 +5038,16 @@ function gwmHTML() {
    surfaces (ground and unit bases, inverse distance, the model's own) and model output (MODFLOW 6 water table, plume cells,
    flow paths) see-through and named in the legend. Coordinates: x east, y up (elevation × exaggeration), z south. */
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js', THREE_SRI = 'sha384-RRHfJ6w1mTlKUBMYT/hvnRiOzEB/vyRV3DrQOseb6oYfvaZSfdd0byS4bHps0k2R';
+CTL.v3d = () => { const off = S.v3dOff || {}; return [
+  { id: 'v3d-view', title: 'View', icon: NAV_ICON.v3d, html: `<div class="lay-ctl"><label class="note" for="v3d-ve">Vertical exaggeration</label><select id="v3d-ve" style="width:auto">${[[0, 'Auto'], [1, '×1'], [2, '×2'], [5, '×5'], [10, '×10']].map(([v, t]) => `<option value="${v}" ${(S.v3dVe || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div><button class="btn" data-act="v3d-reset">Reset view</button>` },
+  { id: 'v3d-layers', title: 'Layers', icon: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>', html: `<div class="sec-opts">${V3D_LAYERS.map(([k, t]) => `<label class="check"><input type="checkbox" id="v3d-lyr-${k}" ${off[k] ? '' : 'checked'}> ${t}</label>`).join('')}</div>` },
+  { id: 'v3d-out', title: 'Save and export', icon: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', html: `<button class="btn" data-act="v3d-report" ${S.readOnly ? 'disabled' : ''}>Add view to report</button><button class="btn" data-act="v3d-png">Save image</button><button class="btn" data-act="v3d-vtk" title="VTK files for ParaView, in real coordinates">Export for ParaView</button>` }]; };
+CTL.gwm = () => S.tab === 'gwm' ? S._gwmCtl || [] : [];
 const V3D_LAYERS = [['boreholes', 'Boreholes'], ['wells', 'Wells'], ['samples', 'Results'], ['ground', 'Ground'], ['layers', 'Unit surfaces'], ['water', 'Water table'], ['plume', 'Model plume'], ['paths', 'Flow paths'], ['labels', 'Names']];
 function v3dHTML() {
   const off = S.v3dOff || {};
-  return `<div class="v3d-page"><section class="sec"><header><h3>3D view</h3><span class="note">drag to rotate · shift-drag to pan · scroll to zoom</span><span class="sp"></span>
-    <label class="note" for="v3d-ve">Vertical exaggeration</label><select id="v3d-ve" style="width:auto">${[[0, 'Auto'], [1, '×1'], [2, '×2'], [5, '×5'], [10, '×10']].map(([v, t]) => `<option value="${v}" ${(S.v3dVe || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-    <button class="btn" data-act="v3d-reset">Reset view</button><button class="btn" data-act="v3d-report" ${S.readOnly ? 'disabled' : ''}>Add view to report</button><button class="btn" data-act="v3d-png">Save image</button><button class="btn" data-act="v3d-vtk" title="VTK files for ParaView, in real coordinates">Export for ParaView</button></header>
-    <div class="body"><div class="sec-opts" style="display:flex;flex-wrap:wrap;gap:4px 14px;margin-bottom:8px">${V3D_LAYERS.map(([k, t]) => `<label class="check"><input type="checkbox" id="v3d-lyr-${k}" ${off[k] ? '' : 'checked'}> ${t}</label>`).join('')}</div>
-    <div id="v3d" style="position:relative;height:560px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#f7f8fa;touch-action:none"></div>
+  return `<div class="v3d-page"><section class="sec"><header><h3>3D view</h3><span class="note">drag to rotate · shift-drag to pan · scroll to zoom</span><span class="sp"></span><button class="btn" data-act="v3d-reset">Reset view</button></header>
+    <div class="body"><div id="v3d" style="position:relative;height:max(420px, calc(100vh - 300px));border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#f7f8fa;touch-action:none"></div>
     <p class="note" id="v3d-legend" style="margin-top:6px"></p></div></section></div>`;
 }
 const v3dCss = name => getComputedStyle(document.documentElement).getPropertyValue('--' + name).trim() || '#b9aca4';
@@ -7932,7 +7954,7 @@ function siteHTML() {
   const pts = projList().filter(b => b.easting != null && b.northing != null);
   return `<div class="site-grid">
     ${S.mapEdit ? `<section class="sec" style="grid-column:1/-1"><header><h3>Map editor</h3><span class="note">Shapes and locations are saved as you go</span></header><div class="body" id="map-ed-wrap">${mapEditorHTML()}</div></section>` : ''}
-    <section class="sec" style="grid-column:1/-1" ${S.mapEdit ? 'hidden' : ''}><header><h3>Site plan</h3><span class="note">Drag to move · scroll to zoom · click boreholes to build the section line</span></header><div class="body">${S.mapEdit ? '' : `<div class="map-wrap"><div id="plan" class="map-canvas"></div><aside class="map-layers">${layersPanelHTML()}</aside></div>`}
+    <section class="sec" style="grid-column:1/-1" ${S.mapEdit ? 'hidden' : ''}><header><h3>Site plan</h3><span class="note">Drag to move · scroll to zoom · click boreholes to build the section line</span></header><div class="body">${S.mapEdit ? '' : `<div id="plan" class="map-canvas"></div>`}
       ${pts.length < projList().length ? `<p class="note" style="margin-top:6px">${projList().length - pts.length} borehole${projList().length - pts.length > 1 ? 's have' : ' has'} no coordinates and ${projList().length - pts.length > 1 ? 'are' : 'is'} not shown.</p>` : ''}</div></section>
     <section class="sec" style="grid-column:1/-1"><header><h3>Cross-section A–A′</h3><span class="note">${S.secIds.size >= 2 ? `Runs through ${S.secIds.size} boreholes picked on the plan` : 'Best-fit line through all boreholes'}</span><span class="sp"></span><button class="btn link" data-tab="xsec">Open cross-section</button></header></section>
     <section class="sec"><header><h3>Plasticity chart</h3><span class="note">CFEM / Modified USCS</span></header><div class="body"><div id="pchart" class="scroll-x"></div></div></section>
