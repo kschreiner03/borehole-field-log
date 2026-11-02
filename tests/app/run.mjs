@@ -1376,6 +1376,42 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('ui: settings panel and collapsible list', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      const keep = CTL.xsec;
+      try {
+        loadXsExample(); await w(300); localStorage.removeItem('bhlog.ui'); S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {} };
+        CTL.xsec = () => [{ id: 'ta', title: 'Group A', html: '<p id="ta-body">A</p>' }, { id: 'tb', title: 'Group B', html: '<p id="tb-body">B</p>' }];
+        goTab('xsec'); await w(300);
+        const ctl = document.querySelector('#ctl'), wd = () => ctl.getBoundingClientRect().width;
+        want(ctl && !ctl.hidden && ctl.querySelectorAll('.ctl-g').length === 2 && Math.abs(wd() - 300) < 3, 'panel open with two groups at 300 px: ' + (ctl && wd()));
+        ctl.querySelector('[data-act="ctl-toggle"]').click(); await w(150);
+        want(Math.abs(wd() - 40) < 3 && ctl.querySelectorAll('[data-ctlgo]').length === 2, 'collapses to a 40 px strip of group icons: ' + wd());
+        ctl.querySelector('[data-ctlgo="tb"]').click(); await w(150);
+        want(wd() > 250 && document.querySelector('#tb-body') && !document.querySelector('[data-ctlg="tb"] .ctl-gb').hidden, 'icon reopens the panel at that group');
+        document.querySelector('[data-ctlfold="ta"]').click(); await w(100);
+        want(document.querySelector('[data-ctlg="ta"] .ctl-gb').hidden, 'a group folds');
+        renderView(true); await w(150);
+        want(document.querySelector('[data-ctlg="ta"] .ctl-gb').hidden && JSON.parse(localStorage.getItem('bhlog.ui') || '{}').fold?.ta === true, 'fold survives a redraw and is saved');
+        /* resize by dragging the left edge, clamped */
+        const x0 = ctl.getBoundingClientRect().left + 1, ev = (t, x) => (t === 'pointerdown' ? ctl.querySelector('[data-ctlrz]') : window).dispatchEvent(new PointerEvent(t, { clientX: x, clientY: 300, bubbles: true, pointerId: 1 }));
+        ev('pointerdown', x0); ev('pointermove', x0 - 600); ev('pointerup', x0 - 600); await w(150);
+        want(Math.abs(wd() - 480) < 3, 'drag wider is clamped at 480: ' + wd());
+        const x1 = ctl.getBoundingClientRect().left + 1; ev('pointerdown', x1); ev('pointermove', x1 + 600); ev('pointerup', x1 + 600); await w(150);
+        want(Math.abs(wd() - 240) < 3 && JSON.parse(localStorage.getItem('bhlog.ui')).ctlW === 240, 'drag narrower is clamped at 240 and saved: ' + wd());
+        goTab('home'); await w(200); want(ctl.hidden, 'no panel on a page without settings');
+        const mw = document.querySelector('#main').getBoundingClientRect().width;
+        document.querySelector('[data-act="side-toggle"]').click(); await w(200);
+        want(Math.abs(document.querySelector('.side').getBoundingClientRect().width - 36) < 3 && document.querySelector('#main').getBoundingClientRect().width > mw + 150, 'borehole list collapses to 36 px and the work area grows');
+        document.querySelector('[data-act="side-toggle"]').click(); await w(200);
+        want(document.querySelector('.side').getBoundingClientRect().width > 200 && document.querySelector('#bl-q'), 'and opens again');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      finally { CTL.xsec = keep; S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {} }; localStorage.removeItem('bhlog.ui'); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
