@@ -5058,7 +5058,10 @@ function gwmHTML() {
    flow paths) see-through and named in the legend. Coordinates: x east, y up (elevation × exaggeration), z south. */
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js', THREE_SRI = 'sha384-RRHfJ6w1mTlKUBMYT/hvnRiOzEB/vyRV3DrQOseb6oYfvaZSfdd0byS4bHps0k2R';
 CTL.v3d = () => { const off = S.v3dOff || {}; return [
-  { id: 'v3d-view', title: 'View', icon: NAV_ICON.v3d, html: `<div class="lay-ctl"><label class="note" for="v3d-ve">Vertical exaggeration</label><select id="v3d-ve" style="width:auto">${[[0, 'Auto'], [1, '×1'], [2, '×2'], [5, '×5'], [10, '×10']].map(([v, t]) => `<option value="${v}" ${(S.v3dVe || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div><button class="btn" data-act="v3d-reset">Reset view</button>` },
+  { id: 'v3d-view', title: 'View', icon: NAV_ICON.v3d, html: `<div class="lay-ctl"><label class="note" for="v3d-ve">Vertical exaggeration</label><select id="v3d-ve" style="width:auto">${[[0, 'Auto'], [1, '×1'], [2, '×2'], [5, '×5'], [10, '×10']].map(([v, t]) => `<option value="${v}" ${(S.v3dVe || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div><button class="btn" data-act="v3d-reset">Reset view</button>
+    <label class="check"><input type="checkbox" id="v3d-cut" ${S.v3dCut?.on ? 'checked' : ''}> Cut along the section line</label>
+    <div class="lay-ctl"><label class="note" for="v3d-cutpos">Cut position</label><input type="range" id="v3d-cutpos" min="0" max="100" step="1" value="${S.v3dCut?.pos ?? 50}" ${S.v3dCut?.on ? '' : 'disabled'} style="flex:1"></div>
+    <p class="note" style="margin:0">Removes the near side of the site along a plane parallel to section A–A′; the cut face shows the plume on that plane.</p>` },
   { id: 'v3d-layers', title: 'Layers', icon: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>', html: `<div class="sec-opts">${V3D_LAYERS.map(([k, t]) => `<label class="check"><input type="checkbox" id="v3d-lyr-${k}" ${off[k] ? '' : 'checked'}> ${t}</label>`).join('')}</div>` },
   { id: 'v3d-out', title: 'Save and export', icon: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', html: `<button class="btn" data-act="v3d-report" ${S.readOnly ? 'disabled' : ''}>Add view to report</button><button class="btn" data-act="v3d-png">Save image</button><button class="btn" data-act="v3d-vtk" title="VTK files for ParaView, in real coordinates">Export for ParaView</button>` }]; };
 CTL.gwm = () => S.tab === 'gwm' ? S._gwmCtl || [] : [];
@@ -5184,7 +5187,14 @@ async function v3dBuild() {
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false })); sp.scale.set(span / 14, span / 56, 1); sp.position.copy(P(b.easting, b.northing, b.elevation + (b.well?.stickup || 0) + 1.2 / Math.max(1, ve / 2))); groups.labels.add(sp); }
   const camera = new THREE.PerspectiveCamera(40, W / H, .1, span * 50);
   S.v3d = { ok: true, renderer, scene, camera, groups, ve, span, target: new THREE.Vector3(0, (zTop - Z0) * ve / 2, 0), orbit: S.v3d?.orbit && S.v3d.ok && S.v3d.span === span ? S.v3d.orbit : null };
-  S.v3d.plume = plume; v3dView(!S.v3d.orbit); v3dControls(renderer.domElement);
+  S.v3d.plume = plume;
+  { // the section line's direction: the picked boreholes' ends, else the best-fit line through all (principal axis)
+    const pk = [...S.secIds].map(id => list.find(b => b.id === id)).filter(Boolean); let ux, uy;
+    if (pk.length >= 2) { const a = pk[0], b = pk[pk.length - 1], L = Math.hypot(b.easting - a.easting, b.northing - a.northing) || 1; ux = (b.easting - a.easting) / L; uy = (b.northing - a.northing) / L; }
+    else { let sxx = 0, syy = 0, sxy = 0; for (const b of list) { const x = b.easting - E0, y = b.northing - N0; sxx += x * x; syy += y * y; sxy += x * y; } const th = .5 * Math.atan2(2 * sxy, sxx - syy); ux = Math.cos(th); uy = Math.sin(th); }
+    const nx = -uy, ny = ux, s = list.map(b => (b.easting - E0) * ux + (b.northing - N0) * uy), o = list.map(b => (b.easting - E0) * nx + (b.northing - N0) * ny);
+    S.v3d.cut = { ux, uy, nx, ny, s0: Math.min(...s) - 6, s1: Math.max(...s) + 6, o0: Math.min(...o) - 3, o1: Math.max(...o) + 3, z0: zBot, z1: zTop, PF, lvP, E0, N0, Z0, ve }; }
+  v3dCutApply(); v3dView(!S.v3d.orbit); v3dControls(renderer.domElement);
   const T = S.gwm?.trans;
   $('#v3d-legend').innerHTML = esc(`Measured: borehole columns in soil colours; wells (white casing, dark screen) with blue discs at the water level${date ? ' on ' + date : ''}; spheres are ${LAB_PARAMS[param]?.label || param} results coloured against the guideline (white = not detected). `)
     + (M && !M.error ? esc(`Interpolated between boreholes (inverse distance): the see-through ground and unit-base surfaces. Water table: ${S.v3dShown.wtSrc}. `) : '')
@@ -5193,9 +5203,30 @@ async function v3dBuild() {
       : esc(`Interpreted from measured results, not modelled: ${LAB_PARAMS[param]?.label || param} in groundwater${PF.date ? ' on ' + PF.date : ''}, shells at 1×, 10× and 100× the guideline, inverse distance between the wells' screens and fading to nothing 5 m beyond the wells. `))
     + `<b>Vertical exaggeration ×${ve}</b>${S.v3dVe ? '' : ' (auto)'}.`;
 }
+/* the cut: a vertical clipping plane parallel to the section line; the face shows the plume on that plane in its colours */
+function v3dCutApply() {
+  const V = S.v3d; if (!V?.ok || !V.cut) return; const C = V.cut, old = V.scene.getObjectByName('cut-face');
+  if (old) { V.scene.remove(old); old.geometry.dispose(); old.material.map?.dispose(); old.material.dispose(); }
+  if (!S.v3dCut?.on) { V.renderer.clippingPlanes = []; if (V.orbit) v3dRender(); return; }
+  const c = C.o0 + (C.o1 - C.o0) * (S.v3dCut.pos ?? 50) / 100;
+  V.renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(C.nx, 0, -C.ny), -c)]; C.c = c;   // v3dRender turns it so the side facing the camera is the one removed
+  const cw = 256, ch = 128, cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const ctx = cv.getContext('2d');
+  ctx.fillStyle = 'rgba(120,120,120,.10)'; ctx.fillRect(0, 0, cw, ch);
+  if (C.PF && C.lvP.length) { const fam = C.PF.src === 'mf6' ? PLUME_RAMP.model : PLUME_RAMP.meas, g0 = C.lvP[0].v, img = ctx.getImageData(0, 0, cw, ch);
+    for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) { const sv = C.s1 - (x + .5) / cw * (C.s1 - C.s0), z = C.z1 - (y + .5) / ch * (C.z1 - C.z0), v = C.PF.at(C.E0 + sv * C.ux + c * C.nx, C.N0 + sv * C.uy + c * C.ny, z);
+      if (!(v >= g0)) continue; const rgb = hexMix(fam.slice(1), Math.log10(v / g0) / 2).match(/\d+/g).map(Number), q = 4 * (y * cw + x); img.data[q] = rgb[0]; img.data[q + 1] = rgb[1]; img.data[q + 2] = rgb[2]; img.data[q + 3] = 215; }
+    ctx.putImageData(img, 0, 0); }
+  ctx.strokeStyle = '#5d6a75'; ctx.lineWidth = 2; ctx.strokeRect(1, 1, cw - 2, ch - 2);
+  const tex = new THREE.CanvasTexture(cv), m = new THREE.Mesh(new THREE.PlaneGeometry(C.s1 - C.s0, (C.z1 - C.z0) * C.ve), new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+  const sm = (C.s0 + C.s1) / 2; m.position.set(sm * C.ux + c * C.nx, ((C.z0 + C.z1) / 2 - C.Z0) * C.ve, -(sm * C.uy + c * C.ny)); m.rotation.y = Math.atan2(C.nx, -C.ny); m.name = 'cut-face'; m.renderOrder = 20;
+  V.scene.add(m); if (V.orbit) v3dRender();
+}
 function v3dView(reset) { const V = S.v3d; if (!V?.ok) return; if (reset || !V.orbit) V.orbit = { th: -.75, ph: 1.0, rad: V.span * .85, tx: V.target.x, ty: V.target.y, tz: V.target.z }; v3dRender(); }
 function v3dRender() { const V = S.v3d; if (!V?.ok) return; const o = V.orbit, c = V.camera;
-  c.position.set(o.tx + o.rad * Math.sin(o.ph) * Math.cos(o.th), o.ty + o.rad * Math.cos(o.ph), o.tz + o.rad * Math.sin(o.ph) * Math.sin(o.th)); c.lookAt(o.tx, o.ty, o.tz); V.renderer.render(V.scene, c); }
+  c.position.set(o.tx + o.rad * Math.sin(o.ph) * Math.cos(o.th), o.ty + o.rad * Math.cos(o.ph), o.tz + o.rad * Math.sin(o.ph) * Math.sin(o.th)); c.lookAt(o.tx, o.ty, o.tz);
+  const pl = V.renderer.clippingPlanes?.[0], C = V.cut, face = V.scene.getObjectByName('cut-face');
+  if (pl && C) { const k = C.nx * c.position.x - C.ny * c.position.z - C.c > 0 ? -1 : 1; pl.normal.set(k * C.nx, 0, -k * C.ny); pl.constant = -k * C.c;   // remove the camera's side
+    if (face) { const sm = (C.s0 + C.s1) / 2, cc = C.c + k * .03; face.position.x = sm * C.ux + cc * C.nx; face.position.z = -(sm * C.uy + cc * C.ny); } } V.renderer.render(V.scene, c); }
 function v3dControls(el) { let drag = null;
   el.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 2 }; el.setPointerCapture(e.pointerId); });
   el.addEventListener('pointermove', e => { if (!drag || !S.v3d?.ok) return; const o = S.v3d.orbit, dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
@@ -8113,6 +8144,7 @@ function xsPlay() {
   step(); xsTimer = setInterval(step, 900);
 }
 function xsSetDate(d) { setXs('date', d); const dates = xsDates(sectionList()); if ($('#xs-date')) $('#xs-date').value = Math.max(0, dates.indexOf(d)); if ($('#xs-date-l')) $('#xs-date-l').textContent = d; if ($('#xs-asof')) $('#xs-asof').value = d; }
+document.addEventListener('input', e => { if (e.target.id === 'v3d-cutpos') { S.v3dCut = { on: true, ...S.v3dCut, pos: +e.target.value }; v3dCutApply(); } });
 document.addEventListener('input', e => { if (e.target.id === 'xs-date') { const d = xsDates(sectionList())[+e.target.value]; if (d) xsSetDate(d); } });
 function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); const ms = $('#xs-model-sec'); if (ms) ms.outerHTML = xsModelHTML(); }   // the forecast panel reads the drawn section's geometry
 const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
@@ -10492,6 +10524,7 @@ document.addEventListener('change', e => {
   if (t.dataset?.gwft) { const [i, k] = t.dataset.gwft.split('|'), fs = [...(gwSaved().features || [])], v = t.value;
     fs[+i] = { ...fs[+i], [k]: k === 'type' || k === 'name' ? v : k === 'pts' ? v.split(';').map(q => q.trim().split(/[\s,]+/).map(Number)).filter(q => q.length === 2 && q.every(Number.isFinite)) : v === '' ? null : +v };
     if (k === 'stage') Object.assign(fs[+i], { elev: fs[+i].stage, head: fs[+i].stage }); setGwm({ features: fs }); return; }
+  if (t.id === 'v3d-cut') { S.v3dCut = { pos: 50, ...S.v3dCut, on: t.checked }; const r = $('#v3d-cutpos'); if (r) r.disabled = !t.checked; v3dCutApply(); return; }
   if (t.id === 'v3d-ve') { S.v3dVe = +t.value || 0; if (S.v3d) S.v3d.orbit = null; v3dBuild(); return; }
   if (t.id?.startsWith('v3d-lyr-')) { const k = t.id.slice(8); S.v3dOff = { ...(S.v3dOff || {}), [k]: !t.checked }; if (S.v3d?.groups?.[k]) { S.v3d.groups[k].visible = t.checked; v3dRender(); } return; }
   if (t.id === 'gwm-tcal') { setGwm({ transport: { ...(gwSaved().transport || {}), calibrate: t.checked } }); return; }
