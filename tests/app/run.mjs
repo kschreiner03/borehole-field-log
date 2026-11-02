@@ -1000,6 +1000,28 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('plumes: report and water labels', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        const d = document.querySelector('#xs-draw'); d.style.width = '700px'; drawXsec(); await w(150);
+        const boxes = [...d.querySelectorAll('svg text.wl')].map(t => [t.textContent, t.getBBox()]);
+        want(boxes.length >= 6, 'water labels drawn: ' + boxes.length);
+        for (let a = 0; a < boxes.length; a++) for (let c = a + 1; c < boxes.length; c++) { const p = boxes[a][1], q = boxes[c][1];
+          if (p.x < q.x + q.width && q.x < p.x + p.width && p.y < q.y + q.height && q.y < p.y + p.height) want(false, boxes[a][0] + ' overlaps ' + boxes[c][0]); }
+        d.style.width = '';
+        goTab('compose'); await w(200);
+        const L = repLayout(), pi = L.pages.findIndex(p => p.items.some(x => x.t === 'section' && x.o?.xs)), it = L.pages[pi].items.find(x => x.t === 'section' && x.o?.xs);
+        it.o = { ...it.o, xs: { ...it.o.xs, style: 'bands', shape: 'data' } }; S.cpage = pi; rerenderCompose(); await w(300);
+        const html = document.querySelector('.cmp-paper')?.innerHTML || '';
+        want(/data-band/.test(html), 'report section item draws its own style (bands)');
+        want(html.includes('No data above or below the well screens'), 'report item keeps its shape label');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
