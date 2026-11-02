@@ -1530,6 +1530,30 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('3d: surface nets and the measured plume field', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        /* isosurface of a sphere of radius 5 cells */
+        const n = 16, v = new Float32Array(n * n * n); for (let k = 0; k < n; k++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) v[i + n * (j + n * k)] = 5 - Math.hypot(i - 7.5, j - 7.5, k - 7.5);
+        const S1 = isoSurface({ nx: n, ny: n, nz: n, v }, 0), nv = S1.positions.length / 3;
+        let worst = 0; for (let q = 0; q < nv; q++) worst = Math.max(worst, Math.abs(Math.hypot(S1.positions[3 * q] - 7.5, S1.positions[3 * q + 1] - 7.5, S1.positions[3 * q + 2] - 7.5) - 5));
+        want(nv > 100 && S1.indices.length > 300 && worst < .6, 'sphere isosurface: ' + nv + ' vertices, worst ' + worst.toFixed(2));
+        /* the field interpolated from measured results */
+        loadXsExample(); await w(300); const date = '2024-05-14', list = mapList(), F3 = plumeField3d(list, date, 'benzene');
+        want(F3 && F3.src === 'interpreted', 'source is interpreted: ' + F3?.src);
+        const b = list.find(b => b.well?.screenTop != null && (b.gwSamples || []).some(s => s.date <= date && gwVal(s, 'benzene') && !gwVal(s, 'benzene').lt && gwVal(s, 'benzene').v > .01));
+        const s = (b.gwSamples || []).filter(s => s.date <= date && gwVal(s, 'benzene')).sort(byDate).pop(), meas = gwVal(s, 'benzene').v;
+        const got = F3.at(b.easting, b.northing, b.elevation - (b.well.screenTop + b.well.screenBottom) / 2);
+        want(got > 0 && Math.abs(Math.log10(got) - Math.log10(meas)) < .01, 'equals the measured result at the well: ' + got + ' vs ' + meas);
+        const xs = list.map(b => b.easting), far = F3.at(Math.max(...xs) + 6, list[0].northing, list[0].elevation - 4);
+        want(far === 0, 'nothing more than 5 m beyond the wells: ' + far);
+        want(plumeField3d(list, '1990-01-01', 'benzene') === null, 'no results by the date: no field');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
