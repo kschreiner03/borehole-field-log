@@ -908,6 +908,7 @@ body.has-menubar #menubar { display: flex; align-items: stretch; height: var(--m
 .titlebar .co { color: var(--muted); font-size: 12px; }
 .tb-actions { gap: 4px; flex-wrap: nowrap; margin-left: 0; min-width: 0; }
 .tb-spring { flex: 1 1 auto; }
+@media (max-width: 1600px) { .titlebar > .tb[data-act="prefs"] .lbl { display: none; } }   /* the gear alone keeps the Tutorial button on the same row */
 .titlebar > .tb { min-height: var(--h-tb); padding: 0 9px; gap: 6px; border: 1px solid transparent; background: transparent; font: 400 13px var(--f-body); display: inline-flex; align-items: center; cursor: pointer; }
 .titlebar > .tb:hover { background: var(--hover); border-color: var(--border); }
 .titlebar > .tb svg { width: 16px; height: 16px; color: inherit; }
@@ -1227,6 +1228,52 @@ body.field .dtabs button { padding: 12px 4px 10px; font-size: 15px; }
 .bl-row .meta { grid-column: 2 / 4; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bl-empty { padding: 10px; }
 .side-foot { margin: 0; padding: 8px 10px; }
+/* work area first: the borehole list folds to a strip on the left, page settings sit in a panel on the right */
+.shell { grid-template-columns: 64px var(--sidebar-width) minmax(0, 1fr) var(--ctl-w, 0px); }
+body.side-min .shell { --sidebar-width: 36px; }
+.side-strip { display: none; }
+@media (min-width: 861px) { body.side-min .side > :not(.side-strip) { display: none; } }
+@media (min-width: 861px) { body.side-min .side-strip { display: flex; } }
+body.side-min .side-strip { flex-direction: column; align-items: center; gap: 6px; padding: 8px 0; }
+.side-strip .tb { min-height: 28px; padding: 0 5px; } .side-strip .ct { font: 12px var(--f-body); color: var(--muted); writing-mode: vertical-rl; }
+.bl-min { min-height: 26px; padding: 0 5px; } .bl-min svg { width: 14px; height: 14px; }
+.ctl { grid-column: 4; grid-row: 1 / -1; position: sticky; top: var(--appbar-h, 68px); align-self: start; height: calc(100vh - var(--appbar-h, 68px) - var(--status-h)); overflow-y: auto; overflow-x: hidden; background: var(--surface); border-left: 1px solid var(--border); font-size: 13px; }
+.ctl[hidden] { display: none; }
+body.drawer-open .main { margin-right: max(0px, calc(min(420px, 100vw) - var(--ctl-w, 0px))); }   /* the drawer covers the panel first */
+.ctl-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; background: var(--surface); border-bottom: 1px solid var(--rule); }
+.ctl-head .sp { flex: 1 1 auto; } .ctl-head .note { font-size: 12px; }
+.ctl .tb { min-height: 26px; padding: 0 5px; } .ctl .tb svg { width: 16px; height: 16px; }
+.ctl-rz { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; cursor: col-resize; z-index: 3; }
+.ctl-rz:hover, body.ctl-drag .ctl-rz { background: var(--accent); opacity: .35; }
+body.ctl-drag { user-select: none; cursor: col-resize; }
+.ctl-g { border-bottom: 1px solid var(--rule); }
+.ctl-gh { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: 0; background: none; font: 600 12.5px var(--f-body); color: var(--ink); text-align: left; cursor: pointer; }
+.ctl-gh:hover { background: var(--hover); } .ctl-gh svg { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.ctl-gh .chev { margin-left: auto; transition: transform .12s; } .ctl-gh[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+.ctl-gb { padding: 2px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.ctl-gb .sec-opts, .ctl-gb .xs-ctl, .ctl-gb .rep-cols { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin: 0; padding: 0; border: 0; }
+.ctl-gb .lay-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.gtick { display: flex; flex-direction: column; gap: 4px; } .gtick .gr-h { margin-top: 6px; font: 600 11.5px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.gtick, .rep-graphs.gtick { align-items: stretch; text-align: left; }
+.gtick .gr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 1px 0; border: 0; border-radius: 0; } .gtick .gr-sty { display: flex; gap: 4px; padding-left: 22px; } .gtick .gr-sty select { min-height: 26px; padding: 0 4px; font-size: 12px; width: auto; }
+.ctl-gb select, .ctl-gb input[type="number"], .ctl-gb input[type="text"] { max-width: 100%; }
+.ctl-gb section.sec { border: 0; box-shadow: none; margin: 0; background: none; } .ctl-gb section.sec > header { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 6px; border: 0; background: none; min-height: 0; } .ctl-gb section.sec > header h3, .ctl-gb section.sec > header .sp { display: none; } .ctl-gb section.sec > .body { padding: 0; }
+.ctl-gb .scroll-x, .ctl-gb table { max-width: 100%; } .ctl-gb .scroll-x { overflow-x: auto; } .ctl-gb table { font-size: 12px; }
+.xs-dates input[type="range"] { width: 160px; }
+.ctl-gb .fields { grid-template-columns: minmax(0, 1fr) !important; gap: 8px; }
+.gwm-act { display: flex; flex-direction: column; gap: 6px; } .gwm-act .btn, .ctl-gb > .btn { justify-content: center; }
+/* wide model tables become one card per row in the panel; each value keeps a short label */
+.ctl-gb #gwm-units thead, .ctl-gb #gwm-feat thead { display: none; }
+.ctl-gb #gwm-units, .ctl-gb #gwm-units tbody, .ctl-gb #gwm-feat, .ctl-gb #gwm-feat tbody { display: block; width: 100%; }
+.ctl-gb #gwm-units tr, .ctl-gb #gwm-feat tr { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.ctl-gb #gwm-units td, .ctl-gb #gwm-feat td { display: block; border: 0; padding: 0; text-align: left; }
+.ctl-gb #gwm-units td:first-child { flex-basis: 100%; font-weight: 600; }
+.ctl-gb #gwm-units td.note { flex-basis: 100%; font-size: 11.5px; }
+.ctl-gb #gwm-units td:nth-child(2)::before { content: "K "; color: var(--muted); } .ctl-gb #gwm-units td:nth-child(5)::before { content: "Kv/Kh "; color: var(--muted); } .ctl-gb #gwm-units td:nth-child(7)::before { content: "nₑ "; color: var(--muted); }
+.ctl-gb #gwm-feat td { flex-basis: calc(50% - 4px); } .ctl-gb #gwm-feat td:nth-child(3) { flex-basis: 100%; } .ctl-gb #gwm-feat input, .ctl-gb #gwm-feat select { width: 100% !important; }
+.ctl-gb h4 { margin: 4px 0 !important; font-size: 12.5px; }
+.ctl.min { overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; }
+.ctl.min .tb { width: 30px; min-height: 30px; justify-content: center; }
 /* toolbar: project switcher and the find box */
 .tb-proj { display: flex; align-items: center; margin-left: 4px; }
 .tb-proj select { min-height: var(--h-tb); max-width: min(380px, 30vw); font: 600 13px var(--f-body); border: 1px solid var(--btn-line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); padding: 0 24px 0 8px; text-overflow: ellipsis; }
@@ -1242,6 +1289,8 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
   .side { grid-column: 1; grid-row: 2; position: static; height: auto; max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--border); }
   .main { grid-column: 1; grid-row: 3; padding: 12px 12px 32px; }
   body.drawer-open .main { margin-right: 0; }
+  .ctl { grid-column: 1; grid-row: 4; position: static; height: auto; max-height: none; border-left: 0; border-top: 1px solid var(--border); }
+  .ctl-rz { display: none; }
   .titlebar h1, .titlebar .co { display: none; }
   #statusbar .sb-opt { display: none; }
 }
@@ -1269,7 +1318,8 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
     </div>
     <span class="tb-spring" aria-hidden="true"></span>
     <button type="button" class="find-btn tb-find" data-act="find" title="Find a borehole, page or tool (Ctrl+K)"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><span>Find anything…</span><kbd>Ctrl K</kbd></button>
-    <button class="tb" data-act="prefs" title="Units, symbols, page depth, log columns, company and logo"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Settings</span></button>
+    <button class="tb" data-act="tut" title="Step-by-step tutorial: the one for this page, or choose one"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5l9-3.5 9 3.5-9 3.5z"/><path d="M7 8.5v5c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-5M21 6.5v6"/></svg><span class="lbl">Tutorial</span></button>
+    <button class="tb" data-act="prefs" aria-label="Settings" title="Units, symbols, page depth, log columns, company and logo"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Settings</span></button>
   </div>
   <div class="rtabs" role="tablist" aria-label="Tool categories" id="rtabs"></div>
   <div class="ribbon" role="toolbar" aria-label="Tools">
@@ -1289,11 +1339,13 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
   <nav class="rail" id="rail" aria-label="Views"></nav>
   <nav class="prail" id="prail" aria-label="Project pages"></nav>
   <aside class="side" aria-label="Boreholes">
+    <div class="side-strip"><button type="button" class="tb" data-act="side-toggle" title="Show the borehole list" aria-label="Show the borehole list"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button><span class="ct" id="side-ct"></span></div>
     <div class="bl-head" id="bl-head"></div>
     <ul class="bl-rows" id="list"></ul>
     <div class="side-foot" id="side-foot" hidden></div>
   </aside>
   <main class="main" id="main"><p class="note">Loading boreholes…</p></main>
+  <aside class="ctl" id="ctl" aria-label="Settings" hidden></aside>
 </div>
 
 <input type="file" id="map-file" hidden>
@@ -1862,6 +1914,45 @@ const BH_TABS = ['log', 'edit', 'report'];
 const NAV_LABEL = { v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
 const NAV_ICON = { v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+/* ---------- the Settings panel: each page with view settings lists its groups in CTL; the shell draws them on the right.
+   Open or collapsed, width and folded groups are one app-wide choice, kept between sessions. ---------- */
+const CTL = {}, CTL_ICON = '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>';
+S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {}, ...jsonLS('bhlog.ui', {}) };
+const uiSave = () => lsSet('bhlog.ui', JSON.stringify(S.ui));
+const ctlClamp = w => Math.round(Math.min(480, Math.max(240, +w || 300)));
+function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
+/* the panel's column is set before a page draws, so drawings measure the work area they will really have */
+function ctlLayout() {
+  const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
+  const has = !!CTL[S.tab] && !!cur() && (S.tab !== 'gwm' || !gwModel().error), open = S.ui.ctlOpen !== false;
+  if (el.dataset.tab !== S.tab) { el.scrollTop = 0; el.dataset.tab = S.tab; }
+  el.hidden = !has; el.classList.toggle('min', has && !open);
+  sh.style.setProperty('--ctl-w', !has ? '0px' : open ? ctlClamp(S.ui.ctlW) + 'px' : '40px');
+}
+function ctlRender() {
+  const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
+  const G = (CTL[S.tab]?.() || []).filter(g => g && g.html);
+  if (!G.length) { el.hidden = true; el.innerHTML = ''; sh.style.setProperty('--ctl-w', '0px'); return; }
+  const open = S.ui.ctlOpen !== false, top = el.scrollTop; el.hidden = false; el.classList.toggle('min', !open);
+  sh.style.setProperty('--ctl-w', open ? ctlClamp(S.ui.ctlW) + 'px' : '40px');
+  if (!open) { el.innerHTML = `<button type="button" class="tb" data-act="ctl-toggle" title="Show the settings panel" aria-label="Show the settings panel">${svgI('<path d="M15 6l-6 6 6 6"/>')}</button>` + G.map(g => `<button type="button" class="tb" data-ctlgo="${g.id}" title="${esc(g.title)}" aria-label="${esc(g.title)}">${svgI(g.icon || CTL_ICON)}</button>`).join(''); return; }
+  el.innerHTML = `<div class="ctl-rz" data-ctlrz title="Drag to resize the panel"></div><div class="ctl-head"><b>Settings</b><span class="note">${esc(NAV_LABEL[S.tab] || '')}</span><span class="sp"></span><button type="button" class="tb" data-act="ctl-toggle" title="Collapse the settings panel" aria-label="Collapse the settings panel">${svgI('<path d="M9 6l6 6-6 6"/>')}</button></div>`
+    + G.map(g => { const f = !!S.ui.fold?.[g.id]; return `<section class="ctl-g" data-ctlg="${g.id}"><button type="button" class="ctl-gh" data-ctlfold="${g.id}" aria-expanded="${!f}">${svgI(g.icon || CTL_ICON)}<span>${esc(g.title)}</span>${svgI('<path d="M6 9l6 6 6-6"/>').replace('<svg', '<svg class="chev"')}</button><div class="ctl-gb" ${f ? 'hidden' : ''}>${g.html}</div></section>`; }).join('');
+  el.scrollTop = top;
+}
+/* the work area changed width: redraw what was sized to it (not the borehole workspace, which keeps its inputs) */
+const workResized = () => { if (S.tab !== 'edit') renderView(true); else ctlRender(); };
+document.addEventListener('click', e => {
+  const go = e.target.closest?.('[data-ctlgo]'); if (go) { S.ui.ctlOpen = true; S.ui.fold = { ...S.ui.fold, [go.dataset.ctlgo]: false }; uiSave(); workResized(); $(`[data-ctlg="${go.dataset.ctlgo}"]`)?.scrollIntoView({ block: 'start' }); return; }
+  const fo = e.target.closest?.('[data-ctlfold]'); if (fo) { const k = fo.dataset.ctlfold, f = !S.ui.fold?.[k]; S.ui.fold = { ...S.ui.fold, [k]: f }; uiSave(); fo.setAttribute('aria-expanded', String(!f)); fo.nextElementSibling.hidden = f; }
+});
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest?.('[data-ctlrz]')) return; e.preventDefault();
+  const x0 = e.clientX, w0 = ctlClamp(S.ui.ctlW), sh = $('.shell'); document.body.classList.add('ctl-drag');
+  const mv = ev => { S.ui.ctlW = ctlClamp(w0 + x0 - ev.clientX); sh.style.setProperty('--ctl-w', S.ui.ctlW + 'px'); };
+  const up = ev => { mv(ev); removeEventListener('pointermove', mv); removeEventListener('pointerup', up); document.body.classList.remove('ctl-drag'); uiSave(); workResized(); };
+  addEventListener('pointermove', mv); addEventListener('pointerup', up);
+});
 const bhGlyph = well => `<svg class="bhg" viewBox="0 0 16 16" aria-hidden="true">${well ? '<circle cx="8" cy="8" r="4.6" fill="#fff" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/>' : '<circle cx="8" cy="8" r="4.6" fill="currentColor"/>'}</svg>`;
 /* the sidebar is the project as a tree: project pages, and each borehole with its own pages nested under it when chosen */
 /* the left side: a rail of project pages, then the project's boreholes as a list with a filter, status chips and a sort */
@@ -1882,7 +1973,7 @@ function renderList(list) {
   const ps = projList(), n = { draft: 0, review: 0, issued: 0, wells: 0 };
   for (const b of ps) { n[b.status || 'draft']++; if (b.well?.installed) n.wells++; }
   const head = $('#bl-head');
-  if (!head.contains(document.activeElement)) head.innerHTML = `<div class="bl-title"><b>Boreholes</b><span class="ct">${ps.length}</span><span class="sp"></span><button class="btn bl-new" data-act="new" ${S.readOnly ? 'disabled' : ''} title="New borehole in this project">${svgI('<path d="M12 5v14M5 12h14"/>')}New</button></div>
+  if (!head.contains(document.activeElement)) head.innerHTML = `<div class="bl-title"><b>Boreholes</b><span class="ct">${ps.length}</span><span class="sp"></span><button type="button" class="tb bl-min" data-act="side-toggle" title="Hide the borehole list" aria-label="Hide the borehole list">${svgI('<path d="M15 6l-6 6 6 6"/>')}</button><button class="btn bl-new" data-act="new" ${S.readOnly ? 'disabled' : ''} title="New borehole in this project">${svgI('<path d="M12 5v14M5 12h14"/>')}New</button></div>
     <input type="search" id="bl-q" placeholder="Filter by name" aria-label="Filter boreholes by name" value="${esc(S.bl.q)}" autocomplete="off">
     <div class="bl-chips" role="group" aria-label="Show">${[['all', 'All', ps.length], ['draft', 'Draft', n.draft], ['review', 'Review', n.review], ['issued', 'Issued', n.issued], ['wells', 'Wells', n.wells]].filter(([k, , c]) => k === 'all' || c).map(([k, t, c]) => `<button type="button" class="chip" data-blst="${k}" aria-pressed="${S.bl.st === k}">${t}${k === 'all' ? '' : ` ${c}`}</button>`).join('')}</div>
     <div class="bl-sort">Sort by ${[['name', 'Name'], ['depth', 'Depth'], ['vapour', 'Vapour']].map(([k, t]) => `<button type="button" class="btn link" data-blsort="${k}" aria-pressed="${S.bl.sort === k}">${t}</button>`).join(' · ')}</div>`;
@@ -1950,6 +2041,9 @@ function mapGoTo(q) {
 }
 document.addEventListener('submit', e => { const f = e.target.closest?.('[data-mapgo]'); if (!f) return; e.preventDefault(); mapGoTo(f.querySelector('input').value); });
 /* map layers and which boreholes the maps draw: a panel beside the map */
+CTL.site = () => [
+  ...(S.mapEdit ? [] : [{ id: 'map-layers', title: 'Map layers', icon: NAV_ICON.site, html: `<div class="map-layers">${layersPanelHTML()}</div>` }]),
+  { id: 'map-sec', title: 'Section line', icon: NAV_ICON.xsec, html: secToolsHTML() }];
 function layersPanelHTML() {
   const site = siteOf(), F = gwFlow(), ps = projList();
   const rows = LAYER_DEFS.map(([k, label, sw]) => {
@@ -2517,7 +2611,7 @@ function renderMain() {
   if (!S.loaded) return;
   const b = cur();
   if (!b) {
-    renderRail();
+    renderRail(); ctlLayout();
     main.dataset.bh = '';
     main.innerHTML = `<div class="start">
       <h2>Make a borehole log in three steps</h2>
@@ -2563,7 +2657,7 @@ function renderFacts(b) {
 }
 function formFocused() { const a = document.activeElement; return !!(a && a.closest && a.closest('.edit')); }
 function renderView(full) {
-  const v = $('#view'); if (!v) return;
+  const v = $('#view'); if (!v) return; ctlLayout();
   if (S.tab === 'reports') S.tab = 'compose';   // the Reports page and the report editor are one page
   const b = cur();
   if (S.tab === 'edit') {
@@ -2583,6 +2677,7 @@ function renderView(full) {
   else { v.innerHTML = nextSteps(b) + (editable(b) ? '<p class="log-hint">Click any layer, sample, water level or the standpipe on the log to edit it. Click empty space in a column to add one at that depth.</p>' : '') + sheetHTML(b) + logLegendHTML(b); const el = $('#log'); el.innerHTML = logSVG(b, Math.max(el.clientWidth, 900)); }
   if (MAP_TABS.includes(S.tab)) v.insertAdjacentHTML('afterbegin', hiddenNote());
   if (BH_TABS.includes(S.tab)) markIssues(b);
+  ctlRender();
 }
 
 /* ---------- data tables: one spreadsheet grid per kind of data, every borehole in the project in one place. Type, paste a block
@@ -3112,7 +3207,7 @@ const LOG_COLS = {
   w: ['Water content and Atterberg limits graph', b => (b.samples || []).some(s => s.w != null || s.ll != null || s.pl != null)],
   obs: ['Observations column', b => (b.events || []).some(e => (e.layer || e.depth != null) && obsLabel(e))],
   cvc: ['Vapour concentration graph (ppm, headspace)', b => (b.samples || []).some(s => s.cvc != null)],
-  lab: ['Lab results graph (parameter chosen under Page layout)', b => (b.samples || []).some(sm => Object.values(sm.lab || {}).some(r => r?.v != null))],
+  lab: ['Lab results graph (chosen under Graphs)', b => (b.samples || []).some(sm => Object.values(sm.lab || {}).some(r => r?.v != null))],
   so4: ['Sulphate SO4 % (PDF)', b => (b.samples || []).some(s => s.so4 != null)],
   water: ['Water level column', b => (b.water || []).some(w => w.depth != null) || b.slough != null || !!b.gwNone],
 };
@@ -3223,7 +3318,8 @@ function graphSeries() {
   for (const p of labParamsUsed(projList())) S0['lab:' + p] = [LAB_PARAMS[p].label, LAB_PARAMS[p].unit || '', 'log', s => labVal(s, p), p];
   return S0;
 }
-const graphsOf = () => (S.co.graphs || []).filter(g => graphSeries()[g.series]);
+const graphHasData = (SR, k) => !!SR[k] && projList().some(x => (x.samples || []).some(sm => val(SR[k][3](sm, x))));
+const graphsOf = () => { const SR = graphSeries(); return (S.co.graphs || []).filter(g => graphHasData(SR, g.series)); };
 const val = x => x == null ? null : typeof x === 'object' ? (x.v != null ? x : null) : isFinite(x) ? { v: +x } : null;
 /* points for one borehole, on a scale shared by the whole project so logs compare */
 function graphData(b, g) {
@@ -3259,11 +3355,34 @@ function graphBody(c, G, type, yOf, y0, y1, o = {}) {
 }
 function refreshGraphs() { const d = $('#overlay .rep-graphs'); if (d) d.outerHTML = graphsRowHTML(); if (S.tab === 'log' || S.tab === 'report') renderView(true); }
 function graphsRowHTML() {
-  const SR = graphSeries(), gs = S.co.graphs || [], ro = S.readOnly ? 'disabled' : '';
+  const b = cur(), ps = projList(), SR = graphSeries(), gs = S.co.graphs || [], ro = S.readOnly ? 'disabled' : '';
   const opts = (list, v) => Object.entries(list).map(([k, t]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${esc(t)}</option>`).join('');
-  return `<div class="rep-cols rep-graphs"><b>Extra graphs</b><span class="note">Add a column for any value measured at depth, drawn the way you choose. It shows on the log and the PDF.</span>
-    ${gs.map((g, i) => `<span class="gr-row"><select data-graph="${i}" data-gk="series" ${ro}>${opts(Object.fromEntries(Object.entries(SR).map(([k, v]) => [k, `${v[0]}${v[1] ? ` (${v[1]})` : ''}`])), g.series)}</select><select data-graph="${i}" data-gk="type" ${ro}>${opts(GRAPH_TYPES, g.type)}</select><select data-graph="${i}" data-gk="scale" ${ro}>${opts({ '': 'Scale: automatic', lin: 'Linear scale', log: 'Log scale' }, g.scale || '')}</select><button class="btn link danger-text" data-graphdel="${i}" ${ro}>Remove</button></span>`).join('')}
-    <button class="btn" data-act="graph-add" ${ro}>+ Add graph</button></div>`;
+  const PC = b ? pdfCols(b) : null, shown = k => b ? (PDF_KEYS.includes(k) ? PC.on.has(k) : colOn(b, k)) : S.co.cols?.[k] === 'on', gi = k => gs.findIndex(g => g.series === k);
+  const style = i => i < 0 ? '' : `<span class="gr-sty"><select data-graph="${i}" data-gk="type" aria-label="Drawn as" ${ro}>${opts(GRAPH_TYPES, gs[i].type)}</select><select data-graph="${i}" data-gk="scale" aria-label="Scale" ${ro}>${opts({ '': 'Scale: automatic', lin: 'Linear', log: 'Log' }, gs[i].scale || '')}</select></span>`;
+  const row = (key, label, on, i = -1) => `<div class="gr-row"><label class="check"><input type="checkbox" data-gtick="${key}" ${on ? 'checked' : ''} ${ro}> ${esc(label)}</label>${on ? style(i) : ''}</div>`;
+  const field = [['nplot', 'SPT N'], ['su', 'Shear strength (pocket pen., vane)'], ['w', 'Water content and limits'], ['cvc', 'Vapour (ppm, headspace)']].filter(([k]) => S.co.cols?.[k] === 'on' || ps.some(x => LOG_COLS[k][1](x)));
+  const lp = labGraphParam(), labCol = shown('lab'), lab = labParamsUsed(ps);
+  const other = Object.keys(SR).filter(k => !k.startsWith('lab:') && !['cvc', 'n'].includes(k) && ps.some(x => (x.samples || []).some(sm => val(SR[k][3](sm, x)))));
+  const head = t => `<div class="gr-h">${t}</div>`, rowKeys = new Set([...lab.map(p => 'lab:' + p), ...other]), extra = gs.filter((g, i) => !rowKeys.has(g.series) && gs.findIndex(x => x.series === g.series) === i);
+  return `<div class="rep-graphs gtick"><span class="note">Ticked graphs show on the log and in the PDF. Every borehole uses them.</span>
+    ${field.length ? head('Field tests') + field.map(([k, t]) => row('col:' + k, t, shown(k))).join('') : ''}
+    ${lab.length ? head('Lab results') + lab.map(p => { const i = gi('lab:' + p); return row('lab:' + p, LAB_PARAMS[p].label, (labCol && lp === p) || i >= 0, i); }).join('') : ''}
+    ${other.length ? head('Other measured values') + other.map(k => { const i = gi(k); return row(k, SR[k][0] + (SR[k][1] ? ` (${SR[k][1]})` : ''), i >= 0, i); }).join('') : ''}
+    ${extra.length ? head('Saved graphs') + extra.map(g => { const i = gs.indexOf(g), p = g.series.startsWith('lab:') ? g.series.slice(4) : null, nm = p ? LAB_PARAMS[p]?.label || p : SR[g.series]?.[0] || g.series; return row(p ? 'lab:' + p : g.series, nm + (graphHasData(SR, g.series) ? '' : ' (no data in this project, not drawn)'), true, i); }).join('') : ''}
+    ${PC && PC.dropped.some(k => GRAPH_COLS.includes(k)) ? `<p class="note">Left out of this PDF to make room: ${esc(PC.dropped.filter(k => GRAPH_COLS.includes(k)).map(k => ({ nplot: 'SPT N', su: 'shear strength', w: 'water content', cvc: 'vapour', lab: LAB_PARAMS[labGraphParam()]?.label || 'lab results' })[k]).join(', '))}. Tick a graph to keep it.</p>` : ''}
+    ${PC && PC.room < 170 ? `<p class="note danger-text">The ticked graphs don't fit on the page with a readable description (${Math.max(0, Math.round(PC.room))} px left of 170). Untick some, or choose Narrow graphs under Page layout.</p>` : ''}
+    ${!field.length && !lab.length && !other.length ? '<p class="note">No test results at depth yet. Graphs appear here once samples have results.</p>' : ''}</div>`;
+}
+function gtickSet(key, on) {
+  const c = key.indexOf(':'), kind = c > 0 && ['col', 'lab'].includes(key.slice(0, c)) ? key.slice(0, c) : 'gs', k = kind === 'gs' ? key : key.slice(c + 1);
+  if (kind === 'col') S.co.cols = { ...(S.co.cols || {}), [k]: on ? 'on' : 'off' };
+  else {
+    const series = kind === 'lab' ? 'lab:' + k : k; S.co.graphs = (S.co.graphs || []).filter(g => g.series !== series);
+    if (on && kind === 'lab' && k === labGraphParam() && S.co.cols?.lab !== 'off') S.co.cols = { ...(S.co.cols || {}), lab: 'on' };   // the older lab column already draws it
+    else if (on) S.co.graphs.push({ series, type: 'points' });
+    if (kind === 'lab' && !on && labGraphParam() === k) S.co.cols = { ...(S.co.cols || {}), lab: 'off' };   // the older single lab column
+  }
+  store.saveCompany(); refreshGraphs(); if (S.tab !== 'log' && S.tab !== 'report') ctlRender();
 }
 
 function logSVG(b, W) {
@@ -4842,7 +4961,7 @@ async function gwEnsure(force) {
 }
 const gwWantedBy = L => !!window.desktop?.mf6Run && !!(gwSaved().calib || gwSaved().transport?.on) && (L?.pages || []).some(p => p.items?.some(it => ['gwsum', 'gwcal', 'gwpar', 'section', 'plan'].includes(it.t)));
 function gwComposeEnsure() { if (!gwWantedBy(repLayout())) return; gwModel(); if (S.gwm.run || S.gwm.busy || S.gwm.tried || S.gwm.M?.error) return; S.gwm.tried = true; gwEnsure(true); }
-function gwRefresh() { if (S.tab === 'gwm') { const v = $('#view'); if (v) v.innerHTML = gwmHTML(); } else if (S.tab === 'xsec') drawXsec(); else if (S.tab === 'site') drawSite?.(); else if (S.tab === 'compose' && !S.gwm.busy) rerenderCompose(); }
+function gwRefresh() { if (S.tab === 'gwm') { const v = $('#view'); if (v) v.innerHTML = gwmHTML(); ctlRender(); } else if (S.tab === 'xsec') drawXsec(); else if (S.tab === 'site') drawSite?.(); else if (S.tab === 'compose' && !S.gwm.busy) rerenderCompose(); }
 async function gwAct(act, t) {
   if (S.readOnly && act !== 'gw-export') return;
   const M = gwModel(); if (M.error) { toast(M.error); return; }
@@ -4870,7 +4989,7 @@ async function gwAct(act, t) {
 }
 function gwmHTML() {
   const desk = !!window.desktop?.mf6Run, M = gwModel(), g = gwSaved(), c = g.calib, ct = g.calibT, pv = gwPv(), ro = S.readOnly || !desk || S.gwm.busy ? 'disabled' : '', f3 = v => v == null || !Number.isFinite(+v) ? '–' : (+v).toPrecision(3), f2 = v => v == null || !Number.isFinite(+v) ? '–' : (+v).toFixed(2);
-  if (M.error) return `<div class="gw-page"><section class="sec"><header><h3>Groundwater model</h3><span class="note">${GW_ENGINE}</span></header><div class="body"><p class="note" style="color:var(--warn,#a3470b)">The model can't be built yet: ${esc(M.error)}</p></div></section></div>`;
+  if (M.error) { S._gwmCtl = null; return `<div class="gw-page"><section class="sec"><header><h3>Groundwater model</h3><span class="note">${GW_ENGINE}</span></header><div class="body"><p class="note" style="color:var(--warn,#a3470b)">The model can't be built yet: ${esc(M.error)}</p></div></section></div>`; }
   const stale = c && c.key !== gwInputsKey(M), rounds = [...new Set(M.list.flatMap(b => monitoring(b).filter(w => w.date).map(w => w.date)))].sort();
   const unitRow = u => { const cal = pv['k:' + u.u]; return `<tr><td>${esc(u.u)}</td><td class="r"><input type="number" step="any" data-gwu="${esc(u.u)}|k" value="${esc(g.units?.[u.u]?.k ?? '')}" placeholder="${f3(cal ?? u.k)}" style="width:7em" ${S.readOnly ? 'disabled' : ''}></td><td>m/day</td><td class="note">${esc(cal != null ? `calibrated (${GW_ENGINE.split(' (')[0]}); start: ${u.kSrc}` : u.kSrc)}</td><td class="r"><input type="number" step="any" data-gwu="${esc(u.u)}|kv" value="${esc(g.units?.[u.u]?.kv ?? '')}" placeholder="${u.kv}" style="width:5em" ${S.readOnly ? 'disabled' : ''}></td><td class="note">${esc(u.kvSrc)}</td><td class="r">${f2(u.ne)}</td></tr>`; };
   const featRow = (ft, i) => `<tr><td><select data-gwft="${i}|type" ${S.readOnly ? 'disabled' : ''}>${[['riv', 'River or creek'], ['drn', 'Drain'], ['wel', 'Pumping well'], ['chd', 'Fixed head']].map(([v, t]) => `<option value="${v}" ${ft.type === v ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
@@ -4891,14 +5010,9 @@ function gwmHTML() {
       <text x="140" y="245" text-anchor="middle">Measured head (m)</text><text x="12" y="120" transform="rotate(-90 12 120)" text-anchor="middle">Simulated head (m)</text><text x="44" y="32">${a.toFixed(1)}–${b.toFixed(1)} m; dashed = 1:1</text></svg></div>`; };
   const resT = C => !C ? '' : `<div class="scroll-x" style="max-height:260px;overflow:auto"><table class="sum" id="gwm-res"><thead><tr><th>Well</th><th>Date</th><th class="r">Measured (m)</th><th class="r">Simulated (m)</th><th class="r">Residual (m)</th></tr></thead><tbody>${C.residuals.map(q => `<tr><td>${esc(q.b)}</td><td>${esc(q.date || C.round)}</td><td class="r">${f2(q.h)}</td><td class="r">${f2(q.sim)}</td><td class="r">${Number.isFinite(q.res) ? (q.res > 0 ? '+' : '') + q.res.toFixed(3) : 'dry'}</td></tr>`).join('')}</tbody></table></div>`;
   const T = S.gwm.trans;
-  return `<div class="gw-page">
-    <section class="sec"><header><h3>Groundwater model</h3><button class="btn link" data-act="tut-gwm">Tutorial</button><span class="note">${GW_ENGINE} · public domain · labelled “Model (MODFLOW 6), not measured” wherever it is drawn</span><span class="sp"></span>
-      <button class="btn" data-act="gw-run" ${ro}>Run model</button><button class="btn primary" data-act="gw-cal" ${ro}>Calibrate (steady)</button><button class="btn" data-act="gw-calt" ${ro || !c ? 'disabled' : ''} title="${c ? 'Specific yield and recharge per period, against every round' : 'Calibrate the steady model first'}">Calibrate (all rounds)</button><button class="btn" data-act="gw-trans" ${ro}>Run transport</button><button class="btn" data-act="gw-export" ${S.gwm.busy ? 'disabled' : ''}>Export model files</button><button class="btn" data-act="gw-report" ${S.readOnly ? 'disabled' : ''}>Add model pages to the report</button></header>
-      <div class="body">
-      ${!desk ? `<p class="note" style="color:var(--warn,#a3470b)">The groundwater model runs MODFLOW 6 on this computer, so it needs the desktop app. The cross-section keeps the Domenico forecast.</p>` : ''}
-      ${S.gwm.msg ? `<p class="note"><b>${esc(S.gwm.msg)}</b></p>` : ''}${S.gwm.err ? `<p class="note" style="color:var(--warn,#a3470b)">MODFLOW 6: ${esc(S.gwm.err)}</p>` : ''}
-      ${stale ? `<p class="note" style="color:var(--warn,#a3470b)">The inputs changed after the last calibration (${esc(c.at.slice(0, 10))}): calibrate again before relying on the results.</p>` : ''}
-      <p class="note" id="gwm-grid">Grid ${M.grid.nrow} rows × ${M.grid.ncol} columns × ${M.grid.nlay} layers of ${M.grid.cell} m, rotated ${M.grid.angrot.toFixed(1)}° so columns follow the fitted flow direction (${M.F.az.toFixed(0)}° from north). Fixed heads on the upgradient and downgradient faces from the ${esc(M.round)} water-table plane; no flow on the sides and through the base of the logs. ${S.gwm.run ? `Last run: ${f3(S.gwm.run.seconds)} s, mass-balance discrepancy ${f3(S.gwm.run.discrepancy)} %.` : ''}</p>
+  S._gwmCtl = [
+    { id: 'gwm-act', title: 'Run', icon: '<path d="M7 5l12 7-12 7z"/>', html: `<div class="gwm-act"><button class="btn" data-act="gw-run" ${ro}>Run model</button><button class="btn primary" data-act="gw-cal" ${ro}>Calibrate (steady)</button><button class="btn" data-act="gw-calt" ${ro || !c ? 'disabled' : ''} title="${c ? 'Specific yield and recharge per period, against every round' : 'Calibrate the steady model first'}">Calibrate (all rounds)</button><button class="btn" data-act="gw-trans" ${ro}>Run transport</button><button class="btn" data-act="gw-export" ${S.gwm.busy ? 'disabled' : ''}>Export model files</button><button class="btn" data-act="gw-report" ${S.readOnly ? 'disabled' : ''}>Add model pages to the report</button></div>` },
+    { id: 'gwm-set', title: 'Model setup', icon: CTL_ICON, html: `<p class="note" id="gwm-grid">Grid ${M.grid.nrow} rows × ${M.grid.ncol} columns × ${M.grid.nlay} layers of ${M.grid.cell} m, rotated ${M.grid.angrot.toFixed(1)}° so columns follow the fitted flow direction (${M.F.az.toFixed(0)}° from north). Fixed heads on the upgradient and downgradient faces from the ${esc(M.round)} water-table plane; no flow on the sides and through the base of the logs. ${S.gwm.run ? `Last run: ${f3(S.gwm.run.seconds)} s, mass-balance discrepancy ${f3(S.gwm.run.discrepancy)} %.` : ''}</p>
       <div class="fields" id="gwm-setup" style="grid-template-columns:repeat(5,minmax(0,1fr))">
         <div class="fld"><label for="gwm-round">Calibration round</label><select id="gwm-round" data-gwm="round" ${S.readOnly ? 'disabled' : ''}>${rounds.map(d => `<option value="${d}" ${d === M.round ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
         <div class="fld"><label for="gwm-cell">Cell size (m)</label><input id="gwm-cell" type="number" step="any" data-gwm="cell" value="${esc(g.cell ?? '')}" placeholder="${M.grid.cell}" ${S.readOnly ? 'disabled' : ''}></div>
@@ -4906,12 +5020,22 @@ function gwmHTML() {
         <div class="fld"><label for="gwm-rch">Recharge (m/day)</label><input id="gwm-rch" type="number" step="any" data-gwm="rch" value="${esc(g.rch ?? '')}" placeholder="${f3(pv.rch ?? M.rch)}" ${S.readOnly ? 'disabled' : ''}></div>
         <div class="fld"><label for="gwm-prior">Slug tests in calibration</label><select id="gwm-prior" data-gwm="prior" ${S.readOnly ? 'disabled' : ''}><option value="1" ${g.prior !== false ? 'selected' : ''}>As prior information</option><option value="0" ${g.prior === false ? 'selected' : ''}>Not used</option></select></div></div>
       <p class="note">Recharge: ${esc(pv.rch != null ? 'calibrated; start ' : '')}${esc(M.params.find(p => p.key === 'rch')?.src || '')}. Effective porosity ${f2(S.co.ne ?? .25)} (assumed; Settings).</p>
-      <h4 style="margin:12px 0 6px">Layers</h4>
+      ` },
+    { id: 'gwm-lay', title: 'Layers', icon: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>', html: `
       <div class="scroll-x"><table class="sum" id="gwm-units"><thead><tr><th>Unit (model layer)</th><th class="r">K</th><th>Unit</th><th>Source</th><th class="r">Kv/Kh</th><th>Source</th><th class="r">nₑ</th></tr></thead><tbody>${M.units.map(unitRow).join('')}</tbody></table></div>
-      <h4 style="margin:12px 0 6px">Boundary features <button class="btn" data-act="gw-feat-add" ${S.readOnly ? 'disabled' : ''}>Add</button></h4>
+      ` },
+    { id: 'gwm-bnd', title: 'Boundary features', icon: '<path d="M3 17c3-3 6 0 9-3s6-3 9 0"/><path d="M3 21h18"/>', html: `<h4 style="margin:12px 0 6px">Boundary features <button class="btn" data-act="gw-feat-add" ${S.readOnly ? 'disabled' : ''}>Add</button></h4>
       <div class="scroll-x"><table class="sum" id="gwm-feat"><thead><tr><th>Type</th><th>Name</th><th>Location</th><th>Stage / elevation / head</th><th>Conductance</th><th>Bed bottom</th><th>Rate</th><th></th></tr></thead><tbody>${(g.features || []).map(featRow).join('')}</tbody></table></div>
       ${M.notes.length ? `<p class="note" style="color:var(--warn,#a3470b)">${M.notes.map(esc).join(' ')}</p>` : ''}
-      ${!(g.features || []).length ? '<p class="note">None: the model is driven by the two fixed-head faces and recharge. Add a creek, drain or pumping well where one controls the water table.</p>' : ''}
+      ${!(g.features || []).length ? '<p class="note">None: the model is driven by the two fixed-head faces and recharge. Add a creek, drain or pumping well where one controls the water table.</p>' : ''}` }];
+  return `<div class="gw-page">
+    <section class="sec"><header><h3>Groundwater model</h3><button class="btn link" data-act="tut-gwm">Tutorial</button><span class="note">${GW_ENGINE} · public domain · labelled “Model (MODFLOW 6), not measured” wherever it is drawn</span><span class="sp"></span>
+      </header>
+      <div class="body">
+      ${!desk ? `<p class="note" style="color:var(--warn,#a3470b)">The groundwater model runs MODFLOW 6 on this computer, so it needs the desktop app. The cross-section keeps the Domenico forecast.</p>` : ''}
+      ${S.gwm.msg ? `<p class="note"><b>${esc(S.gwm.msg)}</b></p>` : ''}${S.gwm.err ? `<p class="note" style="color:var(--warn,#a3470b)">MODFLOW 6: ${esc(S.gwm.err)}</p>` : ''}
+      ${stale ? `<p class="note" style="color:var(--warn,#a3470b)">The inputs changed after the last calibration (${esc(c.at.slice(0, 10))}): calibrate again before relying on the results.</p>` : ''}
+      
       </div></section>
     <section class="sec" id="gwm-cal-sec"><header><h3>Calibration</h3><span class="note">Levenberg–Marquardt on log parameters; statistics after Hill and Tiedeman (2007)</span></header><div class="body">
       ${!c ? '<p class="note">Not calibrated yet. Calibrate (steady) fits the layers without slug tests and the recharge to the measured heads of the calibration round.</p>' : `<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start"><div style="flex:1;min-width:420px">${statsT(c, `Steady state, ${c.round}`)}${statsT(ct, `All rounds (${(ct?.rounds || []).length})`)}</div>${scatter(ct || c)}</div>${resT(ct || c)}`}
@@ -4927,14 +5051,16 @@ function gwmHTML() {
    surfaces (ground and unit bases, inverse distance, the model's own) and model output (MODFLOW 6 water table, plume cells,
    flow paths) see-through and named in the legend. Coordinates: x east, y up (elevation × exaggeration), z south. */
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js', THREE_SRI = 'sha384-RRHfJ6w1mTlKUBMYT/hvnRiOzEB/vyRV3DrQOseb6oYfvaZSfdd0byS4bHps0k2R';
+CTL.v3d = () => { const off = S.v3dOff || {}; return [
+  { id: 'v3d-view', title: 'View', icon: NAV_ICON.v3d, html: `<div class="lay-ctl"><label class="note" for="v3d-ve">Vertical exaggeration</label><select id="v3d-ve" style="width:auto">${[[0, 'Auto'], [1, '×1'], [2, '×2'], [5, '×5'], [10, '×10']].map(([v, t]) => `<option value="${v}" ${(S.v3dVe || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div><button class="btn" data-act="v3d-reset">Reset view</button>` },
+  { id: 'v3d-layers', title: 'Layers', icon: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>', html: `<div class="sec-opts">${V3D_LAYERS.map(([k, t]) => `<label class="check"><input type="checkbox" id="v3d-lyr-${k}" ${off[k] ? '' : 'checked'}> ${t}</label>`).join('')}</div>` },
+  { id: 'v3d-out', title: 'Save and export', icon: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', html: `<button class="btn" data-act="v3d-report" ${S.readOnly ? 'disabled' : ''}>Add view to report</button><button class="btn" data-act="v3d-png">Save image</button><button class="btn" data-act="v3d-vtk" title="VTK files for ParaView, in real coordinates">Export for ParaView</button>` }]; };
+CTL.gwm = () => S.tab === 'gwm' ? S._gwmCtl || [] : [];
 const V3D_LAYERS = [['boreholes', 'Boreholes'], ['wells', 'Wells'], ['samples', 'Results'], ['ground', 'Ground'], ['layers', 'Unit surfaces'], ['water', 'Water table'], ['plume', 'Model plume'], ['paths', 'Flow paths'], ['labels', 'Names']];
 function v3dHTML() {
   const off = S.v3dOff || {};
-  return `<div class="v3d-page"><section class="sec"><header><h3>3D view</h3><span class="note">drag to rotate · shift-drag to pan · scroll to zoom</span><span class="sp"></span>
-    <label class="note" for="v3d-ve">Vertical exaggeration</label><select id="v3d-ve" style="width:auto">${[[0, 'Auto'], [1, '×1'], [2, '×2'], [5, '×5'], [10, '×10']].map(([v, t]) => `<option value="${v}" ${(S.v3dVe || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-    <button class="btn" data-act="v3d-reset">Reset view</button><button class="btn" data-act="v3d-report" ${S.readOnly ? 'disabled' : ''}>Add view to report</button><button class="btn" data-act="v3d-png">Save image</button><button class="btn" data-act="v3d-vtk" title="VTK files for ParaView, in real coordinates">Export for ParaView</button></header>
-    <div class="body"><div class="sec-opts" style="display:flex;flex-wrap:wrap;gap:4px 14px;margin-bottom:8px">${V3D_LAYERS.map(([k, t]) => `<label class="check"><input type="checkbox" id="v3d-lyr-${k}" ${off[k] ? '' : 'checked'}> ${t}</label>`).join('')}</div>
-    <div id="v3d" style="position:relative;height:560px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#f7f8fa;touch-action:none"></div>
+  return `<div class="v3d-page"><section class="sec"><header><h3>3D view</h3><span class="note">drag to rotate · shift-drag to pan · scroll to zoom</span><span class="sp"></span><button class="btn" data-act="v3d-reset">Reset view</button></header>
+    <div class="body"><div id="v3d" style="position:relative;height:max(420px, calc(100vh - 300px));border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#f7f8fa;touch-action:none"></div>
     <p class="note" id="v3d-legend" style="margin-top:6px"></p></div></section></div>`;
 }
 const v3dCss = name => getComputedStyle(document.documentElement).getPropertyValue('--' + name).trim() || '#b9aca4';
@@ -5203,8 +5329,14 @@ const TUTORIALS = {
     { tab: 'gwm', sel: '#gwm-limits', title: 'Know the limits', body: '<p>Layers are interpolated between boreholes and each is uniform; heads alone cannot separate recharge from conductivity; transport uses steady flow and a constant source. Read the warnings and residuals before relying on a result.</p>' },
   ] },
 };
+/* the top-bar button: this page's tutorial, or a choice when the page has none */
+const TUT_FOR = { xsec: 'xsec', gwm: 'gwm', v3d: 'gwm' };
+function tutPick() {
+  if (TUT_FOR[S.tab]) { tutStart(TUT_FOR[S.tab]); return; }
+  dialog('Tutorials', `<p class="note" style="margin-top:0">Each tutorial opens the worked example and walks through the page one step at a time. Back and Next move between steps; × stops at any time.</p>${Object.entries(TUTORIALS).map(([k, T]) => `<p><button class="btn" data-act="tut-${k}">${esc(T.title)}</button> <span class="note">${T.steps.length} steps</span></p>`).join('')}`, '<button class="btn" data-act="close">Close</button>');
+}
 function tutStart(k) {
-  const T = TUTORIALS[k]; if (!T) return;
+  const T = TUTORIALS[k]; if (!T) return; if (!$('#overlay').hidden) closeOverlay();
   if (projKey(cur()) !== XS_PROJ) { if (S.readOnly) { toast('Open the cross-section example to follow the tutorial.'); return; } loadXsExample(); }
   S.tut = { k, i: 0 }; setTimeout(tutShow, 150);
 }
@@ -5213,6 +5345,10 @@ function tutGo(d) { if (!S.tut) return; const N = TUTORIALS[S.tut.k].steps.lengt
 function tutShow() {
   if (!S.tut) return; const T = TUTORIALS[S.tut.k], st = T.steps[S.tut.i], N = T.steps.length;
   if (st.tab && S.tab !== st.tab) goTab(st.tab);
+  // a step pointing at a setting opens the panel and the setting's group first
+  if (st.sel && !document.querySelector(st.sel) && S.ui.ctlOpen === false && !$('#ctl')?.hidden) { S.ui.ctlOpen = true; uiSave(); workResized(); }
+  const tgb = st.sel && document.querySelector(st.sel)?.closest('.ctl-gb[hidden]'); if (tgb) { const k = tgb.closest('[data-ctlg]').dataset.ctlg; S.ui.fold = { ...S.ui.fold, [k]: false }; uiSave(); tgb.hidden = false; tgb.previousElementSibling.setAttribute('aria-expanded', 'true'); }
+  if (st.sel) document.querySelector('#ctl ' + st.sel)?.scrollIntoView({ block: 'nearest' });
   let card = $('#tut'); if (!card) { card = document.createElement('div'); card.id = 'tut'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-live', 'polite'); document.body.append(card); }
   card.setAttribute('aria-label', `${T.title} tutorial`);
   card.innerHTML = `<button class="tut-x" data-act="tut-close" aria-label="Close the tutorial">×</button><div class="tut-k">${esc(T.title)} tutorial · Step ${S.tut.i + 1} of ${N}</div><h4>${esc(st.title)}</h4>${st.body}
@@ -7081,15 +7217,21 @@ function pageCount(b) { return Math.max(1, Math.ceil(toD(Math.max(depthOf(b), .5
 function reportHTML(b) {
   const n = pageCount(b);
   return `<div class="panel" style="padding:10px 12px"><div class="rep-bar">
-      <label for="rp-depth">Depth per page <select id="rp-depth"><option value="fit" ${S.pageFit ? 'selected' : ''}>Fit to depth</option>${pageDepthOpts().map(d => `<option value="${d}" ${!S.pageFit && d === fixedDepth() ? 'selected' : ''}>${d} ${S.units}</option>`).join('')}</select></label>
       <span class="note">${n} page${n > 1 ? 's' : ''} · Letter, ${S.pageFit && pageDepth(b) !== fixedDepth() ? `${pageDepth(b)} ${S.units} on the page, fitted to this borehole` : `${pageDepth(b)} ${S.units} per page, same vertical scale on every borehole`}</span>
       <span style="margin-left:auto;display:flex;gap:8px"><button class="btn" data-act="pdf-all">PDF all boreholes</button><button class="btn" data-act="appendix">Report package…</button><button class="btn primary" data-act="pdf-one">Download PDF</button></span>
-    </div>
-    <div class="rep-cols rep-lay"><b>Page layout</b>${labParamsUsed(projList()).length ? `<span class="lay-ctl"><label class="note" for="lab-graph">Lab result graphed</label><select id="lab-graph" style="width:auto">${labParamsUsed(projList()).map(p => `<option value="${p}" ${labGraphParam() === p ? 'selected' : ''}>${esc(LAB_PARAMS[p].label)}</option>`).join('')}</select></span>` : ''}${Object.entries(LAYOUT).map(([k, L]) => `<span class="lay-ctl"><span class="note">${L.label}</span><span class="seg" role="group" aria-label="${L.label}" data-tip="${esc(L.tip)}">${Object.entries(L.opts).map(([v, [t]]) => `<button data-lay="${k}:${v}" aria-pressed="${(S.co.layout?.[k] || L.def || 'normal') === v}" ${S.readOnly ? 'disabled' : ''}>${t}</button>`).join('')}</span></span>`).join('')}</div>
-    ${graphsRowHTML()}
-    <div class="rep-cols"><b>Columns on the log</b><span class="seg" role="group" aria-label="Column preset">${Object.entries(LOG_PRESETS).map(([k, v]) => `<button data-preset="${k}" aria-pressed="${presetOf() === k}" data-tip="${esc(v.tip)}" ${S.readOnly ? 'disabled' : ''}>${esc(v.label)}</button>`).join('')}</span>${(() => { const d = pdfCols(b).dropped; return d.length ? `<span class="note" style="flex-basis:100%">Left out of this PDF to keep the description readable: ${esc(d.map(k => LOG_COLS[k][0].replace(/ \(.*\)$/, '').replace(/ graph$/, '')).join(', '))}. Tick a column to keep it.</span>` : ''; })()}<span style="flex-basis:100%;height:0"></span>${Object.entries(LOG_COLS).map(([k, [label]]) => `<label class="check" data-tip="${esc(S.co.cols?.[k] && S.co.cols[k] !== 'auto' ? 'Set by you. Untick to hide, tick to show.' : 'Automatic: shown when this borehole has data for it.')}"><input type="checkbox" data-repcol="${k}" ${(PDF_KEYS.includes(k) ? pdfCols(b).on.has(k) : colOn(b, k)) ? 'checked' : ''}> ${esc(label.replace(/ \((PDF|ppm, headspace|pocket pen\., vane)\)/, ''))}</label>`).join('')}<button class="btn link" data-act="cols-auto">Reset to automatic</button></div></div>
+    </div></div>
     <div class="pages">${Array.from({ length: n }, (_, i) => `<div class="page">${pageSVG(b, i, n)}</div>`).join('')}</div>`;
 }
+/* log settings in the panel: page layout, graphs (one tick list) and the other columns */
+const GRAPH_COLS = ['nplot', 'su', 'w', 'cvc', 'lab'];
+function logColsHTML(b) {
+  return `<div class="rep-cols"><span class="seg" role="group" aria-label="Column preset">${Object.entries(LOG_PRESETS).map(([k, v]) => `<button data-preset="${k}" aria-pressed="${presetOf() === k}" data-tip="${esc(v.tip)}" ${S.readOnly ? 'disabled' : ''}>${esc(v.label)}</button>`).join('')}</span>${(() => { const d = pdfCols(b).dropped; return d.length ? `<span class="note" style="flex-basis:100%">Left out of this PDF to keep the description readable: ${esc(d.map(k => LOG_COLS[k][0].replace(/ \(.*\)$/, '').replace(/ graph$/, '')).join(', '))}. Tick a column to keep it.</span>` : ''; })()}<span style="flex-basis:100%;height:0"></span>${Object.entries(LOG_COLS).filter(([k]) => !GRAPH_COLS.includes(k)).map(([k, [label]]) => `<label class="check" data-tip="${esc(S.co.cols?.[k] && S.co.cols[k] !== 'auto' ? 'Set by you. Untick to hide, tick to show.' : 'Automatic: shown when this borehole has data for it.')}"><input type="checkbox" data-repcol="${k}" ${(PDF_KEYS.includes(k) ? pdfCols(b).on.has(k) : colOn(b, k)) ? 'checked' : ''}> ${esc(label.replace(/ \((PDF|ppm, headspace|pocket pen\., vane)\)/, ''))}</label>`).join('')}<button class="btn link" data-act="cols-auto">Reset to automatic</button></div>`;
+}
+CTL.report = () => { const b = cur(); return b ? [
+  { id: 'log-page', title: 'Page layout', icon: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/>', html: `<div class="rep-cols rep-lay"><label for="rp-depth">Depth per page <select id="rp-depth"><option value="fit" ${S.pageFit ? 'selected' : ''}>Fit to depth</option>${pageDepthOpts().map(d => `<option value="${d}" ${!S.pageFit && d === fixedDepth() ? 'selected' : ''}>${d} ${S.units}</option>`).join('')}</select></label>${Object.entries(LAYOUT).map(([k, L]) => `<span class="lay-ctl"><span class="note">${L.label}</span><span class="seg" role="group" aria-label="${L.label}" data-tip="${esc(L.tip)}">${Object.entries(L.opts).map(([v, [t]]) => `<button data-lay="${k}:${v}" aria-pressed="${(S.co.layout?.[k] || L.def || 'normal') === v}" ${S.readOnly ? 'disabled' : ''}>${t}</button>`).join('')}</span></span>`).join('')}</div>` },
+  { id: 'log-graphs', title: 'Graphs', icon: '<path d="M4 20V4M4 20h16M8 16l4-5 3 3 5-7"/>', html: graphsRowHTML() },
+  { id: 'log-cols', title: 'Columns', icon: NAV_ICON.table, html: logColsHTML(b) }] : []; };
+CTL.log = () => { const b = cur(); return b ? CTL.report().filter(g => g.id !== 'log-page') : []; };
 /* PDF columns: what the settings ask for, then, if the page is too crowded for a readable description, automatic columns are
    left out in this order (least used first). Columns you switched on yourself are never dropped. */
 /* page layout choices in PDF preview: text size, soil column width and graph width, kept with the company settings */
@@ -7119,7 +7261,7 @@ function pdfCols(b) {
   const fixed = 38 + (b.elevation != null && colOn(b, 'elev') ? 48 : 0) + 32 + 14 + (well ? 1.85 : 1) * Math.min(lay('sym'), 52) + graphsOf().length * lay('graph');
   const room = () => PG.W - 2 * PG.M - fixed - [...on].reduce((a, k) => a + pdfW(k), 0);
   for (const k of PDF_DROP) { if (room() >= 190) break; if (on.has(k) && (S.co.cols?.[k] || 'auto') === 'auto') { on.delete(k); dropped.push(k); } }
-  return { on, dropped };
+  return { on, dropped, room: room() };
 }
 function pageSVG(b, pi, pn) {
   const { W, H, M } = PG, U = LEN(), D = pageDepth(b);
@@ -7829,7 +7971,7 @@ function siteHTML() {
   const pts = projList().filter(b => b.easting != null && b.northing != null);
   return `<div class="site-grid">
     ${S.mapEdit ? `<section class="sec" style="grid-column:1/-1"><header><h3>Map editor</h3><span class="note">Shapes and locations are saved as you go</span></header><div class="body" id="map-ed-wrap">${mapEditorHTML()}</div></section>` : ''}
-    <section class="sec" style="grid-column:1/-1" ${S.mapEdit ? 'hidden' : ''}><header><h3>Site plan</h3><span class="note">Drag to move · scroll to zoom · click boreholes to build the section line</span></header><div class="body">${S.mapEdit ? '' : `<div class="map-wrap"><div id="plan" class="map-canvas"></div><aside class="map-layers">${layersPanelHTML()}</aside></div>`}
+    <section class="sec" style="grid-column:1/-1" ${S.mapEdit ? 'hidden' : ''}><header><h3>Site plan</h3><span class="note">Drag to move · scroll to zoom · click boreholes to build the section line</span></header><div class="body">${S.mapEdit ? '' : `<div id="plan" class="map-canvas"></div>`}
       ${pts.length < projList().length ? `<p class="note" style="margin-top:6px">${projList().length - pts.length} borehole${projList().length - pts.length > 1 ? 's have' : ' has'} no coordinates and ${projList().length - pts.length > 1 ? 'are' : 'is'} not shown.</p>` : ''}</div></section>
     <section class="sec" style="grid-column:1/-1"><header><h3>Cross-section A–A′</h3><span class="note">${S.secIds.size >= 2 ? `Runs through ${S.secIds.size} boreholes picked on the plan` : 'Best-fit line through all boreholes'}</span><span class="sp"></span><button class="btn link" data-tab="xsec">Open cross-section</button></header></section>
     <section class="sec"><header><h3>Plasticity chart</h3><span class="note">CFEM / Modified USCS</span></header><div class="body"><div id="pchart" class="scroll-x"></div></div></section>
@@ -7864,14 +8006,17 @@ function drawSite() { drawPlan(); drawPlasticity(); }
 /* the Cross-section page: the section line, the drawing and everything drawn on it */
 function xsecHTML() {
   return `<div class="xs-page">
-    <section class="sec"><header><h3>Cross-section A–A′</h3><button class="btn link" data-act="tut-xsec">Tutorial</button><span class="sp"></span><label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">${xsPlumeCtl()}${secToolsHTML()}
+    <section class="sec"><header><h3>Cross-section A–A′</h3><button class="btn link" data-act="tut-xsec">Tutorial</button><span class="sp"></span>${xsDateCtl()}<label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">
       <div class="scroll-x" id="xs-draw"></div>
       <div class="legend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--earth)" stroke-width="2" stroke-dasharray="6 3"/></svg>Ground surface (measured at boreholes, interpolated between)</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="6 3"/></svg>Water table (interpolated)</span><span><svg width="22" height="12" aria-hidden="true"><rect x="7" y="0" width="8" height="12" style="fill:var(--panel);stroke:var(--ink)"/><path d="M9 6h4M9 9h4" style="stroke:var(--ink)"/></svg>Slotted interval</span><span><svg width="22" height="12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" style="fill:var(--s-clay);stroke:var(--muted)" fill-opacity=".38" stroke-dasharray="4 2"/></svg>Interpreted between boreholes</span></div>
       <p class="note" id="xs-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
-    ${xsModelHTML()}
-    ${xsCorrHTML()}
   </div>`;
 }
+CTL.xsec = () => [
+  { id: 'xs-plume', title: 'Plume and layers', icon: NAV_ICON.contam, html: xsPlumeCtl() },
+  { id: 'xs-line', title: 'Section line and drawing', icon: NAV_ICON.xsec, html: secToolsHTML() },
+  { id: 'xs-model', title: 'Forecast (model)', icon: NAV_ICON.gwm, html: xsModelHTML() },
+  { id: 'xs-corr', title: 'Layer correlation', icon: '<path d="M4 7h6l4 4h6M4 17h6l4-4"/>', html: xsCorrHTML() }];
 /* layer correlation: the section joins units of the same name; a unit can be paired with a differently named one by hand */
 function xsCorrHTML() {
   const al = siteOf()?.xsec?.alias || {}, rows = [];
@@ -7893,9 +8038,13 @@ function xsPlumeCtl() {
     <span class="lay-ctl"><select id="xs-layer" aria-label="Layers" style="width:auto">${[['meas', 'Measured'], ['model', 'Forecast'], ['both', 'Compare measured and forecast']].map(([v, t]) => `<option value="${v}" ${(xs.plume !== false && xs.model ? 'both' : xs.model ? 'model' : 'meas') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
     ${xs.medium === 'groundwater' ? `<select id="xs-shape" aria-label="Plume shape" style="width:auto" title="Model-guided: the forecast's shape, matched to every measured result. Data only: blended between wells across the screens."><option value="guided" ${xs.shape !== 'data' ? 'selected' : ''}>Shape: model-guided</option><option value="data" ${xs.shape === 'data' ? 'selected' : ''}>Shape: data only</option></select>` : '<input type="hidden" id="xs-shape" value="data">'}
     <select id="xs-style" aria-label="Drawing style" style="width:auto">${[['graded', 'Graded shading'], ['lines', 'Contour lines'], ['bands', 'Filled bands']].map(([v, t]) => `<option value="${v}" ${(xs.style || 'graded') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-    <label class="check"><input type="checkbox" id="xs-soilcol" ${xs.soilColour ? 'checked' : ''}> Keep soil colours</label></span>
-    <span class="lay-ctl"><span class="note">Date</span><input type="range" id="xs-date" min="0" max="${Math.max(0, dates.length - 1)}" step="1" value="${Math.max(0, idx)}" ${dates.length ? '' : 'disabled'} aria-label="Date shown" style="width:180px"><span id="xs-date-l" class="note">${esc(xs.date || (dates.length ? `latest (${dates[dates.length - 1]})` : 'no dated data'))}</span>
-    <button class="btn" id="xs-play" data-act="xs-play" ${dates.length < 2 ? 'disabled title="Needs results or readings on two or more dates"' : ''}>Play</button></span></div>`;
+    <label class="check"><input type="checkbox" id="xs-soilcol" ${xs.soilColour ? 'checked' : ''}> Keep soil colours</label></span></div>`;
+}
+/* the date strip stays with the drawing: scrub through time without opening the panel */
+function xsDateCtl() {
+  const dates = xsDates(sectionList()), xs = S.xs, idx = xs.date ? Math.max(0, dates.filter(d => d <= xs.date).length - 1) : dates.length - 1;
+  return `<span class="lay-ctl xs-dates"><span class="note">Date</span><input type="range" id="xs-date" min="0" max="${Math.max(0, dates.length - 1)}" step="1" value="${Math.max(0, idx)}" ${dates.length ? '' : 'disabled'} aria-label="Date shown" style="width:180px"><span id="xs-date-l" class="note">${esc(xs.date || (dates.length ? `latest (${dates[dates.length - 1]})` : 'no dated data'))}</span>
+    <button class="btn" id="xs-play" data-act="xs-play" ${dates.length < 2 ? 'disabled title="Needs results or readings on two or more dates"' : ''}>Play</button></span>`;
 }
 let xsTimer = null;
 function xsPlay() {
@@ -10241,6 +10390,9 @@ document.addEventListener('click', e => {
     case 'tut-next': tutGo(1); break;
     case 'tut-back': tutGo(-1); break;
     case 'tut-close': tutClose(); break;
+    case 'tut': tutPick(); break;
+    case 'ctl-toggle': S.ui.ctlOpen = S.ui.ctlOpen === false; uiSave(); workResized(); break;
+    case 'side-toggle': S.ui.sideOpen = S.ui.sideOpen === false; uiSave(); uiApply(); workResized(); break;
     case 'gw-run': case 'gw-cal': case 'gw-calt': case 'gw-trans': case 'gw-export': case 'gw-feat-add': case 'gw-feat-del': gwAct(act, t); break;
     case 'grid-bh': if (b) { S.gridOne = true; S.tsheet = 'layers'; lsSet('bhlog.tsheet', 'layers'); goTab('table'); setTimeout(() => $('.dgrid input')?.focus(), 0); } break;
     case 'clear-examples': for (const x of [...S.bh.values()]) if (x.example) store.remove(x.id); S.formStale = true; render(); break;
@@ -10251,6 +10403,7 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('change', e => {
+  if (e.target.dataset.gtick) { if (!S.readOnly) gtickSet(e.target.dataset.gtick, e.target.checked); return; }
   if (e.target.dataset.graph != null) { if (!S.readOnly) { const g = S.co.graphs[+e.target.dataset.graph]; g[e.target.dataset.gk] = e.target.value; store.saveCompany(); refreshGraphs(); } return; }
   if (e.target.dataset.oblayer != null) { const b = cur(); if (!editable(b)) return; const ev = b.events[+e.target.dataset.oblayer], l = b.layers.find(x => x.id === e.target.value); if (ev && l) { ev.layer = l.id; ev.depth = l.top; ev.to = l.bottom; b.events.sort((a, c) => (a.depth ?? -1) - (c.depth ?? -1)); S.dsel.events = b.events.indexOf(ev); logChange(b, 'Drilling notes'); store.save(b); if (S.drawer) renderDrawer(); else renderView(true); } return; }
   if (e.target.id === 'basemap') { if (!S.readOnly) { setSite({ ...(siteOf() || {}), basemap: e.target.value }); S.tileWarned = false; renderView(true); } return; }
