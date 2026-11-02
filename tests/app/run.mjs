@@ -1359,6 +1359,23 @@ app.whenReady().then(async () => {
     })()`);
     expect(r.n > 10 && !r.hit.length, 'header text overlaps: ' + JSON.stringify(r));
   });
+  await check('tutorial: button in the top bar', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(300); const btn = document.querySelector('.topbar [data-act="tut"], header [data-act="tut"]') || document.querySelector('[data-act="tut"].tb');
+        want(btn && /Tutorial/.test(btn.textContent), 'top bar has a Tutorial button');
+        goTab('xsec'); await w(200); btn?.click(); await w(200); want(S.tut?.k === 'xsec' && document.querySelector('#tut'), 'on the Cross-section page it starts that tutorial: ' + S.tut?.k);
+        tutClose(); goTab('v3d'); await w(200); btn?.click(); await w(200); want(S.tut?.k === 'gwm', '3D page starts the groundwater model tutorial: ' + S.tut?.k);
+        tutClose(); goTab('home'); await w(200); btn?.click(); await w(200);
+        const pick = [...document.querySelectorAll('#overlay [data-act^="tut-"]')].map(b => b.dataset.act); want(pick.includes('tut-xsec') && pick.includes('tut-gwm'), 'elsewhere it offers the tutorials: ' + pick);
+        document.querySelector('#overlay [data-act="tut-gwm"]')?.click(); await w(300); want(S.tut?.k === 'gwm' && !document.querySelector('#overlay:not([hidden]) [data-act="tut-xsec"]'), 'choosing one starts it and closes the choice');
+        tutClose();
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
