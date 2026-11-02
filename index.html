@@ -2668,7 +2668,7 @@ function renderView(full) {
   else if (S.tab === 'site') { v.innerHTML = siteHTML(); drawSite(); }
   else if (S.tab === 'xsec') { v.innerHTML = xsecHTML(); drawXsec(); }
   else if (S.tab === 'gwm') { v.innerHTML = gwmHTML(); gwEnsure(); }
-  else if (S.tab === 'v3d') { v.innerHTML = v3dHTML(); v3dBuild(); }
+  else if (S.tab === 'v3d') { v.innerHTML = v3dHTML(); v3dBuild(); gwAutoEnsure(); }
   else if (S.tab === 'home') { v.innerHTML = homeHTML(); }
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
   else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); }
@@ -4965,8 +4965,9 @@ async function gwEnsure(force) {
   } finally { S.gwm.busy = false; S.gwm.msg = ''; gwRefresh(); }
 }
 const gwWantedBy = L => !!window.desktop?.mf6Run && !!(gwSaved().calib || gwSaved().transport?.on) && (L?.pages || []).some(p => p.items?.some(it => ['gwsum', 'gwcal', 'gwpar', 'section', 'plan'].includes(it.t)));
+function gwAutoEnsure() { if (!window.desktop?.mf6Run || !(gwSaved().calib || gwSaved().transport?.on)) return; gwModel(); if ((S.gwm.run && (S.gwm.trans || !gwSaved().transport?.on)) || S.gwm.busy || S.gwm.tried || S.gwm.M?.error) return; S.gwm.tried = true; gwEnsure(true); }
 function gwComposeEnsure() { if (!gwWantedBy(repLayout())) return; gwModel(); if (S.gwm.run || S.gwm.busy || S.gwm.tried || S.gwm.M?.error) return; S.gwm.tried = true; gwEnsure(true); }
-function gwRefresh() { if (S.tab === 'gwm') { const v = $('#view'); if (v) v.innerHTML = gwmHTML(); ctlRender(); } else if (S.tab === 'xsec') drawXsec(); else if (S.tab === 'site') drawSite?.(); else if (S.tab === 'compose' && !S.gwm.busy) rerenderCompose(); }
+function gwRefresh() { if (S.tab === 'gwm') { const v = $('#view'); if (v) v.innerHTML = gwmHTML(); ctlRender(); } else if (S.tab === 'xsec') drawXsec(); else if (S.tab === 'site') drawSite?.(); else if (S.tab === 'compose' && !S.gwm.busy) rerenderCompose(); else if (S.tab === 'v3d' && !S.gwm.busy) v3dBuild(); }
 async function gwAct(act, t) {
   if (S.readOnly && act !== 'gw-export') return;
   const M = gwModel(); if (M.error) { toast(M.error); return; }
@@ -5103,7 +5104,7 @@ function plumeField3d(list, date, param) {
   const E = pts.map(p => p.E), N = pts.map(p => p.N);
   return { src: 'interpreted', date: date || '', at, bbox: { e0: Math.min(...E) - 5, e1: Math.max(...E) + 5, n0: Math.min(...N) - 5, n1: Math.max(...N) + 5, z0: Math.min(...pts.map(p => p.zb)) - .4, z1: Math.max(...pts.map(p => p.zt)) + .4 } };
 }
-const V3D_LAYERS = [['boreholes', 'Boreholes'], ['wells', 'Wells'], ['samples', 'Results'], ['ground', 'Ground'], ['layers', 'Unit surfaces'], ['water', 'Water table'], ['plume', 'Model plume'], ['paths', 'Flow paths'], ['labels', 'Names']];
+const V3D_LAYERS = [['boreholes', 'Boreholes'], ['wells', 'Wells'], ['samples', 'Results'], ['ground', 'Ground'], ['layers', 'Unit surfaces'], ['water', 'Water table'], ['plume', 'Plume'], ['paths', 'Flow paths'], ['labels', 'Names']];
 function v3dHTML() {
   const off = S.v3dOff || {};
   return `<div class="v3d-page"><section class="sec"><header><h3>3D view</h3><span class="note">drag to rotate · shift-drag to pan · scroll to zoom</span><span class="sp"></span><button class="btn" data-act="v3d-reset">Reset view</button></header>
@@ -5147,38 +5148,49 @@ async function v3dBuild() {
     if (s && w?.screenTop != null) { const v = gwVal(s, param), k = lvG.filter(l => v.v >= l.v).length; const m = new THREE.Mesh(new THREE.SphereGeometry(r * 1.5, 16, 12), mat(v.lt ? '#ffffff' : PLUME_RAMP.meas[k], { emissive: v.lt ? '#000000' : PLUME_RAMP.meas[k], emissiveIntensity: .25 })); m.position.copy(P(b.easting + r * 1.25, b.northing, b.elevation - (w.screenTop + w.screenBottom) / 2)); groups.samples.add(m); }
     for (const sm of (b.samples || []).filter(sm => sm.depth != null && labVal(sm, param))) { const v = labVal(sm, param), k = lvS.filter(l => v.v >= l.v).length; const m = new THREE.Mesh(new THREE.SphereGeometry(r * 1.1, 12, 10), mat(v.lt ? '#ffffff' : PLUME_RAMP.meas[k])); m.position.copy(P(b.easting - r * 1.25, b.northing, b.elevation - sm.depth)); groups.samples.add(m); }
   }
-  // surfaces on the model grid: ground and the base of each unit (interpolated), the water table (model or fitted plane)
-  const M = gwModel(); let wtSrc = '';
+  // the plume: MODFLOW 6 when transport has run for this compound, else interpolated from the measured results
+  const PF = plumeField3d(list, date, param), lvP = plumeLevels('groundwater', param), shellsOn = !!(PF && lvP.length) && !(S.v3dOff || {}).plume;
+  // surfaces on the model grid: ground and the base of each unit (interpolated), the water table (model or fitted plane); faint while shells show
+  const M = gwModel(); let wtSrc = ''; const fadeK = shellsOn ? .12 : null;
   if (M && !M.error) { const g = M.grid, surf = (zOf, color, opacity) => { const pos = [], idx = [];
       for (let rr = 0; rr < g.nrow; rr++) for (let c = 0; c < g.ncol; c++) { const [E, N] = g.cellCentre(rr, c), z = zOf(rr, c, E, N); const v = P(E, N, z ?? NaN); pos.push(v.x, v.y, v.z); }
       for (let rr = 0; rr < g.nrow - 1; rr++) for (let c = 0; c < g.ncol - 1; c++) { const a = rr * g.ncol + c, b2 = a + 1, d = a + g.ncol, e = d + 1; if ([a, b2, d, e].some(i => !Number.isFinite(pos[3 * i + 1]))) continue; idx.push(a, d, b2, b2, d, e); }
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos.map(v => Number.isFinite(v) ? v : 0), 3)); geo.setIndex(idx); geo.computeVertexNormals();
       return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false })); };
-    groups.ground.add(surf((rr, c) => g.top[rr * g.ncol + c], v3dCss('earth'), .28));
-    M.units.forEach((u, k) => { const fill = list.flatMap(b => xsUnits(b)).find(x => x.u === u.u)?.fill || 'panel-2'; groups.layers.add(surf((rr, c) => g.botm[k][rr * g.ncol + c], v3dCss(fill), .3)); });
+    groups.ground.add(surf((rr, c) => g.top[rr * g.ncol + c], v3dCss('earth'), fadeK ?? .28));
+    M.units.forEach((u, k) => { const fill = list.flatMap(b => xsUnits(b)).find(x => x.u === u.u)?.fill || 'panel-2'; groups.layers.add(surf((rr, c) => g.botm[k][rr * g.ncol + c], v3dCss(fill), fadeK ?? .3)); });
     const R = S.gwm?.run; wtSrc = R?.ok ? `MODFLOW 6 (${gwCalLabel()})` : `fitted plane of the ${M.round} levels`;
     groups.water.add(surf((rr, c, E, N) => R?.ok ? gwWaterTable(M, R.layers, E, N) : M.F.fit({ e: E, n: N }), '#1876bd', .3));
-    // the MODFLOW 6 plume: cells above 1×, 10× and 100× the guideline on the date shown
-    const T = S.gwm?.trans; let tShown = '';
-    if (T?.ok) { const tt = T.times.filter(q => !date || q.date <= date).pop() || T.times[0], lv = plumeLevels('groundwater', T.param); tShown = tt.date;
-      lv.forEach((l, k) => { const cells = []; for (let kk = 0; kk < g.nlay; kk++) for (let rr = 0; rr < g.nrow; rr++) for (let c = 0; c < g.ncol; c++) { const i = rr * g.ncol + c, v = tt.layers[kk]?.[i];
-          if (g.idomain[kk][i] === 1 && v >= l.v && (k === lv.length - 1 || v < lv[k + 1].v)) cells.push([kk, rr, c]); }
-        if (!cells.length) return; const box = new THREE.BoxGeometry(g.cell, 1, g.cell), im = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: PLUME_RAMP.model[k + 1], transparent: true, opacity: [.22, .35, .55][k], depthWrite: false }), cells.length), mtx = new THREE.Matrix4(), q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), g.angrot * Math.PI / 180);
-        cells.forEach(([kk, rr, c], n) => { const i = rr * g.ncol + c, tp = kk ? g.botm[kk - 1][i] : g.top[i], bt = g.botm[kk][i], [E, N] = g.cellCentre(rr, c); mtx.compose(P(E, N, (tp + bt) / 2), q, new THREE.Vector3(1, Math.max(.01, (tp - bt) * ve), 1)); im.setMatrixAt(n, mtx); });
-        groups.plume.add(im); }); }
     for (const path of S.gwm?.paths || []) { const geo = new THREE.BufferGeometry().setFromPoints(path.map(p => P(p.E, p.N, p.z))); groups.paths.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#3f007d' }))); }
-    S.v3dShown = { tShown, wtSrc };
+    S.v3dShown = { wtSrc };
+  }
+  // nested shells at 1×, 10× and 100× the guideline from the field sampled on a regular grid (log scale, closed at the edges)
+  let plume = null;
+  if (PF && lvP.length) {
+    const bb = PF.bbox, h = Math.max(.4, Math.max(bb.e1 - bb.e0, bb.n1 - bb.n0) / 55), nx = Math.min(64, Math.ceil((bb.e1 - bb.e0) / h) + 3), ny = Math.min(64, Math.ceil((bb.n1 - bb.n0) / h) + 3), nz = Math.min(36, Math.max(8, Math.ceil((bb.z1 - bb.z0) / .15) + 3));
+    const hx = (bb.e1 - bb.e0) / (nx - 3), hy = (bb.n1 - bb.n0) / (ny - 3), hz = (bb.z1 - bb.z0) / (nz - 3), at = (i, j, k) => [bb.e0 + (i - 1) * hx, bb.n0 + (j - 1) * hy, bb.z0 + (k - 1) * hz];
+    const v = new Float32Array(nx * ny * nz).fill(-9), g0 = lvP[0].v;
+    for (let k = 1; k < nz - 1; k++) for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) { const [E, N, z] = at(i, j, k), c = PF.at(E, N, z); if (c > 0) v[i + nx * (j + ny * k)] = Math.log10(c / g0); }
+    const fam = PF.src === 'mf6' ? PLUME_RAMP.model : PLUME_RAMP.meas, names = ['plume-1x', 'plume-10x', 'plume-100x'], made = [];
+    lvP.forEach((l, k) => { const iso = isoSurface({ nx, ny, nz, v }, Math.log10(l.v / g0)); if (!iso.indices.length) return;
+      const pos = new Float32Array(iso.positions.length); for (let q = 0; q < iso.positions.length; q += 3) { const [E, N, z] = at(iso.positions[q], iso.positions[q + 1], iso.positions[q + 2]), p3 = P(E, N, z); pos[q] = p3.x; pos[q + 1] = p3.y; pos[q + 2] = p3.z; }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(iso.indices); geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: fam[k + 1], emissive: fam[k + 1], emissiveIntensity: .15, transparent: true, opacity: [.24, .4, .62][k], side: THREE.DoubleSide, depthWrite: false }));
+      m.name = names[k]; m.renderOrder = 12 - k; groups.plume.add(m); made.push(l.label); });   // inner shells first, so each outer one is seen around it
+    plume = { src: PF.src, date: PF.date, levels: made };
   }
   // names
   for (const b of list) { const cv = document.createElement('canvas'), ctx = cv.getContext('2d'); cv.width = 256; cv.height = 64; ctx.font = '600 30px Arial'; ctx.fillStyle = '#1c2329'; ctx.textAlign = 'center'; ctx.fillText(b.name, 128, 42);
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false })); sp.scale.set(span / 14, span / 56, 1); sp.position.copy(P(b.easting, b.northing, b.elevation + (b.well?.stickup || 0) + 1.2 / Math.max(1, ve / 2))); groups.labels.add(sp); }
   const camera = new THREE.PerspectiveCamera(40, W / H, .1, span * 50);
   S.v3d = { ok: true, renderer, scene, camera, groups, ve, span, target: new THREE.Vector3(0, (zTop - Z0) * ve / 2, 0), orbit: S.v3d?.orbit && S.v3d.ok && S.v3d.span === span ? S.v3d.orbit : null };
-  v3dView(!S.v3d.orbit); v3dControls(renderer.domElement);
+  S.v3d.plume = plume; v3dView(!S.v3d.orbit); v3dControls(renderer.domElement);
   const T = S.gwm?.trans;
   $('#v3d-legend').innerHTML = esc(`Measured: borehole columns in soil colours; wells (white casing, dark screen) with blue discs at the water level${date ? ' on ' + date : ''}; spheres are ${LAB_PARAMS[param]?.label || param} results coloured against the guideline (white = not detected). `)
     + (M && !M.error ? esc(`Interpolated between boreholes (inverse distance): the see-through ground and unit-base surfaces. Water table: ${S.v3dShown.wtSrc}. `) : '')
-    + (T?.ok ? esc(`Model (MODFLOW 6), not measured: plume cells above 1×, 10× and 100× the guideline on ${S.v3dShown.tShown}, and flow paths from the source. `) : '')
+    + (!PF ? '' : !lvP.length ? esc(`No groundwater guideline for ${LAB_PARAMS[param]?.label || param}, so no plume shells are drawn. `)
+      : PF.src === 'mf6' ? esc(`Model (MODFLOW 6), not measured: ${LAB_PARAMS[param]?.label || param} shells at 1×, 10× and 100× the guideline on ${PF.date} (${gwCalLabel()})${S.gwm?.paths?.length ? ', and flow paths from the source' : ''}. `)
+      : esc(`Interpreted from measured results, not modelled: ${LAB_PARAMS[param]?.label || param} in groundwater${PF.date ? ' on ' + PF.date : ''}, shells at 1×, 10× and 100× the guideline, inverse distance between the wells' screens and fading to nothing 5 m beyond the wells. `))
     + `<b>Vertical exaggeration ×${ve}</b>${S.v3dVe ? '' : ' (auto)'}.`;
 }
 function v3dView(reset) { const V = S.v3d; if (!V?.ok) return; if (reset || !V.orbit) V.orbit = { th: -.75, ph: 1.0, rad: V.span * .85, tx: V.target.x, ty: V.target.y, tz: V.target.z }; v3dRender(); }
