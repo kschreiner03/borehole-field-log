@@ -4567,16 +4567,16 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   // the water table is joined only between static readings of the same round (within 7 days); the join is interpolated
   for (let i = 0; i < wpts.length - 1; i++) { const a = wpts[i], c = wpts[i + 1]; if (!xs) { o.push(`<path d="M${X(a.p.d)} ${Y(top(a.p.b) - a.w.depth)}L${X(c.p.d)} ${Y(top(c.p.b) - c.w.depth)}" fill="none" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="7 4"/>`); continue; }
     if (a.w.kind === 'static' && c.w.kind === 'static' && sameRound(a.w, c.w)) o.push(`<path data-wjoin="1" d="M${X(a.p.d) + bw / 2} ${Y(top(a.p.b) - a.w.depth)}L${X(c.p.d) - bw / 2} ${Y(top(c.p.b) - c.w.depth)}" fill="none" style="stroke:var(--water)" stroke-width="1.6" stroke-dasharray="7 4"><title>Water table interpolated between ${esc(a.p.b.name)} and ${esc(c.p.b.name)}</title></path>`); }
-  const lw = 44;
+  const wlBoxes = [];
   wpts.forEach((x, i) => {
     const xx = X(x.p.d), yy = Y(top(x.p.b) - x.w.depth);
-    const nextX = i < wpts.length - 1 ? X(wpts[i + 1].p.d) - bw / 2 : W - 4, prevX = i > 0 ? X(wpts[i - 1].p.d) + bw / 2 : m.l;
-    const roomR = nextX - (xx + bw / 2 + 4), roomL = (xx - bw / 2 - 4) - prevX;
     const val = noElev ? `−${fx(x.w.depth)}` : fx(top(x.p.b) - x.w.depth);
     const kind = x.w.kind || 'static', solid = kind !== 'strike' && kind !== 'seepage', kn = { static: 'static level', completion: 'on completion', seepage: 'seepage while drilling', strike: 'struck while drilling' }[kind] || kind;
     o.push(`<g data-wkind="${esc(kind)}"><title>${esc(`${x.p.b.name}: ${fu(x.w.depth)} below ground${noElev ? '' : `, el. ${fu(top(x.p.b) - x.w.depth)}`}, ${kn} (${x.w.date || 'undated'})`)}</title>${solid ? `<path data-wtick="1" d="M${xx - bw / 2 - 5} ${yy}h${bw + 10}" style="stroke:var(--water)" stroke-width="2.2"/>` : ''}<path d="M${xx - 6} ${yy - 10}h12l-6 9z" style="fill:${solid ? 'var(--water)' : 'var(--panel)'};stroke:${solid ? 'var(--panel)' : 'var(--water)'}" stroke-width="1.3"/>`);
-    if (roomR >= lw) o.push(`<rect x="${xx + bw / 2 + 3}" y="${yy - 15}" width="${lw}" height="14" rx="2" style="fill:var(--panel)" opacity=".92"/><text class="wl" x="${xx + bw / 2 + 5}" y="${yy - 4}">${val}</text>`);
-    else if (roomL >= lw) o.push(`<rect x="${xx - bw / 2 - 3 - lw}" y="${yy - 15}" width="${lw}" height="14" rx="2" style="fill:var(--panel)" opacity=".92"/><text class="wl" x="${xx - bw / 2 - 5}" y="${yy - 4}" text-anchor="end">${val}</text>`);
+    // the level's label: right of the borehole, else left, else above; never on top of a label already placed
+    const tw = textW(val, '600 11px ' + labelFont()) + 6, cand = [[xx + bw / 2 + 3, yy - 15], [xx - bw / 2 - 3 - tw, yy - 15], [xx - tw / 2, yy - 29]];
+    const spot = cand.find(([cx, cy]) => cx >= m.l && cx + tw <= W - 2 && !wlBoxes.some(([bx, by, bwid]) => cx < bx + bwid + 2 && bx < cx + tw + 2 && Math.abs(cy - by) < 15));
+    if (spot) { wlBoxes.push([spot[0], spot[1], tw]); o.push(`<rect x="${spot[0]}" y="${spot[1]}" width="${tw}" height="14" rx="2" style="fill:var(--panel)" opacity=".92"/><text class="wl" x="${spot[0] + 3}" y="${spot[1] + 11}">${val}</text>`); }
     o.push('</g>');
   });
   o.push('</svg>');
