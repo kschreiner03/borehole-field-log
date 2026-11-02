@@ -21,6 +21,14 @@
   --f-mono: Consolas, "SF Mono", Menlo, ui-monospace, monospace;
 }
 * { box-sizing: border-box; }
+/* tutorial: a highlight around the control being explained, and a card beside it */
+#tut-hole { position: fixed; z-index: 900; pointer-events: none; border: 2px solid var(--accent); border-radius: 6px; box-shadow: 0 0 0 9999px rgba(20, 28, 36, .38); transition: all .18s ease; }
+#tut { position: fixed; z-index: 901; width: min(380px, calc(100vw - 32px)); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .22); padding: 14px 16px 12px; font: 14px/1.5 var(--f-body); }
+#tut .tut-k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+#tut h4 { margin: 2px 0 6px; font-size: 15px; }
+#tut p, #tut li { margin: 0 0 6px; } #tut ul { margin: 0 0 6px; padding-left: 18px; }
+#tut .tut-b { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; } #tut .tut-x { position: absolute; top: 6px; right: 8px; border: 0; background: none; font-size: 18px; color: var(--muted); cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { #tut-hole { transition: none; } }
 html, body { min-height: 100%; }
 body { background: var(--bg); color: var(--ink); font: 13.5px/1.45 var(--f-body); }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--accent-2); }
@@ -4866,14 +4874,14 @@ function gwmHTML() {
   const resT = C => !C ? '' : `<div class="scroll-x" style="max-height:260px;overflow:auto"><table class="sum" id="gwm-res"><thead><tr><th>Well</th><th>Date</th><th class="r">Measured (m)</th><th class="r">Simulated (m)</th><th class="r">Residual (m)</th></tr></thead><tbody>${C.residuals.map(q => `<tr><td>${esc(q.b)}</td><td>${esc(q.date || C.round)}</td><td class="r">${f2(q.h)}</td><td class="r">${f2(q.sim)}</td><td class="r">${Number.isFinite(q.res) ? (q.res > 0 ? '+' : '') + q.res.toFixed(3) : 'dry'}</td></tr>`).join('')}</tbody></table></div>`;
   const T = S.gw.trans;
   return `<div class="gw-page">
-    <section class="sec"><header><h3>Groundwater model</h3><span class="note">${GW_ENGINE} · public domain · labelled “Model (MODFLOW 6), not measured” wherever it is drawn</span><span class="sp"></span>
+    <section class="sec"><header><h3>Groundwater model</h3><button class="btn link" data-act="tut-gwm">Tutorial</button><span class="note">${GW_ENGINE} · public domain · labelled “Model (MODFLOW 6), not measured” wherever it is drawn</span><span class="sp"></span>
       <button class="btn" data-act="gw-run" ${ro}>Run model</button><button class="btn primary" data-act="gw-cal" ${ro}>Calibrate (steady)</button><button class="btn" data-act="gw-calt" ${ro || !c ? 'disabled' : ''} title="${c ? 'Specific yield and recharge per period, against every round' : 'Calibrate the steady model first'}">Calibrate (all rounds)</button><button class="btn" data-act="gw-trans" ${ro}>Run transport</button><button class="btn" data-act="gw-export" ${S.gw.busy ? 'disabled' : ''}>Export model files</button></header>
       <div class="body">
       ${!desk ? `<p class="note" style="color:var(--warn,#a3470b)">The groundwater model runs MODFLOW 6 on this computer, so it needs the desktop app. The cross-section keeps the Domenico forecast.</p>` : ''}
       ${S.gw.msg ? `<p class="note"><b>${esc(S.gw.msg)}</b></p>` : ''}${S.gw.err ? `<p class="note" style="color:var(--warn,#a3470b)">MODFLOW 6: ${esc(S.gw.err)}</p>` : ''}
       ${stale ? `<p class="note" style="color:var(--warn,#a3470b)">The inputs changed after the last calibration (${esc(c.at.slice(0, 10))}): calibrate again before relying on the results.</p>` : ''}
-      <p class="note">Grid ${M.grid.nrow} rows × ${M.grid.ncol} columns × ${M.grid.nlay} layers of ${M.grid.cell} m, rotated ${M.grid.angrot.toFixed(1)}° so columns follow the fitted flow direction (${M.F.az.toFixed(0)}° from north). Fixed heads on the upgradient and downgradient faces from the ${esc(M.round)} water-table plane; no flow on the sides and through the base of the logs. ${S.gw.run ? `Last run: ${f3(S.gw.run.seconds)} s, mass-balance discrepancy ${f3(S.gw.run.discrepancy)} %.` : ''}</p>
-      <div class="fields" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+      <p class="note" id="gwm-grid">Grid ${M.grid.nrow} rows × ${M.grid.ncol} columns × ${M.grid.nlay} layers of ${M.grid.cell} m, rotated ${M.grid.angrot.toFixed(1)}° so columns follow the fitted flow direction (${M.F.az.toFixed(0)}° from north). Fixed heads on the upgradient and downgradient faces from the ${esc(M.round)} water-table plane; no flow on the sides and through the base of the logs. ${S.gw.run ? `Last run: ${f3(S.gw.run.seconds)} s, mass-balance discrepancy ${f3(S.gw.run.discrepancy)} %.` : ''}</p>
+      <div class="fields" id="gwm-setup" style="grid-template-columns:repeat(5,minmax(0,1fr))">
         <div class="fld"><label for="gwm-round">Calibration round</label><select id="gwm-round" data-gwm="round" ${S.readOnly ? 'disabled' : ''}>${rounds.map(d => `<option value="${d}" ${d === M.round ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
         <div class="fld"><label for="gwm-cell">Cell size (m)</label><input id="gwm-cell" type="number" step="any" data-gwm="cell" value="${esc(g.cell ?? '')}" placeholder="${M.grid.cell}" ${S.readOnly ? 'disabled' : ''}></div>
         <div class="fld"><label for="gwm-margin">Margin around the boreholes (m)</label><input id="gwm-margin" type="number" step="any" data-gwm="margin" value="${esc(g.margin ?? '')}" placeholder="auto" ${S.readOnly ? 'disabled' : ''}></div>
@@ -4886,15 +4894,76 @@ function gwmHTML() {
       <div class="scroll-x"><table class="sum" id="gwm-feat"><thead><tr><th>Type</th><th>Name</th><th>Location</th><th>Stage / elevation / head</th><th>Conductance</th><th>Bed bottom</th><th>Rate</th><th></th></tr></thead><tbody>${(g.features || []).map(featRow).join('')}</tbody></table></div>
       ${!(g.features || []).length ? '<p class="note">None: the model is driven by the two fixed-head faces and recharge. Add a creek, drain or pumping well where one controls the water table.</p>' : ''}
       </div></section>
-    <section class="sec"><header><h3>Calibration</h3><span class="note">Levenberg–Marquardt on log parameters; statistics after Hill and Tiedeman (2007)</span></header><div class="body">
+    <section class="sec" id="gwm-cal-sec"><header><h3>Calibration</h3><span class="note">Levenberg–Marquardt on log parameters; statistics after Hill and Tiedeman (2007)</span></header><div class="body">
       ${!c ? '<p class="note">Not calibrated yet. Calibrate (steady) fits the layers without slug tests and the recharge to the measured heads of the calibration round.</p>' : `<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start"><div style="flex:1;min-width:420px">${statsT(c, `Steady state, ${c.round}`)}${statsT(ct, `All rounds (${(ct?.rounds || []).length})`)}</div>${scatter(ct || c)}</div>${resT(ct || c)}`}
     </div></section>
-    <section class="sec"><header><h3>Transport</h3><span class="note">MODFLOW 6 GWT: TVD advection, dispersion, linear sorption${T?.P?.hl > 0 ? ', first-order decay' : ''}; inputs from the Forecast panel on the Section page</span><span class="sp"></span><label class="check"><input type="checkbox" id="gwm-tcal" ${g.transport?.calibrate ? 'checked' : ''} ${S.readOnly ? 'disabled' : ''}> Calibrate the source concentration</label></header><div class="body">
+    <section class="sec" id="gwm-trans-sec"><header><h3>Transport</h3><span class="note">MODFLOW 6 GWT: TVD advection, dispersion, linear sorption${T?.P?.hl > 0 ? ', first-order decay' : ''}; inputs from the Forecast panel on the Section page</span><span class="sp"></span><label class="check"><input type="checkbox" id="gwm-tcal" ${g.transport?.calibrate ? 'checked' : ''} ${S.readOnly ? 'disabled' : ''}> Calibrate the source concentration</label></header><div class="body">
       ${!T ? '<p class="note">Not run. Run transport uses the forecast set-up (compound, source well, release date, dispersivities) on the calibrated flow.</p>' : !T.ok ? `<p class="note" style="color:var(--warn,#a3470b)">${esc(T.error)}</p>` : `<p class="note">${esc(LAB_PARAMS[T.param].label)} from ${esc(T.P.srcBh.name)} since ${esc(T.start)}: source ${f3(T.c0)} mg/L (${esc(T.c0Src)}), Kd ${f3(T.kd)} L/kg, αL ${f3(T.P.ax)} m, αT ${f3(T.P.ay)} m, αV ${f3(T.P.az)} m, ${T.cells.length} source cells. Fit to ${T.fit.n} results: log RMS ${f3(T.fit.rmsLog)} (1 = a factor of 10), mean log error ${f3(T.fit.meLog)}. Mass-balance discrepancy ${f3(T.disc)} %.</p>
         <div class="scroll-x" style="max-height:240px;overflow:auto"><table class="sum" id="gwm-trans"><thead><tr><th>Well</th><th>Date</th><th class="r">Measured (mg/L)</th><th class="r">Simulated (mg/L)</th><th class="r">Ratio</th></tr></thead><tbody>${T.obs.map(o => `<tr><td>${esc(o.name)}</td><td>${esc(o.date)}</td><td class="r">${o.lt ? '<' : ''}${f3(o.meas)}</td><td class="r">${f3(o.sim)}</td><td class="r">${o.lt ? (o.sim <= o.meas ? 'agrees (not detected)' : '×' + f2(o.sim / o.meas) + ' above the limit') : o.sim > 0 ? '×' + f2(o.sim / o.meas) : '–'}</td></tr>`).join('')}</tbody></table></div>`}
     </div></section>
-    <section class="sec"><header><h3>Limits</h3></header><div class="body"><p class="note">A screening-to-intermediate model built from the logs: layers are interpolated between boreholes (inverse distance), each layer is uniform, the base of the logs is treated as impermeable, and the boundaries come from the fitted water-table plane unless features are added. Heads alone cannot separate recharge from conductivity; slug tests (prior information) or flow data are needed. Transport uses steady flow, a constant source and no NAPL. Check the calibration statistics and residuals before using results.</p></div></section></div>`;
+    <section class="sec" id="gwm-limits"><header><h3>Limits</h3></header><div class="body"><p class="note">A screening-to-intermediate model built from the logs: layers are interpolated between boreholes (inverse distance), each layer is uniform, the base of the logs is treated as impermeable, and the boundaries come from the fitted water-table plane unless features are added. Heads alone cannot separate recharge from conductivity; slug tests (prior information) or flow data are needed. Transport uses steady flow, a constant source and no NAPL. Check the calibration statistics and residuals before using results.</p></div></section></div>`;
 }
+/* ---------- tutorials: a guided walk through the Section and Model pages on the cross-section example ----------
+   Each step can switch page, highlights one real control, and explains what it does and why. Nothing is changed for the
+   user except loading the (fictional) example project if it is not open. */
+const TUTORIALS = {
+  xsec: { title: 'Cross-section', steps: [
+    { tab: 'xsec', sel: null, title: 'What the cross-section shows', body: '<p>One drawing of what the ground is, where the water is and where the contamination is, on any date you have data for.</p><p>Everything measured is drawn solid. Everything interpreted between boreholes is dashed, hatched or labelled “interpreted”, and anything from a model is purple and labelled “Model, not measured”.</p><p>This tour uses the fictional cross-section example, so you can try things freely.</p>' },
+    { tab: 'xsec', sel: '.sec-chips', title: 'Choose the section line', body: '<p>Click boreholes in the order the section should run. Until you pick two, the line is a best-fit through all of them.</p><p>Boreholes off the line are projected onto it, and their distance from the line is printed under the drawing (for example “13.6 m S”).</p>' },
+    { tab: 'xsec', sel: '#xs-draw', title: 'Read the drawing', body: '<ul><li><b>Columns</b> are the logs, exactly as logged.</li><li><b>Shaded bands</b> join the same unit between boreholes (interpreted). A unit missing next door pinches out halfway.</li><li><b>Blue ticks</b> are measured water levels; the dashed blue line joins readings from the same round only.</li><li>The <b>ground line</b> is measured at each borehole and dashed between.</li></ul>' },
+    { tab: 'xsec', sel: '#xs-corr-sec', title: 'Pair layers by hand', body: '<p>Units are joined by name. When loggers named the same layer differently (here BH-8 logged “Till” for “Clay till”), pick the group it belongs to and the join is redrawn.</p>' },
+    { tab: 'xsec', sel: '#xs-asof', title: 'Pick the date', body: '<p>“As of” shows water levels and results as they stood on that date: each borehole shows its latest reading on or before it, with its age on hover.</p>' },
+    { tab: 'xsec', sel: '.xs-ctl', title: 'Choose what to plot', body: '<p>Pick the medium (soil, groundwater or headspace vapour) and the parameter. Media are never mixed in one plume.</p><p><b>This round only</b> hides results older than 7 days, so you never contour old and new data together.</p>' },
+    { tab: 'xsec', sel: '#xs-shape', title: 'Plume shape', body: '<p><b>Model-guided</b> (groundwater) takes its shape from the model (MODFLOW 6 when it has been run, else the Domenico forecast) and is corrected to equal every measured result at its well screen. It is labelled “Interpreted”.</p><p><b>Data only</b> blends results between wells across the screened depths and draws nothing above or below the screens.</p>' },
+    { tab: 'xsec', sel: '#xs-style', title: 'Drawing style and layers', body: '<p>Graded shading, contour lines or filled bands at 1×, 10× and 100× the guideline.</p><p>Use the layer list next to it to show the measured plume, the forecast, or both: in Compare the forecast is dashed purple lines, so the two never blend.</p>' },
+    { tab: 'xsec', sel: '#xs-date', title: 'Play through time', body: '<p>The slider stops at every real sampling or water-level date. Press <b>Play</b> to watch the water table and plume change round by round.</p>' },
+    { tab: 'xsec', sel: '#xs-model-sec', title: 'The forecast', body: '<p>A labelled screening forecast (Domenico 1987, as in BIOSCREEN 1.4) from a source well. Every input shows its value, unit and source; anything you type is marked “entered”.</p><p>When the MODFLOW 6 model has been run on the Model page, the section uses its plume instead and says so.</p>' },
+    { tab: 'xsec', sel: '#xs-checks', title: 'Checks you can show a reviewer', body: '<p>The forecast is checked live against exact solutions and a published example, and compared with your later sampling rounds well by well.</p><p>Anything that needs a look is marked “Look at this” with the reason.</p>' },
+    { tab: 'xsec', sel: '#prail [data-tab="compose"]', title: 'Put it in a report', body: '<p>On Reports, add a section item to a page: it keeps its own date, plume, shape and style, and every “interpreted” and “model” label prints with it.</p><p>Next: the groundwater model tutorial (Help › Tutorial: groundwater model).</p>' },
+  ] },
+  gwm: { title: 'Groundwater model', steps: [
+    { tab: 'gwm', sel: null, title: 'A MODFLOW 6 model from your logs', body: '<p>The app builds a 3D groundwater model from the project: layers from the logs, conductivity from slug tests, heads from your water levels. It runs the USGS’s MODFLOW 6 on this computer (desktop app only).</p><p>Results feed the cross-section and the map, always labelled “Model (MODFLOW 6), not measured”.</p>' },
+    { tab: 'gwm', sel: '#gwm-grid', title: 'The grid and its edges', body: '<p>The grid covers the boreholes plus a margin and is turned so its columns follow the fitted flow direction.</p><p>Water levels are fixed on the upstream and downstream edges from the calibration round’s water table; the sides and the base of the logs let no water through. These are the model’s biggest assumptions.</p>' },
+    { tab: 'gwm', sel: '#gwm-setup', title: 'Set-up', body: '<ul><li><b>Calibration round</b>: the water levels the model is fitted to.</li><li><b>Cell size</b>: smaller is more detailed and slower.</li><li><b>Recharge</b>: a start value from CCME (2008); calibration adjusts it.</li><li><b>Slug tests</b>: used as prior information, so measured conductivity is kept unless the heads clearly disagree.</li></ul>' },
+    { tab: 'gwm', sel: '#gwm-units', title: 'Layers and conductivity', body: '<p>One model layer per unit you paired on the Section page. Each conductivity says where it came from: slug tests screened in that unit, a value you entered, or “estimated by calibration”.</p><p>No textbook value is ever filled in as if it were site data.</p>' },
+    { tab: 'gwm', sel: '#gwm-feat', title: 'Creeks, drains and wells', body: '<p>Add a feature where it controls the water table: a creek (stage, bed conductance, bed bottom), a drain (elevation, conductance), a pumping well (rate, negative for pumping) or a fixed head. Give its location as UTM points, “E N; E N” for a line.</p>' },
+    { tab: 'gwm', sel: '[data-act="gw-cal"]', title: 'Calibrate', body: '<p><b>Calibrate (steady)</b> adjusts the unknown conductivities and the recharge until the model matches the measured heads (Levenberg–Marquardt, as in PEST). It runs MODFLOW many times and shows its progress.</p><p>Then <b>Calibrate (all rounds)</b> fits specific yield and seasonal recharge to every monitoring round.</p>' },
+    { tab: 'gwm', sel: '#gwm-cal-sec', title: 'Judge the fit', body: '<ul><li><b>RMSE</b> and <b>RMSE ÷ range</b>: how far the model is from the measured heads overall.</li><li><b>Mean error</b>: whether it is biased high or low.</li><li><b>Mass-balance discrepancy</b>: should be tiny.</li><li><b>95 % interval</b> and <b>sensitivity</b>: how well each value is pinned down.</li><li><b>Correlation</b> in red, and warnings: values the heads cannot separate.</li></ul><p>The plot shows simulated against measured heads: points near the dashed 1:1 line are a good fit.</p>' },
+    { tab: 'gwm', sel: '#gwm-trans-sec', title: 'Contaminant transport', body: '<p><b>Run transport</b> moves the contaminant with MODFLOW 6’s transport model, using the compound, source well, release date and dispersivities from the Forecast panel, with sorption and (if you enter a half-life) decay.</p><p>Each measured result is compared with the model. Tick “Calibrate the source concentration” to fit the source strength.</p>' },
+    { tab: 'xsec', sel: '#xs-draw', title: 'See it on the section', body: '<p>After a run, the section adds the model’s water table (dotted purple), head contours (thin purple lines, in metres) and flow arrows.</p><p>The forecast becomes the MODFLOW 6 plume, and the model-guided shape follows it while still matching every measured result.</p>' },
+    { tab: 'site', sel: '#plan', title: 'And on the map', body: '<p>The map shows the model area, its simulated water-table contours and flow paths from the source with 1, 5, 10 and 25-year marks. Turn them off under Layers › Groundwater model.</p>' },
+    { tab: 'gwm', sel: '[data-act="gw-export"]', title: 'Hand it to a reviewer', body: '<p><b>Export model files</b> saves the MODFLOW 6 input files and outputs as a zip with a short read-me, so a hydrogeologist can rerun and check them in standard tools.</p>' },
+    { tab: 'gwm', sel: '#gwm-limits', title: 'Know the limits', body: '<p>Layers are interpolated between boreholes and each is uniform; heads alone cannot separate recharge from conductivity; transport uses steady flow and a constant source. Read the warnings and residuals before relying on a result.</p>' },
+  ] },
+};
+function tutStart(k) {
+  const T = TUTORIALS[k]; if (!T) return;
+  if (projKey(cur()) !== XS_PROJ) { if (S.readOnly) { toast('Open the cross-section example to follow the tutorial.'); return; } loadXsExample(); }
+  S.tut = { k, i: 0 }; setTimeout(tutShow, 150);
+}
+function tutClose() { S.tut = null; $('#tut')?.remove(); $('#tut-hole')?.remove(); }
+function tutGo(d) { if (!S.tut) return; const N = TUTORIALS[S.tut.k].steps.length, i = S.tut.i + d; if (i >= N) { tutClose(); return; } S.tut.i = Math.max(0, i); tutShow(); }
+function tutShow() {
+  if (!S.tut) return; const T = TUTORIALS[S.tut.k], st = T.steps[S.tut.i], N = T.steps.length;
+  if (st.tab && S.tab !== st.tab) goTab(st.tab);
+  let card = $('#tut'); if (!card) { card = document.createElement('div'); card.id = 'tut'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-live', 'polite'); document.body.append(card); }
+  card.setAttribute('aria-label', `${T.title} tutorial`);
+  card.innerHTML = `<button class="tut-x" data-act="tut-close" aria-label="Close the tutorial">×</button><div class="tut-k">${esc(T.title)} tutorial · Step ${S.tut.i + 1} of ${N}</div><h4>${esc(st.title)}</h4>${st.body}
+    <div class="tut-b"><button class="btn" data-act="tut-back" ${S.tut.i ? '' : 'disabled'}>Back</button><button class="btn primary" data-act="tut-next">${S.tut.i === N - 1 ? 'Done' : 'Next'}</button></div>`;
+  const place = () => {
+    if (!S.tut) return; const el = st.sel ? document.querySelector(st.sel) : null; let hole = $('#tut-hole');
+    if (!el) { hole?.remove(); Object.assign(card.style, { left: `${Math.max(16, (innerWidth - card.offsetWidth) / 2)}px`, top: `${Math.max(16, (innerHeight - card.offsetHeight) / 2.4)}px` }); return; }
+    if (!hole) { hole = document.createElement('div'); hole.id = 'tut-hole'; document.body.append(hole); }
+    const r = el.getBoundingClientRect(), p = 6, w = Math.min(r.width, innerWidth - 32), h = Math.min(r.height, innerHeight * .6);
+    Object.assign(hole.style, { left: `${r.left - p}px`, top: `${r.top - p}px`, width: `${w + 2 * p}px`, height: `${h + 2 * p}px` });
+    const below = r.top + h + p + 12, ch = card.offsetHeight, top = below + ch < innerHeight - 8 ? below : r.top - p - 12 - ch >= 8 ? r.top - p - 12 - ch : Math.max(8, innerHeight - ch - 8);
+    Object.assign(card.style, { left: `${Math.min(Math.max(16, r.left), innerWidth - card.offsetWidth - 16)}px`, top: `${top}px` });
+  };
+  requestAnimationFrame(() => { const el = st.sel ? document.querySelector(st.sel) : null; if (el) el.scrollIntoView({ block: 'center', behavior: 'instant' }); setTimeout(place, 60); });
+  card.querySelector('[data-act="tut-next"]').focus({ preventScroll: true });
+}
+addEventListener('resize', () => S.tut && tutShow());
+document.addEventListener('keydown', e => { if (!S.tut) return; if (e.key === 'Escape') { tutClose(); e.preventDefault(); } else if (e.key === 'ArrowRight' && !e.target.closest?.('input, select, textarea')) tutGo(1); else if (e.key === 'ArrowLeft' && !e.target.closest?.('input, select, textarea')) tutGo(-1); }, true);
 function xsModelHTML() {
   const u = siteOf()?.model || {}, run = S.xs.model ? modelRun(S.xs.date || '') : null, P = run?.P || { src: {} }, ro = S.readOnly ? 'disabled' : '';
   const wellsOpt = projList().filter(b => b.easting != null).map(b => `<option value="${esc(b.id)}" ${P.srcBh?.id === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
@@ -7512,7 +7581,7 @@ function drawSite() { drawPlan(); drawPlasticity(); }
 /* the Cross-section page: the section line, the drawing and everything drawn on it */
 function xsecHTML() {
   return `<div class="xs-page">
-    <section class="sec"><header><h3>Cross-section A–A′</h3><span class="sp"></span><label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">${xsPlumeCtl()}${secToolsHTML()}
+    <section class="sec"><header><h3>Cross-section A–A′</h3><button class="btn link" data-act="tut-xsec">Tutorial</button><span class="sp"></span><label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">${xsPlumeCtl()}${secToolsHTML()}
       <div class="scroll-x" id="xs-draw"></div>
       <div class="legend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--earth)" stroke-width="2" stroke-dasharray="6 3"/></svg>Ground surface (measured at boreholes, interpolated between)</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="6 3"/></svg>Water table (interpolated)</span><span><svg width="22" height="12" aria-hidden="true"><rect x="7" y="0" width="8" height="12" style="fill:var(--panel);stroke:var(--ink)"/><path d="M9 6h4M9 9h4" style="stroke:var(--ink)"/></svg>Slotted interval</span><span><svg width="22" height="12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" style="fill:var(--s-clay);stroke:var(--muted)" fill-opacity=".38" stroke-dasharray="4 2"/></svg>Interpreted between boreholes</span></div>
       <p class="note" id="xs-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
@@ -7526,7 +7595,7 @@ function xsCorrHTML() {
   for (const b of sectionList()) for (const u of [...new Set((b.layers || []).filter(l => l.bottom > l.top).map(defaultUnit))]) rows.push([b, u]);
   const names = [...new Set(rows.map(r => r[1]))];
   if (!rows.length) return '';
-  return `<section class="sec"><header><h3>Layer correlation</h3><span class="note">Units of the same name are joined between boreholes; pair others here</span></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th>Borehole</th><th>Logged unit</th><th>Joined as</th></tr></thead><tbody>
+  return `<section class="sec" id="xs-corr-sec"><header><h3>Layer correlation</h3><span class="note">Units of the same name are joined between boreholes; pair others here</span></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th>Borehole</th><th>Logged unit</th><th>Joined as</th></tr></thead><tbody>
     ${rows.map(([b, u]) => { const k = b.id + '|' + u; return `<tr><td>${esc(b.name)}</td><td>${esc(u)}</td><td><select data-xsalias="${esc(k)}" aria-label="${esc(`${b.name} ${u} joined as`)}" ${S.readOnly ? 'disabled' : ''}><option value="">${esc(u)} (as logged)</option>${names.filter(n => n !== u).map(n => `<option value="${esc(n)}" ${al[k] === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></td></tr>`; }).join('')}
     </tbody></table></div><p class="note">Pairings are an interpretation and are drawn dashed like every other link between boreholes.</p></div></section>`;
 }
@@ -9872,6 +9941,11 @@ document.addEventListener('click', e => {
     case 'load-sk': loadSkExample(); break;
     case 'load-dl': loadDlExample(); break;
     case 'load-xs': loadXsExample(); break;
+    case 'tut-xsec': tutStart('xsec'); break;
+    case 'tut-gwm': tutStart('gwm'); break;
+    case 'tut-next': tutGo(1); break;
+    case 'tut-back': tutGo(-1); break;
+    case 'tut-close': tutClose(); break;
     case 'gw-run': case 'gw-cal': case 'gw-calt': case 'gw-trans': case 'gw-export': case 'gw-feat-add': case 'gw-feat-del': gwAct(act, t); break;
     case 'grid-bh': if (b) { S.gridOne = true; S.tsheet = 'layers'; lsSet('bhlog.tsheet', 'layers'); goTab('table'); setTimeout(() => $('.dgrid input')?.focus(), 0); } break;
     case 'clear-examples': for (const x of [...S.bh.values()]) if (x.example) store.remove(x.id); S.formStale = true; render(); break;
@@ -9991,7 +10065,7 @@ const MENUS = [
     ['Duplicate', 'duplicate'], ['Save as template', 'bh-tpl'], ['Delete…', 'delete']]],
   ['Tools', [['Find anything…', 'find', 'Mod+K'], ['Log columns…', 'log-cols'], ['Graphs…', 'graphs'], ['Company, logo and initials…', 'settings'], '-', ['Load example: oil lease delineation', 'load-lloyd'], ['Load example: service-station plume', 'load-sk'], ['Load example: Dawn Lake excavation', 'load-dl'], ['Load example: cross-section and plume', 'load-xs']]],
   ['Reports', [['This log (PDF)', 'pdf-one', 'Mod+P'], ['All logs in the project (PDF)', 'pdf-all'], ['Report appendix (PDF)…', 'appendix'], ['Location plan (PDF)', 'plan-pdf'], '-', ['Report editor', 'tab:compose'], ['Excel workbook…', 'export']]],
-  ['Help', [['Keyboard shortcuts', 'shortcuts', 'F1'], ['About Borehole Field Log', 'about']]],
+  ['Help', [['Tutorial: cross-section', 'tut-xsec'], ['Tutorial: groundwater model', 'tut-gwm'], '-', ['Keyboard shortcuts', 'shortcuts', 'F1'], ['About Borehole Field Log', 'about']]],
 ];
 const IS_MAC = /Mac|iP(hone|ad|od)/.test(navigator.platform);
 const keyLabel = k => k ? (IS_MAC ? k.replace(/Mod\+/, '⌘').replace(/Shift\+/, '⇧').replace(/Alt\+/, '⌥') : k.replace(/Mod\+/, 'Ctrl+')) : '';
