@@ -16,6 +16,23 @@ Windows and Mac desktop app: Electron + React + TypeScript + Vite.
 | `npm run build` | Build into `out/` |
 | `npm run dist:win` / `npm run dist:mac` | Runs both test suites, then builds installers in `dist/` (build each on its own platform) |
 
+## Building the Windows installer on a Windows computer
+
+The desktop app copies the app from the `borehole-log` folder beside it, so clone both into the same folder.
+
+1. Install [Git](https://git-scm.com/download/win) and [Node.js](https://nodejs.org) (the LTS version), then open a new Command Prompt or PowerShell.
+2. Clone both projects side by side:
+   ```
+   git clone https://github.com/kschreiner03/borehole-log.git
+   git clone https://github.com/kschreiner03/borehole-desktop.git
+   cd borehole-desktop
+   npm ci
+   ```
+3. Build the installer: `npm run dist:win`. It downloads MODFLOW 6 for Windows (checked against its published SHA-256), runs both test suites and writes `dist\Borehole Field Log Setup <version>.exe`. To skip the tests: `node scripts/fetch-mf6.mjs win32-x64 && npm run build && npx electron-builder --win`.
+4. Send the `.exe`. It is unsigned, so Windows shows "Windows protected your PC" the first time; choose **More info › Run anyway** (see Signing below to remove the warning).
+
+To update later: `git pull` in both folders, then build again.
+
 Smoke test: `BOREHOLE_SMOKE=shot.png npx electron .` opens the window, saves a screenshot and quits (`BOREHOLE_VIEW=preview` for the new interface; add a `.bhp` path to open it; `BOREHOLE_USER_DATA=<folder>` runs it in its own profile, beside a copy already open).
 
 Running from a VS Code terminal: VS Code sets `ELECTRON_RUN_AS_NODE=1`, which stops Electron opening a window. Use `env -u ELECTRON_RUN_AS_NODE npm run dev`.
