@@ -4808,14 +4808,19 @@ function gwPointSampler(M, layersOf) {
 function gwWaterTable(M, layers, E, N) { const g = M.grid, rc = g.cellOf(E, N); if (!rc) return null; const [x, y] = g.toLocal(E, N), i = rc[0] * g.ncol + rc[1];
   for (let k = 0; k < g.nlay; k++) { if (g.idomain[k][i] !== 1) continue; const h = gwHeadAt(g, layers, k, x, y); if (h != null && h > g.botm[k][i]) return h; } return null; }
 /* the MODFLOW 6 concentration at a section point on a date (linear in time between saved outputs; nothing before the release) */
-function gwConcSampler(date, param) {
-  const M = gwModel(), T = S.gwm?.trans, G = XS_GEOM, R = S.gwm?.run; if (!T?.ok || !M || M.error || !G || !R || (param && T.param !== param)) return null;
+/* the transport model's concentration at any point and date, between saved times; null above the water table or outside */
+function gwConcField(date, param) {
+  const M = gwModel(), T = S.gwm?.trans, R = S.gwm?.run; if (!T?.ok || !M || M.error || !R || (param && T.param !== param)) return null;
   const d = date || T.times[T.times.length - 1].date, t = (Date.parse(d) - Date.parse(T.start)) / 864e5;
   const i = T.times.findIndex(q => q.totim >= t - 1e-6), a = i <= 0 ? null : T.times[i - 1], b = i < 0 ? T.times[T.times.length - 1] : T.times[i];
   const sb = gwPointSampler(M, b.layers), sa = a ? gwPointSampler(M, a.layers) : null, f = i < 0 ? 1 : a ? (t - a.totim) / (b.totim - a.totim) : Math.max(0, t / b.totim);
-  const cAt = (dd, e) => { if (t <= 0) return 0; const [E, N] = G.pos.at(dd), wt = gwWaterTable(M, R.layers, E, N); if (wt == null || e > wt) return null;
+  const at = (E, N, e) => { if (t <= 0) return 0; const wt = gwWaterTable(M, R.layers, E, N); if (wt == null || e > wt) return null;
     const vb = sb(E, N, e); if (vb == null) return null; const va = sa ? sa(E, N, e) ?? 0 : 0; return Math.max(0, va + (vb - va) * Math.min(1, Math.max(0, f))); };
-  return { cAt, T, date: d };
+  return { at, T, M, date: d };
+}
+function gwConcSampler(date, param) {
+  const G = XS_GEOM, F = G && gwConcField(date, param); if (!F) return null;
+  return { cAt: (dd, e) => { const [E, N] = G.pos.at(dd); return F.at(E, N, e); }, T: F.T, date: F.date };
 }
 const gwCalLabel = () => { const c = gwSaved().calibT || gwSaved().calib; return c ? `calibrated to ${c.mode === 'transient' ? `${c.rounds.length} rounds` : c.round}, RMSE ${(+c.stats.rmse).toPrecision(2)} m` : 'not calibrated'; };
 /* water table, head contours and flow arrows of the model in the section plane */
@@ -5056,6 +5061,48 @@ CTL.v3d = () => { const off = S.v3dOff || {}; return [
   { id: 'v3d-layers', title: 'Layers', icon: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>', html: `<div class="sec-opts">${V3D_LAYERS.map(([k, t]) => `<label class="check"><input type="checkbox" id="v3d-lyr-${k}" ${off[k] ? '' : 'checked'}> ${t}</label>`).join('')}</div>` },
   { id: 'v3d-out', title: 'Save and export', icon: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', html: `<button class="btn" data-act="v3d-report" ${S.readOnly ? 'disabled' : ''}>Add view to report</button><button class="btn" data-act="v3d-png">Save image</button><button class="btn" data-act="v3d-vtk" title="VTK files for ParaView, in real coordinates">Export for ParaView</button>` }]; };
 CTL.gwm = () => S.tab === 'gwm' ? S._gwmCtl || [] : [];
+/* isosurface by surface nets on a regular grid (v[i + nx·(j + ny·k)]); vertices in grid index units */
+function isoSurface({ nx, ny, nz, v }, level) {
+  const at = (i, j, k) => v[i + nx * (j + ny * k)] - level, vid = new Int32Array(nx * ny * nz).fill(-1), pos = [], idx = [];
+  const C = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]], ED = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+  for (let k = 0; k < nz - 1; k++) for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    const c = C.map(([a, b, d]) => at(i + a, j + b, k + d)); if (c.every(x => x > 0) || c.every(x => x <= 0)) continue;
+    let sx = 0, sy = 0, sz = 0, n = 0;
+    for (const [p, q] of ED) { if ((c[p] > 0) === (c[q] > 0)) continue; const t = c[p] / (c[p] - c[q]); sx += C[p][0] + t * (C[q][0] - C[p][0]); sy += C[p][1] + t * (C[q][1] - C[p][1]); sz += C[p][2] + t * (C[q][2] - C[p][2]); n++; }
+    vid[i + nx * (j + ny * k)] = pos.length / 3; pos.push(i + sx / n, j + sy / n, k + sz / n);
+  }
+  const V = (i, j, k) => vid[i + nx * (j + ny * k)], quad = (a, b, c, d, flip) => { if ([a, b, c, d].some(x => x < 0)) return; flip ? idx.push(a, c, b, a, d, c) : idx.push(a, b, c, a, c, d); };
+  for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const a = at(i, j, k) > 0;
+    if (i < nx - 1 && j > 0 && k > 0 && a !== (at(i + 1, j, k) > 0)) quad(V(i, j - 1, k - 1), V(i, j, k - 1), V(i, j, k), V(i, j - 1, k), !a);
+    if (j < ny - 1 && i > 0 && k > 0 && a !== (at(i, j + 1, k) > 0)) quad(V(i - 1, j, k - 1), V(i - 1, j, k), V(i, j, k), V(i, j, k - 1), !a);
+    if (k < nz - 1 && i > 0 && j > 0 && a !== (at(i, j, k + 1) > 0)) quad(V(i - 1, j - 1, k), V(i, j - 1, k), V(i, j, k), V(i - 1, j, k), !a);
+  }
+  return { positions: pos, indices: idx };
+}
+/* the plume in 3D: MODFLOW 6 transport when it has run for this compound, else interpolated from the measured groundwater results
+   (as the section's data-only shape: inverse distance on log concentration in plan, the screened band with a 0.35 m fade, gone 5 m beyond the wells) */
+function plumeField3d(list, date, param) {
+  const MF = gwConcField(date, param);
+  if (MF) { const g = MF.M.grid, cs = [[0, 0], [0, g.ncol - 1], [g.nrow - 1, 0], [g.nrow - 1, g.ncol - 1]].map(([r, c]) => g.cellCentre(r, c)), zs = [...g.top, ...g.botm[g.nlay - 1]].filter(Number.isFinite);
+    return { src: 'mf6', date: MF.date, at: (E, N, z) => MF.at(E, N, z) ?? 0, bbox: { e0: Math.min(...cs.map(q => q[0])), e1: Math.max(...cs.map(q => q[0])), n0: Math.min(...cs.map(q => q[1])), n1: Math.max(...cs.map(q => q[1])), z0: Math.min(...zs), z1: Math.max(...zs) } }; }
+  const pts = list.filter(b => b.easting != null && b.northing != null && b.elevation != null && b.well?.screenTop != null && b.well.screenBottom > b.well.screenTop).map(b => {
+    const s = (b.gwSamples || []).filter(s => s.date && (!date || s.date <= date) && gwVal(s, param)).sort(byDate).pop(); if (!s) return null; const r = gwVal(s, param);
+    return { E: b.easting, N: b.northing, lc: Math.log10(Math.max(1e-9, r.lt ? r.v / 2 : r.v)), zt: b.elevation - b.well.screenTop, zb: b.elevation - b.well.screenBottom }; }).filter(Boolean);
+  if (!pts.length) return null;
+  // the wells' outline: convex hull (a point or a segment for one or two wells)
+  const P2 = pts.map(p => [p.E, p.N]).sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], hi = [];
+  for (const p of P2) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (const p of [...P2].reverse()) { while (hi.length >= 2 && cr(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop(); hi.push(p); }
+  const hull = [...lo.slice(0, -1), ...hi.slice(0, -1)], segD = (E, N, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((E - a[0]) * dx + (N - a[1]) * dy) / L)) : 0; return Math.hypot(E - a[0] - t * dx, N - a[1] - t * dy); };
+  const outside = (E, N) => { if (hull.length < 3) return hull.length === 1 ? Math.hypot(E - hull[0][0], N - hull[0][1]) : segD(E, N, hull[0], hull[1] || hull[0]);
+    if (hull.every((a, i) => cr(a, hull[(i + 1) % hull.length], [E, N]) >= 0)) return 0; return Math.min(...hull.map((a, i) => segD(E, N, a, hull[(i + 1) % hull.length]))); };
+  const idw = (E, N) => { let ws = 0, lc = 0, zt = 0, zb = 0; for (const p of pts) { const d2 = (E - p.E) ** 2 + (N - p.N) ** 2; if (d2 < 1e-6) return p; const w = 1 / d2; ws += w; lc += w * p.lc; zt += w * p.zt; zb += w * p.zb; } return { lc: lc / ws, zt: zt / ws, zb: zb / ws }; };
+  const at = (E, N, z) => { const d = outside(E, N); if (d >= 5) return 0; const q = idw(E, N), dz = z > q.zt ? z - q.zt : z < q.zb ? q.zb - z : 0; if (dz >= .35) return 0;
+    return 10 ** q.lc * (1 - d / 5) * (1 - dz / .35); };
+  const E = pts.map(p => p.E), N = pts.map(p => p.N);
+  return { src: 'interpreted', date: date || '', at, bbox: { e0: Math.min(...E) - 5, e1: Math.max(...E) + 5, n0: Math.min(...N) - 5, n1: Math.max(...N) + 5, z0: Math.min(...pts.map(p => p.zb)) - .4, z1: Math.max(...pts.map(p => p.zt)) + .4 } };
+}
 const V3D_LAYERS = [['boreholes', 'Boreholes'], ['wells', 'Wells'], ['samples', 'Results'], ['ground', 'Ground'], ['layers', 'Unit surfaces'], ['water', 'Water table'], ['plume', 'Model plume'], ['paths', 'Flow paths'], ['labels', 'Names']];
 function v3dHTML() {
   const off = S.v3dOff || {};
