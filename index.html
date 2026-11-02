@@ -1272,6 +1272,20 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .ctl-gb #gwm-units td:nth-child(2)::before { content: "K "; color: var(--muted); } .ctl-gb #gwm-units td:nth-child(5)::before { content: "Kv/Kh "; color: var(--muted); } .ctl-gb #gwm-units td:nth-child(7)::before { content: "nₑ "; color: var(--muted); }
 .ctl-gb #gwm-feat td { flex-basis: calc(50% - 4px); } .ctl-gb #gwm-feat td:nth-child(3) { flex-basis: 100%; } .ctl-gb #gwm-feat input, .ctl-gb #gwm-feat select { width: 100% !important; }
 .ctl-gb h4 { margin: 4px 0 !important; font-size: 12.5px; }
+/* report editor: the page gets the room; item and page settings live in the panel */
+body.side-off .shell { --sidebar-width: 0px; } body.side-off .side { display: none; }
+.cmp { grid-template-columns: 210px minmax(0, 1fr) !important; gap: 14px; }
+.cmp-addwrap { position: relative; display: inline-flex; }
+.cmp-addmenu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; display: grid; grid-template-columns: repeat(2, minmax(160px, 1fr)); gap: 12px 20px; padding: 12px 14px; min-width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: 0 8px 24px rgba(16, 24, 40, .14); }
+.cmp-addmenu[hidden] { display: none; }
+.cmp-addg { display: flex; flex-direction: column; gap: 1px; } .cmp-addg b { margin-bottom: 3px; font: 600 11.5px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.cmp-addi { padding: 5px 6px; border: 0; border-radius: var(--r-sm); background: none; font: 13px var(--f-body); color: var(--ink); text-align: left; cursor: pointer; } .cmp-addi:hover, .cmp-addi:focus-visible { background: var(--hover); }
+.cmp-bar { display: none; position: absolute; bottom: calc(100% + 4px); right: 0; z-index: 5; gap: 2px; padding: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: 0 2px 8px rgba(16, 24, 40, .14); transform: scale(calc(1 / var(--z, 1))); transform-origin: bottom right; }
+.cmp-box.bar-below .cmp-bar { bottom: auto; top: calc(100% + 4px); transform-origin: top right; }
+.cmp-box[aria-selected="true"] .cmp-bar { display: flex; }
+.cmp-bar .tb { min-height: 26px; padding: 0 5px; } .cmp-bar .tb svg { width: 15px; height: 15px; } .cmp-bar .del, .cmp-bar .del svg { color: var(--negative, #c4242a); }
+.ctl-gb .cmp-pageset, .ctl-gb .cmp-props { display: flex; flex-direction: column; gap: 8px; position: static; max-height: none; overflow: visible; }
+.ctl-gb .cmp-pageset .cmp-zoom { display: flex; align-items: center; gap: 6px; }
 .ctl.min { overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; }
 .ctl.min .tb { width: 30px; min-height: 30px; justify-content: center; }
 /* toolbar: project switcher and the find box */
@@ -1920,7 +1934,7 @@ const CTL = {}, CTL_ICON = '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18
 S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {}, ...jsonLS('bhlog.ui', {}) };
 const uiSave = () => lsSet('bhlog.ui', JSON.stringify(S.ui));
 const ctlClamp = w => Math.round(Math.min(480, Math.max(240, +w || 300)));
-function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
+function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); document.body.classList.toggle('side-off', S.tab === 'compose'); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
 /* the panel's column is set before a page draws, so drawings measure the work area they will really have */
 function ctlLayout() {
   const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
@@ -2668,7 +2682,7 @@ function renderView(full) {
   else if (S.tab === 'site') { v.innerHTML = siteHTML(); drawSite(); }
   else if (S.tab === 'xsec') { v.innerHTML = xsecHTML(); drawXsec(); }
   else if (S.tab === 'gwm') { v.innerHTML = gwmHTML(); gwEnsure(); }
-  else if (S.tab === 'v3d') { v.innerHTML = v3dHTML(); v3dBuild(); }
+  else if (S.tab === 'v3d') { v.innerHTML = v3dHTML(); v3dBuild(); gwAutoEnsure(); }
   else if (S.tab === 'home') { v.innerHTML = homeHTML(); }
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
   else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); }
@@ -4808,14 +4822,19 @@ function gwPointSampler(M, layersOf) {
 function gwWaterTable(M, layers, E, N) { const g = M.grid, rc = g.cellOf(E, N); if (!rc) return null; const [x, y] = g.toLocal(E, N), i = rc[0] * g.ncol + rc[1];
   for (let k = 0; k < g.nlay; k++) { if (g.idomain[k][i] !== 1) continue; const h = gwHeadAt(g, layers, k, x, y); if (h != null && h > g.botm[k][i]) return h; } return null; }
 /* the MODFLOW 6 concentration at a section point on a date (linear in time between saved outputs; nothing before the release) */
-function gwConcSampler(date, param) {
-  const M = gwModel(), T = S.gwm?.trans, G = XS_GEOM, R = S.gwm?.run; if (!T?.ok || !M || M.error || !G || !R || (param && T.param !== param)) return null;
+/* the transport model's concentration at any point and date, between saved times; null above the water table or outside */
+function gwConcField(date, param) {
+  const M = gwModel(), T = S.gwm?.trans, R = S.gwm?.run; if (!T?.ok || !M || M.error || !R || (param && T.param !== param)) return null;
   const d = date || T.times[T.times.length - 1].date, t = (Date.parse(d) - Date.parse(T.start)) / 864e5;
   const i = T.times.findIndex(q => q.totim >= t - 1e-6), a = i <= 0 ? null : T.times[i - 1], b = i < 0 ? T.times[T.times.length - 1] : T.times[i];
   const sb = gwPointSampler(M, b.layers), sa = a ? gwPointSampler(M, a.layers) : null, f = i < 0 ? 1 : a ? (t - a.totim) / (b.totim - a.totim) : Math.max(0, t / b.totim);
-  const cAt = (dd, e) => { if (t <= 0) return 0; const [E, N] = G.pos.at(dd), wt = gwWaterTable(M, R.layers, E, N); if (wt == null || e > wt) return null;
+  const at = (E, N, e) => { if (t <= 0) return 0; const wt = gwWaterTable(M, R.layers, E, N); if (wt == null || e > wt) return null;
     const vb = sb(E, N, e); if (vb == null) return null; const va = sa ? sa(E, N, e) ?? 0 : 0; return Math.max(0, va + (vb - va) * Math.min(1, Math.max(0, f))); };
-  return { cAt, T, date: d };
+  return { at, T, M, date: d };
+}
+function gwConcSampler(date, param) {
+  const G = XS_GEOM, F = G && gwConcField(date, param); if (!F) return null;
+  return { cAt: (dd, e) => { const [E, N] = G.pos.at(dd); return F.at(E, N, e); }, T: F.T, date: F.date };
 }
 const gwCalLabel = () => { const c = gwSaved().calibT || gwSaved().calib; return c ? `calibrated to ${c.mode === 'transient' ? `${c.rounds.length} rounds` : c.round}, RMSE ${(+c.stats.rmse).toPrecision(2)} m` : 'not calibrated'; };
 /* water table, head contours and flow arrows of the model in the section plane */
@@ -4960,8 +4979,9 @@ async function gwEnsure(force) {
   } finally { S.gwm.busy = false; S.gwm.msg = ''; gwRefresh(); }
 }
 const gwWantedBy = L => !!window.desktop?.mf6Run && !!(gwSaved().calib || gwSaved().transport?.on) && (L?.pages || []).some(p => p.items?.some(it => ['gwsum', 'gwcal', 'gwpar', 'section', 'plan'].includes(it.t)));
+function gwAutoEnsure() { if (!window.desktop?.mf6Run || !(gwSaved().calib || gwSaved().transport?.on)) return; gwModel(); if ((S.gwm.run && (S.gwm.trans || !gwSaved().transport?.on)) || S.gwm.busy || S.gwm.tried || S.gwm.M?.error) return; S.gwm.tried = true; gwEnsure(true); }
 function gwComposeEnsure() { if (!gwWantedBy(repLayout())) return; gwModel(); if (S.gwm.run || S.gwm.busy || S.gwm.tried || S.gwm.M?.error) return; S.gwm.tried = true; gwEnsure(true); }
-function gwRefresh() { if (S.tab === 'gwm') { const v = $('#view'); if (v) v.innerHTML = gwmHTML(); ctlRender(); } else if (S.tab === 'xsec') drawXsec(); else if (S.tab === 'site') drawSite?.(); else if (S.tab === 'compose' && !S.gwm.busy) rerenderCompose(); }
+function gwRefresh() { if (S.tab === 'gwm') { const v = $('#view'); if (v) v.innerHTML = gwmHTML(); ctlRender(); } else if (S.tab === 'xsec') drawXsec(); else if (S.tab === 'site') drawSite?.(); else if (S.tab === 'compose' && !S.gwm.busy) rerenderCompose(); else if (S.tab === 'v3d' && !S.gwm.busy) v3dBuild(); }
 async function gwAct(act, t) {
   if (S.readOnly && act !== 'gw-export') return;
   const M = gwModel(); if (M.error) { toast(M.error); return; }
@@ -5052,11 +5072,59 @@ function gwmHTML() {
    flow paths) see-through and named in the legend. Coordinates: x east, y up (elevation × exaggeration), z south. */
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js', THREE_SRI = 'sha384-RRHfJ6w1mTlKUBMYT/hvnRiOzEB/vyRV3DrQOseb6oYfvaZSfdd0byS4bHps0k2R';
 CTL.v3d = () => { const off = S.v3dOff || {}; return [
-  { id: 'v3d-view', title: 'View', icon: NAV_ICON.v3d, html: `<div class="lay-ctl"><label class="note" for="v3d-ve">Vertical exaggeration</label><select id="v3d-ve" style="width:auto">${[[0, 'Auto'], [1, '×1'], [2, '×2'], [5, '×5'], [10, '×10']].map(([v, t]) => `<option value="${v}" ${(S.v3dVe || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div><button class="btn" data-act="v3d-reset">Reset view</button>` },
+  { id: 'v3d-view', title: 'View', icon: NAV_ICON.v3d, html: `<div class="lay-ctl"><label class="note" for="v3d-ve">Vertical exaggeration</label><select id="v3d-ve" style="width:auto">${[[0, 'Auto'], [1, '×1'], [2, '×2'], [5, '×5'], [10, '×10']].map(([v, t]) => `<option value="${v}" ${(S.v3dVe || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div><button class="btn" data-act="v3d-reset">Reset view</button>
+    <label class="check"><input type="checkbox" id="v3d-cut" ${S.v3dCut?.on ? 'checked' : ''}> Cut along the section line</label>
+    <div class="lay-ctl"><label class="note" for="v3d-cutpos">Cut position</label><input type="range" id="v3d-cutpos" min="0" max="100" step="1" value="${S.v3dCut?.pos ?? 50}" ${S.v3dCut?.on ? '' : 'disabled'} style="flex:1"></div>
+    <p class="note" style="margin:0">Removes the near side of the site along a plane parallel to section A–A′; the cut face shows the plume on that plane.</p>` },
   { id: 'v3d-layers', title: 'Layers', icon: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>', html: `<div class="sec-opts">${V3D_LAYERS.map(([k, t]) => `<label class="check"><input type="checkbox" id="v3d-lyr-${k}" ${off[k] ? '' : 'checked'}> ${t}</label>`).join('')}</div>` },
   { id: 'v3d-out', title: 'Save and export', icon: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', html: `<button class="btn" data-act="v3d-report" ${S.readOnly ? 'disabled' : ''}>Add view to report</button><button class="btn" data-act="v3d-png">Save image</button><button class="btn" data-act="v3d-vtk" title="VTK files for ParaView, in real coordinates">Export for ParaView</button>` }]; };
 CTL.gwm = () => S.tab === 'gwm' ? S._gwmCtl || [] : [];
-const V3D_LAYERS = [['boreholes', 'Boreholes'], ['wells', 'Wells'], ['samples', 'Results'], ['ground', 'Ground'], ['layers', 'Unit surfaces'], ['water', 'Water table'], ['plume', 'Model plume'], ['paths', 'Flow paths'], ['labels', 'Names']];
+/* isosurface by surface nets on a regular grid (v[i + nx·(j + ny·k)]); vertices in grid index units */
+function isoSurface({ nx, ny, nz, v }, level) {
+  const at = (i, j, k) => v[i + nx * (j + ny * k)] - level, vid = new Int32Array(nx * ny * nz).fill(-1), pos = [], idx = [];
+  const C = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]], ED = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+  for (let k = 0; k < nz - 1; k++) for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    const c = C.map(([a, b, d]) => at(i + a, j + b, k + d)); if (c.every(x => x > 0) || c.every(x => x <= 0)) continue;
+    let sx = 0, sy = 0, sz = 0, n = 0;
+    for (const [p, q] of ED) { if ((c[p] > 0) === (c[q] > 0)) continue; const t = c[p] / (c[p] - c[q]); sx += C[p][0] + t * (C[q][0] - C[p][0]); sy += C[p][1] + t * (C[q][1] - C[p][1]); sz += C[p][2] + t * (C[q][2] - C[p][2]); n++; }
+    vid[i + nx * (j + ny * k)] = pos.length / 3; pos.push(i + sx / n, j + sy / n, k + sz / n);
+  }
+  const V = (i, j, k) => vid[i + nx * (j + ny * k)], quad = (a, b, c, d, flip) => { if ([a, b, c, d].some(x => x < 0)) return; flip ? idx.push(a, c, b, a, d, c) : idx.push(a, b, c, a, c, d); };
+  for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const a = at(i, j, k) > 0;
+    if (i < nx - 1 && j > 0 && k > 0 && a !== (at(i + 1, j, k) > 0)) quad(V(i, j - 1, k - 1), V(i, j, k - 1), V(i, j, k), V(i, j - 1, k), !a);
+    if (j < ny - 1 && i > 0 && k > 0 && a !== (at(i, j + 1, k) > 0)) quad(V(i - 1, j, k - 1), V(i - 1, j, k), V(i, j, k), V(i, j, k - 1), !a);
+    if (k < nz - 1 && i > 0 && j > 0 && a !== (at(i, j, k + 1) > 0)) quad(V(i - 1, j - 1, k), V(i, j - 1, k), V(i, j, k), V(i - 1, j, k), !a);
+  }
+  return { positions: pos, indices: idx };
+}
+/* the plume in 3D: MODFLOW 6 transport when it has run for this compound, else interpolated from the measured groundwater results
+   (as the section's data-only shape: inverse distance on log concentration in plan, the screened band with a 0.35 m fade, gone 5 m beyond the wells) */
+function plumeField3d(list, date, param) {
+  const MF = gwConcField(date, param);
+  if (MF) { const g = MF.M.grid, cs = [[0, 0], [0, g.ncol - 1], [g.nrow - 1, 0], [g.nrow - 1, g.ncol - 1]].map(([r, c]) => g.cellCentre(r, c)), zs = [...g.top, ...g.botm[g.nlay - 1]].filter(Number.isFinite);
+    return { src: 'mf6', date: MF.date, at: (E, N, z) => MF.at(E, N, z) ?? 0, bbox: { e0: Math.min(...cs.map(q => q[0])), e1: Math.max(...cs.map(q => q[0])), n0: Math.min(...cs.map(q => q[1])), n1: Math.max(...cs.map(q => q[1])), z0: Math.min(...zs), z1: Math.max(...zs) } }; }
+  // the section's own points (installed wells, latest result by the date, screen top at the water level), less non-detects at or above the guideline
+  const g0 = plumeLevels('groundwater', param)[0]?.v, raw = plumePoints(list.filter(b => b.easting != null && b.northing != null && b.elevation != null).map(b => ({ b, d: 0 })), 'groundwater', param, date, false).filter(p => !(p.lt && g0 != null && p.v >= g0));
+  if (!raw.length) return null;
+  // screens at one spot (within 0.5 m) are nested wells: the shallowest and the deepest make two levels, interpolated separately
+  const spots = []; for (const p of raw) { const q = spots.find(s => Math.hypot(s.E - p.b.easting, s.N - p.b.northing) < .5); const r = { lc: Math.log10(Math.max(1e-9, p.lt ? p.v / 2 : p.v)), zt: p.b.elevation - p.top, zb: p.b.elevation - p.bot }; if (q) q.all.push(r); else spots.push({ E: p.b.easting, N: p.b.northing, all: [r] }); }
+  for (const s of spots) { s.sh = s.all.reduce((a, c) => c.zt > a.zt ? c : a); s.dp = s.all.reduce((a, c) => c.zb < a.zb ? c : a); }
+  // the wells' outline: convex hull, or the point or segment for one or two spots
+  const P2 = spots.map(p => [p.E, p.N]).sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], hi = [];
+  for (const p of P2) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (const p of [...P2].reverse()) { while (hi.length >= 2 && cr(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop(); hi.push(p); }
+  let hull = [...lo.slice(0, -1), ...hi.slice(0, -1)]; if (!hull.length) hull = [P2[0]];
+  const segD = (E, N, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((E - a[0]) * dx + (N - a[1]) * dy) / L)) : 0; return Math.hypot(E - a[0] - t * dx, N - a[1] - t * dy); };
+  const outside = (E, N) => { if (hull.length < 3) return segD(E, N, hull[0], hull[1] || hull[0]);
+    if (hull.every((a, i) => cr(a, hull[(i + 1) % hull.length], [E, N]) >= 0)) return 0; return Math.min(...hull.map((a, i) => segD(E, N, a, hull[(i + 1) % hull.length]))); };
+  const idw = (E, N, k) => { let ws = 0, lc = 0, zt = 0, zb = 0; for (const s of spots) { const p = s[k], d2 = (E - s.E) ** 2 + (N - s.N) ** 2; if (d2 < 1e-6) return p; const w = 1 / d2; ws += w; lc += w * p.lc; zt += w * p.zt; zb += w * p.zb; } return { lc: lc / ws, zt: zt / ws, zb: zb / ws }; };
+  const band = (q, z) => { const dz = z > q.zt ? z - q.zt : z < q.zb ? q.zb - z : 0; return dz >= .35 ? 0 : 10 ** q.lc * (1 - dz / .35); };
+  const at = (E, N, z) => { const d = outside(E, N); if (d >= 5) return 0; return Math.max(band(idw(E, N, 'sh'), z), band(idw(E, N, 'dp'), z)) * (1 - d / 5); };
+  const E = spots.map(p => p.E), N = spots.map(p => p.N), all = spots.flatMap(s => s.all);
+  return { src: 'interpreted', date: date || '', at, bbox: { e0: Math.min(...E) - 5, e1: Math.max(...E) + 5, n0: Math.min(...N) - 5, n1: Math.max(...N) + 5, z0: Math.min(...all.map(p => p.zb)) - .4, z1: Math.max(...all.map(p => p.zt)) + .4 } };
+}
+const V3D_LAYERS = [['boreholes', 'Boreholes'], ['wells', 'Wells'], ['samples', 'Results'], ['ground', 'Ground'], ['layers', 'Unit surfaces'], ['water', 'Water table'], ['plume', 'Plume'], ['paths', 'Flow paths'], ['labels', 'Names']];
 function v3dHTML() {
   const off = S.v3dOff || {};
   return `<div class="v3d-page"><section class="sec"><header><h3>3D view</h3><span class="note">drag to rotate · shift-drag to pan · scroll to zoom</span><span class="sp"></span><button class="btn" data-act="v3d-reset">Reset view</button></header>
@@ -5067,11 +5135,13 @@ const v3dCss = name => getComputedStyle(document.documentElement).getPropertyVal
 async function v3dBuild() {
   const host = $('#v3d'); if (!host) return;
   if (!window.THREE) { try { await loadScript(THREE_URL, THREE_SRI); } catch (e) { /* handled below */ } }
+  const prev = S.v3d;
   if (S.v3d?.renderer) { try { S.v3d.renderer.dispose(); S.v3d.renderer.forceContextLoss?.(); } catch (e) { /* already gone */ } }
   if (!window.THREE) { S.v3d = { ok: false, error: 'The 3D library did not load.' }; host.innerHTML = `<p class="note" style="padding:16px">${esc(S.v3d.error)} Use Export for ParaView instead.</p>`; return; }
   const list = mapList().filter(b => b.easting != null && b.northing != null && b.elevation != null);   // boreholes unticked on the maps stay out
   if (!list.length) { S.v3d = { ok: false, error: 'No boreholes with coordinates and a ground elevation.' }; host.innerHTML = `<p class="note" style="padding:16px">${esc(S.v3d.error)}</p>`; return; }
   let renderer; try { renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); } catch (e) { S.v3d = { ok: false, error: '3D needs WebGL, which is not available here.' }; host.innerHTML = `<p class="note" style="padding:16px">${esc(S.v3d.error)} Use Export for ParaView instead.</p>`; return; }
+  S.v3d = { ok: false, renderer };   // disposed by the next build even if this one fails part-way
   const W = host.clientWidth || 900, H = host.clientHeight || 560; renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.setSize(W, H); host.innerHTML = ''; host.append(renderer.domElement);
   const E0 = list.reduce((a, b) => a + b.easting, 0) / list.length, N0 = list.reduce((a, b) => a + b.northing, 0) / list.length;
   const zTop = Math.max(...list.map(b => b.elevation + 1)), zBot = Math.min(...list.map(b => b.elevation - depthOf(b))), Z0 = zBot;
@@ -5100,43 +5170,85 @@ async function v3dBuild() {
     if (s && w?.screenTop != null) { const v = gwVal(s, param), k = lvG.filter(l => v.v >= l.v).length; const m = new THREE.Mesh(new THREE.SphereGeometry(r * 1.5, 16, 12), mat(v.lt ? '#ffffff' : PLUME_RAMP.meas[k], { emissive: v.lt ? '#000000' : PLUME_RAMP.meas[k], emissiveIntensity: .25 })); m.position.copy(P(b.easting + r * 1.25, b.northing, b.elevation - (w.screenTop + w.screenBottom) / 2)); groups.samples.add(m); }
     for (const sm of (b.samples || []).filter(sm => sm.depth != null && labVal(sm, param))) { const v = labVal(sm, param), k = lvS.filter(l => v.v >= l.v).length; const m = new THREE.Mesh(new THREE.SphereGeometry(r * 1.1, 12, 10), mat(v.lt ? '#ffffff' : PLUME_RAMP.meas[k])); m.position.copy(P(b.easting - r * 1.25, b.northing, b.elevation - sm.depth)); groups.samples.add(m); }
   }
-  // surfaces on the model grid: ground and the base of each unit (interpolated), the water table (model or fitted plane)
-  const M = gwModel(); let wtSrc = '';
+  // the plume: MODFLOW 6 when transport has run for this compound, else interpolated from the measured results
+  const PF = plumeField3d(list, date, param), lvP = plumeLevels('groundwater', param);
+  // nested shells at 1×, 10× and 100× the guideline from the field sampled on a regular grid (log scale, closed at the edges)
+  let plume = null;
+  if (PF && lvP.length) {
+    const bb = PF.bbox, h = Math.max(.4, Math.max(bb.e1 - bb.e0, bb.n1 - bb.n0) / 55), nx = Math.min(64, Math.ceil((bb.e1 - bb.e0) / h) + 3), ny = Math.min(64, Math.ceil((bb.n1 - bb.n0) / h) + 3), nz = Math.min(36, Math.max(8, Math.ceil((bb.z1 - bb.z0) / .15) + 3));
+    const hx = (bb.e1 - bb.e0) / (nx - 3), hy = (bb.n1 - bb.n0) / (ny - 3), hz = (bb.z1 - bb.z0) / (nz - 3), at = (i, j, k) => [bb.e0 + (i - 1) * hx, bb.n0 + (j - 1) * hy, bb.z0 + (k - 1) * hz];
+    const v = new Float32Array(nx * ny * nz).fill(-9), g0 = lvP[0].v;
+    for (let k = 1; k < nz - 1; k++) for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) { const [E, N, z] = at(i, j, k), c = PF.at(E, N, z); if (c > 0) v[i + nx * (j + ny * k)] = Math.log10(c / g0); }
+    const fam = PF.src === 'mf6' ? PLUME_RAMP.model : PLUME_RAMP.meas, names = ['plume-1x', 'plume-10x', 'plume-100x'], made = [];
+    lvP.forEach((l, k) => { const iso = isoSurface({ nx, ny, nz, v }, Math.log10(l.v / g0)); if (!iso.indices.length) return;
+      const pos = new Float32Array(iso.positions.length); for (let q = 0; q < iso.positions.length; q += 3) { const [E, N, z] = at(iso.positions[q], iso.positions[q + 1], iso.positions[q + 2]), p3 = P(E, N, z); pos[q] = p3.x; pos[q + 1] = p3.y; pos[q + 2] = p3.z; }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(iso.indices); geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: fam[k + 1], emissive: fam[k + 1], emissiveIntensity: .15, transparent: true, opacity: [.24, .4, .62][k], side: THREE.DoubleSide, depthWrite: false }));
+      m.name = names[k]; m.renderOrder = 12 - k; groups.plume.add(m); made.push(l.label); });   // inner shells first, so each outer one is seen around it
+    plume = { src: PF.src, date: PF.date, levels: made };
+  }
+  const shellsOn = !!plume?.levels.length && !(S.v3dOff || {}).plume;
+  // surfaces on the model grid: ground and the base of each unit (interpolated), the water table (model or fitted plane); faint while shells show
+  const M = gwModel(); let wtSrc = ''; const fadeK = shellsOn ? .12 : null;
   if (M && !M.error) { const g = M.grid, surf = (zOf, color, opacity) => { const pos = [], idx = [];
       for (let rr = 0; rr < g.nrow; rr++) for (let c = 0; c < g.ncol; c++) { const [E, N] = g.cellCentre(rr, c), z = zOf(rr, c, E, N); const v = P(E, N, z ?? NaN); pos.push(v.x, v.y, v.z); }
       for (let rr = 0; rr < g.nrow - 1; rr++) for (let c = 0; c < g.ncol - 1; c++) { const a = rr * g.ncol + c, b2 = a + 1, d = a + g.ncol, e = d + 1; if ([a, b2, d, e].some(i => !Number.isFinite(pos[3 * i + 1]))) continue; idx.push(a, d, b2, b2, d, e); }
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos.map(v => Number.isFinite(v) ? v : 0), 3)); geo.setIndex(idx); geo.computeVertexNormals();
       return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false })); };
-    groups.ground.add(surf((rr, c) => g.top[rr * g.ncol + c], v3dCss('earth'), .28));
-    M.units.forEach((u, k) => { const fill = list.flatMap(b => xsUnits(b)).find(x => x.u === u.u)?.fill || 'panel-2'; groups.layers.add(surf((rr, c) => g.botm[k][rr * g.ncol + c], v3dCss(fill), .3)); });
+    groups.ground.add(surf((rr, c) => g.top[rr * g.ncol + c], v3dCss('earth'), fadeK ?? .28));
+    M.units.forEach((u, k) => { const fill = list.flatMap(b => xsUnits(b)).find(x => x.u === u.u)?.fill || 'panel-2'; groups.layers.add(surf((rr, c) => g.botm[k][rr * g.ncol + c], v3dCss(fill), fadeK ?? .3)); });
     const R = S.gwm?.run; wtSrc = R?.ok ? `MODFLOW 6 (${gwCalLabel()})` : `fitted plane of the ${M.round} levels`;
     groups.water.add(surf((rr, c, E, N) => R?.ok ? gwWaterTable(M, R.layers, E, N) : M.F.fit({ e: E, n: N }), '#1876bd', .3));
-    // the MODFLOW 6 plume: cells above 1×, 10× and 100× the guideline on the date shown
-    const T = S.gwm?.trans; let tShown = '';
-    if (T?.ok) { const tt = T.times.filter(q => !date || q.date <= date).pop() || T.times[0], lv = plumeLevels('groundwater', T.param); tShown = tt.date;
-      lv.forEach((l, k) => { const cells = []; for (let kk = 0; kk < g.nlay; kk++) for (let rr = 0; rr < g.nrow; rr++) for (let c = 0; c < g.ncol; c++) { const i = rr * g.ncol + c, v = tt.layers[kk]?.[i];
-          if (g.idomain[kk][i] === 1 && v >= l.v && (k === lv.length - 1 || v < lv[k + 1].v)) cells.push([kk, rr, c]); }
-        if (!cells.length) return; const box = new THREE.BoxGeometry(g.cell, 1, g.cell), im = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: PLUME_RAMP.model[k + 1], transparent: true, opacity: [.22, .35, .55][k], depthWrite: false }), cells.length), mtx = new THREE.Matrix4(), q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), g.angrot * Math.PI / 180);
-        cells.forEach(([kk, rr, c], n) => { const i = rr * g.ncol + c, tp = kk ? g.botm[kk - 1][i] : g.top[i], bt = g.botm[kk][i], [E, N] = g.cellCentre(rr, c); mtx.compose(P(E, N, (tp + bt) / 2), q, new THREE.Vector3(1, Math.max(.01, (tp - bt) * ve), 1)); im.setMatrixAt(n, mtx); });
-        groups.plume.add(im); }); }
     for (const path of S.gwm?.paths || []) { const geo = new THREE.BufferGeometry().setFromPoints(path.map(p => P(p.E, p.N, p.z))); groups.paths.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#3f007d' }))); }
-    S.v3dShown = { tShown, wtSrc };
+    S.v3dShown = { wtSrc };
   }
   // names
   for (const b of list) { const cv = document.createElement('canvas'), ctx = cv.getContext('2d'); cv.width = 256; cv.height = 64; ctx.font = '600 30px Arial'; ctx.fillStyle = '#1c2329'; ctx.textAlign = 'center'; ctx.fillText(b.name, 128, 42);
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false })); sp.scale.set(span / 14, span / 56, 1); sp.position.copy(P(b.easting, b.northing, b.elevation + (b.well?.stickup || 0) + 1.2 / Math.max(1, ve / 2))); groups.labels.add(sp); }
   const camera = new THREE.PerspectiveCamera(40, W / H, .1, span * 50);
-  S.v3d = { ok: true, renderer, scene, camera, groups, ve, span, target: new THREE.Vector3(0, (zTop - Z0) * ve / 2, 0), orbit: S.v3d?.orbit && S.v3d.ok && S.v3d.span === span ? S.v3d.orbit : null };
-  v3dView(!S.v3d.orbit); v3dControls(renderer.domElement);
+  S.v3d = { ok: true, renderer, scene, camera, groups, ve, span, target: new THREE.Vector3(0, (zTop - Z0) * ve / 2, 0), orbit: prev?.orbit && prev.ok && prev.span === span ? prev.orbit : null };
+  S.v3d.plume = plume;
+  { // the section line's direction: the picked boreholes' ends, else the best-fit line through all (principal axis)
+    const pk = [...S.secIds].map(id => list.find(b => b.id === id)).filter(Boolean); let ux, uy;
+    if (pk.length >= 2) { const a = pk[0], b = pk[pk.length - 1], L = Math.hypot(b.easting - a.easting, b.northing - a.northing) || 1; ux = (b.easting - a.easting) / L; uy = (b.northing - a.northing) / L; }
+    else { let sxx = 0, syy = 0, sxy = 0; for (const b of list) { const x = b.easting - E0, y = b.northing - N0; sxx += x * x; syy += y * y; sxy += x * y; } const th = .5 * Math.atan2(2 * sxy, sxx - syy); ux = Math.cos(th); uy = Math.sin(th); }
+    const nx = -uy, ny = ux, s = list.map(b => (b.easting - E0) * ux + (b.northing - N0) * uy), o = list.map(b => (b.easting - E0) * nx + (b.northing - N0) * ny);
+    S.v3d.cut = { ux, uy, nx, ny, s0: Math.min(...s) - 6, s1: Math.max(...s) + 6, o0: Math.min(...o) - 3, o1: Math.max(...o) + 3, z0: zBot, z1: zTop, PF, lvP, E0, N0, Z0, ve }; }
+  v3dCutApply(); v3dView(!S.v3d.orbit); v3dControls(renderer.domElement);
   const T = S.gwm?.trans;
   $('#v3d-legend').innerHTML = esc(`Measured: borehole columns in soil colours; wells (white casing, dark screen) with blue discs at the water level${date ? ' on ' + date : ''}; spheres are ${LAB_PARAMS[param]?.label || param} results coloured against the guideline (white = not detected). `)
     + (M && !M.error ? esc(`Interpolated between boreholes (inverse distance): the see-through ground and unit-base surfaces. Water table: ${S.v3dShown.wtSrc}. `) : '')
-    + (T?.ok ? esc(`Model (MODFLOW 6), not measured: plume cells above 1×, 10× and 100× the guideline on ${S.v3dShown.tShown}, and flow paths from the source. `) : '')
+    + (!PF ? '' : !lvP.length ? esc(`No groundwater guideline for ${LAB_PARAMS[param]?.label || param}, so no plume shells are drawn. `)
+      : !plume?.levels.length ? esc(`No ${LAB_PARAMS[param]?.label || param} result above the groundwater guideline${PF.date ? ' on ' + PF.date : ''}, so no plume shells are drawn. `)
+      : PF.src === 'mf6' ? esc(`Model (MODFLOW 6), not measured: ${LAB_PARAMS[param]?.label || param} shells at ${plume.levels.join(', ')} on ${PF.date} (${gwCalLabel()})${S.gwm?.paths?.length ? ', and flow paths from the source' : ''}. `)
+      : esc(`Interpreted from measured results, not modelled: ${LAB_PARAMS[param]?.label || param} in groundwater${PF.date ? ' on ' + PF.date : ''}, shells at ${plume.levels.join(', ')}, inverse distance between the wells' screens and fading to nothing 5 m beyond the wells. `))
     + `<b>Vertical exaggeration ×${ve}</b>${S.v3dVe ? '' : ' (auto)'}.`;
 }
+/* the cut: a vertical clipping plane parallel to the section line; the face shows the plume on that plane in its colours */
+function v3dCutApply() {
+  const V = S.v3d; if (!V?.ok || !V.cut) return; const C = V.cut, old = V.scene.getObjectByName('cut-face');
+  if (old) { V.scene.remove(old); old.geometry.dispose(); old.material.map?.dispose(); old.material.dispose(); }
+  if (!S.v3dCut?.on) { V.renderer.clippingPlanes = []; if (V.orbit) v3dRender(); return; }
+  const c = C.o0 + (C.o1 - C.o0) * (S.v3dCut.pos ?? 50) / 100;
+  V.renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(C.nx, 0, -C.ny), -c)]; C.c = c;   // v3dRender turns it so the side facing the camera is the one removed
+  const cw = 256, ch = 128, cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const ctx = cv.getContext('2d');
+  ctx.fillStyle = 'rgba(120,120,120,.10)'; ctx.fillRect(0, 0, cw, ch);
+  if (C.PF && C.lvP.length) { const fam = C.PF.src === 'mf6' ? PLUME_RAMP.model : PLUME_RAMP.meas, g0 = C.lvP[0].v, img = ctx.getImageData(0, 0, cw, ch);
+    for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) { const sv = C.s1 - (x + .5) / cw * (C.s1 - C.s0), z = C.z1 - (y + .5) / ch * (C.z1 - C.z0), v = C.PF.at(C.E0 + sv * C.ux + c * C.nx, C.N0 + sv * C.uy + c * C.ny, z);
+      if (!(v >= g0)) continue; const rgb = hexMix(fam.slice(1), Math.log10(v / g0) / 2).match(/\d+/g).map(Number), q = 4 * (y * cw + x); img.data[q] = rgb[0]; img.data[q + 1] = rgb[1]; img.data[q + 2] = rgb[2]; img.data[q + 3] = 215; }
+    ctx.putImageData(img, 0, 0); }
+  ctx.strokeStyle = '#5d6a75'; ctx.lineWidth = 2; ctx.strokeRect(1, 1, cw - 2, ch - 2);
+  const tex = new THREE.CanvasTexture(cv), m = new THREE.Mesh(new THREE.PlaneGeometry(C.s1 - C.s0, (C.z1 - C.z0) * C.ve), new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+  const sm = (C.s0 + C.s1) / 2; m.position.set(sm * C.ux + c * C.nx, ((C.z0 + C.z1) / 2 - C.Z0) * C.ve, -(sm * C.uy + c * C.ny)); m.rotation.y = Math.atan2(C.nx, -C.ny); m.name = 'cut-face'; m.renderOrder = 20;
+  V.scene.add(m); if (V.orbit) v3dRender();
+}
+const v3dCaptionText = () => { const V = S.v3d, p = V?.plume?.levels.length && !(S.v3dOff || {}).plume ? V.plume : null; return `Vertical exaggeration ×${V?.ve} · ${p ? (p.src === 'mf6' ? 'purple shells = model (MODFLOW 6), not measured' : 'red shells = interpreted from measured results, not modelled') + ' · ' : ''}see-through surfaces interpolated · ${new Date().toISOString().slice(0, 10)}`; };
 function v3dView(reset) { const V = S.v3d; if (!V?.ok) return; if (reset || !V.orbit) V.orbit = { th: -.75, ph: 1.0, rad: V.span * .85, tx: V.target.x, ty: V.target.y, tz: V.target.z }; v3dRender(); }
 function v3dRender() { const V = S.v3d; if (!V?.ok) return; const o = V.orbit, c = V.camera;
-  c.position.set(o.tx + o.rad * Math.sin(o.ph) * Math.cos(o.th), o.ty + o.rad * Math.cos(o.ph), o.tz + o.rad * Math.sin(o.ph) * Math.sin(o.th)); c.lookAt(o.tx, o.ty, o.tz); V.renderer.render(V.scene, c); }
+  c.position.set(o.tx + o.rad * Math.sin(o.ph) * Math.cos(o.th), o.ty + o.rad * Math.cos(o.ph), o.tz + o.rad * Math.sin(o.ph) * Math.sin(o.th)); c.lookAt(o.tx, o.ty, o.tz);
+  const pl = V.renderer.clippingPlanes?.[0], C = V.cut, face = V.scene.getObjectByName('cut-face');
+  if (pl && C) { const k = C.nx * c.position.x - C.ny * c.position.z - C.c > 0 ? -1 : 1; pl.normal.set(k * C.nx, 0, -k * C.ny); pl.constant = -k * C.c;   // remove the camera's side
+    if (face) { const sm = (C.s0 + C.s1) / 2, cc = C.c + k * .03; face.position.x = sm * C.ux + cc * C.nx; face.position.z = -(sm * C.uy + cc * C.ny); } } V.renderer.render(V.scene, c); }
 function v3dControls(el) { let drag = null;
   el.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 2 }; el.setPointerCapture(e.pointerId); });
   el.addEventListener('pointermove', e => { if (!drag || !S.v3d?.ok) return; const o = S.v3d.orbit, dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
@@ -5154,7 +5266,7 @@ function v3dCapture(maxW = 0) {
   x.fillStyle = 'rgba(255,255,255,.85)'; x.beginPath(); x.arc(cx, cy, 34 * sc, 0, 7); x.fill(); x.strokeStyle = '#1c2329'; x.lineWidth = 2 * sc; x.beginPath(); x.moveTo(cx - ux * L, cy - uy * L); x.lineTo(cx + ux * L, cy + uy * L); x.stroke();
   x.beginPath(); x.moveTo(cx + ux * L, cy + uy * L); x.lineTo(cx + ux * (L - 9 * sc) - uy * 6 * sc, cy + uy * (L - 9 * sc) + ux * 6 * sc); x.lineTo(cx + ux * (L - 9 * sc) + uy * 6 * sc, cy + uy * (L - 9 * sc) - ux * 6 * sc); x.closePath(); x.fillStyle = '#1c2329'; x.fill();
   x.font = `600 ${13 * sc}px Arial`; x.textAlign = 'center'; x.fillText('N', cx + ux * (L + 9 * sc), cy + uy * (L + 9 * sc) + 4 * sc);
-  const caption = `Vertical exaggeration ×${V.ve} · purple = model (MODFLOW 6), not measured · see-through surfaces interpolated · ${new Date().toISOString().slice(0, 10)}`;
+  const caption = v3dCaptionText();
   x.font = `${12 * sc}px Arial`; x.textAlign = 'left'; const tw = x.measureText(caption).width; x.fillStyle = 'rgba(255,255,255,.85)'; x.fillRect(8 * sc, cv.height - 26 * sc, tw + 12 * sc, 20 * sc); x.fillStyle = '#1c2329'; x.fillText(caption, 14 * sc, cv.height - 11 * sc);
   return { canvas: cv, caption, north };
 }
@@ -8054,6 +8166,7 @@ function xsPlay() {
   step(); xsTimer = setInterval(step, 900);
 }
 function xsSetDate(d) { setXs('date', d); const dates = xsDates(sectionList()); if ($('#xs-date')) $('#xs-date').value = Math.max(0, dates.indexOf(d)); if ($('#xs-date-l')) $('#xs-date-l').textContent = d; if ($('#xs-asof')) $('#xs-asof').value = d; }
+document.addEventListener('input', e => { if (e.target.id === 'v3d-cutpos') { S.v3dCut = { on: true, ...S.v3dCut, pos: +e.target.value }; v3dCutApply(); } });
 document.addEventListener('input', e => { if (e.target.id === 'xs-date') { const d = xsDates(sectionList())[+e.target.value]; if (d) xsSetDate(d); } });
 function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); const ms = $('#xs-model-sec'); if (ms) ms.outerHTML = xsModelHTML(); }   // the forecast panel reads the drawn section's geometry
 const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
@@ -8910,6 +9023,19 @@ async function buildReport() {
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Create PDF'; } }
 }
 
+CTL.compose = () => { const pg = curPage(), tpls = S.co.reportTpls || [], free = pg?.kind === 'free' && !S.csort; return [
+  ...(free ? [{ id: 'cmp-item', title: 'Selected item', icon: '<rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2"/>', html: `<div class="cmp-props" id="cmp-props">${propsHTML()}</div>` },
+    { id: 'cmp-pagecfg', title: 'Page', icon: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/>', html: `<div class="cmp-pageset"><label class="cmp-lbl" for="cmp-title">Page title</label><input id="cmp-title" value="${esc(pg.title || '')}" placeholder="FIGURE 1 – SITE PLAN">
+      <span class="seg" role="group" aria-label="Page orientation"><button data-corient="port" aria-pressed="${pg.orient !== 'land'}">Portrait</button><button data-corient="land" aria-pressed="${pg.orient === 'land'}">Landscape</button></span>
+      <label class="cmp-zoom"><span class="note">Paper</span><select id="cmp-paper-size" aria-label="Paper size">${Object.entries(PAPERS).map(([k, [t]]) => `<option value="${k}" ${(pg.paper || 'letter') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label class="cmp-zoom"><span class="note">Margin</span><input id="cmp-margin" type="number" min="5" max="40" step="1" value="${Math.round(pgDims(pg).M / MMPX)}" style="width:64px"><span class="note">mm</span></label>
+</div>` }] : []),
+  { id: 'cmp-tpls', title: 'Templates', icon: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9h18M9 9v11"/>', html: `        <p class="note" style="margin:0">Start from a layout, or save this one to reuse on any project.</p>
+    <select id="cmp-tpl"><option value="">Choose a template…</option><optgroup label="Ready-made">${Object.entries(REPORT_PRESETS).map(([k, [t]]) => `<option value="p:${k}">${esc(t)}</option>`).join('')}</optgroup>${tpls.length ? `<optgroup label="Your company">${tpls.map(t => `<option value="t:${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>` : ''}</select>
+    <div class="cmp-row"><button class="btn" data-act="cmp-tpl-apply">Use template</button><button class="btn" data-act="cmp-tpl-save" ${S.readOnly ? 'disabled' : ''}>Save as template…</button>${tpls.length ? `<button class="btn" data-act="cmp-tpl-del">Delete…</button>` : ''}</div>
+` },
+  { id: 'cmp-outs', title: 'Other outputs', icon: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', html: `        <div class="cmp-outs">${[['pdf-all', 'All borehole logs (PDF)'], ['export', 'Excel report'], ['export-data', 'Data tables (Excel)'], ['ags', 'AGS 4 (gINT, HoleBASE)'], ['gis', 'GIS / CSV locations']].map(([a, t]) => `<button class="btn link" data-act="${a}">${t}</button>`).join('')}</div>
+` }]; };
 function composeHTML() {
   const L = repLayout(), pg = curPage(), n = L.pages.length, tpls = S.co.reportTpls || [];
   const pages = L.pages.map((p, i) => `<li data-pgi="${i}" draggable="${!S.readOnly}"><button class="cmp-pg" data-cpage="${i}" aria-current="${i === S.cpage}"><span class="n">${i + 1}</span><span class="th" data-th="${p.id}" data-w="52"></span><span class="tx"><b>${esc(pageLabel(p))}</b><small>${esc(pageSub(p))}</small></span></button></li>`).join('');
@@ -8919,30 +9045,20 @@ function composeHTML() {
     <div class="cmp-row"><button class="btn" data-act="cmp-up" ${S.cpage === 0 ? 'disabled' : ''} title="Move this page up">Up</button><button class="btn" data-act="cmp-down" ${S.cpage >= n - 1 ? 'disabled' : ''} title="Move this page down">Down</button><button class="btn" data-act="cmp-dup" title="Duplicate this page">Duplicate</button><button class="btn" data-act="cmp-delpage" ${n < 2 ? 'disabled' : ''} title="Remove this page">Remove</button><button class="btn" data-act="cmp-rot-l" title="Turn left (imported pages) or switch portrait and landscape">Rotate left</button><button class="btn" data-act="cmp-rot-r" title="Turn right (imported pages) or switch portrait and landscape">Rotate right</button></div>
     <button class="btn" data-act="cmp-import" ${S.readOnly ? 'disabled' : ''} title="Insert the pages of a PDF (an ArcGIS map, a lab certificate) or a picture after the current page">Add PDF or image…</button>
     <label class="cmp-lbl" for="cmp-add-page">Add a page</label><select id="cmp-add-page"><option value="">Choose a page type…</option>${Object.entries(RPAGES).filter(([k]) => k !== 'pdf').map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>
-    <h3 style="margin-top:18px">Templates</h3>
-    <p class="note" style="margin:0">Start from a layout, or save this one to reuse on any project.</p>
-    <select id="cmp-tpl"><option value="">Choose a template…</option><optgroup label="Ready-made">${Object.entries(REPORT_PRESETS).map(([k, [t]]) => `<option value="p:${k}">${esc(t)}</option>`).join('')}</optgroup>${tpls.length ? `<optgroup label="Your company">${tpls.map(t => `<option value="t:${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>` : ''}</select>
-    <div class="cmp-row"><button class="btn" data-act="cmp-tpl-apply">Use template</button><button class="btn" data-act="cmp-tpl-save" ${S.readOnly ? 'disabled' : ''}>Save as template…</button>${tpls.length ? `<button class="btn" data-act="cmp-tpl-del">Delete…</button>` : ''}</div>
-    <h3 style="margin-top:18px">Other outputs</h3>
-    <div class="cmp-outs">${[['pdf-all', 'All borehole logs (PDF)'], ['export', 'Excel report'], ['export-data', 'Data tables (Excel)'], ['ags', 'AGS 4 (gINT, HoleBASE)'], ['gis', 'GIS / CSV locations']].map(([a, t]) => `<button class="btn link" data-act="${a}">${t}</button>`).join('')}</div>
   </aside>`;
   let stage;
   if (pg.kind === 'free') {
     const d = pgDims(pg), bd = bodyOf(pg);
-    stage = `<div class="cmp-tools"><label class="cmp-lbl" for="cmp-title">Page title</label><input id="cmp-title" value="${esc(pg.title || '')}" placeholder="FIGURE 1 – SITE PLAN">
-      <span class="seg" role="group" aria-label="Page orientation"><button data-corient="port" aria-pressed="${pg.orient !== 'land'}">Portrait</button><button data-corient="land" aria-pressed="${pg.orient === 'land'}">Landscape</button></span>
-      <label class="cmp-zoom"><span class="note">Paper</span><select id="cmp-paper-size" aria-label="Paper size">${Object.entries(PAPERS).map(([k, [t]]) => `<option value="${k}" ${(pg.paper || 'letter') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <label class="cmp-zoom"><span class="note">Margin</span><input id="cmp-margin" type="number" min="5" max="40" step="1" value="${Math.round(pgDims(pg).M / MMPX)}" style="width:64px"><span class="note">mm</span></label>
-      <label class="cmp-zoom"><span class="note">Zoom</span><select id="cmp-zoom" aria-label="Zoom">${[['fit', 'Fit page'], ['width', 'Fit width'], ...[0.5, 0.75, 1, 1.5, 2, 4].map(v => [v, Math.round(v * 100) + ' %'])].map(([v, t]) => `<option value="${v}" ${String(S.czoom) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <span class="cmp-add"><span class="note">Add</span>${Object.entries(RITEMS).map(([k, [t]]) => `<button class="btn" data-cadd="${k}">${esc(t)}</button>`).join('')}</span></div>
+    stage = `<div class="cmp-tools">      <label class="cmp-zoom"><span class="note">Zoom</span><select id="cmp-zoom" aria-label="Zoom">${[['fit', 'Fit page'], ['width', 'Fit width'], ...[0.5, 0.75, 1, 1.5, 2, 4].map(v => [v, Math.round(v * 100) + ' %'])].map(([v, t]) => `<option value="${v}" ${String(S.czoom) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <span class="cmp-addwrap"><button class="btn primary" data-act="cmp-addmenu" aria-haspopup="true" ${S.readOnly ? 'disabled' : ''}>Add item ▾</button><div class="cmp-addmenu" role="menu" hidden>${(() => { const G = [['Maps and drawings', ['plan', 'section', 'wt', 'vap', 'flow', 'hydro']], ['Groundwater model', ['gwsum', 'gwcal', 'gwpar', 'gwlim']], ['Text and pictures', ['text', 'image']], ['Map parts', ['scalebar', 'north', 'legend', 'shape']]], seen = new Set(G.flatMap(g => g[1])), rest = Object.keys(RITEMS).filter(k => !seen.has(k)); return [...G, ...(rest.length ? [['Other', rest]] : [])].map(([t, ks]) => `<div class="cmp-addg"><b>${t}</b>${ks.filter(k => RITEMS[k]).map(k => `<button type="button" class="cmp-addi" role="menuitem" data-cadd="${k}">${esc(RITEMS[k][0])}</button>`).join('')}</div>`).join(''); })()}</div></span></div>
       <div class="cmp-canvas"><span class="rl-c" aria-hidden="true"></span><svg class="rl-x" id="rl-x" aria-hidden="true"></svg><svg class="rl-y" id="rl-y" aria-hidden="true"></svg>
       <div class="cmp-stage cmp-scroll" id="cmp-stage"><div class="cmp-sizer" id="cmp-sizer"><div class="cmp-paper" id="cmp-paper" style="width:${d.W}px;height:${d.H}px">${pageFrame(pg.title || '', S.cpage + 1, n, pageItemsSVG(pg), d)}
         <div class="cmp-body" style="left:${bd.x}px;top:${bd.y}px;width:${bd.w}px;height:${bd.h}px" aria-hidden="true"></div>
         ${['x', 'y'].map(a => (pg.guides?.[a] || []).map((v, gi) => `<div class="cmp-guide g${a}" data-gaxis="${a}" data-gi="${gi}" style="${a === 'x' ? 'left' : 'top'}:${v}px" title="Guide at ${(v / MMPX).toFixed(1)} mm: drag to move, drag onto the ruler to remove"></div>`).join('')).join('')}
         <div class="cmp-snaps" id="cmp-snaps" aria-hidden="true"></div>
-        ${pg.items.map(it => `<div class="cmp-box" data-box="${it.id}" aria-selected="${it.id === S.csel || !!S.cmulti?.has(it.id)}" title="${esc(RITEMS[it.t][0])}: drag to move, drag the corner to resize"><span class="cmp-tag">${esc(it.cap || RITEMS[it.t][0])}</span><span class="cmp-rz" data-rz aria-hidden="true"></span></div>`).join('')}
+        ${pg.items.map(it => `<div class="cmp-box${it.y < 50 ? ' bar-below' : ''}" data-box="${it.id}" aria-selected="${it.id === S.csel || !!S.cmulti?.has(it.id)}" title="${esc(RITEMS[it.t][0])}: drag to move, drag the corner to resize"><span class="cmp-tag">${esc(it.cap || RITEMS[it.t][0])}</span><span class="cmp-rz" data-rz aria-hidden="true"></span>${S.readOnly ? '' : `<span class="cmp-bar" role="toolbar" aria-label="Item"><button type="button" class="tb" data-act="cmp-copy" title="Duplicate">${svgI('<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>')}</button><button type="button" class="tb" data-act="cmp-front" title="Bring to front">${svgI('<rect x="4" y="4" width="11" height="11" rx="1"/><rect x="9" y="9" width="11" height="11" rx="1" fill="currentColor" fill-opacity=".25"/>')}</button><button type="button" class="tb del" data-act="cmp-del" title="Delete (Delete key)" aria-label="Delete">${svgI('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>')}</button></span>`}</div>`).join('')}
       </div></div></div></div>
-      <p class="note">Drag a diagram to move it; drag its bottom-right corner to resize. Arrow keys nudge the selected one (Shift for bigger steps); Delete removes it. The dashed line is the printable area.</p>`;
+      <p class="note">Click an item to select it: drag to move, drag its corner to resize, use the buttons on its frame or the Delete key. Settings for the item and the page are in the panel on the right. The dashed line is the printable area.</p>`;
   } else {
     const opts = pg.kind === 'logs' ? `<div class="cmp-logs"><span class="note">Boreholes in this section (none ticked = all, in name order)</span><div class="sec-chips">${projList().map(b => `<label class="check"><input type="checkbox" data-clog="${esc(b.id)}" ${pg.bh?.includes(b.id) ? 'checked' : ''}> ${esc(b.name)}</label>`).join('')}</div><p class="note">Log layout, text size, columns and depth per page are set on <button class="btn link" data-tab="report">PDF preview</button>.</p></div>` : '';
     stage = `<div class="cmp-tools"><b>${esc(RPAGES[pg.kind])}</b>${pg.kind === 'logs' || pg.kind === 'photos' ? '' : `<label class="cmp-lbl" for="cmp-title">Page title</label><input id="cmp-title" value="${esc(pg.title || '')}">`}</div>${opts}
@@ -8951,7 +9067,7 @@ function composeHTML() {
   const sel = S.csortSel || new Set();
   const mode = `<div class="cmp-mode"><span class="seg" role="group" aria-label="View"><button data-csort="0" aria-pressed="${!S.csort}">Edit page</button><button data-csort="1" aria-pressed="${!!S.csort}">All pages</button></span>${S.csort ? `<span class="note">${sel.size ? `${sel.size} selected` : 'Click to select; Shift or Ctrl/⌘ for several; drag to reorder; double-click to open'}</span><span class="sp"></span><button class="btn" data-act="cmp-rot-l" ${sel.size ? '' : 'disabled'}>Rotate left</button><button class="btn" data-act="cmp-rot-r" ${sel.size ? '' : 'disabled'}>Rotate right</button><button class="btn" data-act="cmp-dup" ${sel.size ? '' : 'disabled'}>Duplicate</button><button class="btn danger" data-act="cmp-delpage" ${sel.size && sel.size < n ? '' : 'disabled'}>Delete</button>` : ''}</div>`;
   if (S.csort) stage = `<div class="cmp-sorter" role="listbox" aria-multiselectable="true" aria-label="All pages">${L.pages.map((p, i) => `<button type="button" class="tile" role="option" data-tile="${i}" data-pgi="${i}" draggable="${!S.readOnly}" aria-selected="${sel.has(p.id)}"><span class="th" data-th="${p.id}" data-w="150"></span><span class="cap"><b>${i + 1}</b> ${esc(pageLabel(p))}</span></button>`).join('')}</div>`;
-  return `<div class="cmp${S.csort ? ' sorting' : ''}">${side}<div class="cmp-main">${mode}${stage}</div>${pg.kind === 'free' && !S.csort ? `<aside class="cmp-props" id="cmp-props">${propsHTML()}</aside>` : ''}</div>`;
+  return `<div class="cmp${S.csort ? ' sorting' : ''}">${side}<div class="cmp-main">${mode}${stage}</div></div>`;
 }
 /* several selected: align to the selection's edges or centres, or space them evenly */
 const selItems = () => (curPage()?.items || []).filter(i => S.cmulti?.has(i.id));
@@ -8977,7 +9093,7 @@ function propsHTML() {
     <h4>Distribute</h4><div class="cmp-row"><button class="btn" data-cdist="h" ${S.cmulti.size < 3 ? 'disabled' : ''}>Horizontally</button><button class="btn" data-cdist="v" ${S.cmulti.size < 3 ? 'disabled' : ''}>Vertically</button></div>`;
   const pg = curPage(), it = pg?.items?.find(x => x.id === S.csel);
   const tbPanel = `<h3>Title block</h3><div class="cmp-geos">${[['fig', 'Figure no.'], ['rev', 'Revision'], ['drawn', 'Drawn by'], ['checked', 'Checked by'], ['date', 'Date']].map(([k, l]) => `<label class="cmp-geo"><span>${l}</span><input ${k === 'date' ? 'type="date"' : ''} data-tbf="${k}" value="${esc(pg?.tb?.[k] || '')}" ${S.readOnly ? 'readonly' : ''}></label>`).join('')}</div><p class="note">Company, project and number come from Settings and the project.</p>`;
-  if (!it) return tbPanel + `<h3>Diagram</h3><p class="note">Click a diagram on the page to change its size, scale, intervals and caption.</p><p class="note">Use the Add buttons above the page to place a site plan, cross-section, map, hydrograph, text or a picture.</p>`;
+  if (!it) return tbPanel + `<h3>Diagram</h3><p class="note">Click a diagram on the page to change its size, scale, intervals and caption.</p><p class="note">Use Add item above the page to place a site plan, cross-section, map, hydrograph, text or a picture.</p>`;
   const sel = (k, label, list) => `<label class="cmp-lbl" for="co-${k}">${label}</label><select id="co-${k}" data-copt="${k}">${list.map(([v, t]) => `<option value="${v}" ${String(it.o?.[k] ?? '') === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
   const geo = (k, label) => `<label class="cmp-geo"><span>${label}</span><input type="number" step="1" data-cgeo="${k}" value="${mm(it[k])}"><span class="note">mm</span></label>`;
   return `<h3>${esc(RITEMS[it.t][0])}</h3>
@@ -9031,7 +9147,7 @@ function drawCompose() {
   if (paper.dataset.auto) layoutPages({ pages: [curPage()] }).then(ps => { const p = ps[0]; if (p?.pdf) { pdfPageImage(p.pdf, Math.min(1600, stage.clientWidth * 2)).then(r => { const z = Math.min(1, (stage.clientWidth - 2) / r.w); Object.assign(paper.style, { width: r.w + 'px', height: r.h + 'px' }); paper.style.setProperty('--z', z); stage.style.height = r.h * z + 'px'; paper.innerHTML = `<img src="${r.url}" alt="${esc(curPage().title || 'Imported page')}" style="display:block;width:100%;height:100%">`; }).catch(() => { paper.innerHTML = '<p class="note" style="padding:20px">This imported page could not be shown. The file may be missing from this computer.</p>'; }); return; }
     paper.innerHTML = p ? (p.svg || pageFrame(p.framed.title, S.cpage + 1, repLayout().pages.length, p.framed.body)) : '<p class="note" style="padding:20px">Nothing to show yet for this page.</p>'; });
 }
-function rerenderCompose() { if (S.tab !== 'compose') return; const v = $('#view'); v.innerHTML = hiddenNote() + composeHTML(); drawCompose(); fillThumbs(); gwComposeEnsure(); }
+function rerenderCompose() { if (S.tab !== 'compose') return; ctlLayout(); const v = $('#view'); v.innerHTML = hiddenNote() + composeHTML(); ctlRender(); drawCompose(); fillThumbs(); gwComposeEnsure(); }
 function commit(L = repLayout()) { saveLayout(L); rerenderCompose(); }
 function fitItem(it, how) {
   const g = 12, BODY = bodyOf(curPage());
@@ -9046,6 +9162,7 @@ const clampIt = (it, pg = curPage()) => { const d = pgDims(pg); it.w = Math.max(
 function composeAct(act, el) {
   const L = repLayout(), pg = curPage(), it = pg.items?.find(x => x.id === S.csel), i = S.cpage;
   if (act === 'cmp-pdf') { buildReport(); return; }
+  if (S.readOnly && ['cmp-del', 'cmp-copy', 'cmp-front'].includes(act)) return;
   if (act === 'cmp-up' && i > 0) { [L.pages[i - 1], L.pages[i]] = [L.pages[i], L.pages[i - 1]]; S.cpage--; }
   if (act === 'cmp-down' && i < L.pages.length - 1) { [L.pages[i + 1], L.pages[i]] = [L.pages[i], L.pages[i + 1]]; S.cpage++; }
   const many = S.csort && S.csortSel?.size ? L.pages.filter(p => S.csortSel.has(p.id)) : null, targets = many || [pg];
@@ -9057,7 +9174,7 @@ function composeAct(act, el) {
     else if (p.kind === 'free') { p.orient = p.orient === 'land' ? undefined : 'land'; for (const x of p.items || []) clampIt(x, p); }
   }
   if (act === 'cmp-xs-use' && it?.t === 'section') { it.o = { ...it.o, xs: structuredClone(S.xs) }; }
-  if (act === 'cmp-del' && it) { pg.items = pg.items.filter(x => x !== it); S.csel = null; }
+  if (act === 'cmp-del' && (it || S.cmulti?.size)) { const gone = S.cmulti?.size > 1 && (!it || S.cmulti.has(it.id)) ? S.cmulti : new Set([it?.id ?? [...S.cmulti][0]]); pg.items = pg.items.filter(x => !gone.has(x.id)); S.csel = null; S.cmulti = new Set(); }
   if (act === 'cmp-front' && it) { pg.items = [...pg.items.filter(x => x !== it), it]; }
   if (act === 'cmp-copy' && it) { const c = { ...structuredClone(it), id: uid('it'), x: it.x + 18, y: it.y + 18 }; clampIt(c); pg.items.push(c); S.csel = c.id; }
   if (act === 'cmp-img') { $('#cmp-img-file').click(); return; }
@@ -9138,12 +9255,16 @@ document.addEventListener('pointerup', e => {
   commit();
 });
 let cDrag = null;
+// the Add item menu closes on a click elsewhere or Escape
+document.addEventListener('click', e => { const m = $('.cmp-addmenu'); if (m && !m.hidden && !e.target.closest?.('.cmp-addwrap')) m.hidden = true; });
+document.addEventListener('keydown', e => { const m = $('.cmp-addmenu'); if (e.key === 'Escape' && m && !m.hidden) { m.hidden = true; e.stopPropagation(); } }, true);
 document.addEventListener('pointerdown', e => {
   const box = e.target.closest('.cmp-box'); if (!box) return;
+  if (e.target.closest('.cmp-bar')) { S.csel = box.dataset.box; if (!S.cmulti?.has(S.csel)) S.cmulti = new Set(); return; }   // the buttons act on the item they sit on
   const it = curPage().items.find(x => x.id === box.dataset.box); if (!it) return;
   if (e.shiftKey || e.ctrlKey || e.metaKey) { const m = S.cmulti ||= new Set(); if (S.csel && !m.size) m.add(S.csel); m.has(it.id) ? m.delete(it.id) : m.add(it.id); S.csel = it.id; }
   else if (!S.cmulti?.has(it.id)) { S.cmulti = new Set(); S.csel = it.id; }
-  document.querySelectorAll('.cmp-box').forEach(b => b.setAttribute('aria-selected', String(b.dataset.box === S.csel || !!S.cmulti?.has(b.dataset.box)))); $('#cmp-props').innerHTML = propsHTML();
+  document.querySelectorAll('.cmp-box').forEach(b => b.setAttribute('aria-selected', String(b.dataset.box === S.csel || !!S.cmulti?.has(b.dataset.box)))); const pp = $('#cmp-props'); if (pp) pp.innerHTML = propsHTML();
   const group = S.cmulti?.size > 1 && S.cmulti.has(it.id) ? selItems().filter(x => x !== it).map(x => ({ x, ox: x.x, oy: x.y })) : [];
   cDrag = { it, box, group, rz: !!e.target.closest('[data-rz]') && !group.length, sx: e.clientX, sy: e.clientY, x: it.x, y: it.y, w: it.w, h: it.h, moved: false };
   try { box.setPointerCapture(e.pointerId); } catch { /* pointer already released */ } e.preventDefault();
@@ -9175,7 +9296,7 @@ document.addEventListener('keydown', e => {
   if (mv) { e.preventDefault(); it.x += mv[0]; it.y += mv[1]; clampIt(it); commit(); }
   else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); composeAct('cmp-del'); }
 });
-document.addEventListener('dblclick', e => { const box = e.target.closest('.cmp-box'); if (box && curPage().items.find(x => x.id === box.dataset.box)?.t === 'text') $('#cp-text')?.focus(); });
+document.addEventListener('dblclick', e => { const box = e.target.closest('.cmp-box'); if (box && !e.target.closest('.cmp-bar') && curPage().items.find(x => x.id === box.dataset.box)?.t === 'text') $('#cp-text')?.focus(); });
 function composeChange(t) {
   const L = repLayout(), pg = curPage(), it = pg.items?.find(x => x.id === S.csel);
   if (t.id === 'cmp-title') pg.title = t.value;
@@ -10225,7 +10346,7 @@ document.addEventListener('click', e => {
     else { S.csortSel = new Set([id]); S.csortLast = i; }
     rerenderCompose(); return;
   }
-  const cp = e.target.closest('[data-cpage]'); if (cp) { S.cpage = +cp.dataset.cpage; S.csel = null; rerenderCompose(); return; }
+  const cp = e.target.closest('[data-cpage]'); if (cp) { S.cpage = +cp.dataset.cpage; S.csel = null; S.cmulti = new Set(); rerenderCompose(); return; }
   const ca = e.target.closest('[data-cadd]'); if (ca) { const pg = curPage(), k = ca.dataset.cadd, bd = bodyOf(pg), low = Math.max(bd.y, ...pg.items.map(x => x.y + x.h + 12)), it = newItem(k, bd.x, low + RITEMS[k][2] <= bd.y + bd.h ? low : bd.y); if (RITEMS[k][1] === BODY.w) it.w = bd.w; if (k === 'section') it.o.xs = structuredClone(S.xs);
     if (k === 'scalebar') { const m = pg.items.find(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); it.frame = false; if (m) { it.o = { link: m.id }; it.x = m.x + 10; it.y = m.y + m.h - it.h - 10; } }   // inside its map's bottom-left corner
     clampIt(it); pg.items.push(it); S.csel = it.id; commit(); return; }
@@ -10268,6 +10389,7 @@ document.addEventListener('click', e => {
     case 'go-lab': if (b) { S.dtab = 'samples'; lsSet('bhlog.dtab', 'samples'); goTab('edit'); } break;
     case 'go-details': if (b) { S.dtab = 'details'; lsSet('bhlog.dtab', 'details'); goTab('edit'); } break;
     case 'go-slug': if (S.tab !== 'gw') goTab('gw'); setTimeout(() => [...document.querySelectorAll('#view h3')].find(h => /slug/i.test(h.textContent))?.closest('section')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60); break;
+    case 'cmp-addmenu': { const m = $('.cmp-addmenu'); if (m) m.hidden = !m.hidden; break; }
     case 'cmp-import': case 'cmp-rot-l': case 'cmp-rot-r':
     case 'cmp-xs-use': case 'cmp-pdf': case 'cmp-up': case 'cmp-down': case 'cmp-dup': case 'cmp-delpage': case 'cmp-del': case 'cmp-front': case 'cmp-copy': case 'cmp-img':
     case 'cmp-tpl-apply': case 'cmp-tpl-save': case 'cmp-tpl-save-go': case 'cmp-tpl-del': case 'cmp-tpl-del-go': composeAct(act); break;
@@ -10413,7 +10535,7 @@ document.addEventListener('change', e => {
   if (e.target.id === 'map-file') { const f = e.target.files[0]; if (f) (e.target.dataset.mode === 'imp-loc' ? importLocations : importShapes)(f); e.target.value = ''; return; }
   if (e.target.dataset.mfeat) { const f = featsOf().find(x => x.id === S.mapSel); if (f) { f[e.target.dataset.mfeat] = e.target.value; saveFeats(featsOf()); drawPlan(); } return; }
   if (e.target.id === 'mf-place') { S.placeId = e.target.value; return; }
-  if (S.tab === 'compose' && (e.target.closest('.cmp') || e.target.id === 'cmp-img-file' || e.target.id === 'rep-file')) { composeChange(e.target); return; }
+  if (S.tab === 'compose' && (e.target.closest('.cmp, #ctl') || e.target.id === 'cmp-img-file' || e.target.id === 'rep-file')) { composeChange(e.target); return; }
   if (e.target.dataset.secshow) { setSec(e.target.dataset.secshow, e.target.checked); return; }
   if (e.target.dataset.vis) { e.target.checked ? S.offMap.delete(e.target.dataset.vis) : S.offMap.add(e.target.dataset.vis); saveVis(); return; }
   if (e.target.dataset.visgrp) { const g = e.target.dataset.visgrp; for (const b of projList().filter(b => !!b.well?.installed === (g === 'mw'))) e.target.checked ? S.offMap.delete(b.id) : S.offMap.add(b.id); saveVis(); return; }
@@ -10433,6 +10555,7 @@ document.addEventListener('change', e => {
   if (t.dataset?.gwft) { const [i, k] = t.dataset.gwft.split('|'), fs = [...(gwSaved().features || [])], v = t.value;
     fs[+i] = { ...fs[+i], [k]: k === 'type' || k === 'name' ? v : k === 'pts' ? v.split(';').map(q => q.trim().split(/[\s,]+/).map(Number)).filter(q => q.length === 2 && q.every(Number.isFinite)) : v === '' ? null : +v };
     if (k === 'stage') Object.assign(fs[+i], { elev: fs[+i].stage, head: fs[+i].stage }); setGwm({ features: fs }); return; }
+  if (t.id === 'v3d-cut') { S.v3dCut = { pos: 50, ...S.v3dCut, on: t.checked }; const r = $('#v3d-cutpos'); if (r) r.disabled = !t.checked; v3dCutApply(); return; }
   if (t.id === 'v3d-ve') { S.v3dVe = +t.value || 0; if (S.v3d) S.v3d.orbit = null; v3dBuild(); return; }
   if (t.id?.startsWith('v3d-lyr-')) { const k = t.id.slice(8); S.v3dOff = { ...(S.v3dOff || {}), [k]: !t.checked }; if (S.v3d?.groups?.[k]) { S.v3d.groups[k].visible = t.checked; v3dRender(); } return; }
   if (t.id === 'gwm-tcal') { setGwm({ transport: { ...(gwSaved().transport || {}), calibrate: t.checked } }); return; }
