@@ -4013,10 +4013,11 @@ function plumeField(pos, xs, G, cell = 4) {
     const extraNote = L => L.extra.length ? ` ${L.extra.map(p => p.b.name).join(', ')} left out (a third screen at the same spot).` : '';
     let run = null, guided = null;
     if (method === 'guided') {
-      run = modelRun(date, xs);
+      const mf = gwConcSampler(date, param);
+      run = mf ? { ok: true, P: { param } } : modelRun(date, xs);
       let why = !run.ok ? run.missing.join('; ') : run.P.param !== param ? `the forecast is set up for ${LAB_PARAMS[run.P.param]?.label || run.P.param}` : !pts.length ? 'no results to match' : '';
       if (!why) {
-        const P = run.P, when = P.at || date, cAt = (d, e) => { const [E, N] = G.pos.at(d); return modelAt(P, E, N, e, when).c; };
+        const P = run.P, when = P.at || date, cAt = mf ? mf.cAt : (d, e) => { const [E, N] = G.pos.at(d); return modelAt(P, E, N, e, when).c; };
         // every result, including non-detects with a high detection limit: their limit is an upper bound on the plume
         const all = plumePoints(pos, medium, param, date, !!xs.round), res = new Map(), off = [];
         for (const p of all) { const m = cAt(p.d, mid(p)) || 0;
@@ -4026,7 +4027,7 @@ function plumeField(pos, xs, G, cell = 4) {
         if (off.length) why = `the forecast is near zero or more than 100× off at ${off.join(', ')}, so its shape can't be matched to the result${off.length > 1 ? 's' : ''} there`;
         else { const Lv = levels(all), rAt = twoLevel(Lv, p => res.get(p));
           at = (d, e) => { const c = cAt(d, e); return c == null ? [0, 0] : [c * Math.pow(10, rAt(d, e)), fade(d)]; };
-          guided = 'Interpreted: forecast shape matched to measured results' + extraNote(Lv); }
+          guided = `Interpreted: ${mf ? 'MODFLOW 6 plume' : 'forecast'} shape matched to measured results` + extraNote(Lv); }
       }
       if (why) { method = 'data'; note = `Shown as data only, because the forecast can't shape this plume: ${why.replace(/[.\s]+$/, '')}.`; }
     }
@@ -4059,9 +4060,9 @@ function plumeField(pos, xs, G, cell = 4) {
 }
 /* contour lines of a field at one level (marching squares on log10, cells with weight under minA left out), joined into
    continuous polylines in drawing coordinates */
-function fieldContours(g, level, minA = .5) {
-  const { nx, ny, c, a, x0, x1, y0, y1 } = g, L = Math.log10(level), sx = (x1 - x0) / nx, sy = (y1 - y0) / ny, segs = [];
-  const val = k => a[k] < minA || !(c[k] > 0) ? -99 : Math.log10(c[k]), W = nx + 1;
+function fieldContours(g, level, minA = .5, lin = false) {
+  const { nx, ny, c, a, x0, x1, y0, y1 } = g, L = lin ? level : Math.log10(level), sx = (x1 - x0) / nx, sy = (y1 - y0) / ny, segs = [];
+  const val = lin ? k => a[k] < minA ? -1e9 : c[k] : k => a[k] < minA || !(c[k] > 0) ? -99 : Math.log10(c[k]), W = nx + 1;
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const k = j * W + i, q = [val(k), val(k + 1), val(k + W + 1), val(k + W)], p = [[0, 0], [1, 0], [1, 1], [0, 1]], pts = [];
     for (let e = 0; e < 4; e++) { const u = q[e], w = q[(e + 1) % 4]; if ((u >= L) !== (w >= L)) { const f = (L - u) / (w - u), A = p[e], B = p[(e + 1) % 4]; pts.push([x0 + (i + A[0] + (B[0] - A[0]) * f) * sx, y0 + (j + A[1] + (B[1] - A[1]) * f) * sy]); } }
@@ -4312,6 +4313,21 @@ function modelGrid(date, res = 6, xs = S.xs) {
   const reach = Math.max(0, ...segs.filter(s => s.k === 0).flatMap(s => [toXd(s.a), toXd(s.b)]));
   return { run, cells, pts, tris, segs, lv, reach, len: G.maxD, bands: lv.length ? tinBands(pts, tris, lv.map(l => Math.log10(l.v))) : [] };
 }
+/* the forecast from the MODFLOW 6 transport run, on the shared renderer */
+function modelSVGmf6(date, xs, mf) {
+  const G = XS_GEOM, T = mf.T, o = [], x0 = G.X(0), x1 = G.X(G.maxD), y0 = G.m.t, y1 = G.m.t + G.plotH, nx = Math.max(2, Math.ceil((x1 - x0) / 4)), ny = Math.max(2, Math.ceil((y1 - y0) / 4));
+  const c = new Float32Array((nx + 1) * (ny + 1)), a = new Float32Array(c.length);
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { const v = mf.cAt(G.maxD * i / nx, G.e1 - (j / ny) * (G.e1 - G.e0)), k = j * (nx + 1) + i; c[k] = v > 0 ? v : 0; a[k] = v == null ? 0 : 1; }
+  const g = { nx, ny, x0, x1, y0, y1, c, a, lv: plumeLevels('groundwater', T.param), medium: 'groundwater', param: T.param }, beside = xs.plume !== false && (xs.param || xs.medium === 'vapour');
+  o.push(fieldSVG(g, { style: xs.style || 'graded', family: 'model', dashed: !!beside, name: LAB_PARAMS[T.param].label }));
+  if (g.lv.length) { let lx = G.m.l; const ly = G.H - 8 - G.plH, head = 'Model (MODFLOW 6), not measured:';
+    o.push(`<g data-model-legend="1"><text x="${lx}" y="${ly}" class="lbl2" style="font-weight:600;fill:#54278f">${head}</text>`); lx += head.length * 6 + 10;
+    if (beside) o.push(`<path d="M${lx} ${ly - 4}h18" stroke="#3f007d" stroke-width="1.4" stroke-dasharray="5 3"/><text x="${lx + 24}" y="${ly}" class="lbl2">${esc(`dashed lines at ${g.lv.map(l => l.label.split(' (')[0]).join(', ')}`)}</text>`);
+    else g.lv.forEach((l, k) => { const t = `≥ ${l.label}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="9" fill="${PLUME_RAMP.model[k + 1]}" stroke="#3f007d" stroke-width=".6"/><text x="${lx + 14}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 24 + t.length * 5.6; });
+    o.push('</g>'); }
+  o.push(`<text data-model-caption="1" x="${G.m.l + 24}" y="34" style="font:700 11px Arial,sans-serif;fill:#54278f">${esc(`Model (MODFLOW 6 transport), not measured: ${LAB_PARAMS[T.param].label} on ${mf.date} (release from ${T.start}); source ${T.P.srcBh.name} ${(+T.c0.toPrecision(3)).toLocaleString('en-CA')} mg/L; flow ${gwCalLabel()}`)}</text>`);
+  return o.join('');
+}
 /* the forecast as a field on the same grid as the measured plume, for the shared renderer */
 function modelField(run, date, G, cell = 4) {
   const P = run.P, when = P.at || date, x0 = G.X(0), x1 = G.X(G.maxD), y0 = G.m.t, y1 = G.m.t + G.plotH, nx = Math.max(2, Math.ceil((x1 - x0) / cell)), ny = Math.max(2, Math.ceil((y1 - y0) / cell));
@@ -4323,18 +4339,19 @@ function modelField(run, date, G, cell = 4) {
   return { nx, ny, x0, x1, y0, y1, c, a, lv: plumeLevels('groundwater', P.param), medium: 'groundwater', param: P.param };
 }
 function modelSVG(date, xs = S.xs) {
+  const mf = gwConcSampler(date, siteOf()?.model?.param || xs.param); if (mf) return modelSVGmf6(date, xs, mf);
   const G = XS_GEOM, g = modelGrid(date, 6, xs), o = [], P = g.run.P;
   if (!g.run.ok) return `<text class="lbl2" x="${G.m.l + 24}" y="${G.m.t - 22}" style="fill:#54278f">Forecast not drawn: ${esc(g.run.missing.join('; '))}</text>`;
   const beside = xs.plume !== false && (xs.param || xs.medium === 'vapour');   // compare: the forecast as dashed lines beside the measured plume
   o.push(fieldSVG(modelField(g.run, date, G, 4), { style: xs.style || 'graded', family: 'model', dashed: !!beside, name: LAB_PARAMS[P.param].label }));
-  if (g.lv.length) { let lx = G.m.l; const ly = G.H - 8 - G.plH, head = 'Model, not measured (forecast):';
+  if (g.lv.length) { let lx = G.m.l; const ly = G.H - 8 - G.plH - (G.gwH ? 0 : 0), head = 'Model, not measured (forecast):';
     o.push(`<g data-model-legend="1"><text x="${lx}" y="${ly}" class="lbl2" style="font-weight:600;fill:#54278f">${head}</text>`); lx += head.length * 6 + 10;
     const beside = xs.plume !== false && (xs.param || xs.medium === 'vapour');
     if (beside) { const t = `dashed lines at ${g.lv.map(l => l.label.split(' (')[0]).join(', ')}`; o.push(`<path d="M${lx} ${ly - 4}h18" stroke="#3f007d" stroke-width="1.4" stroke-dasharray="5 3"/><text x="${lx + 24}" y="${ly}" class="lbl2">${esc(t)}</text>`); }
     else g.lv.forEach((l, k) => { const t = `≥ ${l.label}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="9" fill="${PLUME_RAMP.model[k + 1]}" stroke="#3f007d" stroke-width=".6"/><text x="${lx + 14}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 24 + t.length * 5.6; });
     o.push('</g>'); }
   const when = P.start ? `on ${P.at || today()} (release from ${P.start})` : 'long-term (steady state)';
-  o.push(`<text x="${G.m.l + 24}" y="34" style="font:700 11px Arial,sans-serif;fill:#54278f">Model, not measured: ${esc(LAB_PARAMS[P.param].label)} in groundwater ${esc(when)}; source ${esc(P.srcBh.name)} ${(+P.C0.toPrecision(3)).toLocaleString('en-CA')} mg/L</text>`);
+  o.push(`<text data-model-caption="1" x="${G.m.l + 24}" y="34" style="font:700 11px Arial,sans-serif;fill:#54278f">Model, not measured: ${esc(LAB_PARAMS[P.param].label)} in groundwater ${esc(when)}; source ${esc(P.srcBh.name)} ${(+P.C0.toPrecision(3)).toLocaleString('en-CA')} mg/L</text>`);
   if (!g.lv.length) o.push(`<text class="lbl2" x="${G.m.l + 24}" y="${G.m.t - 10}" style="fill:#54278f">Enter a groundwater guideline (Water &amp; well) to contour the forecast.</text>`);
   return o.join('');
 }
@@ -4641,6 +4658,63 @@ function gwSourcePaths(M, run, opts = {}) {
   const q = mf6ReadBudget(run.out['gwf.cbc'], 'DATA-SPDIS').pop(); if (!q) return [];
   const G = M.grid, [x0, y0] = G.toLocal(src.easting, src.northing), Y = u.Y ?? CCME_SITE.Y, wt = M.F.fit({ e: src.easting, n: src.northing });
   return [-Y / 3, 0, Y / 3].map(dy => { const [E, N] = G.toWorld(x0, y0 + dy); return gwPathline(G, q.list, M.units.map(x => x.ne), E, N, wt - 1, opts); }).filter(p => p.length > 1);
+}
+/* ---------- the model on the cross-section ----------
+   Values at a point on the section: bilinear between cell centres within a layer, linear in elevation between the layers'
+   cell centres (so layer boundaries don't show as steps). */
+function gwPointSampler(M, layersOf) {
+  const g = M.grid;
+  return (E, N, e) => { const rc = g.cellOf(E, N); if (!rc) return null; const [x, y] = g.toLocal(E, N), i = rc[0] * g.ncol + rc[1], col = [];
+    for (let k = 0; k < g.nlay; k++) { if (g.idomain[k][i] !== 1) continue; const tp = k ? g.botm[k - 1][i] : g.top[i], v = gwHeadAt(g, layersOf, k, x, y); if (v != null) col.push([(tp + g.botm[k][i]) / 2, v]); }
+    if (!col.length) return null; if (e >= col[0][0]) return col[0][1]; if (e <= col[col.length - 1][0]) return col[col.length - 1][1];
+    for (let j = 1; j < col.length; j++) if (e >= col[j][0]) { const [za, va] = col[j - 1], [zb, vb] = col[j]; return vb + (va - vb) * (e - zb) / (za - zb); } return col[col.length - 1][1]; };
+}
+/* the simulated water table at a point: the head of the uppermost layer that is not dry */
+function gwWaterTable(M, layers, E, N) { const g = M.grid, rc = g.cellOf(E, N); if (!rc) return null; const [x, y] = g.toLocal(E, N), i = rc[0] * g.ncol + rc[1];
+  for (let k = 0; k < g.nlay; k++) { if (g.idomain[k][i] !== 1) continue; const h = gwHeadAt(g, layers, k, x, y); if (h != null && h > g.botm[k][i]) return h; } return null; }
+/* the MODFLOW 6 concentration at a section point on a date (linear in time between saved outputs; nothing before the release) */
+function gwConcSampler(date, param) {
+  const T = S.gw?.trans, M = S.gw?.M, G = XS_GEOM, R = S.gw?.run; if (!T?.ok || !M || M.error || !G || !R || (param && T.param !== param)) return null;
+  const d = date || T.times[T.times.length - 1].date, t = (Date.parse(d) - Date.parse(T.start)) / 864e5;
+  const i = T.times.findIndex(q => q.totim >= t - 1e-6), a = i <= 0 ? null : T.times[i - 1], b = i < 0 ? T.times[T.times.length - 1] : T.times[i];
+  const sb = gwPointSampler(M, b.layers), sa = a ? gwPointSampler(M, a.layers) : null, f = i < 0 ? 1 : a ? (t - a.totim) / (b.totim - a.totim) : Math.max(0, t / b.totim);
+  const cAt = (dd, e) => { if (t <= 0) return 0; const [E, N] = G.pos.at(dd), wt = gwWaterTable(M, R.layers, E, N); if (wt == null || e > wt) return null;
+    const vb = sb(E, N, e); if (vb == null) return null; const va = sa ? sa(E, N, e) ?? 0 : 0; return Math.max(0, va + (vb - va) * Math.min(1, Math.max(0, f))); };
+  return { cAt, T, date: d };
+}
+const gwCalLabel = () => { const c = gwSaved().calibT || gwSaved().calib; return c ? `calibrated to ${c.mode === 'transient' ? `${c.rounds.length} rounds` : c.round}, RMSE ${(+c.stats.rmse).toPrecision(2)} m` : 'not calibrated'; };
+/* water table, head contours and flow arrows of the model in the section plane */
+function gwSectionSVG(G) {
+  const M = S.gw?.M, R = S.gw?.run; if (!M || M.error || !R?.ok) return null;
+  const head = gwPointSampler(M, R.layers), wtAt = d => { const [E, N] = G.pos.at(d); return gwWaterTable(M, R.layers, E, N); }, under = [], over = [];
+  const X = G.X, Y = G.Y, n = 120, wt = Array.from({ length: n + 1 }, (_, i) => { const d = G.maxD * i / n; return [d, wtAt(d)]; });
+  // the model's water table, in pieces where it is defined
+  let path = ''; wt.forEach(([d, h], i) => { if (h == null) return; path += `${!path || wt[i - 1]?.[1] == null ? 'M' : 'L'}${X(d).toFixed(1)} ${Y(h).toFixed(1)}`; });
+  if (path) under.push(`<path data-gw-wt="1" d="${path}" fill="none" stroke="#3f007d" stroke-width="1.4" stroke-dasharray="1.5 2.5" stroke-linecap="round"><title>Model water table (MODFLOW 6, ${esc(gwCalLabel())}), not measured</title></path>`);
+  // heads on a grid in the section plane, below the model water table
+  const x0 = X(0), x1 = X(G.maxD), y0 = G.m.t, y1 = G.m.t + G.plotH, nx = Math.max(2, Math.ceil((x1 - x0) / 6)), ny = Math.max(2, Math.ceil((y1 - y0) / 6)), c = new Float32Array((nx + 1) * (ny + 1)), a = new Float32Array(c.length);
+  let hmin = Infinity, hmax = -Infinity;
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { const d = G.maxD * i / nx, e = G.e1 - (j / ny) * (G.e1 - G.e0), w = wtAt(d), [E, N] = G.pos.at(d), h = w != null && e <= w ? head(E, N, e) : null, k = j * (nx + 1) + i;
+    if (h == null) { a[k] = 0; continue; } c[k] = h; a[k] = 1; hmin = Math.min(hmin, h); hmax = Math.max(hmax, h); }
+  if (hmax > hmin) {
+    const step = [.02, .05, .1, .2, .25, .5, 1, 2, 5].find(s => (hmax - hmin) / s <= 10) || 10, g = { nx, ny, x0, x1, y0, y1, c, a };
+    for (let lv = Math.ceil(hmin / step) * step; lv <= hmax + 1e-9; lv += step) { const lines = fieldContours(g, lv, .5, true); if (!lines.length) continue;
+      under.push(`<path data-gw-head="${lv.toFixed(3)}" d="${lines.map(l => l.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')).join('')}" fill="none" stroke="#6a51a3" stroke-width=".7" opacity=".8"><title>Model head ${lv.toFixed(2)} m (MODFLOW 6), not measured</title></path>`);
+      const longest = lines.reduce((b, l) => l.length > b.length ? l : b, []), byY = [...longest].sort((p, r) => p[1] - r[1]), q = byY[Math.floor(byY.length * .8)];   // low on the line, clear of the water-level labels
+      if (q) over.push(`<text data-gw-hlabel="1" x="${q[0].toFixed(1)}" y="${(q[1] - 2).toFixed(1)}" text-anchor="middle" style="font:9.5px Arial,sans-serif;fill:#54278f;paint-order:stroke;stroke:#fff;stroke-width:2.5px">${lv.toFixed(step < .1 ? 2 : step < 1 ? 1 : 0)}</text>`); }
+  }
+  // flow arrows: the velocity in the plane of the section, drawn as it looks with the vertical exaggeration
+  const q = mf6ReadBudget(R.out['gwf.cbc'], 'DATA-SPDIS').pop();
+  if (q) { const vel = gwVelocity(M.grid, q.list, M.units.map(u => u.ne)), pxH = G.plotW / G.maxD, pxV = G.plotH / (G.e1 - G.e0), arr = [];
+    for (let px = x0 + 30; px < x1 - 10; px += 56) for (let py = y0 + 14; py < y1 - 8; py += 26) {
+      const d = (px - x0) / (x1 - x0) * G.maxD, e = G.e1 - (py - y0) / G.plotH * (G.e1 - G.e0), w = wtAt(d); if (w == null || e > w - .1) continue;
+      const [E, N] = G.pos.at(d), [E2, N2] = G.pos.at(Math.min(G.maxD, d + .5)), L = Math.hypot(E2 - E, N2 - N) || 1, ux = (E2 - E) / L, uy = (N2 - N) / L, [lx, ly] = M.grid.toLocal(E, N), v = vel(lx, ly, e); if (!v) continue;
+      const vE = v.vx * M.grid.cs - v.vy * M.grid.sn, vN = v.vx * M.grid.sn + v.vy * M.grid.cs, along = vE * ux + vN * uy, dx = along * pxH, dy = -v.vz * pxV, len = Math.hypot(dx, dy); if (!(len > 0)) continue;
+      arr.push([px, py, dx / len, dy / len, Math.hypot(along, v.vz)]); }
+    const vmax = Math.max(...arr.map(a => a[4]), 1e-12);
+    for (const [px, py, ux, uy, sp] of arr) { const l = 7 + 7 * Math.max(0, 1 + Math.log10(sp / vmax) / 2), hx = px + ux * l, hy = py + uy * l;
+      under.push(`<g data-gw-arrow="1" opacity=".75"><path d="M${(px - ux * l).toFixed(1)} ${(py - uy * l).toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="#3f007d" stroke-width=".9"/><path d="M${hx.toFixed(1)} ${hy.toFixed(1)}L${(hx - ux * 4 - uy * 2.4).toFixed(1)} ${(hy - uy * 4 + ux * 2.4).toFixed(1)}L${(hx - ux * 4 + uy * 2.4).toFixed(1)} ${(hy - uy * 4 - ux * 2.4).toFixed(1)}Z" fill="#3f007d"/><title>${esc(`Model flow ${(sp * 365.25).toPrecision(2)} m/year in the section plane (MODFLOW 6), not measured`)}</title></g>`); } }
+  return { under, over, legend: `Model flow (MODFLOW 6, ${gwCalLabel()}), not measured: dotted = water table; thin lines = heads (m); arrows = flow direction in this plane, vertical exaggerated` };
 }
 /* ---------- calibration: Levenberg–Marquardt on log10 parameters (as in PEST and UCODE), by repeated MODFLOW 6 runs ----------
    Objective: Σ ((h_obs − h_sim)/σh)² + Σ ((log10 K_slug − log10 K)/σlogK)² over parameters with slug-test prior information.
@@ -4990,8 +5064,8 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const su = b => b.well?.installed && b.well.stickup > 0 ? b.well.stickup : 0;
   let W = forceW || Math.max(el.clientWidth, 600), H = fillH || secOpt('h'); const m = { l: 62, r: 64, t: 70, b: 30 };
   // room under the drawing for offset labels (three staggered rows) and the plume legend
-  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 34 : 0, mdH = xs?.model ? 20 : 0;
-  m.b += offH + plH + mdH; if (!fillH) H += offH + plH + mdH;
+  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 34 : 0, mdH = xs?.model ? 20 : 0, gwH = xs && xs.gwFlow !== false && S.gw?.run?.ok ? 18 : 0;
+  m.b += offH + plH + mdH + gwH; if (!fillH) H += offH + plH + mdH + gwH;
   // the forecast caption gets its own line under the header, above the borehole names
   if (mdH) { m.t += 16; if (!fillH) H += 16; }
   const maxD = pos[pos.length - 1].d || 1;
@@ -5032,17 +5106,20 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
     }
     const seen = new Map(); U2.flat().forEach(u => seen.has(u.u) || seen.set(u.u, u.fill));
     let lx = m.l;
-    for (const [u, fl] of seen) { o.push(`<rect x="${lx}" y="${H - 16 - plH - mdH}" width="12" height="9" style="fill:var(--${fl});stroke:var(--muted)" fill-opacity=".6"/><text x="${lx + 16}" y="${H - 8 - plH - mdH}" class="lbl2">${esc(u)}</text>`); lx += 26 + u.length * 5.6; }
+    for (const [u, fl] of seen) { o.push(`<rect x="${lx}" y="${H - 16 - plH - mdH - gwH}" width="12" height="9" style="fill:var(--${fl});stroke:var(--muted)" fill-opacity=".6"/><text x="${lx + 16}" y="${H - 8 - plH - mdH - gwH}" class="lbl2">${esc(u)}</text>`); lx += 26 + u.length * 5.6; }
     o.push('</g>');
   }
   // interpreted and modelled concentrations stay below the ground line
   const gclip = 'gc' + Math.random().toString(36).slice(2, 8), gl = pos.map(p => [X(p.d), Y(top(p.b))]);
   o.push(`<defs><clipPath id="${gclip}"><path d="M0 ${gl[0][1]}${gl.map(q => `L${q[0]} ${q[1]}`).join('')}L${W} ${gl[gl.length - 1][1]}L${W} ${H}L0 ${H}Z"/></clipPath></defs>`);
-  XS_GEOM = { X, Y, m, plotW, plotH, maxD, e0, e1, W, H, pos, located, noElev, plH, mdH, gclip, labels: [] };
+  XS_GEOM = { X, Y, m, plotW, plotH, maxD, e0, e1, W, H, pos, located, noElev, plH, mdH, gwH, gclip, labels: [] };
+  const gs = gwH ? gwSectionSVG(XS_GEOM) : null;
   if (xs && S.sec.water !== false) { const sat = pos.map(p => ({ p, w: wOf(p.b) })).filter(x => x.w && x.w.kind !== 'strike' && x.w.depth != null);
     if (sat.length >= 2) o.push(`<path data-sat="1" d="M${X(sat[0].p.d)} ${Y(e0)}${sat.map(x => `L${X(x.p.d)} ${Y(top(x.p.b) - x.w.depth)}`).join('')}L${X(sat[sat.length - 1].p.d)} ${Y(e0)}Z" clip-path="url(#${gclip})" style="fill:var(--water)" fill-opacity=".07"><title>Below the water table on the date shown</title></path>`); }
   if (xs?.model) o.push(modelSVG(xs.date || '', xs));
   if (xs && xs.plume !== false && (xs.param || xs.medium === 'vapour')) o.push(plumeSVG(pos, xs, X, Y, top, bw, W, H, m));
+  // the model's flow over the plume shading, under the borehole columns
+  if (gs) { o.push(`<g clip-path="url(#${gclip})">`, ...gs.under, '</g>'); (XS_GEOM.over ||= []).push(...gs.over, `<text class="lbl2" data-gw-legend="1" x="${m.l}" y="${H - 8 - plH - mdH}" style="fill:#3f007d">${esc(gs.legend)}</text>`); }
   const colsSVG = []; { const o = colsSVG;
   for (const p of pos) {
     const x = X(p.d) - bw / 2, e = top(p.b);
