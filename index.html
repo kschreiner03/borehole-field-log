@@ -2579,7 +2579,7 @@ function renderView(full) {
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
   else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); }
   else if (S.tab === 'reports') { v.innerHTML = reportsHubHTML(b); }
-  else if (S.tab === 'compose') { v.innerHTML = composeHTML(); requestAnimationFrame(() => { drawCompose(); fillThumbs(); }); }
+  else if (S.tab === 'compose') { v.innerHTML = composeHTML(); requestAnimationFrame(() => { drawCompose(); fillThumbs(); gwComposeEnsure(); }); }
   else { v.innerHTML = nextSteps(b) + (editable(b) ? '<p class="log-hint">Click any layer, sample, water level or the standpipe on the log to edit it. Click empty space in a column to add one at that depth.</p>' : '') + sheetHTML(b) + logLegendHTML(b); const el = $('#log'); el.innerHTML = logSVG(b, Math.max(el.clientWidth, 900)); }
   if (MAP_TABS.includes(S.tab)) v.insertAdjacentHTML('afterbegin', hiddenNote());
   if (BH_TABS.includes(S.tab)) markIssues(b);
@@ -4827,7 +4827,7 @@ const gwInputsKey = M => JSON.stringify([M.rch, M.round, M.grid.nrow, M.grid.nco
 const gwHash = t => { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
 function gwKey() { const g = { ...gwSaved() }; delete g.calib; delete g.calibT; delete g.transport;
   return projKey(cur()) + '|' + gwHash(JSON.stringify([projList().map(b => [b.id, b.easting, b.northing, b.elevation, b.layers, b.water, b.slug, b.well, b.gwSamples]), siteOf()?.xsec, siteOf()?.model, g, S.co.ne])); }
-function gwModel() { const k = gwKey(); if (S.gwm.key !== k || !S.gwm.M) Object.assign(S.gwm, { key: k, M: gwModelSpec(projList(), siteOf() || {}), run: null, trans: null, paths: [], err: '' }); return S.gwm.M; }
+function gwModel() { const k = gwKey(); if (S.gwm.key !== k || !S.gwm.M) Object.assign(S.gwm, { key: k, M: gwModelSpec(projList(), siteOf() || {}), run: null, trans: null, paths: [], err: '', tried: false }); return S.gwm.M; }
 const gwPv = () => { const g = gwSaved(), pv = { ...(g.calib?.pv || {}), ...(g.calibT?.pv || {}) };
   for (const [u, e] of Object.entries(g.units || {})) if (e?.k != null) delete pv['k:' + u];   // a value the user typed wins over the calibration
   if (g.rch != null) delete pv.rch; return pv; };
@@ -4840,7 +4840,9 @@ async function gwEnsure(force) {
     if (r.ok && gwSaved().transport?.on && !S.gwm.trans) { S.gwm.msg = 'Running transport…'; gwRefresh(); S.gwm.trans = await gwTransport(M, gwPv(), { calibrate: !!gwSaved().transport.calibrate }); }
   } finally { S.gwm.busy = false; S.gwm.msg = ''; gwRefresh(); }
 }
-function gwRefresh() { if (S.tab === 'gwm') { const v = $('#view'); if (v) v.innerHTML = gwmHTML(); } else if (S.tab === 'xsec') drawXsec(); else if (S.tab === 'site') drawSite?.(); }
+const gwWantedBy = L => !!window.desktop?.mf6Run && !!(gwSaved().calib || gwSaved().transport?.on) && (L?.pages || []).some(p => p.items?.some(it => ['gwsum', 'gwcal', 'gwpar', 'section', 'plan'].includes(it.t)));
+function gwComposeEnsure() { if (!gwWantedBy(repLayout())) return; gwModel(); if (S.gwm.run || S.gwm.busy || S.gwm.tried || S.gwm.M?.error) return; S.gwm.tried = true; gwEnsure(true); }
+function gwRefresh() { if (S.tab === 'gwm') { const v = $('#view'); if (v) v.innerHTML = gwmHTML(); } else if (S.tab === 'xsec') drawXsec(); else if (S.tab === 'site') drawSite?.(); else if (S.tab === 'compose' && !S.gwm.busy) rerenderCompose(); }
 async function gwAct(act, t) {
   if (S.readOnly && act !== 'gw-export') return;
   const M = gwModel(); if (M.error) { toast(M.error); return; }
@@ -7163,6 +7165,9 @@ function pageSVG(b, pi, pn) {
   add('desc', X1 - x - RC.reduce((a, c) => a + c[1], 0), 'SOIL DESCRIPTION', 'CFEM / Modified USCS');
   RC.forEach(c => add(...c));
   const C = Object.fromEntries(cols.map(c => [c.k, c]));
+  // headings and scale numbers are measured so neighbouring columns never run into each other
+  const fw = (t, sz, wt = '') => textW(String(t), `${wt} ${(sz * F).toFixed(2)}px Arial,Helvetica,sans-serif`);
+  const scaleRow = (c, list, yy) => { let last = -Infinity; for (const [xv, t] of list) { const tw = fw(t, 5.8), xc = Math.min(Math.max(xv, c.x + 2 + tw / 2), c.x + c.w - 2 - tw / 2); if (xc - tw / 2 < last + 2) continue; last = xc + tw / 2; o.push(T(+xc.toFixed(1), yy, t, { s: 5.8, c: 'var(--muted)', a: 'middle' })); } };
   const hy = ib + ibH, hH = ['nplot', 'su', 'w', 'cvc'].some(on) ? 84 : 52, by0 = hy + hH, footH = 206, by1 = H - M - footH, BH = by1 - by0, k = BH / D;
   const Y = dm => by0 + (toD(dm) - d0) * k;
   o.push(`<rect x="${M}" y="${hy}" width="${W - 2 * M}" height="${hH}" style="fill:#e8ecf0;stroke:var(--ink)" stroke-width=".8"/>`);
@@ -7170,25 +7175,38 @@ function pageSVG(b, pi, pn) {
   const grp = (a, z, t) => { o.push(T((C[a].x + C[z].x + C[z].w) / 2, hy + 11.5, t, { s: 6.5, w: 700, a: 'middle' }), line(C[a].x, hy + 16, C[z].x + C[z].w, hy + 16, 'var(--ink)', .5)); };
   const tests = cols.filter(c => ['np', 'sp', 'ap', 'vp', 'lp', 'so4'].includes(c.k) || c.k.startsWith('gx')), smp = cols.filter(c => ['sid', 'sty', 'blows', 'n'].includes(c.k));
   grp('depth', C.ob ? 'ob' : 'desc', 'SOIL PROFILE'); grp(smp[0].k, smp[smp.length - 1].k, 'SAMPLES');
-  if (tests.length) grp(tests[0].k, tests[tests.length - 1].k, tests.reduce((a, c) => a + c.w, 0) > 150 ? 'FIELD AND LABORATORY TESTS' : 'TESTS');
+  if (tests.length) { const tw = tests.reduce((a, c) => a + c.w, 0) - 6, t = ['FIELD AND LABORATORY TESTS', 'TESTS'].find(t => fw(t, 6.5, 700) <= tw); if (t) grp(tests[0].k, tests[tests.length - 1].k, t); }
   if (C.gw) grp('gw', 'gw', 'GW');
   if (wellRight && C.well) grp('well', 'well', 'WELL');
   for (const c of cols) {
-    o.push(T(c.x + c.w / 2, hy + 30, c.h1, { s: 7, w: 700, a: 'middle' }));
+    // a heading too wide for its column gets a little smaller, or goes onto two smaller lines at a space
+    let hl = [c.h1], hs = 7; const room2 = c.w - 4;
+    if (c.h1 && fw(c.h1, 7, 700) > room2) {
+      hs = 7 * room2 / fw(c.h1, 7, 700);
+      const sp = [...c.h1.matchAll(/ /g)].map(m => m.index).sort((a, z) => Math.abs(a - c.h1.length / 2) - Math.abs(z - c.h1.length / 2))[0];
+      if (hs < 6 && sp != null && !['np', 'sp', 'ap', 'vp'].includes(c.k)) { hl = [c.h1.slice(0, sp), c.h1.slice(sp + 1)]; hs = Math.min(6, 7 * room2 / Math.max(...hl.map(t => fw(t, 7, 700)))); }
+      hs = Math.max(4.5, hs);
+    }
+    if (hl.length > 1) hl.forEach((t, i) => o.push(T(c.x + c.w / 2, hy + 25 + i * 9.5, t, { s: hs, w: 700, a: 'middle' })));
+    else o.push(T(c.x + c.w / 2, hy + 30, c.h1, { s: hs, w: 700, a: 'middle' }));
     if (c.h2) o.push(T(c.x + c.w / 2, hy + 41, c.h2, { s: 6.5, c: 'var(--muted)', a: 'middle' }));
   }
   const P = logPlots(b); P.n.lab = [20, 50, 80]; P.su.lab = P.su.lab.filter((v, i) => i % 2); if (P.w.lab.length > 3) P.w.lab = P.w.lab.filter((v, i) => i % 2);
   const PX = (c, p, v) => c.x + 5 + Math.min(Math.max(v, 0), p.max) / p.max * (c.w - 10);
   const NX = v => PX(C.np, P.n, v), SX = v => PX(C.sp, P.su, v), AX = v => PX(C.ap, P.w, v);
-  if (C.np) o.push(`<circle cx="${C.np.x + 14}" cy="${hy + 41}" r="2" style="fill:var(--accent)"/>`, T(C.np.x + 19, hy + 43.5, NUNIT(), { s: 6, c: 'var(--muted)' }));
-  if (C.sp) o.push(`<path d="M${C.sp.x + 6} ${hy + 43.5}l3-5.5 3 5.5z" style="fill:var(--ink)"/>`, T(C.sp.x + 14, hy + 43.5, 'PP', { s: 6, c: 'var(--muted)' }), `<rect x="${C.sp.x + 32}" y="${hy + 38.5}" width="5" height="5" style="fill:var(--ink)"/>`, T(C.sp.x + 40, hy + 43.5, 'Vane', { s: 6, c: 'var(--muted)' }));
-  if (C.ap) o.push(T(C.ap.x + 5, hy + 43.5, 'PL', { s: 6, c: 'var(--muted)' }), `<path d="M${C.ap.x + 16} ${hy + 41.5}h30M${C.ap.x + 16} ${hy + 39}v5M${C.ap.x + 46} ${hy + 39}v5" style="stroke:var(--ink)" stroke-width=".8"/><circle cx="${C.ap.x + 31}" cy="${hy + 41.5}" r="2" style="fill:var(--ink)"/>`, T(C.ap.x + 49, hy + 43.5, 'LL', { s: 6, c: 'var(--muted)' }));
-  if (C.vp) { o.push(`<rect x="${C.vp.x + 6}" y="${hy + 38.5}" width="10" height="5" style="fill:var(--warn)" opacity=".75"/>`, T(C.vp.x + 19, hy + 43.5, 'headspace', { s: 6, c: 'var(--muted)' })); [10, 100, 1000].forEach(v => o.push(T(VX(C.vp, v, 5), hy + 58, v >= 1000 ? '1k' : v, { s: 5.8, c: 'var(--muted)', a: 'middle' }), line(VX(C.vp, v, 5), hy + 61, VX(C.vp, v, 5), by0, 'var(--muted)', .5))); }
-  for (const [c, p, X] of [[C.np, P.n, NX], [C.sp, P.su, SX], [C.ap, P.w, AX]].filter(([c]) => c)) p.lab.forEach(v => o.push(T(X(v), hy + 58, v, { s: 5.8, c: 'var(--muted)', a: 'middle' }), line(X(v), hy + 61, X(v), by0, 'var(--muted)', .5)));
+  // symbol keys under the headings shrink evenly when the graph column is narrower than they are
+  const keyG = (c, need, ...parts) => { const kk = Math.min(1, (c.w - 4) / need), ky = hy + 41; o.push(kk < 1 ? `<g transform="translate(${c.x + 2} ${ky}) scale(${kk.toFixed(3)}) translate(${-c.x - 2} ${-ky})">${parts.join('')}</g>` : parts.join('')); };
+  if (C.np) keyG(C.np, 19 + fw(NUNIT(), 6) - 2, `<circle cx="${C.np.x + 14}" cy="${hy + 41}" r="2" style="fill:var(--accent)"/>`, T(C.np.x + 19, hy + 43.5, NUNIT(), { s: 6, c: 'var(--muted)' }));
+  if (C.sp) keyG(C.sp, 40 + fw('Vane', 6) - 2, `<path d="M${C.sp.x + 6} ${hy + 43.5}l3-5.5 3 5.5z" style="fill:var(--ink)"/>`, T(C.sp.x + 14, hy + 43.5, 'PP', { s: 6, c: 'var(--muted)' }), `<rect x="${C.sp.x + 32}" y="${hy + 38.5}" width="5" height="5" style="fill:var(--ink)"/>`, T(C.sp.x + 40, hy + 43.5, 'Vane', { s: 6, c: 'var(--muted)' }));
+  if (C.ap) keyG(C.ap, 49 + fw('LL', 6) - 2, T(C.ap.x + 5, hy + 43.5, 'PL', { s: 6, c: 'var(--muted)' }), `<path d="M${C.ap.x + 16} ${hy + 41.5}h30M${C.ap.x + 16} ${hy + 39}v5M${C.ap.x + 46} ${hy + 39}v5" style="stroke:var(--ink)" stroke-width=".8"/><circle cx="${C.ap.x + 31}" cy="${hy + 41.5}" r="2" style="fill:var(--ink)"/>`, T(C.ap.x + 49, hy + 43.5, 'LL', { s: 6, c: 'var(--muted)' }));
+  // thin dividers keep each test column's heading and scale numbers visibly its own
+  tests.slice(1).forEach(c => o.push(line(c.x, hy + 18, c.x, by0, 'var(--line)', .4)));
+  if (C.vp) { keyG(C.vp, 19 + fw('headspace', 6) - 2, `<rect x="${C.vp.x + 6}" y="${hy + 38.5}" width="10" height="5" style="fill:var(--warn)" opacity=".75"/>`, T(C.vp.x + 19, hy + 43.5, 'headspace', { s: 6, c: 'var(--muted)' })); scaleRow(C.vp, [10, 100, 1000].map(v => [VX(C.vp, v, 5), v >= 1000 ? '1k' : String(v)]), hy + 58); [10, 100, 1000].forEach(v => o.push(line(VX(C.vp, v, 5), hy + 61, VX(C.vp, v, 5), by0, 'var(--muted)', .5))); }
+  for (const [c, p, X] of [[C.np, P.n, NX], [C.sp, P.su, SX], [C.ap, P.w, AX]].filter(([c]) => c)) { scaleRow(c, p.lab.map(v => [X(v), String(v)]), hy + 58); p.lab.forEach(v => o.push(line(X(v), hy + 61, X(v), by0, 'var(--muted)', .5))); }
   const LG = C.lp ? labGraphData(b, labGraphParam()) : null, LX = v => LGX(C.lp, LG.lo, LG.hi, v, 5);
-  if (LG) for (let d = LG.lo; d <= LG.hi; d++) { const v = 10 ** d; if (d < LG.hi || LG.hi - LG.lo <= 3) o.push(T(LX(v), hy + 58, v >= 1000 ? (v / 1000) + 'k' : +v.toPrecision(1), { s: 5.8, c: 'var(--muted)', a: 'middle' })); }
+  if (LG) scaleRow(C.lp, Array.from({ length: LG.hi - LG.lo + 1 }, (_, i) => 10 ** (LG.lo + i)).map(v => [LX(v), String(v >= 1000 ? (v / 1000) + 'k' : +v.toPrecision(1))]), hy + 58);
   const GXP = graphsOf().map((g, i) => ({ g, c: C['gx' + i], G: graphData(b, g) })).filter(e => e.c);
-  for (const { c, G } of GXP) G.ticks.forEach((v, i) => { if (G.ticks.length <= 4 || i % 2 === 0) o.push(T(graphX(c, G, v, 5), hy + 58, tickLabel(v), { s: 5.8, c: 'var(--muted)', a: 'middle' })); });
+  for (const { c, G } of GXP) scaleRow(c, G.ticks.map(v => [graphX(c, G, v, 5), String(tickLabel(v))]), hy + 58);
   // body clip
   o.push(`<defs><clipPath id="body${pi}"><rect x="${M}" y="${by0}" width="${W - 2 * M}" height="${BH}"/></clipPath></defs><g clip-path="url(#body${pi})">`);
   if (C.vp) [1, 10, 100, 1000, 1e4].forEach(v => o.push(line(VX(C.vp, v, 5), by0, VX(C.vp, v, 5), by1, 'var(--grid)', .8)));
@@ -8252,7 +8270,7 @@ function wtPageBody() {
 /* cross-section page: the section as set up on the Site plan page, scaled to the page width, with the same notes */
 function secPageBody() {
   const el = document.createElement('div'), note = {}, PW = PG.W - 2 * PG.M;
-  drawSection(el, note, PW, sectionList(), false, 800);
+  withRO({ xs: S.xs }, () => drawSection(el, note, PW, sectionList(), false, 800));
   const svg = el.querySelector('svg');
   if (!svg) return `<text x="${PG.M}" y="${PG.M + 100}" style="font:10px Arial,sans-serif">Log at least two boreholes to draw a cross-section.</text>`;
   const w = +svg.getAttribute('width'), h = +svg.getAttribute('height'), k = Math.min(PW / w, 800 / h);
@@ -8592,7 +8610,7 @@ function itemInner(it, w, h) {
   if (['gwsum', 'gwcal', 'gwpar', 'gwlim'].includes(it.t)) return gwReportSVG(it.t, w, h);
   const out = withRO(ro, () => {
     if (it.t === 'plan') { const r = planSVG(w, h, false); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
-    if (it.t === 'section') return fromEl(el => { if (o.xs) RO.xs = o.xs.shape ? o.xs : { ...o.xs, shape: 'data' }; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
+    if (it.t === 'section') return fromEl(el => { RO.xs = { shape: 'guided', style: 'graded', ...(o.xs || S.xs) }; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
     if (it.t === 'wt') return wtMapSVG(w, h)?.svg || msg('Needs water levels in at least 3 wells with coordinates and ground elevations.');
     if (it.t === 'vap') { const r = vapourMapSVG(w, h); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'flow') { const F = gwFlow(); return F.error ? msg(F.error) : flowPlanSVG(F, w, h); }
@@ -8697,7 +8715,7 @@ async function layoutPages(L = repLayout()) {
    user's rotation added to their own); the app's pages go in as 300 dpi images at their paper size */
 async function buildReportBytes(L = repLayout()) {
   // model results on any page come from a fresh run of the calibrated model, not from a stale session
-  if (window.desktop?.mf6Run && (gwSaved().calib || gwSaved().transport?.on) && L.pages.some(p => p.items?.some(it => ['gwsum', 'gwcal', 'gwpar', 'section', 'plan'].includes(it.t)))) { gwModel(); if (!S.gwm.run) await gwEnsure(true); }
+  if (gwWantedBy(L)) { gwModel(); if (!S.gwm.run) await gwEnsure(true); }
   const { PDFDocument, degrees } = PDFLib, out = await PDFDocument.create(), src = new Map();
   if (basemapKey() !== 'none') { await layoutPages(L); await basemapIdle(); }   // first pass asks for the map tiles the pages need
   const all = await layoutPages(L); if (!all.length) throw new Error('empty');
@@ -8817,7 +8835,7 @@ function propsHTML() {
     <label class="cmp-lbl" for="cp-cap">Caption</label><input id="cp-cap" data-cprop="cap" value="${esc(it.cap || '')}" placeholder="Figure 1 – Site plan">
     <label class="check"><input type="checkbox" data-cprop="frame" ${it.frame !== false ? 'checked' : ''}> Frame around it</label>
     ${(ROPTS[it.t] || []).map(([k, l, list]) => sel(k, l, list)).join('')}
-    ${it.t === 'section' ? `<p class="note">Follows the section line chosen on the <button class="btn link" data-tab="xsec">Cross-section</button> page.${it.o?.xs ? ` Shows ${esc(it.o.xs.date ? 'the date ' + it.o.xs.date : 'the latest data')}${it.o.xs.plume !== false && (it.o.xs.param || it.o.xs.medium === 'vapour') ? ` with the ${esc(it.o.xs.medium === 'vapour' ? 'vapour' : (LAB_PARAMS[it.o.xs.param]?.label || '') + ' ' + it.o.xs.medium)} plume` : ''}.` : ''}</p><button class="btn" data-act="cmp-xs-use" ${S.readOnly ? 'disabled' : ''}>Use the Cross-section page's current view</button>` : ''}
+    ${it.t === 'section' ? `<p class="note">Follows the section line chosen on the <button class="btn link" data-tab="xsec">Cross-section</button> page.${it.o?.xs ? ` Shows ${esc(it.o.xs.date ? 'the date ' + it.o.xs.date : 'the latest data')}${it.o.xs.plume !== false && (it.o.xs.param || it.o.xs.medium === 'vapour') ? ` with the ${esc(it.o.xs.medium === 'vapour' ? 'vapour' : (LAB_PARAMS[it.o.xs.param]?.label || '') + ' ' + it.o.xs.medium)} plume` : ''}.` : ' Shows that page\'s current view: date, plume and model results.'}</p><button class="btn" data-act="cmp-xs-use" ${S.readOnly ? 'disabled' : ''}>Use the Cross-section page's current view</button>` : ''}
     ${it.t === 'plan' || it.t === 'wt' || it.t === 'vap' ? '<p class="note">A fixed scale is true on the printed Letter page; resize the frame to show more or less of the site.</p>' : ''}
     ${it.t === 'scalebar' ? (() => { const maps = pg.items.filter(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); return `<label class="cmp-lbl" for="co-link">Measures</label><select id="co-link" data-copt="link"><option value="">Choose a map…</option>${maps.map(m => `<option value="${m.id}" ${it.o?.link === m.id ? 'selected' : ''}>${esc(m.cap || RITEMS[m.t][0])}</option>`).join('')}</select>
       <label class="cmp-lbl" for="co-units">Units</label><select id="co-units" data-copt="units">${[['auto', 'As the project (m or ft)'], ['m', 'Metres'], ['ft', 'Feet']].map(([v, t]) => `<option value="${v}" ${(it.o?.units || 'auto') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
@@ -8864,7 +8882,7 @@ function drawCompose() {
   if (paper.dataset.auto) layoutPages({ pages: [curPage()] }).then(ps => { const p = ps[0]; if (p?.pdf) { pdfPageImage(p.pdf, Math.min(1600, stage.clientWidth * 2)).then(r => { const z = Math.min(1, (stage.clientWidth - 2) / r.w); Object.assign(paper.style, { width: r.w + 'px', height: r.h + 'px' }); paper.style.setProperty('--z', z); stage.style.height = r.h * z + 'px'; paper.innerHTML = `<img src="${r.url}" alt="${esc(curPage().title || 'Imported page')}" style="display:block;width:100%;height:100%">`; }).catch(() => { paper.innerHTML = '<p class="note" style="padding:20px">This imported page could not be shown. The file may be missing from this computer.</p>'; }); return; }
     paper.innerHTML = p ? (p.svg || pageFrame(p.framed.title, S.cpage + 1, repLayout().pages.length, p.framed.body)) : '<p class="note" style="padding:20px">Nothing to show yet for this page.</p>'; });
 }
-function rerenderCompose() { if (S.tab !== 'compose') return; const v = $('#view'); v.innerHTML = hiddenNote() + composeHTML(); drawCompose(); fillThumbs(); }
+function rerenderCompose() { if (S.tab !== 'compose') return; const v = $('#view'); v.innerHTML = hiddenNote() + composeHTML(); drawCompose(); fillThumbs(); gwComposeEnsure(); }
 function commit(L = repLayout()) { saveLayout(L); rerenderCompose(); }
 function fitItem(it, how) {
   const g = 12, BODY = bodyOf(curPage());
