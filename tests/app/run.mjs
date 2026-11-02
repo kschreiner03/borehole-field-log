@@ -1485,7 +1485,7 @@ app.whenReady().then(async () => {
         const planIt = added.flatMap(p => p.items).find(x => x.t === 'plan'); want(/data-gw-path/.test(itemInner(planIt, planIt.w, planIt.h)), 'report plan carries the flow paths');
         // 3D view to the report as a dated picture with its legend
         goTab('v3d'); await w(900); const n0 = repLayout().pages.length; document.querySelector('[data-act="v3d-report"]').click(); await w(400);
-        const pg = repLayout().pages[n0]; want(pg && pg.items.some(x => x.t === 'image' && /^data:image\\/png/.test(x.o.img)) && pg.items.some(x => x.t === 'text' && /exaggeration/.test(x.o.text)), '3D view added as a picture with its legend');
+        const pg = repLayout().pages[n0]; want(pg && pg.items.some(x => x.t === 'image' && /^data:image\\/jpeg/.test(x.o.img)) && pg.items.some(x => x.t === 'text' && /exaggeration/.test(x.o.text)), '3D view added as a picture with its legend');
         // export runs the model first if needed and produces the PDF
         S.gwm.run = null; const bytes = await buildReportBytes(); want(bytes && bytes.length > 10000 && S.gwm.run?.ok, 'report exports with fresh model results: ' + (bytes && bytes.length));
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
@@ -1493,6 +1493,42 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('3d and report review fixes', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        // C1: measured values keep their decimals whatever comes first
+        const x = vtkPoly([[0, 0, 0], [1, 0, 0], [2, 0, 0]], { verts: [[0], [1], [2]] }, { concentration: [120, .005, 2.5] });
+        want(/type="Float64" Name="concentration"/.test(x) && x.includes('0.005') && x.includes('2.5'), 'concentration stays Float64: ' + x.match(/Name="concentration"[^<]*/)?.[0]);
+        const f = gwVtkFiles(); want(/type="Float64" Name="concentration"/.test(f['samples.vtp']) && /type="Float64" Name="K_m_per_day"/.test(f['model.vtu']), 'export arrays typed by meaning');
+        // I6: no nan text anywhere
+        want(Object.entries(f).every(([n, t]) => !/\\.(vtp|vtu)$/.test(n) || !/\\bnan\\b|NaN/.test(t)), 'no NaN written');
+        // M7: large numbers kept
+        want(vtkArr('a', 'Float64', [123000000, 5712345.678]).includes('123000000') && vtkArr('a', 'Float64', [5712345.678]).includes('5712345.678'), 'large numbers kept');
+        // I4: results carry their date
+        want(/Name="date_days"/.test(f['samples.vtp']) && /date_days/.test(f['README.txt']), 'results carry a date');
+        // I5: boreholes unticked on the maps are left out of 3D and the export
+        const hide = projList().find(b => b.name === 'MW-0'); S.offMap.add(hide.id); goTab('v3d'); await w(900);
+        want(S.v3d.ok && S.v3d.groups.boreholes.children.every(g => g.name !== 'MW-0'), '3D leaves out an unticked borehole');
+        want(!gwVtkFiles()['README.txt'].includes('MW-0'), 'export leaves it out too'); S.offMap.delete(hide.id); goTab('v3d'); await w(900);
+        // I2: captured images carry the exaggeration and a north arrow
+        const cap = v3dCapture(); want(cap && cap.caption.includes('Vertical exaggeration ×' + S.v3d.ve) && Number.isFinite(cap.north), 'capture states exaggeration and north: ' + JSON.stringify(cap && { c: cap.caption, n: cap.north }));
+        // M6: changing the exaggeration re-frames the view
+        const before = S.v3d.orbit.ty; const ve = document.querySelector('#v3d-ve'); ve.value = S.v3d.ve === 10 ? '1' : '10'; ve.dispatchEvent(new Event('change', { bubbles: true })); await w(900);
+        want(Math.abs(S.v3d.orbit.ty - S.v3d.target.y) < 1e-6 && S.v3d.orbit.ty !== before, 'view re-framed for the new exaggeration');
+        // I1: figures without model results say so in the summary
+        const M = gwModel(); setGwm({ calib: { mode: 'steady', pv: {}, params: [], stats: { n: 1, me: 0, mae: 0, rmse: 0, range: 1, srms: 0, disc: 0 }, residuals: [], css: {}, corr: [], warnings: [], round: M.round, rounds: [M.round], at: new Date().toISOString(), runs: 1, iterations: 1, key: gwInputsKey(gwModel()) } });
+        gwModel(); S.gwm.run = null; S.gwm.err = 'test failure'; const sum = itemInner(newItem('gwsum'), 700, 900);
+        want(/No MODFLOW 6 results are drawn/.test(sum) && /test failure/.test(sum), 'summary says the figures have no model results and why');
+        // M1: a cut warning recolours only its own lines
+        const b = gwBlocksSVG([{ h: 'Heading A' }, { p: 'normal text' }, { p: Array(80).fill('warning words').join(' '), warn: true }], 400, 90);
+        want(!/fill:#b4451a">Heading A/.test(b) && !/fill:#b4451a">normal text/.test(b), 'heading and normal text keep their colour');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
