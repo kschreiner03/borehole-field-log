@@ -1272,6 +1272,19 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .ctl-gb #gwm-units td:nth-child(2)::before { content: "K "; color: var(--muted); } .ctl-gb #gwm-units td:nth-child(5)::before { content: "Kv/Kh "; color: var(--muted); } .ctl-gb #gwm-units td:nth-child(7)::before { content: "nₑ "; color: var(--muted); }
 .ctl-gb #gwm-feat td { flex-basis: calc(50% - 4px); } .ctl-gb #gwm-feat td:nth-child(3) { flex-basis: 100%; } .ctl-gb #gwm-feat input, .ctl-gb #gwm-feat select { width: 100% !important; }
 .ctl-gb h4 { margin: 4px 0 !important; font-size: 12.5px; }
+/* report editor: the page gets the room; item and page settings live in the panel */
+body.side-off .shell { --sidebar-width: 0px; } body.side-off .side { display: none; }
+.cmp { grid-template-columns: 210px minmax(0, 1fr) !important; gap: 14px; }
+.cmp-addwrap { position: relative; display: inline-flex; }
+.cmp-addmenu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; display: grid; grid-template-columns: repeat(2, minmax(160px, 1fr)); gap: 12px 20px; padding: 12px 14px; min-width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: 0 8px 24px rgba(16, 24, 40, .14); }
+.cmp-addmenu[hidden] { display: none; }
+.cmp-addg { display: flex; flex-direction: column; gap: 1px; } .cmp-addg b { margin-bottom: 3px; font: 600 11.5px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.cmp-addi { padding: 5px 6px; border: 0; border-radius: var(--r-sm); background: none; font: 13px var(--f-body); color: var(--ink); text-align: left; cursor: pointer; } .cmp-addi:hover, .cmp-addi:focus-visible { background: var(--hover); }
+.cmp-bar { display: none; position: absolute; top: 4px; right: 4px; z-index: 5; gap: 2px; padding: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: 0 2px 8px rgba(16, 24, 40, .14); transform: scale(calc(1 / var(--z, 1))); transform-origin: top right; }
+.cmp-box[aria-selected="true"] .cmp-bar { display: flex; }
+.cmp-bar .tb { min-height: 26px; padding: 0 5px; } .cmp-bar .tb svg { width: 15px; height: 15px; } .cmp-bar .del, .cmp-bar .del svg { color: var(--negative, #c4242a); }
+.ctl-gb .cmp-pageset, .ctl-gb .cmp-props { display: flex; flex-direction: column; gap: 8px; position: static; max-height: none; overflow: visible; }
+.ctl-gb .cmp-pageset .cmp-zoom { display: flex; align-items: center; gap: 6px; }
 .ctl.min { overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; }
 .ctl.min .tb { width: 30px; min-height: 30px; justify-content: center; }
 /* toolbar: project switcher and the find box */
@@ -1920,7 +1933,7 @@ const CTL = {}, CTL_ICON = '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18
 S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {}, ...jsonLS('bhlog.ui', {}) };
 const uiSave = () => lsSet('bhlog.ui', JSON.stringify(S.ui));
 const ctlClamp = w => Math.round(Math.min(480, Math.max(240, +w || 300)));
-function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
+function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); document.body.classList.toggle('side-off', S.tab === 'compose'); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
 /* the panel's column is set before a page draws, so drawings measure the work area they will really have */
 function ctlLayout() {
   const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
@@ -8910,6 +8923,19 @@ async function buildReport() {
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Create PDF'; } }
 }
 
+CTL.compose = () => { const pg = curPage(), tpls = S.co.reportTpls || [], free = pg?.kind === 'free' && !S.csort; return [
+  ...(free ? [{ id: 'cmp-item', title: 'Selected item', icon: '<rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2"/>', html: `<div class="cmp-props" id="cmp-props">${propsHTML()}</div>` },
+    { id: 'cmp-pagecfg', title: 'Page', icon: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/>', html: `<div class="cmp-pageset"><label class="cmp-lbl" for="cmp-title">Page title</label><input id="cmp-title" value="${esc(pg.title || '')}" placeholder="FIGURE 1 – SITE PLAN">
+      <span class="seg" role="group" aria-label="Page orientation"><button data-corient="port" aria-pressed="${pg.orient !== 'land'}">Portrait</button><button data-corient="land" aria-pressed="${pg.orient === 'land'}">Landscape</button></span>
+      <label class="cmp-zoom"><span class="note">Paper</span><select id="cmp-paper-size" aria-label="Paper size">${Object.entries(PAPERS).map(([k, [t]]) => `<option value="${k}" ${(pg.paper || 'letter') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label class="cmp-zoom"><span class="note">Margin</span><input id="cmp-margin" type="number" min="5" max="40" step="1" value="${Math.round(pgDims(pg).M / MMPX)}" style="width:64px"><span class="note">mm</span></label>
+</div>` }] : []),
+  { id: 'cmp-tpls', title: 'Templates', icon: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9h18M9 9v11"/>', html: `        <p class="note" style="margin:0">Start from a layout, or save this one to reuse on any project.</p>
+    <select id="cmp-tpl"><option value="">Choose a template…</option><optgroup label="Ready-made">${Object.entries(REPORT_PRESETS).map(([k, [t]]) => `<option value="p:${k}">${esc(t)}</option>`).join('')}</optgroup>${tpls.length ? `<optgroup label="Your company">${tpls.map(t => `<option value="t:${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>` : ''}</select>
+    <div class="cmp-row"><button class="btn" data-act="cmp-tpl-apply">Use template</button><button class="btn" data-act="cmp-tpl-save" ${S.readOnly ? 'disabled' : ''}>Save as template…</button>${tpls.length ? `<button class="btn" data-act="cmp-tpl-del">Delete…</button>` : ''}</div>
+` },
+  { id: 'cmp-outs', title: 'Other outputs', icon: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', html: `        <div class="cmp-outs">${[['pdf-all', 'All borehole logs (PDF)'], ['export', 'Excel report'], ['export-data', 'Data tables (Excel)'], ['ags', 'AGS 4 (gINT, HoleBASE)'], ['gis', 'GIS / CSV locations']].map(([a, t]) => `<button class="btn link" data-act="${a}">${t}</button>`).join('')}</div>
+` }]; };
 function composeHTML() {
   const L = repLayout(), pg = curPage(), n = L.pages.length, tpls = S.co.reportTpls || [];
   const pages = L.pages.map((p, i) => `<li data-pgi="${i}" draggable="${!S.readOnly}"><button class="cmp-pg" data-cpage="${i}" aria-current="${i === S.cpage}"><span class="n">${i + 1}</span><span class="th" data-th="${p.id}" data-w="52"></span><span class="tx"><b>${esc(pageLabel(p))}</b><small>${esc(pageSub(p))}</small></span></button></li>`).join('');
@@ -8919,30 +8945,20 @@ function composeHTML() {
     <div class="cmp-row"><button class="btn" data-act="cmp-up" ${S.cpage === 0 ? 'disabled' : ''} title="Move this page up">Up</button><button class="btn" data-act="cmp-down" ${S.cpage >= n - 1 ? 'disabled' : ''} title="Move this page down">Down</button><button class="btn" data-act="cmp-dup" title="Duplicate this page">Duplicate</button><button class="btn" data-act="cmp-delpage" ${n < 2 ? 'disabled' : ''} title="Remove this page">Remove</button><button class="btn" data-act="cmp-rot-l" title="Turn left (imported pages) or switch portrait and landscape">Rotate left</button><button class="btn" data-act="cmp-rot-r" title="Turn right (imported pages) or switch portrait and landscape">Rotate right</button></div>
     <button class="btn" data-act="cmp-import" ${S.readOnly ? 'disabled' : ''} title="Insert the pages of a PDF (an ArcGIS map, a lab certificate) or a picture after the current page">Add PDF or image…</button>
     <label class="cmp-lbl" for="cmp-add-page">Add a page</label><select id="cmp-add-page"><option value="">Choose a page type…</option>${Object.entries(RPAGES).filter(([k]) => k !== 'pdf').map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>
-    <h3 style="margin-top:18px">Templates</h3>
-    <p class="note" style="margin:0">Start from a layout, or save this one to reuse on any project.</p>
-    <select id="cmp-tpl"><option value="">Choose a template…</option><optgroup label="Ready-made">${Object.entries(REPORT_PRESETS).map(([k, [t]]) => `<option value="p:${k}">${esc(t)}</option>`).join('')}</optgroup>${tpls.length ? `<optgroup label="Your company">${tpls.map(t => `<option value="t:${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>` : ''}</select>
-    <div class="cmp-row"><button class="btn" data-act="cmp-tpl-apply">Use template</button><button class="btn" data-act="cmp-tpl-save" ${S.readOnly ? 'disabled' : ''}>Save as template…</button>${tpls.length ? `<button class="btn" data-act="cmp-tpl-del">Delete…</button>` : ''}</div>
-    <h3 style="margin-top:18px">Other outputs</h3>
-    <div class="cmp-outs">${[['pdf-all', 'All borehole logs (PDF)'], ['export', 'Excel report'], ['export-data', 'Data tables (Excel)'], ['ags', 'AGS 4 (gINT, HoleBASE)'], ['gis', 'GIS / CSV locations']].map(([a, t]) => `<button class="btn link" data-act="${a}">${t}</button>`).join('')}</div>
   </aside>`;
   let stage;
   if (pg.kind === 'free') {
     const d = pgDims(pg), bd = bodyOf(pg);
-    stage = `<div class="cmp-tools"><label class="cmp-lbl" for="cmp-title">Page title</label><input id="cmp-title" value="${esc(pg.title || '')}" placeholder="FIGURE 1 – SITE PLAN">
-      <span class="seg" role="group" aria-label="Page orientation"><button data-corient="port" aria-pressed="${pg.orient !== 'land'}">Portrait</button><button data-corient="land" aria-pressed="${pg.orient === 'land'}">Landscape</button></span>
-      <label class="cmp-zoom"><span class="note">Paper</span><select id="cmp-paper-size" aria-label="Paper size">${Object.entries(PAPERS).map(([k, [t]]) => `<option value="${k}" ${(pg.paper || 'letter') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <label class="cmp-zoom"><span class="note">Margin</span><input id="cmp-margin" type="number" min="5" max="40" step="1" value="${Math.round(pgDims(pg).M / MMPX)}" style="width:64px"><span class="note">mm</span></label>
-      <label class="cmp-zoom"><span class="note">Zoom</span><select id="cmp-zoom" aria-label="Zoom">${[['fit', 'Fit page'], ['width', 'Fit width'], ...[0.5, 0.75, 1, 1.5, 2, 4].map(v => [v, Math.round(v * 100) + ' %'])].map(([v, t]) => `<option value="${v}" ${String(S.czoom) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <span class="cmp-add"><span class="note">Add</span>${Object.entries(RITEMS).map(([k, [t]]) => `<button class="btn" data-cadd="${k}">${esc(t)}</button>`).join('')}</span></div>
+    stage = `<div class="cmp-tools">      <label class="cmp-zoom"><span class="note">Zoom</span><select id="cmp-zoom" aria-label="Zoom">${[['fit', 'Fit page'], ['width', 'Fit width'], ...[0.5, 0.75, 1, 1.5, 2, 4].map(v => [v, Math.round(v * 100) + ' %'])].map(([v, t]) => `<option value="${v}" ${String(S.czoom) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <span class="cmp-addwrap"><button class="btn primary" data-act="cmp-addmenu" aria-haspopup="true" ${S.readOnly ? 'disabled' : ''}>Add item ▾</button><div class="cmp-addmenu" role="menu" hidden>${(() => { const G = [['Maps and drawings', ['plan', 'section', 'wt', 'vap', 'flow', 'hydro']], ['Groundwater model', ['gwsum', 'gwcal', 'gwpar', 'gwlim']], ['Text and pictures', ['text', 'image']], ['Map parts', ['scalebar', 'north', 'legend', 'shape']]], seen = new Set(G.flatMap(g => g[1])), rest = Object.keys(RITEMS).filter(k => !seen.has(k)); return [...G, ...(rest.length ? [['Other', rest]] : [])].map(([t, ks]) => `<div class="cmp-addg"><b>${t}</b>${ks.filter(k => RITEMS[k]).map(k => `<button type="button" class="cmp-addi" role="menuitem" data-cadd="${k}">${esc(RITEMS[k][0])}</button>`).join('')}</div>`).join(''); })()}</div></span></div>
       <div class="cmp-canvas"><span class="rl-c" aria-hidden="true"></span><svg class="rl-x" id="rl-x" aria-hidden="true"></svg><svg class="rl-y" id="rl-y" aria-hidden="true"></svg>
       <div class="cmp-stage cmp-scroll" id="cmp-stage"><div class="cmp-sizer" id="cmp-sizer"><div class="cmp-paper" id="cmp-paper" style="width:${d.W}px;height:${d.H}px">${pageFrame(pg.title || '', S.cpage + 1, n, pageItemsSVG(pg), d)}
         <div class="cmp-body" style="left:${bd.x}px;top:${bd.y}px;width:${bd.w}px;height:${bd.h}px" aria-hidden="true"></div>
         ${['x', 'y'].map(a => (pg.guides?.[a] || []).map((v, gi) => `<div class="cmp-guide g${a}" data-gaxis="${a}" data-gi="${gi}" style="${a === 'x' ? 'left' : 'top'}:${v}px" title="Guide at ${(v / MMPX).toFixed(1)} mm: drag to move, drag onto the ruler to remove"></div>`).join('')).join('')}
         <div class="cmp-snaps" id="cmp-snaps" aria-hidden="true"></div>
-        ${pg.items.map(it => `<div class="cmp-box" data-box="${it.id}" aria-selected="${it.id === S.csel || !!S.cmulti?.has(it.id)}" title="${esc(RITEMS[it.t][0])}: drag to move, drag the corner to resize"><span class="cmp-tag">${esc(it.cap || RITEMS[it.t][0])}</span><span class="cmp-rz" data-rz aria-hidden="true"></span></div>`).join('')}
+        ${pg.items.map(it => `<div class="cmp-box" data-box="${it.id}" aria-selected="${it.id === S.csel || !!S.cmulti?.has(it.id)}" title="${esc(RITEMS[it.t][0])}: drag to move, drag the corner to resize"><span class="cmp-tag">${esc(it.cap || RITEMS[it.t][0])}</span><span class="cmp-rz" data-rz aria-hidden="true"></span><span class="cmp-bar" role="toolbar" aria-label="Item"><button type="button" class="tb" data-act="cmp-copy" title="Duplicate">${svgI('<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>')}</button><button type="button" class="tb" data-act="cmp-front" title="Bring to front">${svgI('<rect x="4" y="4" width="11" height="11" rx="1"/><rect x="9" y="9" width="11" height="11" rx="1" fill="currentColor" fill-opacity=".25"/>')}</button><button type="button" class="tb del" data-act="cmp-del" title="Delete (Delete key)" aria-label="Delete">${svgI('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>')}</button></span></div>`).join('')}
       </div></div></div></div>
-      <p class="note">Drag a diagram to move it; drag its bottom-right corner to resize. Arrow keys nudge the selected one (Shift for bigger steps); Delete removes it. The dashed line is the printable area.</p>`;
+      <p class="note">Click an item to select it: drag to move, drag its corner to resize, use the buttons on its frame or the Delete key. Settings for the item and the page are in the panel on the right. The dashed line is the printable area.</p>`;
   } else {
     const opts = pg.kind === 'logs' ? `<div class="cmp-logs"><span class="note">Boreholes in this section (none ticked = all, in name order)</span><div class="sec-chips">${projList().map(b => `<label class="check"><input type="checkbox" data-clog="${esc(b.id)}" ${pg.bh?.includes(b.id) ? 'checked' : ''}> ${esc(b.name)}</label>`).join('')}</div><p class="note">Log layout, text size, columns and depth per page are set on <button class="btn link" data-tab="report">PDF preview</button>.</p></div>` : '';
     stage = `<div class="cmp-tools"><b>${esc(RPAGES[pg.kind])}</b>${pg.kind === 'logs' || pg.kind === 'photos' ? '' : `<label class="cmp-lbl" for="cmp-title">Page title</label><input id="cmp-title" value="${esc(pg.title || '')}">`}</div>${opts}
@@ -8951,7 +8967,7 @@ function composeHTML() {
   const sel = S.csortSel || new Set();
   const mode = `<div class="cmp-mode"><span class="seg" role="group" aria-label="View"><button data-csort="0" aria-pressed="${!S.csort}">Edit page</button><button data-csort="1" aria-pressed="${!!S.csort}">All pages</button></span>${S.csort ? `<span class="note">${sel.size ? `${sel.size} selected` : 'Click to select; Shift or Ctrl/⌘ for several; drag to reorder; double-click to open'}</span><span class="sp"></span><button class="btn" data-act="cmp-rot-l" ${sel.size ? '' : 'disabled'}>Rotate left</button><button class="btn" data-act="cmp-rot-r" ${sel.size ? '' : 'disabled'}>Rotate right</button><button class="btn" data-act="cmp-dup" ${sel.size ? '' : 'disabled'}>Duplicate</button><button class="btn danger" data-act="cmp-delpage" ${sel.size && sel.size < n ? '' : 'disabled'}>Delete</button>` : ''}</div>`;
   if (S.csort) stage = `<div class="cmp-sorter" role="listbox" aria-multiselectable="true" aria-label="All pages">${L.pages.map((p, i) => `<button type="button" class="tile" role="option" data-tile="${i}" data-pgi="${i}" draggable="${!S.readOnly}" aria-selected="${sel.has(p.id)}"><span class="th" data-th="${p.id}" data-w="150"></span><span class="cap"><b>${i + 1}</b> ${esc(pageLabel(p))}</span></button>`).join('')}</div>`;
-  return `<div class="cmp${S.csort ? ' sorting' : ''}">${side}<div class="cmp-main">${mode}${stage}</div>${pg.kind === 'free' && !S.csort ? `<aside class="cmp-props" id="cmp-props">${propsHTML()}</aside>` : ''}</div>`;
+  return `<div class="cmp${S.csort ? ' sorting' : ''}">${side}<div class="cmp-main">${mode}${stage}</div></div>`;
 }
 /* several selected: align to the selection's edges or centres, or space them evenly */
 const selItems = () => (curPage()?.items || []).filter(i => S.cmulti?.has(i.id));
@@ -9031,7 +9047,7 @@ function drawCompose() {
   if (paper.dataset.auto) layoutPages({ pages: [curPage()] }).then(ps => { const p = ps[0]; if (p?.pdf) { pdfPageImage(p.pdf, Math.min(1600, stage.clientWidth * 2)).then(r => { const z = Math.min(1, (stage.clientWidth - 2) / r.w); Object.assign(paper.style, { width: r.w + 'px', height: r.h + 'px' }); paper.style.setProperty('--z', z); stage.style.height = r.h * z + 'px'; paper.innerHTML = `<img src="${r.url}" alt="${esc(curPage().title || 'Imported page')}" style="display:block;width:100%;height:100%">`; }).catch(() => { paper.innerHTML = '<p class="note" style="padding:20px">This imported page could not be shown. The file may be missing from this computer.</p>'; }); return; }
     paper.innerHTML = p ? (p.svg || pageFrame(p.framed.title, S.cpage + 1, repLayout().pages.length, p.framed.body)) : '<p class="note" style="padding:20px">Nothing to show yet for this page.</p>'; });
 }
-function rerenderCompose() { if (S.tab !== 'compose') return; const v = $('#view'); v.innerHTML = hiddenNote() + composeHTML(); drawCompose(); fillThumbs(); gwComposeEnsure(); }
+function rerenderCompose() { if (S.tab !== 'compose') return; ctlLayout(); const v = $('#view'); v.innerHTML = hiddenNote() + composeHTML(); ctlRender(); drawCompose(); fillThumbs(); gwComposeEnsure(); }
 function commit(L = repLayout()) { saveLayout(L); rerenderCompose(); }
 function fitItem(it, how) {
   const g = 12, BODY = bodyOf(curPage());
@@ -9057,7 +9073,7 @@ function composeAct(act, el) {
     else if (p.kind === 'free') { p.orient = p.orient === 'land' ? undefined : 'land'; for (const x of p.items || []) clampIt(x, p); }
   }
   if (act === 'cmp-xs-use' && it?.t === 'section') { it.o = { ...it.o, xs: structuredClone(S.xs) }; }
-  if (act === 'cmp-del' && it) { pg.items = pg.items.filter(x => x !== it); S.csel = null; }
+  if (act === 'cmp-del' && (it || S.cmulti?.size)) { const gone = S.cmulti?.size > 1 ? S.cmulti : new Set([it.id]); pg.items = pg.items.filter(x => !gone.has(x.id)); S.csel = null; S.cmulti = new Set(); }
   if (act === 'cmp-front' && it) { pg.items = [...pg.items.filter(x => x !== it), it]; }
   if (act === 'cmp-copy' && it) { const c = { ...structuredClone(it), id: uid('it'), x: it.x + 18, y: it.y + 18 }; clampIt(c); pg.items.push(c); S.csel = c.id; }
   if (act === 'cmp-img') { $('#cmp-img-file').click(); return; }
@@ -9138,8 +9154,11 @@ document.addEventListener('pointerup', e => {
   commit();
 });
 let cDrag = null;
+// the Add item menu closes on a click elsewhere or Escape
+document.addEventListener('click', e => { const m = $('.cmp-addmenu'); if (m && !m.hidden && !e.target.closest?.('.cmp-addwrap')) m.hidden = true; });
+document.addEventListener('keydown', e => { const m = $('.cmp-addmenu'); if (e.key === 'Escape' && m && !m.hidden) { m.hidden = true; e.stopPropagation(); } }, true);
 document.addEventListener('pointerdown', e => {
-  const box = e.target.closest('.cmp-box'); if (!box) return;
+  const box = e.target.closest('.cmp-box'); if (!box || e.target.closest('.cmp-bar')) return;
   const it = curPage().items.find(x => x.id === box.dataset.box); if (!it) return;
   if (e.shiftKey || e.ctrlKey || e.metaKey) { const m = S.cmulti ||= new Set(); if (S.csel && !m.size) m.add(S.csel); m.has(it.id) ? m.delete(it.id) : m.add(it.id); S.csel = it.id; }
   else if (!S.cmulti?.has(it.id)) { S.cmulti = new Set(); S.csel = it.id; }
@@ -10269,6 +10288,7 @@ document.addEventListener('click', e => {
     case 'go-details': if (b) { S.dtab = 'details'; lsSet('bhlog.dtab', 'details'); goTab('edit'); } break;
     case 'go-slug': if (S.tab !== 'gw') goTab('gw'); setTimeout(() => [...document.querySelectorAll('#view h3')].find(h => /slug/i.test(h.textContent))?.closest('section')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60); break;
     case 'cmp-import': case 'cmp-rot-l': case 'cmp-rot-r':
+    case 'cmp-addmenu': { const m = $('.cmp-addmenu'); if (m) m.hidden = !m.hidden; break; }
     case 'cmp-xs-use': case 'cmp-pdf': case 'cmp-up': case 'cmp-down': case 'cmp-dup': case 'cmp-delpage': case 'cmp-del': case 'cmp-front': case 'cmp-copy': case 'cmp-img':
     case 'cmp-tpl-apply': case 'cmp-tpl-save': case 'cmp-tpl-save-go': case 'cmp-tpl-del': case 'cmp-tpl-del-go': composeAct(act); break;
     case 'bh-tpl': saveBhTemplate(); break;
