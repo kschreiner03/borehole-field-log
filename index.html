@@ -908,6 +908,7 @@ body.has-menubar #menubar { display: flex; align-items: stretch; height: var(--m
 .titlebar .co { color: var(--muted); font-size: 12px; }
 .tb-actions { gap: 4px; flex-wrap: nowrap; margin-left: 0; min-width: 0; }
 .tb-spring { flex: 1 1 auto; }
+@media (max-width: 1600px) { .titlebar > .tb[data-act="prefs"] .lbl { display: none; } }   /* the gear alone keeps the Tutorial button on the same row */
 .titlebar > .tb { min-height: var(--h-tb); padding: 0 9px; gap: 6px; border: 1px solid transparent; background: transparent; font: 400 13px var(--f-body); display: inline-flex; align-items: center; cursor: pointer; }
 .titlebar > .tb:hover { background: var(--hover); border-color: var(--border); }
 .titlebar > .tb svg { width: 16px; height: 16px; color: inherit; }
@@ -1269,7 +1270,8 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
     </div>
     <span class="tb-spring" aria-hidden="true"></span>
     <button type="button" class="find-btn tb-find" data-act="find" title="Find a borehole, page or tool (Ctrl+K)"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><span>Find anything…</span><kbd>Ctrl K</kbd></button>
-    <button class="tb" data-act="prefs" title="Units, symbols, page depth, log columns, company and logo"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Settings</span></button>
+    <button class="tb" data-act="tut" title="Step-by-step tutorial: the one for this page, or choose one"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5l9-3.5 9 3.5-9 3.5z"/><path d="M7 8.5v5c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-5M21 6.5v6"/></svg><span class="lbl">Tutorial</span></button>
+    <button class="tb" data-act="prefs" aria-label="Settings" title="Units, symbols, page depth, log columns, company and logo"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Settings</span></button>
   </div>
   <div class="rtabs" role="tablist" aria-label="Tool categories" id="rtabs"></div>
   <div class="ribbon" role="toolbar" aria-label="Tools">
@@ -5203,8 +5205,14 @@ const TUTORIALS = {
     { tab: 'gwm', sel: '#gwm-limits', title: 'Know the limits', body: '<p>Layers are interpolated between boreholes and each is uniform; heads alone cannot separate recharge from conductivity; transport uses steady flow and a constant source. Read the warnings and residuals before relying on a result.</p>' },
   ] },
 };
+/* the top-bar button: this page's tutorial, or a choice when the page has none */
+const TUT_FOR = { xsec: 'xsec', gwm: 'gwm', v3d: 'gwm' };
+function tutPick() {
+  if (TUT_FOR[S.tab]) { tutStart(TUT_FOR[S.tab]); return; }
+  dialog('Tutorials', `<p class="note" style="margin-top:0">Each tutorial opens the worked example and walks through the page one step at a time. Back and Next move between steps; × stops at any time.</p>${Object.entries(TUTORIALS).map(([k, T]) => `<p><button class="btn" data-act="tut-${k}">${esc(T.title)}</button> <span class="note">${T.steps.length} steps</span></p>`).join('')}`, '<button class="btn" data-act="close">Close</button>');
+}
 function tutStart(k) {
-  const T = TUTORIALS[k]; if (!T) return;
+  const T = TUTORIALS[k]; if (!T) return; if (!$('#overlay').hidden) closeOverlay();
   if (projKey(cur()) !== XS_PROJ) { if (S.readOnly) { toast('Open the cross-section example to follow the tutorial.'); return; } loadXsExample(); }
   S.tut = { k, i: 0 }; setTimeout(tutShow, 150);
 }
@@ -10241,6 +10249,7 @@ document.addEventListener('click', e => {
     case 'tut-next': tutGo(1); break;
     case 'tut-back': tutGo(-1); break;
     case 'tut-close': tutClose(); break;
+    case 'tut': tutPick(); break;
     case 'gw-run': case 'gw-cal': case 'gw-calt': case 'gw-trans': case 'gw-export': case 'gw-feat-add': case 'gw-feat-del': gwAct(act, t); break;
     case 'grid-bh': if (b) { S.gridOne = true; S.tsheet = 'layers'; lsSet('bhlog.tsheet', 'layers'); goTab('table'); setTimeout(() => $('.dgrid input')?.focus(), 0); } break;
     case 'clear-examples': for (const x of [...S.bh.values()]) if (x.example) store.remove(x.id); S.formStale = true; render(); break;
