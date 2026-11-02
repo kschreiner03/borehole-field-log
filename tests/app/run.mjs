@@ -1317,6 +1317,30 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('report: section pages show the current plume and model', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400); setGwm({ transport: { on: true } });
+        await gwEnsure(true); want(S.gwm.run?.ok && S.gwm.trans?.ok, 'model ran: ' + (S.gwm.err || S.gwm.trans?.error));
+        const has = (svg, what) => { const d = document.createElement('div'); d.innerHTML = svg; return { wt: !!d.querySelector('[data-gw-wt]'), plume: !!d.querySelector('[data-band],[data-contour],[data-model-contour]'), note: d.querySelector('[data-fnote]')?.textContent || '' }; };
+        /* a preset page's section item has no saved view: it follows the Cross-section page */
+        const a = has(itemInner({ t: 'section', o: {} }, 900, 420)); want(a.wt && a.plume, 'preset section item shows model and plume: ' + JSON.stringify(a));
+        /* a view saved before the plume shapes existed gets today's look */
+        const { shape, style, ...old } = S.xs; const b = has(itemInner({ t: 'section', o: { xs: old } }, 900, 420));
+        want(b.plume && /MODFLOW 6/.test(b.note), 'older saved view draws the model-guided plume: ' + JSON.stringify(b));
+        const c = has('<svg>' + secPageBody() + '</svg>'); want(c.wt && c.plume, 'PDF preview section page shows model and plume: ' + JSON.stringify(c));
+        /* the Reports page runs the model when it has none yet, then redraws */
+        S.gwm.run = null; S.gwm.trans = null; S.gwm.key = '';
+        goTab('compose'); await w(150); const L = repLayout(); L.pages.push(xsecPage()); S.cpage = L.pages.length - 1; rerenderCompose();
+        for (let i = 0; i < 450 && !(S.gwm.run?.ok && !S.gwm.busy); i++) await w(200); await w(300);
+        want(S.gwm.run?.ok, 'Reports page started the model run: ' + S.gwm.err);
+        want(document.querySelector('#view [data-gw-wt]'), 'Reports page redrew with the model');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
