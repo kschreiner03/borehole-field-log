@@ -1736,6 +1736,47 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('log: typed layers review fixes', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      const keepU = S.units;
+      try {
+        loadDlExample(); await w(300); goTab('log'); await w(300);
+        const b = cur(), L0 = structuredClone(b.layers), enter = el => el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        const typeIn = async (i, text) => { openDrawer('layer', i); await w(150); const el = document.querySelector('#drawer #lt-type'); el.value = text; enter(el); await w(200); return el; };
+        /* field-level round trip of the panel's own text: nothing changes on a plain Enter (metres and feet, texture, horizon, origin, colour) */
+        b.layers[1] = { ...b.layers[1], texture: 'cssc|Silty clay', uscs: 'CL' }; b.layers[2] = { ...b.layers[2], hz: 'Btnj', origin: 'bedrock', colour: 'mottled', other: 'trace coal', mods: '' };
+        for (const u of ['m', 'ft']) { S.units = u; renderView(true); await w(150);
+          for (const i of [0, 1, 2]) { const before = JSON.stringify(b.layers[i]); openDrawer('layer', i); await w(120); enter(document.querySelector('#drawer #lt-type')); await w(150);
+            const now = JSON.stringify(b.layers[i]); want(now === before, u + ': Enter on unchanged text keeps layer ' + (i + 1) + ': ' + before + ' -> ' + now); } }
+        S.units = 'm'; renderView(true); await w(150);
+        /* depths only: just the depths change */
+        const d1 = structuredClone(b.layers[1]); await typeIn(1, (+d1.top).toFixed(2) + '-' + (+d1.bottom + .1).toFixed(2));
+        want(b.layers[1].uscs === d1.uscs && b.layers[1].consistency === d1.consistency && Math.abs(b.layers[1].bottom - d1.bottom - .1) < 1e-6, 'depths only keep the description');
+        want(Math.abs(b.layers[2].top - b.layers[1].bottom) < 1e-6, 'the next layer follows the changed bottom');
+        /* bottom above top is refused */
+        const d2 = JSON.stringify(b.layers[1]); await typeIn(1, '3.5-1.2 SP'); want(JSON.stringify(b.layers[1]) === d2 && /above|below|top/i.test(document.querySelector('#lt-read').textContent), 'bottom above top refused with a note: ' + document.querySelector('#lt-read')?.textContent);
+        /* code-like words and units */
+        want(parseLayerText('Sand with coal fragments').uscs === '' && parseLayerText('fill over clay (CL)').uscs === 'CL' && parseLayerText('Silty sand with ml lenses').other.includes('ml lenses') || parseLayerText('Silty sand with ml lenses').mods.includes('ml lenses'), 'code-like words inside text do not set the soil');
+        want(parseLayerText('SANDSTONE, weathered').uscs === 'SDST' && parseLayerText('ORGANIC SILT, soft').uscs === 'OL', 'whole soil names are recognised');
+        const fu4 = parseLayerText('4-10 ft SAND (SP)'); want(Math.abs(fu4.top - 4 / 3.28084) < 1e-3 && Math.abs(fu4.bottom - 10 / 3.28084) < 1e-3, 'a unit typed with the depths is used: ' + JSON.stringify(fu4));
+        want(parseLayerText('1.2-3.5SP').uscs === 'SP' && parseLayerText('1.2-3.5SP').bottom === 3.5, 'depths with no space before the code');
+        want(parseLayerText('CLAY (CI), firm, moist, mottled').colour === 'mottled' && parseLayerText('CLAY (CI), firm, grey brown').colour === 'grey brown', 'mottled and space-separated colours');
+        /* the panel stays on the edited layer after re-sorting */
+        const id0 = b.layers[0].id; await typeIn(0, '4.2-4.4 SP sand'); want(b.layers[S.drawer.i]?.id === id0 && document.querySelector('#drawer #lt-type').dataset.ltl == S.drawer.i, 'panel follows the layer it edited');
+        /* Escape in the box on the log leaves the panel open */
+        openDrawer('layer', 1); await w(100); ltInline(1); await w(100); document.querySelector('#lt-inline').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await w(150);
+        want(!document.querySelector('#lt-inline') && S.drawer, 'Escape closes the box, not the panel');
+        closeDrawer();
+        /* a new borehole: the first typed layer reuses the empty layer 1 */
+        S.sel = null; const nb = blankBorehole ? blankBorehole() : null; if (nb) { S.bh.set(nb.id, nb); S.sel = nb.id; goTab('log'); await w(250);
+          const box = document.querySelector('#lt-new'); box.value = 'TOP topsoil, black'; enter(box); await w(200); want(cur().layers.length === 1 && cur().layers[0].uscs === 'TOP', 'new borehole: typed layer is layer 1: ' + JSON.stringify(cur().layers)); }
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      finally { S.units = keepU; }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
