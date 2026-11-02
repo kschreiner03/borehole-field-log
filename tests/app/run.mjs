@@ -1317,6 +1317,22 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('mf6: drawn on the map', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400); goTab('site'); await w(300);
+        want(!document.querySelector('#plan svg [data-gw-area]'), 'no model layers before a run');
+        await gwEnsure(true); goTab('site'); await w(300); const svg = document.querySelector('#plan svg');
+        want(svg.querySelector('[data-gw-area]'), 'model area outlined');
+        want(svg.querySelectorAll('path[data-gw-plan-wt]').length >= 2, 'model water-table contours');
+        want(svg.querySelectorAll('[data-gw-path]').length >= 1 && svg.querySelector('[data-gw-tt]'), 'flow paths with travel-time marks');
+        want(/MODFLOW 6/.test(svg.innerHTML), 'labelled MODFLOW 6');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
