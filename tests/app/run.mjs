@@ -1022,6 +1022,55 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('plumes: review fixes', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        const fresh = async () => { loadXsExample(); await w(400); };
+        const byName = n => sectionList().find(b => b.name === n), mid = (b, p) => b.elevation - (p.top + p.bot) / 2;
+        const ptOf = (n, G) => plumePoints(G.pos, 'groundwater', 'benzene', S.xs.date, true).find(p => p.b.name === n);
+        // C1: forecast 0 at a measured exceedance (default az = 0, screen below the source depth) -> data only, naming the well
+        await fresh(); setModel('az', ''); const m3 = byName('MW-3'); m3.well.screenTop = 5.0; m3.well.screenBottom = 6.2; drawXsec(); await w(100);
+        let G = XS_GEOM, g = plumeField(G.pos, { ...S.xs, shape: 'guided' }, G, 4);
+        want(g.method === 'data' && /MW-3/.test(g.note), 'C1: falls back to data only naming MW-3: ' + g.method + ' / ' + g.note);
+        // I1: a non-detect caps the guided field at its detection limit
+        await fresh(); const m4 = byName('MW-4'), s4 = (m4.gwSamples || []).filter(s => s.date <= S.xs.date).sort((a, c) => a.date < c.date ? -1 : 1).pop();
+        s4.res.benzene = { v: .001, lt: true }; drawXsec(); await w(100); G = XS_GEOM;
+        g = plumeField(G.pos, { ...S.xs, shape: 'guided' }, G, 4); const p4 = ptOf('MW-4', G);
+        want(g.method === 'guided' && g.at(p4.d, mid(m4, p4))[0] <= .00101, 'I1: field at the non-detect is at or below its DL: ' + g.at(p4.d, mid(m4, p4))[0]);
+        // I2: a nested well at the same spot keeps its own result in both shapes
+        await fresh(); const base = byName('MW-3'), nb = structuredClone(base); Object.assign(nb, { id: uid('bh-'), name: 'MW-3D' });
+        base.well = { ...base.well, screenTop: 2.0, screenBottom: 3.5 }; nb.well = { ...nb.well, screenTop: 4.5, screenBottom: 6.0 }; /* nested: separate screens */ nb.gwSamples = nb.gwSamples.map(s => ({ ...s, id: uid('g'), res: { ...s.res, benzene: { v: .02, lt: false } } }));
+        S.bh.set(nb.id, normalize(nb)); S.secIds = new Set(); drawXsec(); await w(150); G = XS_GEOM;
+        for (const shape of ['guided', 'data']) { g = plumeField(G.pos, { ...S.xs, shape }, G, 4);
+          const pd = ptOf('MW-3D', G), ps = ptOf('MW-3', G), b3 = byName('MW-3');
+          want(pd && Math.abs(Math.log10(g.at(pd.d, mid(nb, pd))[0]) - Math.log10(.02)) < .01, 'I2 ' + shape + ': nested MW-3D keeps 0.02: ' + (pd && g.at(pd.d, mid(nb, pd))[0]) + ' ' + JSON.stringify(pd && [pd.d, pd.top, pd.bot, pd.v, nb.elevation, mid(nb, pd)]));
+          want(Math.abs(Math.log10(g.at(ps.d, mid(b3, ps))[0]) - Math.log10(ps.v)) < .01, 'I2 ' + shape + ': MW-3 still matched'); }
+        // I3: shaded cells do not overlap (no doubled stripes in print)
+        await fresh(); let svg = document.querySelector('#xs-draw svg'); const cells = [...svg.querySelectorAll('rect[data-cell]')];
+        const ys = [...new Set(cells.map(c => +c.getAttribute('y')))].sort((a, b) => a - b), h = +cells[0].getAttribute('height');
+        want(ys.length > 2 && ys[1] - ys[0] >= h - 1e-6 && cells[0].closest('g').getAttribute('shape-rendering') === 'crispEdges', 'I3: rows abut without overlap');
+        // I4: the shape note fits the drawing and touches no other text, at report width
+        const d = document.querySelector('#xs-draw'); d.style.width = '700px'; drawXsec(); await w(150); svg = d.querySelector('svg');
+        const note = svg.querySelector('[data-fnote]'), nb2 = note.getBBox(), sw = +svg.getAttribute('width');
+        want(nb2.x >= 0 && nb2.x + nb2.width <= sw + .5, 'I4: note inside the drawing: ' + nb2.x.toFixed(0) + '–' + (nb2.x + nb2.width).toFixed(0) + ' of ' + sw);
+        for (const t of svg.querySelectorAll('text')) { if (t === note || !t.textContent.trim()) continue; const q = t.getBBox(); if (nb2.x < q.x + q.width && q.x < nb2.x + nb2.width && nb2.y < q.y + q.height && q.y < nb2.y + nb2.height) want(false, 'I4: note overlaps "' + t.textContent.slice(0, 30) + '"'); }
+        d.style.width = '';
+        // I5: a detection below the guideline is not drawn like a non-detect
+        drawXsec(); await w(100); svg = document.querySelector('#xs-draw svg');
+        const det = [...svg.querySelectorAll('[data-pt][data-lt="0"]')], nd = [...svg.querySelectorAll('[data-pt][data-lt="1"]')];
+        want(det.every(c => c.getAttribute('fill') !== '#fff') && nd.length && nd.every(c => c.getAttribute('stroke-dasharray')), 'I5: detections filled, non-detects dashed and hollow');
+        // I6: soil below the water table is tinted
+        want(svg.querySelector('[data-sat]'), 'I6: saturated zone tinted');
+        // I7: a report item saved before this change draws data only
+        goTab('compose'); await w(200); const L = repLayout(), pi = L.pages.findIndex(p => p.items.some(x => x.t === 'section' && x.o?.xs)), it = L.pages[pi].items.find(x => x.t === 'section' && x.o?.xs);
+        const old = { ...it.o.xs }; delete old.shape; it.o = { ...it.o, xs: old }; S.cpage = pi; rerenderCompose(); await w(300);
+        want((document.querySelector('.cmp-paper')?.innerHTML || '').includes('No data above or below the well screens'), 'I7: older report items keep data only');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
