@@ -1227,6 +1227,34 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('mf6: pathlines follow flow', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        // uniform strip: travel time from x0 to the outflow boundary is distance / v
+        const n = 101, nr = 3, cell = 1, K = 10, ne = .3, L = (n - 1) * cell, v = K * 1 / L / ne;
+        const G = gwGrid({ xorigin: 500, yorigin: 800, ang: Math.PI / 6, cell, nrow: nr, ncol: n, top: new Float64Array(n * nr).fill(20), botm: [new Float64Array(n * nr).fill(0)], idomain: [new Int32Array(n * nr).fill(1)] });
+        const chd = []; for (let r = 0; r < nr; r++) chd.push([0, r, 0, 10], [0, r, n - 1, 9]);
+        const spec = { nper: 1, periods: [[1, 1, 1]], steady: [true], dis: { nlay: 1, nrow: nr, ncol: n, delr: cell, delc: cell, top: 20, botm: [0], xorigin: 500, yorigin: 800, angrot: 30 }, npf: { icelltype: [0], k: [K], k33: [K] }, ic: 10, chd: [chd], rch: [null] };
+        const { files, outputs } = mf6Files(spec), res = await window.desktop.mf6Run({ files, outputs }); want(res.ok, 'runs: ' + res.error);
+        const q = mf6ReadBudget(res.files['gwf.cbc'], 'DATA-SPDIS').pop(), [E, N] = G.toWorld(10.5, 1.5);
+        const path = gwPathline(G, q.list, [ne], E, N, 10, { tmax: 1e6 });
+        want(path.length > 5, 'a path: ' + path.length);
+        const end = path[path.length - 1], dist = G.toLocal(end.E, end.N)[0] - 10.5, tExact = dist / v;
+        want(dist > 80, 'moves downgradient to the outflow: ' + dist.toFixed(1) + ' m');
+        want(Math.abs(end.t / tExact - 1) < .05, 'travel time = distance / v within 5 %: ' + end.t.toFixed(1) + ' vs ' + tExact.toFixed(1) + ' days');
+        want(path.every(p => Math.abs(G.toLocal(p.E, p.N)[1] - 1.5) < .01), 'stays on its row in uniform flow');
+        // at the site, from the source well
+        loadXsExample(); await w(400);
+        const M = gwModelSpec(sectionList(), siteOf()), runS = await gwRun(M); want(runS.ok, 'site runs');
+        const paths = gwSourcePaths(M, runS); want(paths.length >= 1 && paths[0].length > 3, 'site paths from the source');
+        const p0 = paths[0], a = M.grid.toLocal(p0[0].E, p0[0].N)[0], b = M.grid.toLocal(p0[p0.length - 1].E, p0[p0.length - 1].N)[0];
+        want(b > a + 10, 'site path moves along the flow direction: ' + a.toFixed(1) + ' → ' + b.toFixed(1));
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
