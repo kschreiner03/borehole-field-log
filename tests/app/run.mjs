@@ -1847,6 +1847,37 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('tables: soil type cell reads names like silty sand', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); const b = cur(), c = sheetOf('layers').cols.find(c => c[0] === 'uscs'), l = b.layers[1]; l.texture = '';
+        let bad = gridWrite([{ b, r: l, c, txt: 'Silty Sand' }], 'layers');
+        want(!bad && l.uscs === 'SM' && l.texture === 'cfem|silty SAND', 'Silty Sand typed in the Soil type cell: ' + JSON.stringify([bad, l.uscs, l.texture]));
+        want(/^silty SAND \\(SM\\)/.test(composeDesc(l).text) && !!soilOf(l.uscs), 'the log shows the name and the soil pattern: ' + composeDesc(l).text);
+        bad = gridWrite([{ b, r: l, c, txt: 'CL' }], 'layers'); want(!bad && l.uscs === 'CL', 'codes still work');
+        const keep = l.uscs; bad = gridWrite([{ b, r: l, c, txt: 'blah blah' }], 'layers'); want(bad === 1 && l.uscs === keep, 'text it cannot read is refused, not stored: ' + JSON.stringify([bad, l.uscs]));
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('log and data: type the description in the layer list', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); cur().layers[1].texture = ''; goTab('edit'); await w(500);
+        const inp = () => document.querySelector('.ws .dgrid[data-sheet="layerList"] tbody tr:nth-child(2) input[data-c="2"]');
+        want(inp() && !inp().readOnly, 'the Description cell can be typed in');
+        if (inp()) { inp().focus(); inp().value = 'silty sand, compact, moist, brown'; inp().dispatchEvent(new Event('input', { bubbles: true })); inp().dispatchEvent(new Event('change', { bubbles: true })); inp().blur(); await w(400); }
+        const l = cur().layers[1]; want(l.uscs === 'SM' && l.texture === 'cfem|silty SAND' && l.consistency === 'Compact', 'typed description sets the soil, texture and fields: ' + JSON.stringify([l.uscs, l.texture, l.consistency]));
+        want(/silty SAND \\(SM\\)/.test(inp()?.value || ''), 'the cell then shows the description: ' + inp()?.value);
+        want(document.querySelector('#ldetail [aria-pressed="true"]') && /SM/.test(document.querySelector('#ldetail')?.textContent || ''), 'the pick buttons below follow');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };

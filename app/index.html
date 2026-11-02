@@ -2867,7 +2867,7 @@ const SHEETS = {
     blank: (b, prev) => ({ id: uid('w'), date: prev?.date || today(), measured: null, depth: null, kind: prev?.kind || 'static', ref: prev?.ref || 'gs' }) },
 };
 /* the workspace's layer list: depths typed in place, the description built from the pick panel below it */
-const WS_SHEETS = { layerList: { name: 'Soil layers', key: 'layers', by: 'top', cols: [['top', 'From', 'depth'], ['bottom', 'To', 'depth'], ['desc', 'Description', 'calc', (r, b) => plainDesc(r) || 'Not described yet: pick the soil below']], blank: (b, prev) => SHEETS.layers.blank(b, prev) } };
+const WS_SHEETS = { layerList: { name: 'Soil layers', key: 'layers', by: 'top', cols: [['top', 'From', 'depth'], ['bottom', 'To', 'depth'], ['desc', 'Description', 'ltdesc']], blank: (b, prev) => SHEETS.layers.blank(b, prev) } };
 const sheetOf = k => SHEETS[k] || WS_SHEETS[k];
 S.tsheet = lsGet('bhlog.tsheet') || 'layers'; if (!SHEETS[S.tsheet]) S.tsheet = 'layers';
 /* problems in a borehole's data, found as it is typed: [{sec, id, k, msg}] */
@@ -2918,6 +2918,7 @@ const sheetRows = (sh, list = gridList()) => list.flatMap(b => [...(b[sh.key] ||
 function cellText(c, r, b) {
   const [k, , t, , map] = c;
   if (isCalc(t)) { const v = c[3](r, b); return v == null ? '' : t === 'calcdepth' ? f(v, 3) : String(v); }
+  if (t === 'ltdesc') return ltDesc(r);   // the layer typed as text, read as on the log's type line
   const v = r[k]; if (v == null || v === '') return '';
   if (t === 'depth') return f(v, 3);
   if (map) return map[v] ?? v;
@@ -2967,6 +2968,14 @@ function gridWrite(cells, sheet = S.tsheet) {
   const touched = new Set(); let bad = 0;
   for (const { b, r, c, txt } of cells) {
     if (!editable(b) || isCalc(c[2])) continue;
+    // a soil name in the Soil type cell ("silty sand") gives the symbol and the texture, read as on the log's type line; unreadable text is refused
+    const s0 = String(txt ?? '').trim();
+    if (c[2] === 'ltdesc') { if (s0 && s0 !== ltDesc(r)) { if (ltApply(b, r, s0)) { bad++; continue; } const d = $('#ldetail'); if (d && S.tab === 'edit' && b === cur()) d.innerHTML = layerDetail(b); } continue; }
+    if (c[0] === 'uscs' && sheet === 'layers' && s0 && !SOILS[s0.toUpperCase()]) {
+      const q = parseLayerText(s0, r); if (!q.uscs && !q.texture) { bad++; continue; }
+      r.uscs = q.uscs; r.texture = q.texture || ''; if (q.mods && !r.mods) r.mods = q.mods;
+      if (r.consistency && !stateList(r.uscs).includes(r.consistency)) r.consistency = ''; touched.add(b); continue;
+    }
     const v = cellParse(c, txt); if (v === undefined) { bad++; continue; }
     r[c[0]] = v;
     if (sheet === 'water' && ['measured', 'ref'].includes(c[0])) recomputeWater(r, b);
