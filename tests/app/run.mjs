@@ -1574,6 +1574,25 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('3d: cut along the section line', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(300); S.v3dCut = { on: false, pos: 50 }; S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {} };
+        goTab('v3d'); for (let i = 0; i < 40 && !S.v3d?.ok; i++) await w(200); await w(300);
+        const cut = document.querySelector('#ctl #v3d-cut'), pos = () => document.querySelector('#ctl #v3d-cutpos');
+        want(cut && pos(), 'panel has the cut controls');
+        cut.checked = true; cut.dispatchEvent(new Event('change', { bubbles: true })); await w(400);
+        const pl = S.v3d.renderer.clippingPlanes; want(pl.length === 1 && S.v3d.scene.getObjectByName('cut-face'), 'cut sets a clipping plane and a coloured cut face');
+        const c0 = pl[0]?.constant; pos().value = '20'; pos().dispatchEvent(new Event('input', { bubbles: true })); await w(300);
+        want(S.v3d.renderer.clippingPlanes[0] && Math.abs(S.v3d.renderer.clippingPlanes[0].constant - c0) > .5, 'moving the slider moves the cut');
+        const c2 = document.querySelector('#ctl #v3d-cut'); c2.checked = false; c2.dispatchEvent(new Event('change', { bubbles: true })); await w(300);
+        want(!S.v3d.renderer.clippingPlanes.length && !S.v3d.scene.getObjectByName('cut-face'), 'unticking removes the cut');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
