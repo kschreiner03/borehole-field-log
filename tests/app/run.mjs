@@ -1412,6 +1412,23 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('ui: cross-section settings live in the panel', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(300); S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {} }; goTab('xsec'); await w(400);
+        const inCtl = s => !!document.querySelector('#ctl ' + s), inView = s => !!document.querySelector('#view ' + s);
+        for (const s of ['#xs-plume', '#xs-medium', '#xs-style', '#sec-tools', '#xs-model-sec', '#xs-corr-sec']) { want(inCtl(s), s + ' is in the panel'); want(!inView(s), s + ' is not above the drawing'); }
+        for (const s of ['#xs-draw svg', '#xs-asof', '#xs-date']) want(inView(s), s + ' stays with the drawing');
+        const v = document.querySelector('#view').getBoundingClientRect().top, d = document.querySelector('#xs-draw').getBoundingClientRect().top;
+        want(d - v < 260, 'drawing starts near the top: ' + Math.round(d - v));
+        const before = document.querySelector('#xs-draw').innerHTML, m = document.querySelector('#ctl #xs-medium'); m.value = 'soil'; m.dispatchEvent(new Event('change', { bubbles: true })); await w(300);
+        want(document.querySelector('#xs-draw').innerHTML !== before && document.querySelector('#ctl #xs-medium').value === 'soil', 'changing a panel control redraws the section');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
