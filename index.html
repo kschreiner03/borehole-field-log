@@ -4434,6 +4434,15 @@ function mf6Discrepancy(lst) { const v = [...lst.matchAll(/PERCENT DISCREPANCY\s
    downgradient faces from the calibration round's fitted water-table plane; no flow on the faces parallel to flow. */
 const GW_MIN_TH = .1, GW_DAY = 86400;
 function gwIdw(pts, x, y) { let sw = 0, sv = 0; for (const [px, py, v] of pts) { const d2 = (px - x) ** 2 + (py - y) ** 2; if (d2 < 1e-6) return v; const w = 1 / d2; sw += w; sv += w * v; } return sv / sw; }
+/* a rotated structured grid: local x along columns (the flow direction), local y across, rows numbered from the far side */
+function gwGrid({ xorigin, yorigin, ang, cell, nrow, ncol, top, botm, idomain }) {
+  const cs = Math.cos(ang), sn = Math.sin(ang), Lv = nrow * cell, nlay = botm.length;
+  const toWorld = (x, y) => [xorigin + x * cs - y * sn, yorigin + x * sn + y * cs], toLocal = (E, N) => [(E - xorigin) * cs + (N - yorigin) * sn, -(E - xorigin) * sn + (N - yorigin) * cs];
+  const cellCentre = (r, c) => toWorld((c + .5) * cell, Lv - (r + .5) * cell);
+  const cellOf = (E, N) => { const [x, y] = toLocal(E, N), c = Math.floor(x / cell), r = Math.floor((Lv - y) / cell); return r >= 0 && r < nrow && c >= 0 && c < ncol ? [r, c] : null; };
+  const layerAt = (r, c, z) => { let k = 0; while (k < nlay - 1 && (z < botm[k][r * ncol + c] || idomain[k][r * ncol + c] !== 1)) k++; return k; };
+  return { xorigin, yorigin, angrot: ang * 180 / Math.PI, cs, sn, cell, nrow, ncol, nlay, top, botm, idomain, toWorld, toLocal, cellCentre, cellOf, layerAt, Lv };
+}
 function gwModelSpec(list, site = siteOf() || {}, opts = {}) {
   const u0 = site.gwModel || {}, located = list.filter(b => b.easting != null && b.northing != null && b.elevation != null);
   if (located.length < 3) return { error: 'The model needs at least 3 boreholes with coordinates and a ground elevation.' };
@@ -4448,9 +4457,7 @@ function gwModelSpec(list, site = siteOf() || {}, opts = {}) {
   const xa = Math.min(...xs) - margin, xb = Math.max(...xs) + margin, ya = Math.min(...ys) - margin, yb = Math.max(...ys) + margin;
   const cell = u0.cell || opts.cell || Math.max(1, Math.ceil(Math.max((xb - xa) / 80, (yb - ya) / 60))), ncol = Math.ceil((xb - xa) / cell), nrow = Math.ceil((yb - ya) / cell);
   const xorigin = E0 + xa * cs - ya * sn, yorigin = N0 + xa * sn + ya * cs, Lv = nrow * cell;
-  const toWorld = (x, y) => [xorigin + x * cs - y * sn, yorigin + x * sn + y * cs], toLocal = (E, N) => [(E - xorigin) * cs + (N - yorigin) * sn, -(E - xorigin) * sn + (N - yorigin) * cs];
-  const cellCentre = (r, c) => toWorld((c + .5) * cell, Lv - (r + .5) * cell);
-  const cellOf = (E, N) => { const [x, y] = toLocal(E, N), c = Math.floor(x / cell), r = Math.floor((Lv - y) / cell); return r >= 0 && r < nrow && c >= 0 && c < ncol ? [r, c] : null; };
+  const toLocal = (E, N) => [(E - xorigin) * cs + (N - yorigin) * sn, -(E - xorigin) * sn + (N - yorigin) * cs];
   // units in order of depth (mean middle depth where present)
   const byB = new Map(located.map(b => [b, xsUnits(b)])), names = [...new Set([...byB.values()].flatMap(us => us.map(u => u.u)))];
   if (!names.length) return { error: 'The boreholes have no logged soil layers to build model layers from.' };
@@ -4480,10 +4487,9 @@ function gwModelSpec(list, site = siteOf() || {}, opts = {}) {
       sy: e.sy ?? null, ne: e.ne ?? (S.co.ne ?? .25) }; });
   const rch = u0.rch != null ? +u0.rch : CCME_SOIL[u0.soil === 'fine' ? 'fine' : 'coarse'].I / 365.25, rchSrc = u0.rch != null ? 'entered' : `${CCME_SRC} (infiltration ${CCME_SOIL[u0.soil === 'fine' ? 'fine' : 'coarse'].I} m/year; start value)`;
   // head observations: each well read in the round, in the layer holding its screen middle
-  const layerAt = (r, c, z) => { let k = 0; while (k < names.length - 1 && (z < botm[k][r * ncol + c] || idomain[k][r * ncol + c] !== 1)) k++; return k; };
+  const grid = gwGrid({ xorigin, yorigin, ang, cell, nrow, ncol, top, botm, idomain }), { cellOf, layerAt } = grid;
   const obs = gwHeads(located, round).wells.map((w, j) => { const rc = cellOf(w.e, w.n); if (!rc) return null; const sc = w.b.well, z = sc?.screenTop != null ? w.b.elevation - (sc.screenTop + sc.screenBottom) / 2 : w.h;
     const [x, y] = toLocal(w.e, w.n); return { name: 'h' + (j + 1), b: w.b, r: rc[0], c: rc[1], l: layerAt(rc[0], rc[1], z), x, y, h: w.h, date: w.w.date }; }).filter(Boolean);
-  const grid = { xorigin, yorigin, angrot: ang * 180 / Math.PI, cs, sn, cell, nrow, ncol, nlay: names.length, top, botm, idomain, toWorld, toLocal, cellCentre, cellOf, layerAt, Lv };
   const params = [...units.filter(u => u.calib).map(u => ({ key: 'k:' + u.u, label: `K, ${u.u}`, unit: 'm/day', value: u.k, prior: u.prior, src: u.kSrc })),
     { key: 'rch', label: 'Recharge', unit: 'm/day', value: rch, prior: null, src: rchSrc }];
   const M = { round, F, grid, units, obs, params, rch, features: u0.features || [], notes: [], list: located }; M.spec = gwSpec(M); return M;
@@ -4597,6 +4603,43 @@ async function gwTransport(M, pv = {}, opts = {}) {
     return T2.ok && T2.fit.rmsLog <= fit.rmsLog ? { ...T2, c0Src: `calibrated (×${m.toPrecision(3)} the measured ${(+P.C0.toPrecision(3))} mg/L)` } : { ...result, c0Src: 'measured at the source (calibration did not improve the fit)' };
   }
   return { ...result, c0Src: P.src.C0 || 'measured at the source' };
+}
+/* ---------- flow paths from MODFLOW 6's specific discharge (DATA-SPDIS, in the grid's own axes) ----------
+   Velocity = q / effective porosity, interpolated bilinearly between cell centres in the particle's layer; the vertical
+   component is the cell's. Midpoint (RK2) steps of a fifth of a cell. Times are for water; a sorbing solute is slower by R. */
+function gwVelocity(G, spdis, ne) {
+  const n2 = G.nrow * G.ncol, qx = new Float64Array(G.nlay * n2).fill(NaN), qy = new Float64Array(G.nlay * n2).fill(NaN), qz = new Float64Array(G.nlay * n2).fill(NaN);
+  for (const e of spdis) { const i = e.id1 - 1; if (i >= 0 && i < qx.length) { qx[i] = e.aux[0]; qy[i] = e.aux[1]; qz[i] = e.aux[2]; } }
+  const zTop = (k, i) => k ? G.botm[k - 1][i] : G.top[i];
+  const layerOfZ = (r, c, z) => { const i = r * G.ncol + c; for (let k = 0; k < G.nlay; k++) if (G.idomain[k][i] === 1 && z >= G.botm[k][i] && z <= zTop(k, i) + 1e-9) return k; for (let k = 0; k < G.nlay; k++) if (G.idomain[k][i] === 1) return z > zTop(k, i) ? k : -1; return -1; };
+  return (x, y, z) => {
+    const fc = x / G.cell - .5, fr = (G.Lv - y) / G.cell - .5, c = Math.floor(x / G.cell), r = Math.floor((G.Lv - y) / G.cell);
+    if (r < 0 || r >= G.nrow || c < 0 || c >= G.ncol) return null;
+    const k = layerOfZ(r, c, z); if (k < 0) return null;
+    const c0 = Math.max(0, Math.min(G.ncol - 2, Math.floor(fc))), r0 = Math.max(0, Math.min(G.nrow - 2, Math.floor(fr))), tx = Math.max(0, Math.min(1, fc - c0)), ty = Math.max(0, Math.min(1, fr - r0));
+    let vx = 0, vy = 0, w = 0; for (const [rr, cc, ww] of [[r0, c0, (1 - tx) * (1 - ty)], [r0, c0 + 1, tx * (1 - ty)], [r0 + 1, c0, (1 - tx) * ty], [r0 + 1, c0 + 1, tx * ty]]) {
+      const i = k * n2 + rr * G.ncol + cc; if (!(ww > 0) || !Number.isFinite(qx[i])) continue; vx += qx[i] * ww; vy += qy[i] * ww; w += ww; }
+    const ic = k * n2 + r * G.ncol + c; if (!(w > 0) || !Number.isFinite(qz[ic])) return null;
+    const n = ne[k] ?? ne[0]; return { vx: vx / w / n, vy: vy / w / n, vz: qz[ic] / n, r, c, k };
+  };
+}
+function gwPathline(G, spdis, ne, E, N, z, opts = {}) {
+  const vel = gwVelocity(G, spdis, ne), tmax = opts.tmax ?? 100 * 365.25, out = []; let [x, y] = G.toLocal(E, N), t = 0;
+  for (let step = 0; step < 20000; step++) {
+    const v = vel(x, y, z); if (!v) break; out.push({ E: G.toWorld(x, y)[0], N: G.toWorld(x, y)[1], z, t });
+    if (v.c === 0 && step > 0 || v.c === G.ncol - 1 || t >= tmax) break;   // fixed-head faces take the water out
+    const sp = Math.hypot(v.vx, v.vy, v.vz); if (!(sp > 1e-12)) break;
+    const dt = Math.min(.2 * G.cell / sp, tmax - t), m = vel(x + v.vx * dt / 2, y + v.vy * dt / 2, z + v.vz * dt / 2) || v;
+    x += m.vx * dt; y += m.vy * dt; z += m.vz * dt; t += dt;
+  }
+  return out;
+}
+/* paths from the forecast's source well: three particles across the source width, a metre below the water table */
+function gwSourcePaths(M, run, opts = {}) {
+  const u = siteOf()?.model || {}, src = S.bh.get(u.srcBh) || M.obs[0]?.b; if (!src || !run?.out?.['gwf.cbc']) return [];
+  const q = mf6ReadBudget(run.out['gwf.cbc'], 'DATA-SPDIS').pop(); if (!q) return [];
+  const G = M.grid, [x0, y0] = G.toLocal(src.easting, src.northing), Y = u.Y ?? CCME_SITE.Y, wt = M.F.fit({ e: src.easting, n: src.northing });
+  return [-Y / 3, 0, Y / 3].map(dy => { const [E, N] = G.toWorld(x0, y0 + dy); return gwPathline(G, q.list, M.units.map(x => x.ne), E, N, wt - 1, opts); }).filter(p => p.length > 1);
 }
 /* ---------- calibration: Levenberg–Marquardt on log10 parameters (as in PEST and UCODE), by repeated MODFLOW 6 runs ----------
    Objective: Σ ((h_obs − h_sim)/σh)² + Σ ((log10 K_slug − log10 K)/σlogK)² over parameters with slug-test prior information.
