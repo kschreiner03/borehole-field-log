@@ -1286,6 +1286,11 @@ body.side-off .shell { --sidebar-width: 0px; } body.side-off .side { display: no
 .cmp-bar .tb { min-height: 26px; padding: 0 5px; } .cmp-bar .tb svg { width: 15px; height: 15px; } .cmp-bar .del, .cmp-bar .del svg { color: var(--negative, #c4242a); }
 .ctl-gb .cmp-pageset, .ctl-gb .cmp-props { display: flex; flex-direction: column; gap: 8px; position: static; max-height: none; overflow: visible; }
 .ctl-gb .cmp-pageset .cmp-zoom { display: flex; align-items: center; gap: 6px; }
+/* typing layers on the log page */
+.lt-box { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--rule); } .lt-box label, .lt-new label { font: 600 12.5px var(--f-body); }
+.lt-box input, .lt-new input { width: 100%; font: 13px var(--f-mono, monospace); } .lt-box .note { margin: 0; font-size: 12px; }
+.lt-new { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 10px; margin: 0 0 8px; } .lt-new .note { grid-column: 2; font-size: 12px; min-height: 1em; }
+#lt-inline { position: absolute; z-index: 40; padding: 6px 8px; font: 13px/1.35 var(--f-body); color: var(--ink); background: var(--surface); border: 2px solid var(--accent); border-radius: var(--r-sm); box-shadow: 0 6px 18px rgba(16, 24, 40, .18); resize: vertical; }
 .ctl.min { overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; }
 .ctl.min .tb { width: 30px; min-height: 30px; justify-content: center; }
 /* toolbar: project switcher and the find box */
@@ -1556,6 +1561,65 @@ function blankBorehole(name) {
     easting: null, northing: null, crs: '', elevation: null, datum: '', termination: '', slough: null, notes: '', gwNone: false, csscGG: '', csscSub: '',
     layers: [newLayer(0)], samples: [], water: [], well: blankWell(), status: 'draft', rev: 0, issued: null, history: [{ at: new Date().toISOString(), by: S.me || '', what: 'Borehole created' }], updated: new Date().toISOString() };
 }
+/* a layer typed as text ("1.2-3.5 SP fine to medium grained, trace silt, compact, moist, brown") → the fields the buttons set.
+   Depths first are optional; words it doesn't recognise go to other features, so nothing typed is lost. */
+const LT_COLOUR = /^(?:(?:dark|light|pale|mottled|reddish|greyish|grayish|yellowish|olive)\s+)*(?:brown|grey|gray|black|red|orange|yellow|green|blue|white|tan|olive)(?:\s*(?:-|and|to)\s*(?:dark\s+|light\s+)?(?:brown|grey|gray|black|red|orange|yellow|green|white|tan))*$/i;
+function parseLayerText(text) {
+  let t = String(text || '').replace(/\s+/g, ' ').trim(); const o = { uscs: '', mods: '', consistency: '', moisture: '', colour: '', origin: '', other: '', hz: '' }, mods = [], other = [];
+  const dm = /^(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*(?:m|ft)?(?=[\s,:]|$)[\s,:]*/i.exec(t); if (dm) { o.top = fromD(+dm[1]); o.bottom = fromD(+dm[2]); t = t.slice(dm[0].length); }
+  const tag = /\s*\((FILL|LACUSTRINE|ALLUVIUM|TILL|GLACIOFLUVIAL|AEOLIAN)\)\s*$/i.exec(t); if (tag) { o.origin = Object.keys(ORIGIN_TAG).find(k => ORIGIN_TAG[k] === tag[1].toUpperCase()); t = t.slice(0, tag.index); }
+  const hz = /^([A-Za-z]{1,3}\d?)\s+horizon:?\s*/i.exec(t); if (hz) { o.hz = hz[1]; t = t.slice(hz[0].length); }
+  const parts = t.split(',').map(x => x.trim()).filter(Boolean); let head = parts.shift() || '';
+  // the soil: a group symbol in the head ("SAND (SP)", "SP sand", "sp"), else a name that means one thing (topsoil, peat, fill, shale…)
+  const code = head.match(/\(?\b([A-Za-z]{1,4}(?:-[A-Za-z]{2})?)\b\)?/g)?.map(x => x.replace(/[()]/g, '').toUpperCase()).find(x => SOILS[x]);
+  if (code) { o.uscs = code; head = head.replace(new RegExp(`\\(?\\b${code.replace('-', '\\-')}\\b\\)?`, 'i'), ''); }
+  else { const byName = Object.entries(SOILS).filter(([, v]) => v.p && head.toUpperCase().includes(v.p)), one = byName.length && new Set(byName.map(([, v]) => v.p)).size === 1 && byName.length === 1 ? byName[0] : null; if (one) { o.uscs = one[0]; head = head.toUpperCase().replace(one[1].p, '').toLowerCase(); } }
+  const s = soilOf(o.uscs); if (s?.p) head = head.replace(new RegExp(s.p.replace(/[,]/g, ''), 'i'), ''); head = head.replace(/^[\s:–-]+|[\s:–-]+$/g, '');
+  if (head) parts.unshift(head);
+  const proper = (list, x) => list.find(v => v && v.toLowerCase() === x.toLowerCase()); let past = false;   // the description runs modifiers, grading, consistency, moisture, colour, then other features
+  for (const part of parts) {
+    const x = part.toLowerCase(), gr = /^(fine|medium|coarse)(?:\s*(?:to|-)\s*(fine|medium|coarse))?(?:\s+grained)?$/.exec(x);
+    if (gr && !past) { mods.push(gr[2] ? `${gr[1]} to ${gr[2]} grained` : gr[1] + ' grained'); continue; }   // keeps "fine to medium grained" as written
+    if (MOD_CHIPS.includes(x) && !past) { mods.push(x); continue; }
+    const cn = proper([...COHESIVE, ...GRANULAR, ...WEATHERING], x); if (cn && !o.consistency) { o.consistency = cn; past = true; continue; }
+    const mo = proper(MOISTURE, x); if (mo && !o.moisture) { o.moisture = mo; past = true; continue; }
+    if ((s?.grad && x === s.grad) || (s?.plast && x === `${s.plast} plastic`)) { past = true; continue; }   // implied by the soil type; written back from it
+    const og = Object.entries(ORIGINS).find(([k, v]) => k && (x === k || x === v.toLowerCase())); if (og && !o.origin && !(og[0] === 'topsoil' && o.uscs === 'TOP')) { o.origin = og[0]; continue; }
+    if (LT_COLOUR.test(x) && !o.colour) { o.colour = part; past = true; continue; }
+    (past ? other : mods).push(part);
+  }
+  if (mods.length === 1 && s?.imp && mods[0] === s.imp) mods.length = 0;   // "silty" alone on SM is the soil's own word
+  o.mods = mods.join(', '); o.other = other.join(', ');
+  return o;
+}
+const LT_KEYS = ['uscs', 'mods', 'consistency', 'moisture', 'colour', 'origin', 'other', 'hz'];
+function layerApplyText(b, l, text) {
+  const q = parseLayerText(text); if (q.top != null) l.top = q.top; if (q.bottom != null) l.bottom = q.bottom;
+  for (const k of LT_KEYS) l[k] = q[k]; if (q.uscs) l.texture = '';
+  b.layers.sort((a, c) => (a.top ?? 0) - (c.top ?? 0)); logChange(b, 'Soil layers'); store.save(b);
+}
+const layerText = l => `${l.top != null && l.bottom != null ? `${fx(toD(l.top))}-${fx(toD(l.bottom))} ` : ''}${composeDesc(l).name || composeDesc(l).body ? composeDesc(l).text : ''}`;
+function ltRead(text) { const q = parseLayerText(text); return [q.top != null ? `${fx(toD(q.top))}–${fu(q.bottom)}` : '', q.uscs, q.mods, q.consistency, q.moisture, q.colour, q.origin && ORIGINS[q.origin], q.other && `other: ${q.other}`].filter(Boolean).join(' · ') || 'Nothing recognised yet'; }
+/* typing straight onto the log: a text box over the layer's description; Enter applies, Escape leaves it */
+function ltInline(i) {
+  $('#lt-inline')?.remove(); const b = cur(), l = b?.layers[i], z = document.querySelector(`#log [data-desc][data-i="${i}"]`); if (!l || !z) return;
+  const r = z.getBoundingClientRect(), ta = document.createElement('textarea'); ta.id = 'lt-inline'; ta.dataset.i = i; ta.setAttribute('aria-label', `Layer ${i + 1} description`); ta.spellcheck = false;
+  ta.value = composeDesc(l).name || composeDesc(l).body ? composeDesc(l).text : ''; Object.assign(ta.style, { left: r.left + scrollX + 'px', top: r.top + scrollY + 'px', width: Math.max(260, r.width) + 'px', height: Math.max(64, Math.min(200, r.height)) + 'px' });
+  document.body.append(ta); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  ta.addEventListener('blur', () => { if (ta.isConnected && !ta.dataset.done) ltInlineDone(ta, true); });
+}
+function ltInlineDone(ta, apply) { ta.dataset.done = '1'; const b = cur(), l = b?.layers[+ta.dataset.i]; if (apply && l && editable(b) && ta.value.trim() !== (composeDesc(l).text || '').trim()) { layerApplyText(b, l, ta.value); } ta.remove(); redrawLog(); renderDrawer(); }
+document.addEventListener('keydown', e => {
+  const t = e.target; if (!t?.id?.startsWith?.('lt-')) return;
+  if (t.id === 'lt-inline' && e.key === 'Escape') { e.preventDefault(); ltInlineDone(t, false); return; }
+  if (e.key !== 'Enter' || e.shiftKey) return; e.preventDefault(); const b = cur(); if (!editable(b)) return;
+  if (t.id === 'lt-inline') { ltInlineDone(t, true); return; }
+  if (t.id === 'lt-type') { const l = b.layers[+t.dataset.ltl]; if (l) { layerApplyText(b, l, t.value); renderDrawer(); redrawLog(); $('#lt-type')?.focus(); } return; }
+  if (t.id === 'lt-new' && t.value.trim()) { const q = parseLayerText(t.value), top = q.top ?? Math.max(0, ...b.layers.map(l => l.bottom ?? 0)), l = newLayer(top);
+    l.bottom = q.bottom ?? top + fromD(S.units === 'ft' ? 2 : .5); b.layers.push(l); layerApplyText(b, l, t.value); l.top = top; if (q.bottom == null) l.bottom = top + fromD(S.units === 'ft' ? 2 : .5);
+    t.value = ''; $('#lt-new-read').textContent = `Added layer ${b.layers.indexOf(l) + 1}: ${fx(toD(l.top))}–${fu(l.bottom)}. Type the next one.`; redrawLog(); t.focus(); }
+});
+document.addEventListener('input', e => { const t = e.target; if (t.id === 'lt-type') $('#lt-read').textContent = 'Reads as: ' + ltRead(t.value); if (t.id === 'lt-new') $('#lt-new-read').textContent = t.value.trim() ? 'Reads as: ' + ltRead(t.value) : ''; });
 function newLayer(top) { return { id: uid('l'), top, bottom: null, hz: '', uscs: '', mods: '', consistency: '', moisture: '', colour: '', other: '', origin: '' }; }
 function nextName() {
   let max = 0;
@@ -2555,7 +2619,8 @@ function drawerHTML(b) {
   const num2 = (id, sec, k, v, label, extra = '') => `<div class="fld"><label for="${id}">${label}</label><input id="${id}" type="number" step="any" inputmode="decimal" data-sec="${sec}" data-i="${i}" data-k="${k}" value="${esc(v ?? '')}" ${extra}></div>`;
   const head = (t, sub = '') => `<header><div><h3>${t}</h3>${sub ? `<span class="note">${sub}</span>` : ''}</div><button class="btn" data-act="drawer-close" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></header>`;
   if (d.kind === 'layer') {
-    return head(`Layer ${i + 1}`, 'Edits show on the log as you type') + `<div class="dbody">${layerDetail(b).replace(/^<div style="display:flex[^]*?<\/div>/, '')}
+    const lt = b.layers[i];
+    return head(`Layer ${i + 1}`, 'Edits show on the log as you type') + `<div class="dbody"><div class="lt-box"><label for="lt-type">Type the layer</label><input id="lt-type" data-ltl="${i}" value="${esc(lt ? layerText(lt) : '')}" autocomplete="off" spellcheck="false" placeholder="1.2-3.5 SP fine to medium grained, trace silt, compact, moist, brown"><p class="note" id="lt-read">Press Enter to apply; the buttons below follow. Words it doesn't know go to other features.</p></div>${layerDetail(b).replace(/^<div style="display:flex[^]*?<\/div>/, '')}
       <div class="actions"><button class="btn" data-act="drawer-layer-below">Add layer below</button><button class="btn danger" data-act="drawer-del" data-what="layers">Delete layer</button></div></div>`;
   }
   if (d.kind === 'sample') { const sm = b.samples[i]; if (!sm) return ''; return head(`Sample ${esc(sampleId(sm))}`, `at ${fu(sm.depth)}`) + `<div class="dbody">${sampleFormHTML(b, i, false)}</div>`; }
@@ -2589,6 +2654,7 @@ document.addEventListener('click', e => {
   const svg = z.ownerSVGElement, r = svg.getBoundingClientRect(), sc = r.height / svg.viewBox.baseVal.height;
   const depth = Math.max(0, snapD((((e.clientY - r.top) / sc) - +svg.dataset.t) / +svg.dataset.k));
   const ed = z.dataset.ed, i = z.dataset.i != null ? +z.dataset.i : null;
+  if (ed === 'layer' && z.dataset.desc != null) { openDrawer('layer', i); ltInline(i); return; }
   if (ed === 'layer' || ed === 'sample' || ed === 'water') { openDrawer(ed, i); return; }
   if (ed === 'well') { if (!b.well.installed) { b.well.installed = true; b.well.type ||= 'standpipe'; store.save(b); redrawLog(); } openDrawer('well'); return; }
   if (ed === 'add-layer') {
@@ -2688,7 +2754,7 @@ function renderView(full) {
   else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); }
   else if (S.tab === 'reports') { v.innerHTML = reportsHubHTML(b); }
   else if (S.tab === 'compose') { v.innerHTML = composeHTML(); requestAnimationFrame(() => { drawCompose(); fillThumbs(); gwComposeEnsure(); }); }
-  else { v.innerHTML = nextSteps(b) + (editable(b) ? '<p class="log-hint">Click any layer, sample, water level or the standpipe on the log to edit it. Click empty space in a column to add one at that depth.</p>' : '') + sheetHTML(b) + logLegendHTML(b); const el = $('#log'); el.innerHTML = logSVG(b, Math.max(el.clientWidth, 900)); }
+  else { v.innerHTML = nextSteps(b) + (editable(b) ? '<div class="lt-new"><label for="lt-new">Add a layer by typing</label><input id="lt-new" autocomplete="off" spellcheck="false" placeholder="e.g. 2.4-3.1 CL silty clay, stiff, moist, brown (depths optional: it starts at the bottom of the log)"><span class="note" id="lt-new-read"></span></div>' : '') + (editable(b) ? '<p class="log-hint">Click any layer, sample, water level or the standpipe on the log to edit it. Click empty space in a column to add one at that depth.</p>' : '') + sheetHTML(b) + logLegendHTML(b); const el = $('#log'); el.innerHTML = logSVG(b, Math.max(el.clientWidth, 900)); }
   if (MAP_TABS.includes(S.tab)) v.insertAdjacentHTML('afterbegin', hiddenNote());
   if (BH_TABS.includes(S.tab)) markIssues(b);
   ctlRender();
@@ -3591,7 +3657,7 @@ function logSVG(b, W) {
     out.push(z(cSm.x, T, sx1 - sx0, H, 'add-sample', null, 'Click to add a sample at this depth'));
     if (cW.w) out.push(z(cW.x, T, cW.w, H, 'add-water', null, 'Click to add a water level at this depth'));
     out.push(z(cG.x, y(eoh), cDs.x + cDs.w + 10 - cG.x, T + H - y(eoh) + 24, 'add-layer', null, 'Click to add the next layer down to this depth'));
-    layers.forEach(l => out.push(z(cG.x, y(l.top), cG.w, y(l.bottom) - y(l.top), 'layer', b.layers.indexOf(l), 'Edit this layer'), z(cDs.x - 10, y(l.top), cDs.w + 20, y(l.bottom) - y(l.top), 'layer', b.layers.indexOf(l), 'Edit this layer')));
+    layers.forEach(l => out.push(z(cG.x, y(l.top), cG.w, y(l.bottom) - y(l.top), 'layer', b.layers.indexOf(l), 'Edit this layer'), z(cDs.x - 10, y(l.top), cDs.w + 20, y(l.bottom) - y(l.top), 'layer', b.layers.indexOf(l), 'Click to type this layer; the panel has the buttons').replace('data-ed="layer"', 'data-ed="layer" data-desc="1"')));
     if (cWl.w) out.push(z(cWl.x, T - AG, cWl.w, H + AG, 'well', null, 'Edit the standpipe / well'));
     for (const it of sm) out.push(z(sx0, Math.min(it.ly, it.y) - 9, sx1 - sx0, Math.abs(it.ly - it.y) + 18, 'sample', b.samples.indexOf(it.s), `Edit ${sampleId(it.s)}`));
     if (cW.w) for (const it of lab) out.push(z(cW.x, it.ly - 14, cW.w, 28, 'water', b.water.indexOf(it.w), 'Edit this water level'));
