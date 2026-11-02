@@ -1455,6 +1455,26 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('ui: 3D, model and map settings in the panel', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(300); S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {} };
+        const inCtl = s => !!document.querySelector('#ctl ' + s), inView = s => !!document.querySelector('#view ' + s);
+        goTab('v3d'); await w(800);
+        want(inCtl('#v3d-ve') && inCtl('#v3d-lyr-boreholes') && inCtl('[data-act="v3d-vtk"]') && !inView('#v3d-ve'), '3D settings in the panel');
+        want(document.querySelector('#v3d').getBoundingClientRect().width > .85 * document.querySelector('#view').getBoundingClientRect().width, '3D canvas fills the work area');
+        goTab('gwm'); await w(500);
+        for (const s of ['#gwm-setup', '#gwm-units', '#gwm-feat', '[data-act="gw-run"]', '[data-act="gw-cal"]']) { want(inCtl(s), s + ' in the panel'); want(!inView(s), s + ' not in the page'); }
+        want(inView('#gwm-cal-sec') && inView('#gwm-trans-sec'), 'results stay in the page');
+        document.querySelector('#ctl [data-act="gw-run"]').click(); for (let i = 0; i < 60 && (S.gwm.busy || !S.gwm.run); i++) await w(200);
+        want(S.gwm.run?.ok, 'Run model from the panel works: ' + S.gwm.err);
+        goTab('site'); await w(400); want(inCtl('#sec-tools') && !inView('#sec-tools'), 'Map & sections: section tools in the panel');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
