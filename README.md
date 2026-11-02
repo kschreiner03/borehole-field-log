@@ -1,8 +1,11 @@
-# Borehole Field Log (desktop)
+# Borehole Field Log
 
-Windows and Mac desktop app: Electron + React + TypeScript + Vite.
+Borehole logging, groundwater and reporting, as a Windows and Mac desktop app (Electron + React + TypeScript + Vite).
 
-- **Classic interface**: the current app (from `../borehole-log`), copied into `resources/legacy` by `npm run sync-legacy` and opened by default. It has native Open/Save dialogs, File menu shortcuts, recent documents, and opens `.bhp` / `.bhlog` files by double-click.
+- `app/`: the app itself, a single `index.html` (with `DESIGN.md`, `PRODUCT.md` and the design docs in `app/docs`). It also runs on its own in a browser.
+- Everything else: the desktop shell, its tests and the installers.
+
+- **Classic interface**: the app in `app/`, copied into `resources/legacy` by `npm run sync-legacy` and opened by default. It has native Open/Save dialogs, File menu shortcuts, recent documents, and opens `.bhp` / `.bhlog` files by double-click.
 - **New interface (preview)**: React screens, opened from View > New interface (preview). They are being rebuilt screen by screen on the tested calculation modules in `src/core`.
 
 ## Commands
@@ -18,20 +21,17 @@ Windows and Mac desktop app: Electron + React + TypeScript + Vite.
 
 ## Building the Windows installer on a Windows computer
 
-The desktop app copies the app from the `borehole-log` folder beside it, so clone both into the same folder.
-
-1. Install [Git](https://git-scm.com/download/win) and [Node.js](https://nodejs.org) (the LTS version), then open a new Command Prompt or PowerShell.
-2. Clone both projects side by side:
+1. Install [Git](https://git-scm.com/download/win) and [Node.js](https://nodejs.org) (the LTS version), then open a new Command Prompt or PowerShell. Python is not needed.
+2. Get the project and its packages:
    ```
-   git clone https://github.com/kschreiner03/borehole-log.git
-   git clone https://github.com/kschreiner03/borehole-desktop.git
-   cd borehole-desktop
+   git clone https://github.com/kschreiner03/borehole-field-log.git
+   cd borehole-field-log
    npm ci
    ```
 3. Build the installer: `npm run dist:win`. It downloads MODFLOW 6 for Windows (checked against its published SHA-256), runs both test suites and writes `dist\Borehole Field Log Setup <version>.exe`. To skip the tests: `node scripts/fetch-mf6.mjs win32-x64 && npm run build && npx electron-builder --win`.
 4. Send the `.exe`. It is unsigned, so Windows shows "Windows protected your PC" the first time; choose **More info › Run anyway** (see Signing below to remove the warning).
 
-To update later: `git pull` in both folders, then build again.
+To update later: `git pull`, then build again.
 
 Smoke test: `BOREHOLE_SMOKE=shot.png npx electron .` opens the window, saves a screenshot and quits (`BOREHOLE_VIEW=preview` for the new interface; add a `.bhp` path to open it; `BOREHOLE_USER_DATA=<folder>` runs it in its own profile, beside a copy already open).
 
