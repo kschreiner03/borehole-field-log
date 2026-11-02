@@ -1269,17 +1269,17 @@ app.whenReady().then(async () => {
         want([...document.querySelectorAll('#gwm-units tbody tr')].every(tr => /slug|calibration|entered/.test(tr.textContent)), 'every K has a source');
         document.querySelector('[data-act="gw-feat-add"]').click(); await w(200);
         want((siteOf().gwModel?.features || []).length === 1 && document.querySelectorAll('#gwm-feat tbody tr').length === 1, 'a boundary feature row');
-        const ft = document.querySelector('#gwm-feat tbody tr [data-gwf$="|type"]'); ft.value = 'drn'; ft.dispatchEvent(new Event('change', { bubbles: true })); await w(100);
+        const ft = document.querySelector('#gwm-feat tbody tr [data-gwft$="|type"]'); ft.value = 'drn'; ft.dispatchEvent(new Event('change', { bubbles: true })); await w(100);
         want(siteOf().gwModel.features[0].type === 'drn', 'feature type saved');
         document.querySelector('#gwm-feat [data-act="gw-feat-del"]').click(); await w(150); want(!(siteOf().gwModel.features || []).length, 'feature removed');
         document.querySelector('[data-act="gw-cal"]').click();
-        await until(() => siteOf().gwModel?.calib && !S.gw?.busy, 180000);
+        await until(() => siteOf().gwModel?.calib && !S.gwm?.busy, 180000);
         const c = siteOf().gwModel.calib; want(c && Number.isFinite(c.stats.rmse), 'calibration stored with its statistics');
         await w(300);
         want(document.querySelectorAll('#gwm-res tbody tr').length === c.residuals.length && document.querySelector('#gwm-scatter svg'), 'residual table and measured-vs-simulated plot');
         want(/RMSE/.test(v().textContent) && /discrepancy/i.test(v().textContent), 'statistics shown');
-        document.querySelector('[data-act="gw-trans"]').click(); await until(() => S.gw?.trans && !S.gw?.busy, 180000);
-        want(S.gw.trans?.ok && document.querySelector('#gwm-trans tbody tr'), 'transport results shown: ' + S.gw.trans?.error);
+        document.querySelector('[data-act="gw-trans"]').click(); await until(() => S.gwm?.trans && !S.gwm?.busy, 180000);
+        want(S.gwm.trans?.ok && document.querySelector('#gwm-trans tbody tr'), 'transport results shown: ' + S.gwm.trans?.error);
         let saved = null; window.saveFile = (name, data) => { saved = { name, size: data.size ?? data.length ?? data.byteLength }; };
         document.querySelector('[data-act="gw-export"]').click(); await until(() => saved, 20000); want(saved && /\\.zip$/.test(saved.name) && saved.size > 1000, 'exports the model files: ' + JSON.stringify(saved));
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
@@ -1301,7 +1301,7 @@ app.whenReady().then(async () => {
         let svg = document.querySelector('#xs-draw svg'); want(!svg.querySelector('[data-gw-wt]') && /Model, not measured/.test(svg.textContent) && !/MODFLOW/.test(svg.textContent), 'without a run: Domenico, no model flow');
         const M = gwModel(), C = await gwCalibrate(M, { maxIter: 4 }); want(C.ok, 'calibrates: ' + C.error);
         setGwm({ calib: { mode: 'steady', pv: C.pv, params: C.params, stats: C.stats, residuals: C.residuals, css: C.css, corr: C.corr, warnings: C.warnings, round: M.round, rounds: [M.round], at: new Date().toISOString(), runs: C.runs, iterations: C.iterations, key: gwInputsKey(gwModel()) }, transport: { on: true } });
-        await gwEnsure(true); want(S.gw.run?.ok && S.gw.trans?.ok, 'model and transport ran: ' + (S.gw.err || S.gw.trans?.error));
+        await gwEnsure(true); want(S.gwm.run?.ok && S.gwm.trans?.ok, 'model and transport ran: ' + (S.gwm.err || S.gwm.trans?.error));
         drawXsec(); await w(200); svg = document.querySelector('#xs-draw svg');
         want(svg.querySelector('path[data-gw-wt]'), 'model water table drawn');
         want(svg.querySelectorAll('path[data-gw-head]').length >= 2 && svg.querySelector('text[data-gw-hlabel]'), 'head contours with labels');
@@ -1359,6 +1359,57 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('mf6: review fixes', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        // C1: the Water page's plot mode and the model state are separate
+        want(S.gw === 'elev' || S.gw === 'depth', 'Water plot mode intact: ' + typeof S.gw);
+        S.gw = 'depth'; goTab('gwm'); await w(300); want(/Groundwater model/.test(document.querySelector('#view').textContent) && gwModel() && !gwModel().error, 'Model page works after the Water toggle');
+        // C2: lab table edits are not caught by the model's feature inputs
+        const b = sectionList().find(x => (x.gwSamples || []).length); S.sel = b.id; goTab('gw'); await w(300);
+        const inp = document.querySelector('[data-gwf$="|sid"]'); if (inp) { inp.value = 'PROBE-ID'; inp.dispatchEvent(new Event('change', { bubbles: true })); await w(150); }
+        want(!inp || S.bh.get(b.id).gwSamples.some(s => s.sid === 'PROBE-ID'), 'groundwater lab edits are kept');
+        want(!(siteOf().gwModel?.features || []).length, 'no stray model features');
+        // C3: switching project drops the cached model
+        const M1 = gwModel(); const other = blankBorehole('OTHER-1'); other.project = 'Another project'; S.bh.set(other.id, normalize(other)); store.save(other); S.sel = other.id; render(); await w(200);
+        want(gwModel() !== M1 && (gwModel().error || gwModel().list.every(x => x.project === 'Another project')), 'the model belongs to the open project');
+        S.sel = sectionList().length ? S.sel : S.sel; loadXsExample(); await w(300);
+        // I1, I2: features in the right layer, fixed heads honoured, incomplete ones skipped with a note
+        const M = gwModel(), mw = M.list.find(x => x.name === 'MW-5'), wt = M.F.fit({ e: mw.easting, n: mw.northing });
+        setGwm({ features: [{ type: 'riv', name: 'Creek', pts: [[mw.easting, mw.northing]], stage: wt - .3, cond: 50, rbot: wt - 1 }, { type: 'chd', name: 'Pond', pts: [[mw.easting + 8, mw.northing]], stage: wt + .2, head: wt + .2 }, { type: 'drn', name: 'Half done', pts: [] }] });
+        const M2 = gwModel(), sp = gwSpec(M2), rv = sp.riv?.[0]?.[0], ch = sp.chd[0].filter(q => Math.abs(q[3] - (wt + .2)) < 1e-6);
+        want(rv && M2.grid.botm[rv[0]][rv[1] * M2.grid.ncol + rv[2]] < wt - 1 + 1e-9, 'river in the layer holding its bed bottom');
+        want(ch.length >= 1, 'fixed-head feature written');
+        want(M2.notes.some(n => /Half done/.test(n)), 'incomplete feature skipped with a note: ' + M2.notes);
+        const run1 = await gwRun(M2); want(run1.ok, 'runs with the features: ' + run1.error);
+        setGwm({ features: [] });
+        // I3: vertical transverse dispersivity is ATH2
+        const f = mf6Files({ ...gwSpec(gwModel()), gwt: { porosity: [.25, .25, .25, .25], rhob: 1.7, kd: .1, al: 2, ath: .2, atv: .01, cnc: [null] } }).files['gwt.dsp'];
+        want((f.split('ATH2')[1] || '').trim().startsWith('CONSTANT 0.01'), 'ATH2 carries the vertical dispersivity: ' + f);
+        // I4: the bridge refuses paths and directives inside model files
+        const bad = await window.desktop.mf6Run({ files: { 'mfsim.nam': 'BEGIN options\\nEND options\\n', 'gwf.oc': 'BEGIN options\\n  HEAD FILEOUT /tmp/x.hds\\nEND options\\n' } });
+        want(!bad.ok && /path/i.test(bad.error), 'refuses a path inside a model file: ' + bad.error);
+        const dots = await window.desktop.mf6Run({ files: { 'mfsim.nam': 'x', '..': 'y' } }); want(!dots.ok, 'refuses ..');
+        // I5: an entered K or recharge wins over the stored calibration
+        const M3 = gwModel(), u = M3.units.find(x => x.calib);
+        setGwm({ calib: { pv: { ['k:' + u.u]: 9.9, rch: 1e-4 }, params: [], stats: {}, residuals: [], css: {}, corr: [], warnings: [], round: M3.round, at: new Date().toISOString(), key: '' } });
+        setGwm({ units: { [u.u]: { k: 3.3 } }, rch: 2e-4 }); const pv = gwPv();
+        want(pv['k:' + u.u] == null && pv.rch == null, 'entered values drop the calibrated ones: ' + JSON.stringify(pv));
+        want(gwSpec(gwModel(), pv).npf.k[gwModel().units.findIndex(x => x.u === u.u)] === 3.3, 'entered K used');
+        setGwm({ units: {}, rch: null, calib: null });
+        // I6: the default calibration includes every unit's K (slug units with their prior) and the boundary shift
+        const keys = gwDefaultKeys(gwModel()); want(gwModel().units.every(x => keys.includes('k:' + x.u)) && keys.includes('rch') && keys.includes('shift'), 'default keys: ' + keys);
+        // I7: no source well, no flow paths
+        const keepSrc = siteOf().model.srcBh; setSite({ ...siteOf(), model: { ...siteOf().model, srcBh: '' } });
+        const r7 = await gwRun(gwModel()); want(gwSourcePaths(gwModel(), r7).length === 0, 'no paths without a source well');
+        setSite({ ...siteOf(), model: { ...siteOf().model, srcBh: keepSrc } });
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
