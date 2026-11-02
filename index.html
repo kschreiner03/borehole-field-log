@@ -7165,6 +7165,9 @@ function pageSVG(b, pi, pn) {
   add('desc', X1 - x - RC.reduce((a, c) => a + c[1], 0), 'SOIL DESCRIPTION', 'CFEM / Modified USCS');
   RC.forEach(c => add(...c));
   const C = Object.fromEntries(cols.map(c => [c.k, c]));
+  // headings and scale numbers are measured so neighbouring columns never run into each other
+  const fw = (t, sz, wt = '') => textW(String(t), `${wt} ${(sz * F).toFixed(2)}px Arial,Helvetica,sans-serif`);
+  const scaleRow = (c, list, yy) => { let last = -Infinity; for (const [xv, t] of list) { const tw = fw(t, 5.8), xc = Math.min(Math.max(xv, c.x + 2 + tw / 2), c.x + c.w - 2 - tw / 2); if (xc - tw / 2 < last + 2) continue; last = xc + tw / 2; o.push(T(+xc.toFixed(1), yy, t, { s: 5.8, c: 'var(--muted)', a: 'middle' })); } };
   const hy = ib + ibH, hH = ['nplot', 'su', 'w', 'cvc'].some(on) ? 84 : 52, by0 = hy + hH, footH = 206, by1 = H - M - footH, BH = by1 - by0, k = BH / D;
   const Y = dm => by0 + (toD(dm) - d0) * k;
   o.push(`<rect x="${M}" y="${hy}" width="${W - 2 * M}" height="${hH}" style="fill:#e8ecf0;stroke:var(--ink)" stroke-width=".8"/>`);
@@ -7172,25 +7175,38 @@ function pageSVG(b, pi, pn) {
   const grp = (a, z, t) => { o.push(T((C[a].x + C[z].x + C[z].w) / 2, hy + 11.5, t, { s: 6.5, w: 700, a: 'middle' }), line(C[a].x, hy + 16, C[z].x + C[z].w, hy + 16, 'var(--ink)', .5)); };
   const tests = cols.filter(c => ['np', 'sp', 'ap', 'vp', 'lp', 'so4'].includes(c.k) || c.k.startsWith('gx')), smp = cols.filter(c => ['sid', 'sty', 'blows', 'n'].includes(c.k));
   grp('depth', C.ob ? 'ob' : 'desc', 'SOIL PROFILE'); grp(smp[0].k, smp[smp.length - 1].k, 'SAMPLES');
-  if (tests.length) grp(tests[0].k, tests[tests.length - 1].k, tests.reduce((a, c) => a + c.w, 0) > 150 ? 'FIELD AND LABORATORY TESTS' : 'TESTS');
+  if (tests.length) { const tw = tests.reduce((a, c) => a + c.w, 0) - 6, t = ['FIELD AND LABORATORY TESTS', 'TESTS'].find(t => fw(t, 6.5, 700) <= tw); if (t) grp(tests[0].k, tests[tests.length - 1].k, t); }
   if (C.gw) grp('gw', 'gw', 'GW');
   if (wellRight && C.well) grp('well', 'well', 'WELL');
   for (const c of cols) {
-    o.push(T(c.x + c.w / 2, hy + 30, c.h1, { s: 7, w: 700, a: 'middle' }));
+    // a heading too wide for its column gets a little smaller, or goes onto two smaller lines at a space
+    let hl = [c.h1], hs = 7; const room2 = c.w - 4;
+    if (c.h1 && fw(c.h1, 7, 700) > room2) {
+      hs = 7 * room2 / fw(c.h1, 7, 700);
+      const sp = [...c.h1.matchAll(/ /g)].map(m => m.index).sort((a, z) => Math.abs(a - c.h1.length / 2) - Math.abs(z - c.h1.length / 2))[0];
+      if (hs < 6 && sp != null && !['np', 'sp', 'ap', 'vp'].includes(c.k)) { hl = [c.h1.slice(0, sp), c.h1.slice(sp + 1)]; hs = Math.min(6, 7 * room2 / Math.max(...hl.map(t => fw(t, 7, 700)))); }
+      hs = Math.max(4.5, hs);
+    }
+    if (hl.length > 1) hl.forEach((t, i) => o.push(T(c.x + c.w / 2, hy + 25 + i * 9.5, t, { s: hs, w: 700, a: 'middle' })));
+    else o.push(T(c.x + c.w / 2, hy + 30, c.h1, { s: hs, w: 700, a: 'middle' }));
     if (c.h2) o.push(T(c.x + c.w / 2, hy + 41, c.h2, { s: 6.5, c: 'var(--muted)', a: 'middle' }));
   }
   const P = logPlots(b); P.n.lab = [20, 50, 80]; P.su.lab = P.su.lab.filter((v, i) => i % 2); if (P.w.lab.length > 3) P.w.lab = P.w.lab.filter((v, i) => i % 2);
   const PX = (c, p, v) => c.x + 5 + Math.min(Math.max(v, 0), p.max) / p.max * (c.w - 10);
   const NX = v => PX(C.np, P.n, v), SX = v => PX(C.sp, P.su, v), AX = v => PX(C.ap, P.w, v);
-  if (C.np) o.push(`<circle cx="${C.np.x + 14}" cy="${hy + 41}" r="2" style="fill:var(--accent)"/>`, T(C.np.x + 19, hy + 43.5, NUNIT(), { s: 6, c: 'var(--muted)' }));
-  if (C.sp) o.push(`<path d="M${C.sp.x + 6} ${hy + 43.5}l3-5.5 3 5.5z" style="fill:var(--ink)"/>`, T(C.sp.x + 14, hy + 43.5, 'PP', { s: 6, c: 'var(--muted)' }), `<rect x="${C.sp.x + 32}" y="${hy + 38.5}" width="5" height="5" style="fill:var(--ink)"/>`, T(C.sp.x + 40, hy + 43.5, 'Vane', { s: 6, c: 'var(--muted)' }));
-  if (C.ap) o.push(T(C.ap.x + 5, hy + 43.5, 'PL', { s: 6, c: 'var(--muted)' }), `<path d="M${C.ap.x + 16} ${hy + 41.5}h30M${C.ap.x + 16} ${hy + 39}v5M${C.ap.x + 46} ${hy + 39}v5" style="stroke:var(--ink)" stroke-width=".8"/><circle cx="${C.ap.x + 31}" cy="${hy + 41.5}" r="2" style="fill:var(--ink)"/>`, T(C.ap.x + 49, hy + 43.5, 'LL', { s: 6, c: 'var(--muted)' }));
-  if (C.vp) { o.push(`<rect x="${C.vp.x + 6}" y="${hy + 38.5}" width="10" height="5" style="fill:var(--warn)" opacity=".75"/>`, T(C.vp.x + 19, hy + 43.5, 'headspace', { s: 6, c: 'var(--muted)' })); [10, 100, 1000].forEach(v => o.push(T(VX(C.vp, v, 5), hy + 58, v >= 1000 ? '1k' : v, { s: 5.8, c: 'var(--muted)', a: 'middle' }), line(VX(C.vp, v, 5), hy + 61, VX(C.vp, v, 5), by0, 'var(--muted)', .5))); }
-  for (const [c, p, X] of [[C.np, P.n, NX], [C.sp, P.su, SX], [C.ap, P.w, AX]].filter(([c]) => c)) p.lab.forEach(v => o.push(T(X(v), hy + 58, v, { s: 5.8, c: 'var(--muted)', a: 'middle' }), line(X(v), hy + 61, X(v), by0, 'var(--muted)', .5)));
+  // symbol keys under the headings shrink evenly when the graph column is narrower than they are
+  const keyG = (c, need, ...parts) => { const kk = Math.min(1, (c.w - 4) / need), ky = hy + 41; o.push(kk < 1 ? `<g transform="translate(${c.x + 2} ${ky}) scale(${kk.toFixed(3)}) translate(${-c.x - 2} ${-ky})">${parts.join('')}</g>` : parts.join('')); };
+  if (C.np) keyG(C.np, 19 + fw(NUNIT(), 6) - 2, `<circle cx="${C.np.x + 14}" cy="${hy + 41}" r="2" style="fill:var(--accent)"/>`, T(C.np.x + 19, hy + 43.5, NUNIT(), { s: 6, c: 'var(--muted)' }));
+  if (C.sp) keyG(C.sp, 40 + fw('Vane', 6) - 2, `<path d="M${C.sp.x + 6} ${hy + 43.5}l3-5.5 3 5.5z" style="fill:var(--ink)"/>`, T(C.sp.x + 14, hy + 43.5, 'PP', { s: 6, c: 'var(--muted)' }), `<rect x="${C.sp.x + 32}" y="${hy + 38.5}" width="5" height="5" style="fill:var(--ink)"/>`, T(C.sp.x + 40, hy + 43.5, 'Vane', { s: 6, c: 'var(--muted)' }));
+  if (C.ap) keyG(C.ap, 49 + fw('LL', 6) - 2, T(C.ap.x + 5, hy + 43.5, 'PL', { s: 6, c: 'var(--muted)' }), `<path d="M${C.ap.x + 16} ${hy + 41.5}h30M${C.ap.x + 16} ${hy + 39}v5M${C.ap.x + 46} ${hy + 39}v5" style="stroke:var(--ink)" stroke-width=".8"/><circle cx="${C.ap.x + 31}" cy="${hy + 41.5}" r="2" style="fill:var(--ink)"/>`, T(C.ap.x + 49, hy + 43.5, 'LL', { s: 6, c: 'var(--muted)' }));
+  // thin dividers keep each test column's heading and scale numbers visibly its own
+  tests.slice(1).forEach(c => o.push(line(c.x, hy + 18, c.x, by0, 'var(--line)', .4)));
+  if (C.vp) { keyG(C.vp, 19 + fw('headspace', 6) - 2, `<rect x="${C.vp.x + 6}" y="${hy + 38.5}" width="10" height="5" style="fill:var(--warn)" opacity=".75"/>`, T(C.vp.x + 19, hy + 43.5, 'headspace', { s: 6, c: 'var(--muted)' })); scaleRow(C.vp, [10, 100, 1000].map(v => [VX(C.vp, v, 5), v >= 1000 ? '1k' : String(v)]), hy + 58); [10, 100, 1000].forEach(v => o.push(line(VX(C.vp, v, 5), hy + 61, VX(C.vp, v, 5), by0, 'var(--muted)', .5))); }
+  for (const [c, p, X] of [[C.np, P.n, NX], [C.sp, P.su, SX], [C.ap, P.w, AX]].filter(([c]) => c)) { scaleRow(c, p.lab.map(v => [X(v), String(v)]), hy + 58); p.lab.forEach(v => o.push(line(X(v), hy + 61, X(v), by0, 'var(--muted)', .5))); }
   const LG = C.lp ? labGraphData(b, labGraphParam()) : null, LX = v => LGX(C.lp, LG.lo, LG.hi, v, 5);
-  if (LG) for (let d = LG.lo; d <= LG.hi; d++) { const v = 10 ** d; if (d < LG.hi || LG.hi - LG.lo <= 3) o.push(T(LX(v), hy + 58, v >= 1000 ? (v / 1000) + 'k' : +v.toPrecision(1), { s: 5.8, c: 'var(--muted)', a: 'middle' })); }
+  if (LG) scaleRow(C.lp, Array.from({ length: LG.hi - LG.lo + 1 }, (_, i) => 10 ** (LG.lo + i)).map(v => [LX(v), String(v >= 1000 ? (v / 1000) + 'k' : +v.toPrecision(1))]), hy + 58);
   const GXP = graphsOf().map((g, i) => ({ g, c: C['gx' + i], G: graphData(b, g) })).filter(e => e.c);
-  for (const { c, G } of GXP) G.ticks.forEach((v, i) => { if (G.ticks.length <= 4 || i % 2 === 0) o.push(T(graphX(c, G, v, 5), hy + 58, tickLabel(v), { s: 5.8, c: 'var(--muted)', a: 'middle' })); });
+  for (const { c, G } of GXP) scaleRow(c, G.ticks.map(v => [graphX(c, G, v, 5), String(tickLabel(v))]), hy + 58);
   // body clip
   o.push(`<defs><clipPath id="body${pi}"><rect x="${M}" y="${by0}" width="${W - 2 * M}" height="${BH}"/></clipPath></defs><g clip-path="url(#body${pi})">`);
   if (C.vp) [1, 10, 100, 1000, 1e4].forEach(v => o.push(line(VX(C.vp, v, 5), by0, VX(C.vp, v, 5), by1, 'var(--grid)', .8)));
