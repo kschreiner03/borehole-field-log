@@ -1554,6 +1554,26 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('3d: plume shells', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(300); S.gwm.key = ''; S.gwm.run = null; S.gwm.trans = null; S.v3dOff = {};
+        goTab('v3d'); for (let i = 0; i < 40 && !S.v3d?.ok; i++) await w(200); await w(300);
+        const shells = () => (S.v3d.groups?.plume?.children || []).filter(m => /^plume-/.test(m.name) && m.geometry.attributes.position.count > 0);
+        want(S.v3d.plume?.src === 'interpreted' && shells().some(m => m.name === 'plume-1x'), 'interpreted shells without a model: ' + JSON.stringify({ src: S.v3d.plume?.src, n: shells().map(m => m.name) }));
+        want(/Interpreted from measured results/.test(document.querySelector('#v3d-legend').textContent), 'legend says interpreted');
+        const gr = S.v3d.groups.ground.children[0]; want(gr && gr.material.opacity <= .15, 'ground fades while shells show: ' + gr?.material.opacity);
+        /* with a transport model set up, the 3D page runs it and draws its plume */
+        setGwm({ transport: { on: true } }); S.gwm.key = ''; S.gwm.run = null; S.gwm.trans = null; goTab('home'); await w(100); goTab('v3d');
+        for (let i = 0; i < 450 && S.v3d?.plume?.src !== 'mf6'; i++) await w(200);
+        want(S.v3d.plume?.src === 'mf6' && shells().length, 'the 3D page ran the model and draws its shells: ' + (S.gwm.err || S.v3d.plume?.src));
+        want(/Model \\(MODFLOW 6\\), not measured/.test(document.querySelector('#v3d-legend').textContent), 'legend names MODFLOW 6');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
