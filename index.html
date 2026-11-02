@@ -4332,6 +4332,93 @@ function modelSVG(date, xs = S.xs) {
   if (!g.lv.length) o.push(`<text class="lbl2" x="${G.m.l + 24}" y="${G.m.t - 10}" style="fill:#54278f">Enter a groundwater guideline (Water &amp; well) to contour the forecast.</text>`);
   return o.join('');
 }
+/* ---------- MODFLOW 6: input files from a model description, and readers for its binary outputs ----------
+   Input format: MODFLOW 6 Description of Input and Output, version 6.8.1 (USGS, mf6io.pdf). Cells are 0-based here and
+   written 1-based. A spec is { nper, periods: [[perlen, nstp, tsmult]], steady: [bool], dis: { nlay, nrow, ncol, delr, delc,
+   top, botm: [per layer], idomain?, xorigin?, yorigin?, angrot? }, npf: { icelltype, k, k33 } (per layer), ic, sto?,
+   chd/riv/drn/wel: [per period: [[l, r, c, ...values]]], rch: [per period: number | array], obs: [[name, l, r, c]], gwt? }.
+   A number is written as CONSTANT, an array (row by row) as INTERNAL. */
+function mf6Arr(v, ncol) {
+  if (typeof v === 'number') return `    CONSTANT ${mf6Num(v)}`;
+  const out = ['    INTERNAL FACTOR 1.0']; for (let i = 0; i < v.length; i += Math.min(ncol, 10)) out.push('      ' + Array.from(v.slice(i, i + Math.min(ncol, 10)), mf6Num).join(' '));
+  return out.join('\n');
+}
+const mf6Num = x => Number.isInteger(x) ? String(x) : (+x).toPrecision(10).replace(/\.?0+(e|$)/, '$1');
+const mf6Layered = (name, vals, ncol) => `  ${name} LAYERED\n${vals.map(v => mf6Arr(v, ncol)).join('\n')}`;
+function mf6List(name, per, cols, opts = '') {
+  const max = Math.max(1, ...per.filter(Boolean).map(p => p.length));
+  return `BEGIN options\n${opts}END options\nBEGIN dimensions\n  MAXBOUND ${max}\nEND dimensions\n` +
+    per.map((p, i) => p ? `BEGIN period ${i + 1}\n${p.map(q => `  ${q[0] + 1} ${q[1] + 1} ${q[2] + 1} ${q.slice(3, 3 + cols).map(mf6Num).join(' ')}${q[3 + cols] != null ? ' ' + q[3 + cols] : ''}`).join('\n')}\nEND period ${i + 1}\n` : '').join('');
+}
+function mf6Files(spec) {
+  const d = spec.dis, nc = d.ncol, f = {}, pk = [], conv = spec.npf.icelltype.some(c => c > 0), outputs = ['gwf.hds', 'gwf.cbc', 'gwf.lst', 'mfsim.lst'];
+  f['sim.tdis'] = `BEGIN options\n  TIME_UNITS days\nEND options\nBEGIN dimensions\n  NPER ${spec.nper}\nEND dimensions\nBEGIN perioddata\n${spec.periods.map(p => '  ' + p.map(mf6Num).join(' ')).join('\n')}\nEND perioddata\n`;
+  const ims = `BEGIN options\n  COMPLEXITY ${conv ? 'complex' : 'moderate'}\nEND options\nBEGIN nonlinear\n  OUTER_DVCLOSE 1e-5\n  OUTER_MAXIMUM 300\nEND nonlinear\nBEGIN linear\n  INNER_DVCLOSE 1e-7\n  INNER_RCLOSE 1e-5\n  INNER_MAXIMUM 500\n  LINEAR_ACCELERATION bicgstab\nEND linear\n`;
+  f['sim.ims'] = ims;
+  f['gwf.dis'] = `BEGIN options\n  LENGTH_UNITS meters\n${d.xorigin != null ? `  XORIGIN ${mf6Num(d.xorigin)}\n  YORIGIN ${mf6Num(d.yorigin)}\n  ANGROT ${mf6Num(d.angrot || 0)}\n` : ''}END options\nBEGIN dimensions\n  NLAY ${d.nlay}\n  NROW ${d.nrow}\n  NCOL ${nc}\nEND dimensions\nBEGIN griddata\n  DELR\n${mf6Arr(d.delr, nc)}\n  DELC\n${mf6Arr(d.delc, nc)}\n  TOP\n${mf6Arr(d.top, nc)}\n${mf6Layered('BOTM', d.botm, nc)}\n${d.idomain ? mf6Layered('IDOMAIN', d.idomain, nc) + '\n' : ''}END griddata\n`; pk.push('DIS6 gwf.dis dis');
+  f['gwf.npf'] = `BEGIN options\n  SAVE_SPECIFIC_DISCHARGE\n  SAVE_FLOWS\nEND options\nBEGIN griddata\n${mf6Layered('ICELLTYPE', spec.npf.icelltype, nc)}\n${mf6Layered('K', spec.npf.k, nc)}\n${mf6Layered('K33', spec.npf.k33, nc)}\nEND griddata\n`; pk.push('NPF6 gwf.npf npf');
+  f['gwf.ic'] = `BEGIN griddata\n  STRT\n${mf6Arr(spec.ic, nc)}\nEND griddata\n`; pk.push('IC6 gwf.ic ic');
+  if (spec.sto) { f['gwf.sto'] = `BEGIN options\n  SAVE_FLOWS\nEND options\nBEGIN griddata\n${mf6Layered('ICONVERT', spec.npf.icelltype, nc)}\n${mf6Layered('SS', spec.sto.ss, nc)}\n${mf6Layered('SY', spec.sto.sy, nc)}\nEND griddata\n` + spec.steady.map((st, i) => `BEGIN period ${i + 1}\n  ${st ? 'STEADY-STATE' : 'TRANSIENT'}\nEND period ${i + 1}\n`).join(''); pk.push('STO6 gwf.sto sto'); }
+  if (spec.chd?.some(Boolean)) { f['gwf.chd'] = mf6List('chd', spec.chd, 1); pk.push('CHD6 gwf.chd chd'); }
+  if (spec.riv?.some(Boolean)) { f['gwf.riv'] = mf6List('riv', spec.riv, 3, '  BOUNDNAMES\n  SAVE_FLOWS\n'); pk.push('RIV6 gwf.riv riv'); }
+  if (spec.drn?.some(Boolean)) { f['gwf.drn'] = mf6List('drn', spec.drn, 2, '  BOUNDNAMES\n  SAVE_FLOWS\n'); pk.push('DRN6 gwf.drn drn'); }
+  if (spec.wel?.some(Boolean)) { f['gwf.wel'] = mf6List('wel', spec.wel, 1, '  BOUNDNAMES\n  SAVE_FLOWS\n'); pk.push('WEL6 gwf.wel wel'); }
+  if (spec.rch?.some(v => v != null)) { f['gwf.rch'] = `BEGIN options\n  READASARRAYS\n  SAVE_FLOWS\nEND options\n` + spec.rch.map((v, i) => v == null ? '' : `BEGIN period ${i + 1}\n  RECHARGE\n${mf6Arr(v, nc)}\nEND period ${i + 1}\n`).join(''); pk.push('RCH6 gwf.rch rch'); }
+  if (spec.obs?.length) { f['gwf.obs'] = `BEGIN options\n  DIGITS 12\nEND options\nBEGIN continuous FILEOUT gwf.obs.csv\n${spec.obs.map(o => `  ${o[0]} HEAD ${o[1] + 1} ${o[2] + 1} ${o[3] + 1}`).join('\n')}\nEND continuous\n`; pk.push('OBS6 gwf.obs obs'); outputs.push('gwf.obs.csv'); }
+  f['gwf.oc'] = `BEGIN options\n  HEAD FILEOUT gwf.hds\n  BUDGET FILEOUT gwf.cbc\nEND options\nBEGIN period 1\n  SAVE HEAD ${spec.saveAll === false ? 'LAST' : 'ALL'}\n  SAVE BUDGET ${spec.saveAll === false ? 'LAST' : 'ALL'}\nEND period 1\n`; pk.push('OC6 gwf.oc oc');
+  f['gwf.nam'] = `BEGIN options\n${conv ? '  NEWTON UNDER_RELAXATION\n' : ''}  SAVE_FLOWS\nEND options\nBEGIN packages\n${pk.map(x => '  ' + x).join('\n')}\nEND packages\n`;
+  let models = '  gwf6 gwf.nam gwf\n', exch = '', sol = '  ims6 sim.ims gwf\n';
+  if (spec.gwt) {
+    const t = spec.gwt, tp = ['DIS6 gwf.dis dis', 'IC6 gwt.ic ic', 'ADV6 gwt.adv adv', 'DSP6 gwt.dsp dsp', 'MST6 gwt.mst mst', 'SSM6 gwt.ssm ssm', 'OC6 gwt.oc oc'];
+    f['gwt.ic'] = `BEGIN griddata\n  STRT\n${mf6Arr(t.ic ?? 0, nc)}\nEND griddata\n`;
+    f['gwt.adv'] = 'BEGIN options\n  SCHEME TVD\nEND options\n';
+    f['gwt.dsp'] = `BEGIN options\nEND options\nBEGIN griddata\n  ALH\n${mf6Arr(t.al, nc)}\n  ATH1\n${mf6Arr(t.ath, nc)}\n  ATV\n${mf6Arr(t.atv, nc)}\n  DIFFC\n${mf6Arr(t.diffc ?? 0, nc)}\nEND griddata\n`;
+    const dec = t.decay > 0;
+    f['gwt.mst'] = `BEGIN options\n${t.kd > 0 ? '  SORPTION LINEAR\n' : ''}${dec ? '  FIRST_ORDER_DECAY\n' : ''}END options\nBEGIN griddata\n${mf6Layered('POROSITY', t.porosity, nc)}\n${t.kd > 0 ? `  BULK_DENSITY\n${mf6Arr(t.rhob, nc)}\n  DISTCOEF\n${mf6Arr(t.kd, nc)}\n` : ''}${dec ? `  DECAY\n${mf6Arr(t.decay, nc)}\n${t.kd > 0 ? `  DECAY_SORBED\n${mf6Arr(t.decay, nc)}\n` : ''}` : ''}END griddata\n`;
+    f['gwt.ssm'] = 'BEGIN options\nEND options\nBEGIN sources\nEND sources\n';
+    if (t.cnc?.some(Boolean)) { f['gwt.cnc'] = mf6List('cnc', t.cnc, 1); tp.push('CNC6 gwt.cnc cnc'); }
+    if (t.obs?.length) { f['gwt.obs'] = `BEGIN options\n  DIGITS 12\nEND options\nBEGIN continuous FILEOUT gwt.obs.csv\n${t.obs.map(o => `  ${o[0]} CONCENTRATION ${o[1] + 1} ${o[2] + 1} ${o[3] + 1}`).join('\n')}\nEND continuous\n`; tp.push('OBS6 gwt.obs obs'); outputs.push('gwt.obs.csv'); }
+    f['gwt.oc'] = `BEGIN options\n  CONCENTRATION FILEOUT gwt.ucn\n  BUDGET FILEOUT gwt.cbc\nEND options\n` + spec.periods.map((p, i) => `BEGIN period ${i + 1}\n  SAVE CONCENTRATION ${t.saveAll || (t.savePeriods || []).includes(i) ? 'ALL' : 'LAST'}\nEND period ${i + 1}\n`).join('');
+    f['gwt.nam'] = `BEGIN options\n  SAVE_FLOWS\nEND options\nBEGIN packages\n${tp.map(x => '  ' + x).join('\n')}\nEND packages\n`;
+    f['sim.gwfgwt'] = 'BEGIN options\nEND options\n'; f['simt.ims'] = ims.replace('COMPLEXITY complex', 'COMPLEXITY moderate');
+    models += '  gwt6 gwt.nam gwt\n'; exch = '  GWF6-GWT6 sim.gwfgwt gwf gwt\n'; sol += '  ims6 simt.ims gwt\n'; outputs.push('gwt.ucn', 'gwt.lst');
+  }
+  f['mfsim.nam'] = `BEGIN options\nEND options\nBEGIN timing\n  TDIS6 sim.tdis\nEND timing\nBEGIN models\n${models}END models\nBEGIN exchanges\n${exch}END exchanges\nBEGIN solutiongroup 1\n${sol}END solutiongroup\n`;
+  return { files: f, outputs };
+}
+/* binary head or concentration file: records of kstp, kper, pertim, totim, text, ncol, nrow, ilay, then ncol × nrow doubles */
+function mf6ReadHeads(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), out = []; let o = 0;
+  while (o + 52 <= u8.byteLength) {
+    const kstp = dv.getInt32(o, true), kper = dv.getInt32(o + 4, true), totim = dv.getFloat64(o + 16, true), text = new TextDecoder().decode(u8.subarray(o + 24, o + 40)).trim();
+    const ncol = dv.getInt32(o + 40, true), nrow = dv.getInt32(o + 44, true), ilay = dv.getInt32(o + 48, true); o += 52;
+    const data = new Float64Array(ncol * nrow); for (let i = 0; i < data.length; i++) data[i] = dv.getFloat64(o + 8 * i, true); o += 8 * data.length;
+    out.push({ kstp, kper, totim, text, ncol, nrow, ilay, data });
+  }
+  return out;
+}
+/* the heads of one saved time as layers [ilay-1] of row-major arrays */
+function mf6Layers(recs, totim) { const t = totim ?? recs[recs.length - 1]?.totim, L = []; for (const r of recs) if (Math.abs(r.totim - t) < 1e-9) L[r.ilay - 1] = r.data; return { totim: t, layers: L }; }
+/* binary budget file: the records named `want` (e.g. DATA-SPDIS); method 1 = full array, method 6 = a list of cells with values */
+function mf6ReadBudget(u8, want) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), td = new TextDecoder(), out = []; let o = 0;
+  while (o + 64 <= u8.byteLength) {
+    const kstp = dv.getInt32(o, true), kper = dv.getInt32(o + 4, true), text = td.decode(u8.subarray(o + 8, o + 24)).trim(), n1 = dv.getInt32(o + 24, true), n2 = dv.getInt32(o + 28, true), n3 = dv.getInt32(o + 32, true);
+    const imeth = dv.getInt32(o + 36, true), totim = dv.getFloat64(o + 56, true); o += 64;
+    const rec = { kstp, kper, totim, text, imeth };
+    if (imeth === 1) { const n = Math.abs(n1 * n2 * n3); if (text === want) { rec.data = new Float64Array(n); for (let i = 0; i < n; i++) rec.data[i] = dv.getFloat64(o + 8 * i, true); } o += 8 * n; }
+    else if (imeth === 6) {
+      o += 64; const ndat = dv.getInt32(o, true); o += 4 + 16 * (ndat - 1); const nlist = dv.getInt32(o, true); o += 4;
+      if (text === want) { rec.list = []; for (let i = 0; i < nlist; i++) { const b = o + i * (8 + 8 * ndat), aux = []; for (let k = 1; k < ndat; k++) aux.push(dv.getFloat64(b + 8 + 8 * k, true)); rec.list.push({ id1: dv.getInt32(b, true), id2: dv.getInt32(b + 4, true), q: dv.getFloat64(b + 8, true), aux }); } }
+      o += nlist * (8 + 8 * ndat);
+    } else break;
+    if (text === want) out.push(rec);
+  }
+  return out;
+}
+function mf6ReadObs(csv) { const [head, ...rows] = csv.trim().split(/\r?\n/), cols = head.split(','), out = {}; cols.forEach(c => { out[c.toUpperCase()] = []; }); for (const r of rows) r.split(',').forEach((v, i) => out[cols[i].toUpperCase()].push(+v)); return out; }
+/* the largest percent discrepancy of any time step in a listing file */
+function mf6Discrepancy(lst) { const v = [...lst.matchAll(/PERCENT DISCREPANCY\s*=\s*(-?[\d.]+(?:E[+-]?\d+)?)/gi)].map(m => +m[1]); return v.length ? v.reduce((a, b) => Math.abs(b) > Math.abs(a) ? b : a, 0) : null; }
 function xsModelHTML() {
   const u = siteOf()?.model || {}, run = S.xs.model ? modelRun(S.xs.date || '') : null, P = run?.P || { src: {} }, ro = S.readOnly ? 'disabled' : '';
   const wellsOpt = projList().filter(b => b.easting != null).map(b => `<option value="${esc(b.id)}" ${P.srcBh?.id === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
