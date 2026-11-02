@@ -529,7 +529,7 @@ app.whenReady().then(async () => {
       goTab('site'); await w(200); const link = !!document.querySelector('#view [data-tab="xsec"]'), old = !!document.querySelector('#section');
       return { tabs, svg, chips, link, old };
     })()`);
-    expect(r.tabs.indexOf('xsec') === r.tabs.indexOf('contam') + 1 && r.tabs.indexOf('compose') === r.tabs.indexOf('xsec') + 1, 'rail order: ' + r.tabs);
+    expect(r.tabs.indexOf('xsec') === r.tabs.indexOf('contam') + 1 && r.tabs.indexOf('gwm') === r.tabs.indexOf('xsec') + 1 && r.tabs.indexOf('compose') === r.tabs.indexOf('gwm') + 1, 'rail order: ' + r.tabs);
     expect(r.svg && r.chips >= 2, 'section page draws: ' + JSON.stringify(r));
     expect(r.link && !r.old, 'map page links to the section page: ' + JSON.stringify(r));
   });
@@ -1292,6 +1292,31 @@ app.whenReady().then(async () => {
       return { msg: /needs the desktop app/.test(document.body.textContent), disabled: document.querySelector('[data-act="gw-run"]')?.disabled }; })()`);
     expect(r.msg && r.disabled, 'web message and disabled buttons: ' + JSON.stringify(r));
   });
+  await check('mf6: drawn on the section', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        // without a model run: the Domenico forecast
+        let svg = document.querySelector('#xs-draw svg'); want(!svg.querySelector('[data-gw-wt]') && /Model, not measured/.test(svg.textContent) && !/MODFLOW/.test(svg.textContent), 'without a run: Domenico, no model flow');
+        const M = gwModel(), C = await gwCalibrate(M, { maxIter: 4 }); want(C.ok, 'calibrates: ' + C.error);
+        setGwm({ calib: { mode: 'steady', pv: C.pv, params: C.params, stats: C.stats, residuals: C.residuals, css: C.css, corr: C.corr, warnings: C.warnings, round: M.round, rounds: [M.round], at: new Date().toISOString(), runs: C.runs, iterations: C.iterations, key: gwInputsKey(gwModel()) }, transport: { on: true } });
+        await gwEnsure(true); want(S.gw.run?.ok && S.gw.trans?.ok, 'model and transport ran: ' + (S.gw.err || S.gw.trans?.error));
+        drawXsec(); await w(200); svg = document.querySelector('#xs-draw svg');
+        want(svg.querySelector('path[data-gw-wt]'), 'model water table drawn');
+        want(svg.querySelectorAll('path[data-gw-head]').length >= 2 && svg.querySelector('text[data-gw-hlabel]'), 'head contours with labels');
+        want(svg.querySelectorAll('[data-gw-arrow]').length >= 4, 'flow arrows: ' + svg.querySelectorAll('[data-gw-arrow]').length);
+        want(/MODFLOW 6/.test(svg.querySelector('[data-model-caption]')?.textContent || ''), 'forecast caption names MODFLOW 6: ' + svg.querySelector('[data-model-caption]')?.textContent);
+        want(svg.querySelector('[data-model-contour]'), 'the MODFLOW 6 plume is contoured');
+        const g = plumeField(XS_GEOM.pos, { ...S.xs, shape: 'guided' }, XS_GEOM, 4); want(g.method === 'guided' && /MODFLOW 6/.test(g.note), 'model-guided shape comes from MODFLOW 6: ' + g.note);
+        const p = plumePoints(XS_GEOM.pos, 'groundwater', 'benzene', S.xs.date, true).filter(q => !q.lt)[1];
+        want(Math.abs(Math.log10(g.at(p.d, p.b.elevation - (p.top + p.bot) / 2)[0]) - Math.log10(p.v)) < .01, 'still equals the measured result at the well');
+        want(/MODFLOW 6/.test(svg.textContent) && /calibrated/.test(svg.textContent), 'legend says MODFLOW 6 and calibrated');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
