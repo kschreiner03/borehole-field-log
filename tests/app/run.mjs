@@ -214,7 +214,7 @@ app.whenReady().then(async () => {
       return { has, added, focusedCell: fresh?.dataset?.c, top, prevBottom, nl: { bottom: nl.bottom, uscs: nl.uscs }, logHasSand: /SAND/.test(logText), focusedRow, sheets, which: document.querySelector('[data-which="samples"]')?.textContent, sel: S.dsel.samples };
     })()`);
     expect(r.has.grid && r.has.log, 'workspace parts: ' + JSON.stringify(r.has));
-    expect(r.has.tree.join() === 'Overview,Borehole,Map,Tables,Water,Lab,Section,Reports' && r.has.cur === 'Borehole' && r.has.rows === r.has.want, 'rail and list: ' + JSON.stringify(r.has));
+    expect(r.has.tree.join() === 'Overview,Borehole,Map,Tables,Water,Lab,Section,Model,Reports' && r.has.cur === 'Borehole' && r.has.rows === r.has.want, 'rail and list: ' + JSON.stringify(r.has));
     expect(r.added === 1 && r.top === r.prevBottom, 'Enter on the last row: ' + JSON.stringify(r));
     expect(r.nl.uscs === 'SP' && Math.abs(r.nl.bottom - (r.prevBottom + 1.2)) < 1e-6 && r.logHasSand, 'typed interval: ' + JSON.stringify(r.nl) + ' log has sand ' + r.logHasSand);
     expect(r.focusedRow === 0, 'log click focused row ' + r.focusedRow);
@@ -1255,6 +1255,43 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('mf6: model page', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      const until = async (f, ms = 120000) => { const t0 = Date.now(); while (!f() && Date.now() - t0 < ms) await w(250); return f(); };
+      try {
+        loadXsExample(); await w(400);
+        want(document.querySelector('#prail [data-tab="gwm"]'), 'a Model page on the rail');
+        goTab('gwm'); await w(300); const v = () => document.querySelector('#view') || document.body;
+        want(/MODFLOW 6/.test(v().textContent), 'names the engine');
+        for (const a of ['gw-run', 'gw-cal', 'gw-calt', 'gw-trans', 'gw-export', 'gw-feat-add']) want(document.querySelector('[data-act="' + a + '"]'), 'button ' + a);
+        want(document.querySelectorAll('#gwm-units tbody tr').length === gwModelSpec(projList(), siteOf()).units.length, 'a row per unit with its K source');
+        want([...document.querySelectorAll('#gwm-units tbody tr')].every(tr => /slug|calibration|entered/.test(tr.textContent)), 'every K has a source');
+        document.querySelector('[data-act="gw-feat-add"]').click(); await w(200);
+        want((siteOf().gwModel?.features || []).length === 1 && document.querySelectorAll('#gwm-feat tbody tr').length === 1, 'a boundary feature row');
+        const ft = document.querySelector('#gwm-feat tbody tr [data-gwf$="|type"]'); ft.value = 'drn'; ft.dispatchEvent(new Event('change', { bubbles: true })); await w(100);
+        want(siteOf().gwModel.features[0].type === 'drn', 'feature type saved');
+        document.querySelector('#gwm-feat [data-act="gw-feat-del"]').click(); await w(150); want(!(siteOf().gwModel.features || []).length, 'feature removed');
+        document.querySelector('[data-act="gw-cal"]').click();
+        await until(() => siteOf().gwModel?.calib && !S.gw?.busy, 180000);
+        const c = siteOf().gwModel.calib; want(c && Number.isFinite(c.stats.rmse), 'calibration stored with its statistics');
+        await w(300);
+        want(document.querySelectorAll('#gwm-res tbody tr').length === c.residuals.length && document.querySelector('#gwm-scatter svg'), 'residual table and measured-vs-simulated plot');
+        want(/RMSE/.test(v().textContent) && /discrepancy/i.test(v().textContent), 'statistics shown');
+        document.querySelector('[data-act="gw-trans"]').click(); await until(() => S.gw?.trans && !S.gw?.busy, 180000);
+        want(S.gw.trans?.ok && document.querySelector('#gwm-trans tbody tr'), 'transport results shown: ' + S.gw.trans?.error);
+        let saved = null; window.saveFile = (name, data) => { saved = { name, size: data.size ?? data.length ?? data.byteLength }; };
+        document.querySelector('[data-act="gw-export"]').click(); await until(() => saved, 20000); want(saved && /\\.zip$/.test(saved.name) && saved.size > 1000, 'exports the model files: ' + JSON.stringify(saved));
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
+  await check('mf6: web version explains the model needs the desktop app', async run => {
+    const r = await run(`(async () => { const w = ms => new Promise(r => setTimeout(r, ms)); loadXsExample(); await w(300); goTab('gwm'); await w(300);
+      return { msg: /needs the desktop app/.test(document.body.textContent), disabled: document.querySelector('[data-act="gw-run"]')?.disabled }; })()`);
+    expect(r.msg && r.disabled, 'web message and disabled buttons: ' + JSON.stringify(r));
+  });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
