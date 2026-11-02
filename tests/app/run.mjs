@@ -1176,6 +1176,24 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('mf6: transient rounds', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        const M = gwModelSpec(sectionList(), siteOf()), T = gwTransientSetup(M);
+        want(T.rounds.length >= 6 && T.periods.length === T.rounds.length, 'one stress period per round: ' + T.rounds.length + ' rounds, ' + T.periods.length + ' periods');
+        want(M.obsT.length >= T.rounds.length * 5 && new Set(M.obsT.map(o => o.date)).size === T.rounds.length, 'observations in every round');
+        const res = await gwRunTransient(M, {}); want(res.ok, 'runs: ' + res.error);
+        want(Math.abs(res.discrepancy) < 1, 'mass balance under 1 %: ' + res.discrepancy);
+        const mw = M.obsT.filter(o => o.b.name === 'MW-3'), sims = mw.map(o => res.sim[M.obsT.indexOf(o)]), meas = mw.map(o => o.h);
+        const k = meas.indexOf(Math.max(...meas)); want(k > 0 && sims[k] > sims[k - 1], 'the modelled head rises into the high round, as measured: ' + sims.map(v => v.toFixed(2)) + ' vs ' + meas.map(v => v.toFixed(2)));
+        const C = await gwCalibrate(M, { transient: true, keys: ['sy'], maxIter: 3 }); want(C.ok && C.residuals.length === M.obsT.length, 'transient calibration with a residual for every well and round: ' + C.error);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
