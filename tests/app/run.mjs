@@ -1194,6 +1194,39 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('mf6: transport against Ogata-Banks and at the site', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        // 1-D column: constant concentration 1 at the inflow cell, uniform flow, dispersivity 1 m
+        const n = 240, dx = .5, K = 10, ne = .3, h1 = 10, h2 = 9, L = (n - 1) * dx, v = K * (h1 - h2) / L / ne, al = 1, t = 100;
+        for (const kd of [0, .1]) {
+          const rhob = 1.7, R = 1 + rhob * kd / ne;
+          const spec = { nper: 1, periods: [[t, 200, 1]], steady: [true], dis: { nlay: 1, nrow: 1, ncol: n, delr: dx, delc: 1, top: 20, botm: [0] },
+            npf: { icelltype: [0], k: [K], k33: [K] }, ic: 10, chd: [[[0, 0, 0, h1], [0, 0, n - 1, h2]]], rch: [null],
+            gwt: { porosity: [ne], rhob, kd, al, ath: 0, atv: 0, cnc: [[[0, 0, 0, 1]]], saveAll: true } };
+          const { files, outputs } = mf6Files(spec), res = await window.desktop.mf6Run({ files, outputs });
+          want(res.ok, 'column runs: ' + res.error); if (!res.ok) continue;
+          const C = mf6ReadHeads(res.files['gwt.ucn']), last = C[C.length - 1].data; let worst = 0, at = 0;
+          for (let c = 1; c < n - 20; c++) { const x = c * dx, ob = ogataBanks({ C0: 1, v, D: al * v, R, x, t }); if (Math.abs(last[c] - ob) > worst) { worst = Math.abs(last[c] - ob); at = x; } }
+          want(worst < .03, 'Kd ' + kd + ': matches Ogata-Banks within 0.03 (worst ' + worst.toFixed(4) + ' at ' + at + ' m; front at ' + (v * t / R).toFixed(1) + ' m)');
+          const disc = mf6Discrepancy(new TextDecoder().decode(res.files['gwt.lst'])); want(disc != null && Math.abs(disc) < 1, 'transport mass balance under 1 %: ' + disc);
+        }
+        // site transport from the example's forecast set-up
+        loadXsExample(); await w(400);
+        const M = gwModelSpec(sectionList(), siteOf()), T = await gwTransport(M, {});
+        want(T.ok, 'site transport runs: ' + T.error);
+        const rounds = [...new Set(sectionList().flatMap(b => (b.gwSamples || []).map(s => s.date)).filter(d => d && d >= siteOf().model.start))];
+        want(rounds.every(d => T.times.some(x => x.date === d)), 'a concentration at every sampling round');
+        want(T.obs.length >= 10 && T.obs.every(o => Number.isFinite(o.sim)), 'compared with measured results: ' + T.obs.length);
+        want(T.times[T.times.length - 1].layers.some(L => L.some(v => v > .005)), 'a plume above the guideline exists');
+        want(Number.isFinite(T.fit.rmsLog) && Number.isFinite(T.disc), 'fit and mass balance reported');
+        const Tc = await gwTransport(M, {}, { calibrate: true }); want(Tc.ok && Tc.fit.rmsLog <= T.fit.rmsLog + 1e-9 && Tc.c0 > 0, 'source calibration improves or keeps the fit: ' + Tc.fit.rmsLog + ' vs ' + T.fit.rmsLog);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
