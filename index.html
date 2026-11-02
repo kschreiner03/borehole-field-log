@@ -1251,6 +1251,9 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .ctl-gb { padding: 2px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
 .ctl-gb .sec-opts, .ctl-gb .xs-ctl, .ctl-gb .rep-cols { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin: 0; padding: 0; border: 0; }
 .ctl-gb .lay-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.gtick { display: flex; flex-direction: column; gap: 4px; } .gtick .gr-h { margin-top: 6px; font: 600 11.5px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.gtick, .rep-graphs.gtick { align-items: stretch; text-align: left; }
+.gtick .gr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 1px 0; border: 0; border-radius: 0; } .gtick .gr-sty { display: flex; gap: 4px; padding-left: 22px; } .gtick .gr-sty select { min-height: 26px; padding: 0 4px; font-size: 12px; width: auto; }
 .ctl-gb select, .ctl-gb input[type="number"], .ctl-gb input[type="text"] { max-width: 100%; }
 .ctl-gb section.sec { border: 0; box-shadow: none; margin: 0; background: none; } .ctl-gb section.sec > header { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 6px; border: 0; background: none; min-height: 0; } .ctl-gb section.sec > header h3, .ctl-gb section.sec > header .sp { display: none; } .ctl-gb section.sec > .body { padding: 0; }
 .ctl-gb .scroll-x, .ctl-gb table { max-width: 100%; } .ctl-gb .scroll-x { overflow-x: auto; } .ctl-gb table { font-size: 12px; }
@@ -3179,7 +3182,7 @@ const LOG_COLS = {
   w: ['Water content and Atterberg limits graph', b => (b.samples || []).some(s => s.w != null || s.ll != null || s.pl != null)],
   obs: ['Observations column', b => (b.events || []).some(e => (e.layer || e.depth != null) && obsLabel(e))],
   cvc: ['Vapour concentration graph (ppm, headspace)', b => (b.samples || []).some(s => s.cvc != null)],
-  lab: ['Lab results graph (parameter chosen under Page layout)', b => (b.samples || []).some(sm => Object.values(sm.lab || {}).some(r => r?.v != null))],
+  lab: ['Lab results graph (chosen under Graphs)', b => (b.samples || []).some(sm => Object.values(sm.lab || {}).some(r => r?.v != null))],
   so4: ['Sulphate SO4 % (PDF)', b => (b.samples || []).some(s => s.so4 != null)],
   water: ['Water level column', b => (b.water || []).some(w => w.depth != null) || b.slough != null || !!b.gwNone],
 };
@@ -3326,11 +3329,32 @@ function graphBody(c, G, type, yOf, y0, y1, o = {}) {
 }
 function refreshGraphs() { const d = $('#overlay .rep-graphs'); if (d) d.outerHTML = graphsRowHTML(); if (S.tab === 'log' || S.tab === 'report') renderView(true); }
 function graphsRowHTML() {
-  const SR = graphSeries(), gs = S.co.graphs || [], ro = S.readOnly ? 'disabled' : '';
+  const b = cur(), ps = projList(), SR = graphSeries(), gs = S.co.graphs || [], ro = S.readOnly ? 'disabled' : '';
   const opts = (list, v) => Object.entries(list).map(([k, t]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${esc(t)}</option>`).join('');
-  return `<div class="rep-cols rep-graphs"><b>Extra graphs</b><span class="note">Add a column for any value measured at depth, drawn the way you choose. It shows on the log and the PDF.</span>
-    ${gs.map((g, i) => `<span class="gr-row"><select data-graph="${i}" data-gk="series" ${ro}>${opts(Object.fromEntries(Object.entries(SR).map(([k, v]) => [k, `${v[0]}${v[1] ? ` (${v[1]})` : ''}`])), g.series)}</select><select data-graph="${i}" data-gk="type" ${ro}>${opts(GRAPH_TYPES, g.type)}</select><select data-graph="${i}" data-gk="scale" ${ro}>${opts({ '': 'Scale: automatic', lin: 'Linear scale', log: 'Log scale' }, g.scale || '')}</select><button class="btn link danger-text" data-graphdel="${i}" ${ro}>Remove</button></span>`).join('')}
-    <button class="btn" data-act="graph-add" ${ro}>+ Add graph</button></div>`;
+  const PC = b ? pdfCols(b) : null, shown = k => b ? (PDF_KEYS.includes(k) ? PC.on.has(k) : colOn(b, k)) : S.co.cols?.[k] === 'on', gi = k => gs.findIndex(g => g.series === k);
+  const style = i => i < 0 ? '' : `<span class="gr-sty"><select data-graph="${i}" data-gk="type" aria-label="Drawn as" ${ro}>${opts(GRAPH_TYPES, gs[i].type)}</select><select data-graph="${i}" data-gk="scale" aria-label="Scale" ${ro}>${opts({ '': 'Scale: automatic', lin: 'Linear', log: 'Log' }, gs[i].scale || '')}</select></span>`;
+  const row = (key, label, on, i = -1) => `<div class="gr-row"><label class="check"><input type="checkbox" data-gtick="${key}" ${on ? 'checked' : ''} ${ro}> ${esc(label)}</label>${on ? style(i) : ''}</div>`;
+  const field = [['nplot', 'SPT N'], ['su', 'Shear strength (pocket pen., vane)'], ['w', 'Water content and limits'], ['cvc', 'Vapour (ppm, headspace)']].filter(([k]) => S.co.cols?.[k] === 'on' || ps.some(x => LOG_COLS[k][1](x)));
+  const lp = labGraphParam(), labCol = shown('lab'), lab = labParamsUsed(ps);
+  const other = Object.keys(SR).filter(k => !k.startsWith('lab:') && !['cvc', 'n'].includes(k) && ps.some(x => (x.samples || []).some(sm => val(SR[k][3](sm, x)))));
+  const head = t => `<div class="gr-h">${t}</div>`;
+  return `<div class="rep-graphs gtick"><span class="note">Ticked graphs show on the log and in the PDF, in this order. Every borehole in the project uses them.</span>
+    ${field.length ? head('Field tests') + field.map(([k, t]) => row('col:' + k, t, shown(k))).join('') : ''}
+    ${lab.length ? head('Lab results') + lab.map(p => { const i = gi('lab:' + p); return row('lab:' + p, LAB_PARAMS[p].label, (labCol && lp === p) || i >= 0, i); }).join('') : ''}
+    ${other.length ? head('Other measured values') + other.map(k => { const i = gi(k); return row(k, SR[k][0] + (SR[k][1] ? ` (${SR[k][1]})` : ''), i >= 0, i); }).join('') : ''}
+    ${PC && PC.dropped.some(k => GRAPH_COLS.includes(k)) ? `<p class="note">Left out of this PDF to make room: ${esc(PC.dropped.filter(k => GRAPH_COLS.includes(k)).map(k => ({ nplot: 'SPT N', su: 'shear strength', w: 'water content', cvc: 'vapour', lab: LAB_PARAMS[labGraphParam()]?.label || 'lab results' })[k]).join(', '))}. Tick a graph to keep it.</p>` : ''}
+    ${PC && PC.room < 170 ? `<p class="note danger-text">The ticked graphs don't fit on the page with a readable description (${Math.max(0, Math.round(PC.room))} px left of 170). Untick some, or choose Narrow graphs under Page layout.</p>` : ''}
+    ${!field.length && !lab.length && !other.length ? '<p class="note">No test results at depth yet. Graphs appear here once samples have results.</p>' : ''}</div>`;
+}
+function gtickSet(key, on) {
+  const c = key.indexOf(':'), kind = c > 0 && ['col', 'lab'].includes(key.slice(0, c)) ? key.slice(0, c) : 'gs', k = kind === 'gs' ? key : key.slice(c + 1);
+  if (kind === 'col') S.co.cols = { ...(S.co.cols || {}), [k]: on ? 'on' : 'off' };
+  else {
+    const series = kind === 'lab' ? 'lab:' + k : k; S.co.graphs = (S.co.graphs || []).filter(g => g.series !== series);
+    if (on) S.co.graphs.push({ series, type: 'points' });
+    if (kind === 'lab' && !on && labGraphParam() === k) S.co.cols = { ...(S.co.cols || {}), lab: 'off' };   // the older single lab column
+  }
+  store.saveCompany(); refreshGraphs(); if (S.tab !== 'log' && S.tab !== 'report') ctlRender();
 }
 
 function logSVG(b, W) {
@@ -7154,15 +7178,21 @@ function pageCount(b) { return Math.max(1, Math.ceil(toD(Math.max(depthOf(b), .5
 function reportHTML(b) {
   const n = pageCount(b);
   return `<div class="panel" style="padding:10px 12px"><div class="rep-bar">
-      <label for="rp-depth">Depth per page <select id="rp-depth"><option value="fit" ${S.pageFit ? 'selected' : ''}>Fit to depth</option>${pageDepthOpts().map(d => `<option value="${d}" ${!S.pageFit && d === fixedDepth() ? 'selected' : ''}>${d} ${S.units}</option>`).join('')}</select></label>
       <span class="note">${n} page${n > 1 ? 's' : ''} · Letter, ${S.pageFit && pageDepth(b) !== fixedDepth() ? `${pageDepth(b)} ${S.units} on the page, fitted to this borehole` : `${pageDepth(b)} ${S.units} per page, same vertical scale on every borehole`}</span>
       <span style="margin-left:auto;display:flex;gap:8px"><button class="btn" data-act="pdf-all">PDF all boreholes</button><button class="btn" data-act="appendix">Report package…</button><button class="btn primary" data-act="pdf-one">Download PDF</button></span>
-    </div>
-    <div class="rep-cols rep-lay"><b>Page layout</b>${labParamsUsed(projList()).length ? `<span class="lay-ctl"><label class="note" for="lab-graph">Lab result graphed</label><select id="lab-graph" style="width:auto">${labParamsUsed(projList()).map(p => `<option value="${p}" ${labGraphParam() === p ? 'selected' : ''}>${esc(LAB_PARAMS[p].label)}</option>`).join('')}</select></span>` : ''}${Object.entries(LAYOUT).map(([k, L]) => `<span class="lay-ctl"><span class="note">${L.label}</span><span class="seg" role="group" aria-label="${L.label}" data-tip="${esc(L.tip)}">${Object.entries(L.opts).map(([v, [t]]) => `<button data-lay="${k}:${v}" aria-pressed="${(S.co.layout?.[k] || L.def || 'normal') === v}" ${S.readOnly ? 'disabled' : ''}>${t}</button>`).join('')}</span></span>`).join('')}</div>
-    ${graphsRowHTML()}
-    <div class="rep-cols"><b>Columns on the log</b><span class="seg" role="group" aria-label="Column preset">${Object.entries(LOG_PRESETS).map(([k, v]) => `<button data-preset="${k}" aria-pressed="${presetOf() === k}" data-tip="${esc(v.tip)}" ${S.readOnly ? 'disabled' : ''}>${esc(v.label)}</button>`).join('')}</span>${(() => { const d = pdfCols(b).dropped; return d.length ? `<span class="note" style="flex-basis:100%">Left out of this PDF to keep the description readable: ${esc(d.map(k => LOG_COLS[k][0].replace(/ \(.*\)$/, '').replace(/ graph$/, '')).join(', '))}. Tick a column to keep it.</span>` : ''; })()}<span style="flex-basis:100%;height:0"></span>${Object.entries(LOG_COLS).map(([k, [label]]) => `<label class="check" data-tip="${esc(S.co.cols?.[k] && S.co.cols[k] !== 'auto' ? 'Set by you. Untick to hide, tick to show.' : 'Automatic: shown when this borehole has data for it.')}"><input type="checkbox" data-repcol="${k}" ${(PDF_KEYS.includes(k) ? pdfCols(b).on.has(k) : colOn(b, k)) ? 'checked' : ''}> ${esc(label.replace(/ \((PDF|ppm, headspace|pocket pen\., vane)\)/, ''))}</label>`).join('')}<button class="btn link" data-act="cols-auto">Reset to automatic</button></div></div>
+    </div></div>
     <div class="pages">${Array.from({ length: n }, (_, i) => `<div class="page">${pageSVG(b, i, n)}</div>`).join('')}</div>`;
 }
+/* log settings in the panel: page layout, graphs (one tick list) and the other columns */
+const GRAPH_COLS = ['nplot', 'su', 'w', 'cvc', 'lab'];
+function logColsHTML(b) {
+  return `<div class="rep-cols"><span class="seg" role="group" aria-label="Column preset">${Object.entries(LOG_PRESETS).map(([k, v]) => `<button data-preset="${k}" aria-pressed="${presetOf() === k}" data-tip="${esc(v.tip)}" ${S.readOnly ? 'disabled' : ''}>${esc(v.label)}</button>`).join('')}</span>${(() => { const d = pdfCols(b).dropped; return d.length ? `<span class="note" style="flex-basis:100%">Left out of this PDF to keep the description readable: ${esc(d.map(k => LOG_COLS[k][0].replace(/ \(.*\)$/, '').replace(/ graph$/, '')).join(', '))}. Tick a column to keep it.</span>` : ''; })()}<span style="flex-basis:100%;height:0"></span>${Object.entries(LOG_COLS).filter(([k]) => !GRAPH_COLS.includes(k)).map(([k, [label]]) => `<label class="check" data-tip="${esc(S.co.cols?.[k] && S.co.cols[k] !== 'auto' ? 'Set by you. Untick to hide, tick to show.' : 'Automatic: shown when this borehole has data for it.')}"><input type="checkbox" data-repcol="${k}" ${(PDF_KEYS.includes(k) ? pdfCols(b).on.has(k) : colOn(b, k)) ? 'checked' : ''}> ${esc(label.replace(/ \((PDF|ppm, headspace|pocket pen\., vane)\)/, ''))}</label>`).join('')}<button class="btn link" data-act="cols-auto">Reset to automatic</button></div>`;
+}
+CTL.report = () => { const b = cur(); return b ? [
+  { id: 'log-page', title: 'Page layout', icon: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/>', html: `<div class="rep-cols rep-lay"><label for="rp-depth">Depth per page <select id="rp-depth"><option value="fit" ${S.pageFit ? 'selected' : ''}>Fit to depth</option>${pageDepthOpts().map(d => `<option value="${d}" ${!S.pageFit && d === fixedDepth() ? 'selected' : ''}>${d} ${S.units}</option>`).join('')}</select></label>${Object.entries(LAYOUT).map(([k, L]) => `<span class="lay-ctl"><span class="note">${L.label}</span><span class="seg" role="group" aria-label="${L.label}" data-tip="${esc(L.tip)}">${Object.entries(L.opts).map(([v, [t]]) => `<button data-lay="${k}:${v}" aria-pressed="${(S.co.layout?.[k] || L.def || 'normal') === v}" ${S.readOnly ? 'disabled' : ''}>${t}</button>`).join('')}</span></span>`).join('')}</div>` },
+  { id: 'log-graphs', title: 'Graphs', icon: '<path d="M4 20V4M4 20h16M8 16l4-5 3 3 5-7"/>', html: graphsRowHTML() },
+  { id: 'log-cols', title: 'Columns', icon: NAV_ICON.table, html: logColsHTML(b) }] : []; };
+CTL.log = () => { const b = cur(); return b ? CTL.report().filter(g => g.id !== 'log-page') : []; };
 /* PDF columns: what the settings ask for, then, if the page is too crowded for a readable description, automatic columns are
    left out in this order (least used first). Columns you switched on yourself are never dropped. */
 /* page layout choices in PDF preview: text size, soil column width and graph width, kept with the company settings */
@@ -7192,7 +7222,7 @@ function pdfCols(b) {
   const fixed = 38 + (b.elevation != null && colOn(b, 'elev') ? 48 : 0) + 32 + 14 + (well ? 1.85 : 1) * Math.min(lay('sym'), 52) + graphsOf().length * lay('graph');
   const room = () => PG.W - 2 * PG.M - fixed - [...on].reduce((a, k) => a + pdfW(k), 0);
   for (const k of PDF_DROP) { if (room() >= 190) break; if (on.has(k) && (S.co.cols?.[k] || 'auto') === 'auto') { on.delete(k); dropped.push(k); } }
-  return { on, dropped };
+  return { on, dropped, room: room() };
 }
 function pageSVG(b, pi, pn) {
   const { W, H, M } = PG, U = LEN(), D = pageDepth(b);
@@ -10334,6 +10364,7 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('change', e => {
+  if (e.target.dataset.gtick) { if (!S.readOnly) gtickSet(e.target.dataset.gtick, e.target.checked); return; }
   if (e.target.dataset.graph != null) { if (!S.readOnly) { const g = S.co.graphs[+e.target.dataset.graph]; g[e.target.dataset.gk] = e.target.value; store.saveCompany(); refreshGraphs(); } return; }
   if (e.target.dataset.oblayer != null) { const b = cur(); if (!editable(b)) return; const ev = b.events[+e.target.dataset.oblayer], l = b.layers.find(x => x.id === e.target.value); if (ev && l) { ev.layer = l.id; ev.depth = l.top; ev.to = l.bottom; b.events.sort((a, c) => (a.depth ?? -1) - (c.depth ?? -1)); S.dsel.events = b.events.indexOf(ev); logChange(b, 'Drilling notes'); store.save(b); if (S.drawer) renderDrawer(); else renderView(true); } return; }
   if (e.target.id === 'basemap') { if (!S.readOnly) { setSite({ ...(siteOf() || {}), basemap: e.target.value }); S.tileWarned = false; renderView(true); } return; }
