@@ -904,6 +904,7 @@ app.whenReady().then(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
       try {
         loadXsExample(); await w(400);
+        setModel('az', '');   // the example enters its own value; test the defaults
         const date = '2024-05-14', mw1 = sectionList().find(b => b.name === 'MW-1'), lvl = mw1.elevation - waterAt(mw1, date).depth;
         const run1 = modelRun(date); want(run1.ok, 'runs: ' + run1.missing);
         const fit = run1.P.fit({ e: mw1.easting, n: mw1.northing });
@@ -941,6 +942,59 @@ app.whenReady().then(async () => {
         const fb = plumeField(G.pos, flat, G, 4); window.gwFlow = sav;
         want(fb.method === 'data' && /forecast/i.test(fb.note) && /no flow/.test(fb.note), 'falls back to data with the reason: ' + fb.method + ' ' + fb.note);
         const one = plumeField([G.pos[0], G.pos[0]], { ...S.xs, shape: 'data' }, G, 4); want(one.c.every(Number.isFinite) && one.a.every(Number.isFinite), 'same-position wells give a finite grid');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('plumes: three styles', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400); setXs('model', false); await w(100);
+        const svg = () => document.querySelector('#xs-draw svg');
+        setXs('style', 'graded'); await w(150);
+        want(svg().querySelectorAll('path[data-contour="1"]').length >= 1, 'graded: a guideline contour');
+        want(svg().querySelectorAll('rect[data-cell]').length > 0 && !svg().querySelector('[data-band]'), 'graded: shaded cells, no bands');
+        setXs('style', 'bands'); await w(150);
+        want(svg().querySelectorAll('[data-band]').length > 0 && !svg().querySelector('rect[data-cell]'), 'bands: bands, no shaded cells');
+        setXs('style', 'lines'); await w(150);
+        want([...svg().querySelectorAll('text[data-clabel]')].some(t => /0\.005/.test(t.textContent)), 'lines: a labelled guideline contour');
+        want(svg().querySelector('text').textContent !== undefined && svg().textContent.includes('Interpreted: forecast shape matched to measured results'), 'guided label on the drawing');
+        const d = svg().querySelector('path[data-contour]').getAttribute('d'); want((d.match(/M/g) || []).length < (d.match(/L/g) || []).length / 3, 'contours are joined into continuous lines');
+        // halving the grid barely moves the guideline contour's furthest point
+        const G = XS_GEOM, far = cell => { const g = plumeField(G.pos, S.xs, G, cell), s = fieldContours(g, g.lv[0].v); return Math.max(...s.flatMap(l => l.map(p => p[0]))); };
+        const a = far(4), b = far(2), len = G.X(G.maxD) - G.X(0); want(Math.abs(a - b) < .01 * len, 'grid halving moves the contour < 1 % of the length: ' + (a - b).toFixed(2) + ' px of ' + len.toFixed(0));
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('plumes: compare and markers', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        for (const id of ['xs-shape', 'xs-style', 'xs-layer', 'xs-soilcol']) want(document.querySelector('#' + id), 'control #' + id);
+        const pick = async (id, v) => { const el = document.querySelector('#' + id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await w(200); };
+        await pick('xs-layer', 'both'); let svg = document.querySelector('#xs-draw svg');
+        const mc = [...svg.querySelectorAll('[data-model-contour]')];
+        want(mc.length && mc.every(p => p.getAttribute('stroke-dasharray')) && !svg.querySelector('[data-model-fill]'), 'compare: forecast as dashed lines only');
+        want(svg.querySelector('[data-contour]') && svg.querySelector('rect[data-cell]'), 'compare: measured plume in its style');
+        await pick('xs-layer', 'model'); svg = document.querySelector('#xs-draw svg');
+        want(svg.querySelector('[data-model-fill]') && !svg.querySelector('[data-contour]'), 'forecast only: filled, no measured plume');
+        await pick('xs-layer', 'meas'); svg = document.querySelector('#xs-draw svg');
+        want(!svg.querySelector('[data-model-contour]') && svg.querySelector('[data-contour]'), 'measured only');
+        want(svg.querySelector('g[data-soil]')?.getAttribute('style')?.includes('grayscale'), 'soil turns grey under a plume');
+        document.querySelector('#xs-soilcol').click(); await w(200); svg = document.querySelector('#xs-draw svg');
+        want(!svg.querySelector('g[data-soil]')?.getAttribute('style')?.includes('grayscale'), 'keep soil colours');
+        const G = XS_GEOM, cols = G.pos.map(p => G.X(p.d));
+        const pts = [...svg.querySelectorAll('[data-pt]')]; want(pts.length >= 5, 'markers drawn');
+        want(pts.every(c => cols.some(x => Math.abs(+c.getAttribute('cx') - x) < 1)), 'markers sit on the borehole column');
+        const order = [...svg.children], firstCell = order.findIndex(e => e.querySelector?.('rect[data-cell]')), lastCol = order.map((e, i) => e.matches('g[data-col]') ? i : -1).filter(i => i >= 0).pop();
+        want(firstCell >= 0 && lastCol > firstCell, 'columns are drawn over the plume shading');
+        await pick('xs-shape', 'data'); svg = document.querySelector('#xs-draw svg');
+        want(svg.textContent.includes('No data above or below the well screens'), 'data only labelled');
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       return F;
     })()`);
