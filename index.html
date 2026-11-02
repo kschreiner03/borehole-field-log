@@ -1562,25 +1562,36 @@ function blankBorehole(name) {
     layers: [newLayer(0)], samples: [], water: [], well: blankWell(), status: 'draft', rev: 0, issued: null, history: [{ at: new Date().toISOString(), by: S.me || '', what: 'Borehole created' }], updated: new Date().toISOString() };
 }
 /* a layer typed as text ("1.2-3.5 SP fine to medium grained, trace silt, compact, moist, brown") → the fields the buttons set.
-   Depths first are optional; words it doesn't recognise go to other features, so nothing typed is lost. */
-const LT_COLOUR = /^(?:(?:dark|light|pale|mottled|reddish|greyish|grayish|yellowish|olive)\s+)*(?:brown|grey|gray|black|red|orange|yellow|green|blue|white|tan|olive)(?:\s*(?:-|and|to)\s*(?:dark\s+|light\s+)?(?:brown|grey|gray|black|red|orange|yellow|green|white|tan))*$/i;
-function parseLayerText(text) {
+   Depths first are optional (a unit after them is used: "4-10 ft"); words it doesn't recognise are kept, with the modifiers or under other
+   features (where the layer had them, else by their place in the description), so nothing typed is lost. */
+const LT_CW = 'brown|grey|gray|black|red|orange|yellow|green|blue|white|tan|olive|mottled';
+const LT_COLOUR = new RegExp(`^(?:(?:dark|light|pale|mottled|reddish|greyish|grayish|yellowish|olive)\\s+)*(?:${LT_CW})(?:\\s*(?:-|/|and|to|\\s)\\s*(?:dark\\s+|light\\s+)?(?:${LT_CW}))*$`, 'i');
+function parseLayerText(text, prev) {
   let t = String(text || '').replace(/\s+/g, ' ').trim(); const o = { uscs: '', mods: '', consistency: '', moisture: '', colour: '', origin: '', other: '', hz: '' }, mods = [], other = [];
-  const dm = /^(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*(?:m|ft)?(?=[\s,:]|$)[\s,:]*/i.exec(t); if (dm) { o.top = fromD(+dm[1]); o.bottom = fromD(+dm[2]); t = t.slice(dm[0].length); }
+  const toM = (v, u) => u ? (/^f/i.test(u) || u === "'" ? v / FT : v) : fromD(v);
+  const dm = /^(\d+(?:\.\d+)?)\s*(m|ft|')?\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*(m\b|ft\b|')?[\s,:]*/i.exec(t);
+  if (dm) { const u = dm[4] || dm[2]; o.top = toM(+dm[1], u); o.bottom = toM(+dm[3], u); o.raw = u ? null : [dm[1], dm[3]]; t = t.slice(dm[0].length); }
+  o.depthOnly = !!dm && !t.trim();
+  if (o.top != null && !(o.bottom > o.top)) o.error = `The bottom (${fx(o.bottom)}) must be below the top (${fu(o.top)}).`;
   const tag = /\s*\((FILL|LACUSTRINE|ALLUVIUM|TILL|GLACIOFLUVIAL|AEOLIAN)\)\s*$/i.exec(t); if (tag) { o.origin = Object.keys(ORIGIN_TAG).find(k => ORIGIN_TAG[k] === tag[1].toUpperCase()); t = t.slice(0, tag.index); }
-  const hz = /^([A-Za-z]{1,3}\d?)\s+horizon:?\s*/i.exec(t); if (hz) { o.hz = hz[1]; t = t.slice(hz[0].length); }
-  const parts = t.split(',').map(x => x.trim()).filter(Boolean); let head = parts.shift() || '';
-  // the soil: a group symbol in the head ("SAND (SP)", "SP sand", "sp"), else a name that means one thing (topsoil, peat, fill, shale…)
-  const code = head.match(/\(?\b([A-Za-z]{1,4}(?:-[A-Za-z]{2})?)\b\)?/g)?.map(x => x.replace(/[()]/g, '').toUpperCase()).find(x => SOILS[x]);
-  if (code) { o.uscs = code; head = head.replace(new RegExp(`\\(?\\b${code.replace('-', '\\-')}\\b\\)?`, 'i'), ''); }
-  else { const byName = Object.entries(SOILS).filter(([, v]) => v.p && head.toUpperCase().includes(v.p)), one = byName.length && new Set(byName.map(([, v]) => v.p)).size === 1 && byName.length === 1 ? byName[0] : null; if (one) { o.uscs = one[0]; head = head.toUpperCase().replace(one[1].p, '').toLowerCase(); } }
-  const s = soilOf(o.uscs); if (s?.p) head = head.replace(new RegExp(s.p.replace(/[,]/g, ''), 'i'), ''); head = head.replace(/^[\s:–-]+|[\s:–-]+$/g, '');
+  const hz = /^((?:II|III|IV)?[A-Za-z][a-z]{0,4}\d?)\s+horizon:?\s*/.exec(t); if (hz) { o.hz = hz[1]; t = t.slice(hz[0].length); }
+  const parts = t.split(/[,;]/).map(x => x.trim()).filter(Boolean); let head = parts.shift() || '';
+  // the soil: a group symbol in brackets ("SAND (SP)"), else as the head's first word ("SP sand"), else the longest soil name in the head that means one symbol
+  const isCode = x => SOILS[x.toUpperCase()] && x.length <= 5;
+  let code = /\(([A-Za-z]{1,4}(?:-[A-Za-z]{2})?)\)/.exec(head)?.[1], first = /^([A-Za-z]{1,4}(?:-[A-Za-z]{2})?)(?=[\s:]|$)/.exec(head)?.[1];
+  if (code && isCode(code)) head = head.replace(`(${code})`, ''); else if (first && isCode(first) && (first === first.toUpperCase() || head.trim().split(' ').length <= 3)) { code = first; head = head.slice(first.length); } else code = null;
+  if (code) o.uscs = code.toUpperCase();
+  else { const hits = Object.entries(SOILS).filter(([, v]) => v.p && new RegExp(`\\b${v.p.replace(/[,]/g, '\\,')}\\b`, 'i').test(head)), long = Math.max(0, ...hits.map(([, v]) => v.p.length)), top = hits.filter(([, v]) => v.p.length === long);
+    if (top.length === 1) o.uscs = top[0][0]; }
+  const s = soilOf(o.uscs); if (s?.p) head = head.replace(new RegExp(`\\b${s.p.replace(/[,]/g, '\\,')}\\b`, 'i'), ''); head = head.replace(/^[\s:–-]+|[\s:–-]+$/g, '');
   if (head) parts.unshift(head);
-  const proper = (list, x) => list.find(v => v && v.toLowerCase() === x.toLowerCase()); let past = false;   // the description runs modifiers, grading, consistency, moisture, colour, then other features
+  const proper = (list, x) => list.find(v => v && v.toLowerCase() === x.toLowerCase()), had = (f, x) => String(prev?.[f] || '').toLowerCase().split(/,\s*/).includes(x); let past = false;   // modifiers, grading, consistency, moisture, colour, then other features
   for (const part of parts) {
     const x = part.toLowerCase(), gr = /^(fine|medium|coarse)(?:\s*(?:to|-)\s*(fine|medium|coarse))?(?:\s+grained)?$/.exec(x);
+    if (had('other', x)) { other.push(part); continue; } if (had('mods', x)) { mods.push(part); continue; }
     if (gr && !past) { mods.push(gr[2] ? `${gr[1]} to ${gr[2]} grained` : gr[1] + ' grained'); continue; }   // keeps "fine to medium grained" as written
     if (MOD_CHIPS.includes(x) && !past) { mods.push(x); continue; }
+    if (OTHER_CHIPS.includes(x)) { other.push(part); continue; }
     const cn = proper([...COHESIVE, ...GRANULAR, ...WEATHERING], x); if (cn && !o.consistency) { o.consistency = cn; past = true; continue; }
     const mo = proper(MOISTURE, x); if (mo && !o.moisture) { o.moisture = mo; past = true; continue; }
     if ((s?.grad && x === s.grad) || (s?.plast && x === `${s.plast} plastic`)) { past = true; continue; }   // implied by the soil type; written back from it
@@ -1588,38 +1599,71 @@ function parseLayerText(text) {
     if (LT_COLOUR.test(x) && !o.colour) { o.colour = part; past = true; continue; }
     (past ? other : mods).push(part);
   }
-  if (mods.length === 1 && s?.imp && mods[0] === s.imp) mods.length = 0;   // "silty" alone on SM is the soil's own word
+  if (mods.length === 1 && s?.imp && mods[0] === s.imp && !had('mods', s.imp)) mods.length = 0;   // "silty" alone on SM is the soil's own word
   o.mods = mods.join(', '); o.other = other.join(', ');
   return o;
 }
 const LT_KEYS = ['uscs', 'mods', 'consistency', 'moisture', 'colour', 'origin', 'other', 'hz'];
-function layerApplyText(b, l, text) {
-  const q = parseLayerText(text); if (q.top != null) l.top = q.top; if (q.bottom != null) l.bottom = q.bottom;
-  for (const k of LT_KEYS) l[k] = q[k]; if (q.uscs) l.texture = '';
-  b.layers.sort((a, c) => (a.top ?? 0) - (c.top ?? 0)); logChange(b, 'Soil layers'); store.save(b);
+/* the text shown for typing: the symbol-based description (a texture keeps its own button), depths in the display unit */
+const ltDesc = l => { const c = composeDesc({ ...l, texture: '' }); return c.name || c.body ? c.text : ''; };
+const layerText = l => `${l.top != null && l.bottom != null ? `${fx(l.top)}-${fx(l.bottom)} ` : ''}${ltDesc(l)}`;
+/* apply typed text to a layer: returns an error to show instead of applying, else ''. A new layer (o.add) takes its depths from the text or o.top/o.bottom
+   and must not overlap; an existing one moves its neighbours with it, as when a depth is typed in its box, if they stay the right way up. */
+function layerApplyText(b, l, text, o = {}) {
+  const q = parseLayerText(text, o.add ? null : l); if (q.error) return q.error;
+  const was = { uscs: l.uscs, origin: l.origin, top: l.top, bottom: l.bottom }, same = (k, j) => q.raw && was[k] != null && +q.raw[j] === +fx(was[k]);   // a depth typed as shown keeps its exact value
+  const top = same('top', 0) ? was.top : q.top ?? o.top, bottom = same('bottom', 1) ? was.bottom : q.bottom ?? o.bottom, others = b.layers.filter(x => x !== l && x.top != null && x.bottom != null);
+  if (top != null && bottom != null && (top !== was.top || bottom !== was.bottom)) {
+    if (!(bottom > top)) return `The bottom (${fx(bottom)}) must be below the top (${fu(top)}).`;
+    const next = o.add ? null : others.find(x => Math.abs(x.top - was.bottom) < 1e-6), prev = o.add ? null : others.find(x => Math.abs(x.bottom - was.top) < 1e-6);
+    if (next && !(next.bottom > bottom)) return `${fu(bottom)} is below the bottom of layer ${b.layers.indexOf(next) + 1} (${fu(next.bottom)}). Change that layer first.`;
+    if (prev && !(top > prev.top)) return `${fu(top)} is above the top of layer ${b.layers.indexOf(prev) + 1} (${fu(prev.top)}). Change that layer first.`;
+    const clash = others.find(x => x !== next && x !== prev && top < x.bottom - 1e-6 && bottom > x.top + 1e-6);
+    if (clash) return `${fx(top)}–${fu(bottom)} overlaps layer ${b.layers.indexOf(clash) + 1} (${fx(clash.top)}–${fu(clash.bottom)}).`;
+    if (next) next.top = bottom; if (prev) prev.bottom = top; l.top = top; l.bottom = bottom;
+  }
+  if (!q.depthOnly) {
+    for (const k of LT_KEYS) l[k] = q[k];
+    if (!q.origin && (!ORIGIN_TAG[was.origin] || (was.origin === 'fill' && l.uscs === 'FILL'))) l.origin = was.origin || '';   // origins the description doesn't print (topsoil, bedrock, fill on FILL) keep their value
+    if (q.uscs && q.uscs !== was.uscs) l.texture = '';
+  }
+  b.layers.sort((a, c) => (a.top ?? 0) - (c.top ?? 0)); logChange(b, 'Soil layers'); store.save(b); return '';
 }
-const layerText = l => `${l.top != null && l.bottom != null ? `${fx(toD(l.top))}-${fx(toD(l.bottom))} ` : ''}${composeDesc(l).name || composeDesc(l).body ? composeDesc(l).text : ''}`;
-function ltRead(text) { const q = parseLayerText(text); return [q.top != null ? `${fx(toD(q.top))}–${fu(q.bottom)}` : '', q.uscs, q.mods, q.consistency, q.moisture, q.colour, q.origin && ORIGINS[q.origin], q.other && `other: ${q.other}`].filter(Boolean).join(' · ') || 'Nothing recognised yet'; }
+const ltApply = layerApplyText;
+function ltRead(text, l) { const q = parseLayerText(text, l); if (q.error) return q.error; return [q.top != null ? `${fx(q.top)}–${fu(q.bottom)}` : '', q.depthOnly ? 'depths only; the description stays' : '', q.uscs, q.mods, q.consistency, q.moisture, q.colour, q.origin && ORIGINS[q.origin], q.other && `other: ${q.other}`].filter(Boolean).join(' · ') || 'Nothing recognised yet'; }
+/* the panel stays on the layer it edited, wherever the layer sorted to */
+function ltShow(b, l) { if (S.drawer?.kind === 'layer') { S.drawer.i = S.layer = b.layers.indexOf(l); renderDrawer(); } redrawLog(); }
 /* typing straight onto the log: a text box over the layer's description; Enter applies, Escape leaves it */
 function ltInline(i) {
   $('#lt-inline')?.remove(); const b = cur(), l = b?.layers[i], z = document.querySelector(`#log [data-desc][data-i="${i}"]`); if (!l || !z) return;
-  const r = z.getBoundingClientRect(), ta = document.createElement('textarea'); ta.id = 'lt-inline'; ta.dataset.i = i; ta.setAttribute('aria-label', `Layer ${i + 1} description`); ta.spellcheck = false;
-  ta.value = composeDesc(l).name || composeDesc(l).body ? composeDesc(l).text : ''; Object.assign(ta.style, { left: r.left + scrollX + 'px', top: r.top + scrollY + 'px', width: Math.max(260, r.width) + 'px', height: Math.max(64, Math.min(200, r.height)) + 'px' });
+  const r = z.getBoundingClientRect(), ta = document.createElement('textarea'); ta.id = 'lt-inline'; ta.dataset.i = i; ta.dataset.lid = l.id; ta.setAttribute('aria-label', `Layer ${i + 1} description`); ta.spellcheck = false;
+  ta.value = ta.dataset.orig = ltDesc(l); const wd = Math.max(260, r.width);
+  Object.assign(ta.style, { left: Math.min(r.left, innerWidth - wd - 8) + scrollX + 'px', top: r.top + scrollY + 'px', width: wd + 'px', height: Math.max(64, Math.min(200, r.height)) + 'px' });
   document.body.append(ta); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
-  ta.addEventListener('blur', () => { if (ta.isConnected && !ta.dataset.done) ltInlineDone(ta, true); });
+  ta.addEventListener('blur', () => { if (ta.isConnected && !ta.dataset.done) setTimeout(() => ltInlineDone(ta, true), 0); });   // after the click that moved focus has landed
+  $('#log')?.addEventListener('scroll', () => ta.isConnected && !ta.dataset.done && ltInlineDone(ta, true), { once: true });
 }
-function ltInlineDone(ta, apply) { ta.dataset.done = '1'; const b = cur(), l = b?.layers[+ta.dataset.i]; if (apply && l && editable(b) && ta.value.trim() !== (composeDesc(l).text || '').trim()) { layerApplyText(b, l, ta.value); } ta.remove(); redrawLog(); renderDrawer(); }
+function ltInlineDone(ta, apply) {
+  if (ta.dataset.done) return; ta.dataset.done = '1'; const b = cur(), l = b?.layers.find(x => x.id === ta.dataset.lid); let err = '';
+  if (apply && l && editable(b) && ta.value.trim() !== ta.dataset.orig.trim()) err = ltApply(b, l, ta.value);
+  ta.remove(); if (err) toast(err); if (l) ltShow(b, l); else redrawLog();
+}
+addEventListener('resize', () => { const ta = $('#lt-inline'); if (ta) ltInlineDone(ta, true); });
 document.addEventListener('keydown', e => {
-  const t = e.target; if (!t?.id?.startsWith?.('lt-')) return;
-  if (t.id === 'lt-inline' && e.key === 'Escape') { e.preventDefault(); ltInlineDone(t, false); return; }
+  const t = e.target; if (!t?.id?.startsWith?.('lt-') || e.isComposing) return;
+  if (t.id === 'lt-inline' && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); ltInlineDone(t, false); return; }
   if (e.key !== 'Enter' || e.shiftKey) return; e.preventDefault(); const b = cur(); if (!editable(b)) return;
   if (t.id === 'lt-inline') { ltInlineDone(t, true); return; }
-  if (t.id === 'lt-type') { const l = b.layers[+t.dataset.ltl]; if (l) { layerApplyText(b, l, t.value); renderDrawer(); redrawLog(); $('#lt-type')?.focus(); } return; }
-  if (t.id === 'lt-new' && t.value.trim()) { const q = parseLayerText(t.value), top = q.top ?? Math.max(0, ...b.layers.map(l => l.bottom ?? 0)), l = newLayer(top);
-    l.bottom = q.bottom ?? top + fromD(S.units === 'ft' ? 2 : .5); b.layers.push(l); layerApplyText(b, l, t.value); l.top = top; if (q.bottom == null) l.bottom = top + fromD(S.units === 'ft' ? 2 : .5);
-    t.value = ''; $('#lt-new-read').textContent = `Added layer ${b.layers.indexOf(l) + 1}: ${fx(toD(l.top))}–${fu(l.bottom)}. Type the next one.`; redrawLog(); t.focus(); }
+  if (t.id === 'lt-type') { const l = b.layers[+t.dataset.ltl]; if (!l) return; const err = ltApply(b, l, t.value); if (err) { $('#lt-read').textContent = err; return; } ltShow(b, l); $('#lt-type')?.focus(); return; }
+  if (t.id === 'lt-new' && t.value.trim()) {
+    const q = parseLayerText(t.value), bot = Math.max(0, ...b.layers.map(l => l.bottom ?? 0)), top = q.top ?? bot, bottom = q.bottom ?? top + fromD(S.units === 'ft' ? 2 : .5), note = $('#lt-new-read');
+    const empty = b.layers.find(l => !l.uscs && !l.texture && l.bottom == null), l = empty || newLayer(top); if (!empty) b.layers.push(l);
+    l.top = l.bottom = null; const err = ltApply(b, l, t.value, { add: true, top, bottom });
+    if (err) { if (!empty) b.layers.splice(b.layers.indexOf(l), 1); else l.top = top; note.textContent = err; return; }
+    t.value = ''; note.textContent = `Added layer ${b.layers.indexOf(l) + 1}: ${fx(l.top)}–${fu(l.bottom)}. Type the next one.`; ltShow(b, l); t.focus();
+  }
 });
-document.addEventListener('input', e => { const t = e.target; if (t.id === 'lt-type') $('#lt-read').textContent = 'Reads as: ' + ltRead(t.value); if (t.id === 'lt-new') $('#lt-new-read').textContent = t.value.trim() ? 'Reads as: ' + ltRead(t.value) : ''; });
+document.addEventListener('input', e => { const t = e.target; if (t.id === 'lt-type') $('#lt-read').textContent = 'Reads as: ' + ltRead(t.value, cur()?.layers[+t.dataset.ltl]); if (t.id === 'lt-new') $('#lt-new-read').textContent = t.value.trim() ? 'Reads as: ' + ltRead(t.value) : ''; });
 function newLayer(top) { return { id: uid('l'), top, bottom: null, hz: '', uscs: '', mods: '', consistency: '', moisture: '', colour: '', other: '', origin: '' }; }
 function nextName() {
   let max = 0;
