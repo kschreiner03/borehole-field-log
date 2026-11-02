@@ -1232,12 +1232,14 @@ body.field .dtabs button { padding: 12px 4px 10px; font-size: 15px; }
 .shell { grid-template-columns: 64px var(--sidebar-width) minmax(0, 1fr) var(--ctl-w, 0px); }
 body.side-min .shell { --sidebar-width: 36px; }
 .side-strip { display: none; }
-body.side-min .side > :not(.side-strip) { display: none; }
-body.side-min .side-strip { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0; }
+@media (min-width: 861px) { body.side-min .side > :not(.side-strip) { display: none; } }
+@media (min-width: 861px) { body.side-min .side-strip { display: flex; } }
+body.side-min .side-strip { flex-direction: column; align-items: center; gap: 6px; padding: 8px 0; }
 .side-strip .tb { min-height: 28px; padding: 0 5px; } .side-strip .ct { font: 12px var(--f-body); color: var(--muted); writing-mode: vertical-rl; }
 .bl-min { min-height: 26px; padding: 0 5px; } .bl-min svg { width: 14px; height: 14px; }
 .ctl { grid-column: 4; grid-row: 1 / -1; position: sticky; top: var(--appbar-h, 68px); align-self: start; height: calc(100vh - var(--appbar-h, 68px) - var(--status-h)); overflow-y: auto; overflow-x: hidden; background: var(--surface); border-left: 1px solid var(--border); font-size: 13px; }
 .ctl[hidden] { display: none; }
+body.drawer-open .main { margin-right: max(0px, calc(min(420px, 100vw) - var(--ctl-w, 0px))); }   /* the drawer covers the panel first */
 .ctl-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; background: var(--surface); border-bottom: 1px solid var(--rule); }
 .ctl-head .sp { flex: 1 1 auto; } .ctl-head .note { font-size: 12px; }
 .ctl .tb { min-height: 26px; padding: 0 5px; } .ctl .tb svg { width: 16px; height: 16px; }
@@ -1288,7 +1290,7 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
   .main { grid-column: 1; grid-row: 3; padding: 12px 12px 32px; }
   body.drawer-open .main { margin-right: 0; }
   .ctl { grid-column: 1; grid-row: 4; position: static; height: auto; max-height: none; border-left: 0; border-top: 1px solid var(--border); }
-  body.side-min .side > :not(.side-strip) { display: flex; } body.side-min .side-strip { display: none; }
+  .ctl-rz { display: none; }
   .titlebar h1, .titlebar .co { display: none; }
   #statusbar .sb-opt { display: none; }
 }
@@ -1918,7 +1920,15 @@ const CTL = {}, CTL_ICON = '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18
 S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {}, ...jsonLS('bhlog.ui', {}) };
 const uiSave = () => lsSet('bhlog.ui', JSON.stringify(S.ui));
 const ctlClamp = w => Math.round(Math.min(480, Math.max(240, +w || 300)));
-function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); const c = $('#side-ct'); if (c) c.textContent = `${projList().length} boreholes`; }
+function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
+/* the panel's column is set before a page draws, so drawings measure the work area they will really have */
+function ctlLayout() {
+  const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
+  const has = !!CTL[S.tab] && !!cur() && (S.tab !== 'gwm' || !gwModel().error), open = S.ui.ctlOpen !== false;
+  if (el.dataset.tab !== S.tab) { el.scrollTop = 0; el.dataset.tab = S.tab; }
+  el.hidden = !has; el.classList.toggle('min', has && !open);
+  sh.style.setProperty('--ctl-w', !has ? '0px' : open ? ctlClamp(S.ui.ctlW) + 'px' : '40px');
+}
 function ctlRender() {
   const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
   const G = (CTL[S.tab]?.() || []).filter(g => g && g.html);
@@ -2601,7 +2611,7 @@ function renderMain() {
   if (!S.loaded) return;
   const b = cur();
   if (!b) {
-    renderRail();
+    renderRail(); ctlLayout();
     main.dataset.bh = '';
     main.innerHTML = `<div class="start">
       <h2>Make a borehole log in three steps</h2>
@@ -2647,7 +2657,7 @@ function renderFacts(b) {
 }
 function formFocused() { const a = document.activeElement; return !!(a && a.closest && a.closest('.edit')); }
 function renderView(full) {
-  const v = $('#view'); if (!v) return;
+  const v = $('#view'); if (!v) return; ctlLayout();
   if (S.tab === 'reports') S.tab = 'compose';   // the Reports page and the report editor are one page
   const b = cur();
   if (S.tab === 'edit') {
@@ -3308,7 +3318,8 @@ function graphSeries() {
   for (const p of labParamsUsed(projList())) S0['lab:' + p] = [LAB_PARAMS[p].label, LAB_PARAMS[p].unit || '', 'log', s => labVal(s, p), p];
   return S0;
 }
-const graphsOf = () => (S.co.graphs || []).filter(g => graphSeries()[g.series]);
+const graphHasData = (SR, k) => !!SR[k] && projList().some(x => (x.samples || []).some(sm => val(SR[k][3](sm, x))));
+const graphsOf = () => { const SR = graphSeries(); return (S.co.graphs || []).filter(g => graphHasData(SR, g.series)); };
 const val = x => x == null ? null : typeof x === 'object' ? (x.v != null ? x : null) : isFinite(x) ? { v: +x } : null;
 /* points for one borehole, on a scale shared by the whole project so logs compare */
 function graphData(b, g) {
@@ -3352,11 +3363,12 @@ function graphsRowHTML() {
   const field = [['nplot', 'SPT N'], ['su', 'Shear strength (pocket pen., vane)'], ['w', 'Water content and limits'], ['cvc', 'Vapour (ppm, headspace)']].filter(([k]) => S.co.cols?.[k] === 'on' || ps.some(x => LOG_COLS[k][1](x)));
   const lp = labGraphParam(), labCol = shown('lab'), lab = labParamsUsed(ps);
   const other = Object.keys(SR).filter(k => !k.startsWith('lab:') && !['cvc', 'n'].includes(k) && ps.some(x => (x.samples || []).some(sm => val(SR[k][3](sm, x)))));
-  const head = t => `<div class="gr-h">${t}</div>`;
-  return `<div class="rep-graphs gtick"><span class="note">Ticked graphs show on the log and in the PDF, in this order. Every borehole in the project uses them.</span>
+  const head = t => `<div class="gr-h">${t}</div>`, rowKeys = new Set([...lab.map(p => 'lab:' + p), ...other]), extra = gs.filter((g, i) => !rowKeys.has(g.series) && gs.findIndex(x => x.series === g.series) === i);
+  return `<div class="rep-graphs gtick"><span class="note">Ticked graphs show on the log and in the PDF. Every borehole uses them.</span>
     ${field.length ? head('Field tests') + field.map(([k, t]) => row('col:' + k, t, shown(k))).join('') : ''}
     ${lab.length ? head('Lab results') + lab.map(p => { const i = gi('lab:' + p); return row('lab:' + p, LAB_PARAMS[p].label, (labCol && lp === p) || i >= 0, i); }).join('') : ''}
     ${other.length ? head('Other measured values') + other.map(k => { const i = gi(k); return row(k, SR[k][0] + (SR[k][1] ? ` (${SR[k][1]})` : ''), i >= 0, i); }).join('') : ''}
+    ${extra.length ? head('Saved graphs') + extra.map(g => { const i = gs.indexOf(g), p = g.series.startsWith('lab:') ? g.series.slice(4) : null, nm = p ? LAB_PARAMS[p]?.label || p : SR[g.series]?.[0] || g.series; return row(p ? 'lab:' + p : g.series, nm + (graphHasData(SR, g.series) ? '' : ' (no data in this project, not drawn)'), true, i); }).join('') : ''}
     ${PC && PC.dropped.some(k => GRAPH_COLS.includes(k)) ? `<p class="note">Left out of this PDF to make room: ${esc(PC.dropped.filter(k => GRAPH_COLS.includes(k)).map(k => ({ nplot: 'SPT N', su: 'shear strength', w: 'water content', cvc: 'vapour', lab: LAB_PARAMS[labGraphParam()]?.label || 'lab results' })[k]).join(', '))}. Tick a graph to keep it.</p>` : ''}
     ${PC && PC.room < 170 ? `<p class="note danger-text">The ticked graphs don't fit on the page with a readable description (${Math.max(0, Math.round(PC.room))} px left of 170). Untick some, or choose Narrow graphs under Page layout.</p>` : ''}
     ${!field.length && !lab.length && !other.length ? '<p class="note">No test results at depth yet. Graphs appear here once samples have results.</p>' : ''}</div>`;
@@ -3366,7 +3378,8 @@ function gtickSet(key, on) {
   if (kind === 'col') S.co.cols = { ...(S.co.cols || {}), [k]: on ? 'on' : 'off' };
   else {
     const series = kind === 'lab' ? 'lab:' + k : k; S.co.graphs = (S.co.graphs || []).filter(g => g.series !== series);
-    if (on) S.co.graphs.push({ series, type: 'points' });
+    if (on && kind === 'lab' && k === labGraphParam() && S.co.cols?.lab !== 'off') S.co.cols = { ...(S.co.cols || {}), lab: 'on' };   // the older lab column already draws it
+    else if (on) S.co.graphs.push({ series, type: 'points' });
     if (kind === 'lab' && !on && labGraphParam() === k) S.co.cols = { ...(S.co.cols || {}), lab: 'off' };   // the older single lab column
   }
   store.saveCompany(); refreshGraphs(); if (S.tab !== 'log' && S.tab !== 'report') ctlRender();
