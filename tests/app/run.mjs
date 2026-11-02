@@ -1429,6 +1429,32 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('ui: log graphs are one tick list', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      const keepCo = structuredClone({ cols: S.co.cols, graphs: S.co.graphs, labGraph: S.co.labGraph, layout: S.co.layout });
+      try {
+        loadDlExample(); await w(300); const b = projList().find(b => (b.samples || []).some(s => s.lab)); S.sel = b.id;
+        S.co.cols = { lab: 'on' }; S.co.labGraph = 'benzene'; S.co.graphs = []; S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {} };
+        goTab('report'); await w(400);
+        const ticks = [...document.querySelectorAll('#ctl input[data-gtick]')], keys = ticks.map(t => t.dataset.gtick);
+        want(keys.includes('col:nplot') && keys.includes('lab:benzene') && keys.includes('lab:toluene'), 'Graphs group lists field and lab graphs: ' + keys);
+        want(!document.querySelector('#view #lab-graph') && !document.querySelector('#view [data-act="graph-add"]') && !document.querySelector('#view [data-repcol]'), 'old graph controls are gone from the page');
+        want(document.querySelector('#ctl input[data-gtick="lab:benzene"]')?.checked, 'old lab column setting shows Benzene ticked');
+        const tick = (k, on) => { const el = document.querySelector('#ctl input[data-gtick="' + k + '"]'); el.checked = on; el.dispatchEvent(new Event('change', { bubbles: true })); };
+        const heads = () => { const d = document.createElement('div'); d.innerHTML = pageSVG(b, 0, 1); return d.textContent; };
+        tick('lab:toluene', true); await w(300); want(/Toluene/.test(heads()), 'ticking Toluene adds its column');
+        tick('lab:toluene', false); await w(300); want(!/Toluene/.test(heads()), 'unticking removes it');
+        tick('lab:benzene', false); await w(300); want(!/Benzene/.test(heads()), 'unticking the old lab column removes it');
+        tick('col:nplot', true); await w(300); want(!pdfCols(b).dropped.includes('nplot') && pdfCols(b).on.has('nplot'), 'a ticked field graph is never left out');
+        for (const k of ['lab:benzene', 'lab:toluene', 'lab:ethylbenzene', 'lab:xylenes', 'col:su', 'col:w', 'col:cvc']) if (document.querySelector('#ctl input[data-gtick="' + k + '"]')) { tick(k, true); await w(250); }
+        want(/don.t fit|do not fit/i.test(document.querySelector('#ctl [data-ctlg="log-graphs"]')?.textContent || ''), 'too many graphs: the group says they do not fit');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      finally { Object.assign(S.co, keepCo); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
