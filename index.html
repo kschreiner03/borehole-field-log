@@ -4941,9 +4941,9 @@ async function v3dBuild() {
   if (!window.THREE) { try { await loadScript(THREE_URL, THREE_SRI); } catch (e) { /* handled below */ } }
   if (S.v3d?.renderer) { try { S.v3d.renderer.dispose(); S.v3d.renderer.forceContextLoss?.(); } catch (e) { /* already gone */ } }
   if (!window.THREE) { S.v3d = { ok: false, error: 'The 3D library did not load.' }; host.innerHTML = `<p class="note" style="padding:16px">${esc(S.v3d.error)} Use Export for ParaView instead.</p>`; return; }
-  let renderer; try { renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); } catch (e) { S.v3d = { ok: false, error: '3D needs WebGL, which is not available here.' }; host.innerHTML = `<p class="note" style="padding:16px">${esc(S.v3d.error)} Use Export for ParaView instead.</p>`; return; }
-  const list = projList().filter(b => b.easting != null && b.northing != null && b.elevation != null);
+  const list = mapList().filter(b => b.easting != null && b.northing != null && b.elevation != null);   // boreholes unticked on the maps stay out
   if (!list.length) { S.v3d = { ok: false, error: 'No boreholes with coordinates and a ground elevation.' }; host.innerHTML = `<p class="note" style="padding:16px">${esc(S.v3d.error)}</p>`; return; }
+  let renderer; try { renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); } catch (e) { S.v3d = { ok: false, error: '3D needs WebGL, which is not available here.' }; host.innerHTML = `<p class="note" style="padding:16px">${esc(S.v3d.error)} Use Export for ParaView instead.</p>`; return; }
   const W = host.clientWidth || 900, H = host.clientHeight || 560; renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.setSize(W, H); host.innerHTML = ''; host.append(renderer.domElement);
   const E0 = list.reduce((a, b) => a + b.easting, 0) / list.length, N0 = list.reduce((a, b) => a + b.northing, 0) / list.length;
   const zTop = Math.max(...list.map(b => b.elevation + 1)), zBot = Math.min(...list.map(b => b.elevation - depthOf(b))), Z0 = zBot;
@@ -5016,23 +5016,42 @@ function v3dControls(el) { let drag = null;
     else { o.th += dx * .008; o.ph = Math.max(.08, Math.min(Math.PI - .08, o.ph - dy * .008)); } v3dRender(); });
   el.addEventListener('pointerup', () => { drag = null; }); el.addEventListener('contextmenu', e => e.preventDefault());
   el.addEventListener('wheel', e => { if (!S.v3d?.ok) return; e.preventDefault(); S.v3d.orbit.rad *= Math.exp(e.deltaY * .0012); v3dRender(); }, { passive: false }); }
-function v3dPng() { const V = S.v3d; if (!V?.ok) return; v3dRender(); V.renderer.domElement.toBlob(bl => bl && saveFile(`3d-view-${(projKey(cur()) || 'project').replace(/[^\w-]+/g, '-').slice(0, 40)}.png`, bl), 'image/png'); }
+/* the view as a picture that explains itself: the vertical exaggeration and a north arrow drawn on it (at most maxW wide) */
+function v3dCapture(maxW = 0) {
+  const V = S.v3d; if (!V?.ok) return null; v3dRender(); const src = V.renderer.domElement, k = maxW && src.width > maxW ? maxW / src.width : 1, cv = document.createElement('canvas'); cv.width = Math.round(src.width * k); cv.height = Math.round(src.height * k);
+  const x = cv.getContext('2d'); x.drawImage(src, 0, 0, cv.width, cv.height); const sc = cv.width / 900;
+  // north: where a point 10 m north of the centre lands on screen
+  const a = new THREE.Vector3(V.orbit.tx, V.orbit.ty, V.orbit.tz).project(V.camera), b = new THREE.Vector3(V.orbit.tx, V.orbit.ty, V.orbit.tz - 10).project(V.camera), north = Math.atan2(-(b.y - a.y), b.x - a.x);
+  const cx = cv.width - 46 * sc, cy = 46 * sc, L = 26 * sc, ux = Math.cos(north), uy = Math.sin(north);
+  x.fillStyle = 'rgba(255,255,255,.85)'; x.beginPath(); x.arc(cx, cy, 34 * sc, 0, 7); x.fill(); x.strokeStyle = '#1c2329'; x.lineWidth = 2 * sc; x.beginPath(); x.moveTo(cx - ux * L, cy - uy * L); x.lineTo(cx + ux * L, cy + uy * L); x.stroke();
+  x.beginPath(); x.moveTo(cx + ux * L, cy + uy * L); x.lineTo(cx + ux * (L - 9 * sc) - uy * 6 * sc, cy + uy * (L - 9 * sc) + ux * 6 * sc); x.lineTo(cx + ux * (L - 9 * sc) + uy * 6 * sc, cy + uy * (L - 9 * sc) - ux * 6 * sc); x.closePath(); x.fillStyle = '#1c2329'; x.fill();
+  x.font = `600 ${13 * sc}px Arial`; x.textAlign = 'center'; x.fillText('N', cx + ux * (L + 9 * sc), cy + uy * (L + 9 * sc) + 4 * sc);
+  const caption = `Vertical exaggeration ×${V.ve} · purple = model (MODFLOW 6), not measured · see-through surfaces interpolated · ${new Date().toISOString().slice(0, 10)}`;
+  x.font = `${12 * sc}px Arial`; x.textAlign = 'left'; const tw = x.measureText(caption).width; x.fillStyle = 'rgba(255,255,255,.85)'; x.fillRect(8 * sc, cv.height - 26 * sc, tw + 12 * sc, 20 * sc); x.fillStyle = '#1c2329'; x.fillText(caption, 14 * sc, cv.height - 11 * sc);
+  return { canvas: cv, caption, north };
+}
+function v3dPng() { const c = v3dCapture(); if (!c) return; c.canvas.toBlob(bl => bl && saveFile(`3d-view-${(projKey(cur()) || 'project').replace(/[^\w-]+/g, '-').slice(0, 40)}.png`, bl), 'image/png'); }
 /* ---------- ParaView export: VTK XML (ASCII) in real coordinates (UTM m, elevation m) ---------- */
-function vtkArr(name, type, vals, nc = 1) { return `<DataArray type="${type}" Name="${name}"${nc > 1 ? ` NumberOfComponents="${nc}"` : ''} format="ascii">${vals.map(v => type === 'Int32' ? Math.round(v) : Number.isFinite(+v) ? (+v).toPrecision(9).replace(/\.?0+(e|$)/, '$1') : 'nan').join(' ')}</DataArray>`; }
+/* integer arrays by name (ids and flags); every measured or modelled quantity is Float64. Non-finite values never reach a file:
+   callers use the documented no-data value VTK_NODATA */
+const VTK_INT = new Set(['borehole', 'unit', 'part', 'nondetect', 'medium', 'layer', 'surface', 'connectivity', 'offsets', 'types']), VTK_NODATA = -1e30;
+const vtkNum = v => { const n = +v; if (!Number.isFinite(n)) return String(VTK_NODATA); const t = String(n); return t.length <= 17 ? t : n.toPrecision(15); };
+function vtkArr(name, type, vals, nc = 1) { return `<DataArray type="${type}" Name="${name}"${nc > 1 ? ` NumberOfComponents="${nc}"` : ''} format="ascii">${vals.map(v => type === 'Int32' ? String(Math.round(+v) || 0) : vtkNum(v)).join(' ')}</DataArray>`; }
+const vtkType = n => VTK_INT.has(n) ? 'Int32' : 'Float64';
 function vtkPoly(pts, { lines = [], verts = [], polys = [] } = {}, cellData = {}, pointData = {}) {
   const sec = (tag, cells) => cells.length ? `<${tag}>${vtkArr('connectivity', 'Int32', cells.flat())}${vtkArr('offsets', 'Int32', cells.reduce((a, c) => (a.push((a[a.length - 1] || 0) + c.length), a), []))}</${tag}>` : '';
-  const cd = Object.entries(cellData).map(([n, v]) => vtkArr(n, Number.isInteger(v[0]) ? 'Int32' : 'Float64', v)).join(''), pd = Object.entries(pointData).map(([n, v]) => vtkArr(n, 'Float64', v)).join('');
+  const cd = Object.entries(cellData).map(([n, v]) => vtkArr(n, vtkType(n), v)).join(''), pd = Object.entries(pointData).map(([n, v]) => vtkArr(n, vtkType(n), v)).join('');
   return `<?xml version="1.0"?>\n<VTKFile type="PolyData" version="0.1" byte_order="LittleEndian"><PolyData><Piece NumberOfPoints="${pts.length}" NumberOfVerts="${verts.length}" NumberOfLines="${lines.length}" NumberOfStrips="0" NumberOfPolys="${polys.length}"><Points>${vtkArr('Points', 'Float64', pts.flat(), 3)}</Points>${sec('Verts', verts)}${sec('Lines', lines)}${sec('Polys', polys)}${cd ? `<CellData>${cd}</CellData>` : ''}${pd ? `<PointData>${pd}</PointData>` : ''}</Piece></PolyData></VTKFile>\n`;
 }
 function vtkHex(M, cells, cellData) { const g = M.grid, pts = [], conn = [];
   for (const [k, r, c] of cells) { const i = r * g.ncol + c, tp = k ? g.botm[k - 1][i] : g.top[i], bt = g.botm[k][i], x0 = c * g.cell, x1 = x0 + g.cell, y1 = g.Lv - r * g.cell, y0 = y1 - g.cell, base = pts.length;
     for (const z of [bt, tp]) for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]) { const [E, N] = g.toWorld(x, y); pts.push([E, N, z]); }
     conn.push([0, 1, 2, 3, 4, 5, 6, 7].map(j => base + j)); }
-  const cd = Object.entries(cellData).map(([n, v]) => vtkArr(n, Number.isInteger(v[0]) ? 'Int32' : 'Float64', v)).join('');
+  const cd = Object.entries(cellData).map(([n, v]) => vtkArr(n, vtkType(n), v)).join('');
   return `<?xml version="1.0"?>\n<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian"><UnstructuredGrid><Piece NumberOfPoints="${pts.length}" NumberOfCells="${cells.length}"><Points>${vtkArr('Points', 'Float64', pts.flat(), 3)}</Points><Cells>${vtkArr('connectivity', 'Int32', conn.flat())}${vtkArr('offsets', 'Int32', conn.map((_, i) => 8 * (i + 1)))}${vtkArr('types', 'Int32', conn.map(() => 12))}</Cells>${cd ? `<CellData>${cd}</CellData>` : ''}</Piece></UnstructuredGrid></VTKFile>\n`;
 }
 function gwVtkFiles() {
-  const list = projList().filter(b => b.easting != null && b.northing != null && b.elevation != null), f = {}, units = [...new Set(list.flatMap(b => xsUnits(b).map(u => u.u)))];
+  const list = mapList().filter(b => b.easting != null && b.northing != null && b.elevation != null), f = {}, units = [...new Set(list.flatMap(b => xsUnits(b).map(u => u.u)))];
   // boreholes: one line per unit interval
   { const pts = [], lines = [], bh = [], un = []; list.forEach((b, j) => xsUnits(b).forEach(u => { lines.push([pts.length, pts.length + 1]); pts.push([b.easting, b.northing, b.elevation - u.top], [b.easting, b.northing, b.elevation - u.bot]); bh.push(j); un.push(units.indexOf(u.u)); }));
     f['boreholes.vtp'] = vtkPoly(pts, { lines }, { borehole: bh, unit: un }); }
@@ -5040,16 +5059,16 @@ function gwVtkFiles() {
       lines.push([pts.length, pts.length + 1]); pts.push([b.easting, b.northing, b.elevation + st], [b.easting, b.northing, b.elevation - w.screenTop]); bh.push(j); part.push(0);
       lines.push([pts.length, pts.length + 1]); pts.push([b.easting, b.northing, b.elevation - w.screenTop], [b.easting, b.northing, b.elevation - w.screenBottom]); bh.push(j); part.push(1); });
     f['wells.vtp'] = vtkPoly(pts, { lines }, { borehole: bh, part }); }
-  { const param = S.xs.param || 'benzene', pts = [], verts = [], conc = [], nd = [], med = [];
-    list.forEach(b => { for (const s of (b.gwSamples || []).filter(s => gwVal(s, param)) ) { const w = b.well; if (w?.screenTop == null) continue; const v = gwVal(s, param); verts.push([pts.length]); pts.push([b.easting, b.northing, b.elevation - (w.screenTop + w.screenBottom) / 2]); conc.push(v.v); nd.push(v.lt ? 1 : 0); med.push(1); }
-      for (const sm of (b.samples || []).filter(sm => sm.depth != null && labVal(sm, param))) { const v = labVal(sm, param); verts.push([pts.length]); pts.push([b.easting, b.northing, b.elevation - sm.depth]); conc.push(v.v); nd.push(v.lt ? 1 : 0); med.push(0); } });
-    f['samples.vtp'] = vtkPoly(pts, { verts }, { concentration: conc.map(Number), nondetect: nd, medium: med }); }
+  { const param = S.xs.param || 'benzene', pts = [], verts = [], conc = [], nd = [], med = [], day = [], dd = d => d ? Date.parse(d) / 864e5 : VTK_NODATA;
+    list.forEach(b => { for (const s of (b.gwSamples || []).filter(s => gwVal(s, param)) ) { const w = b.well; if (w?.screenTop == null || w.screenBottom == null) continue; const v = gwVal(s, param); verts.push([pts.length]); pts.push([b.easting, b.northing, b.elevation - (w.screenTop + w.screenBottom) / 2]); conc.push(v.v); nd.push(v.lt ? 1 : 0); med.push(1); day.push(dd(s.date)); }
+      for (const sm of (b.samples || []).filter(sm => sm.depth != null && labVal(sm, param))) { const v = labVal(sm, param); verts.push([pts.length]); pts.push([b.easting, b.northing, b.elevation - sm.depth]); conc.push(v.v); nd.push(v.lt ? 1 : 0); med.push(0); day.push(dd(soilDate(b))); } });
+    f['samples.vtp'] = vtkPoly(pts, { verts }, { concentration: conc.map(Number), nondetect: nd, medium: med, date_days: day }); }
   const M = gwModel(), readme = [`Borehole Field Log: 3D export for ParaView (VTK XML), ${new Date().toISOString().slice(0, 10)}. Project: ${projKey(cur())}.`, 'Coordinates are real: UTM easting and northing (m) and elevation (m). Nothing is exaggerated; set a Z scale in ParaView (Transform) if wanted.',
-    'Measured: boreholes.vtp (unit intervals; cell data borehole and unit index), wells.vtp (part 0 = casing, 1 = screen), samples.vtp (concentration; nondetect 1 = below the detection limit; medium 0 = soil mg/kg, 1 = groundwater mg/L).',
+    'Measured: boreholes.vtp (unit intervals; cell data borehole and unit index), wells.vtp (part 0 = casing, 1 = screen), samples.vtp (every result of the parameter: concentration; nondetect 1 = below the detection limit; medium 0 = soil mg/kg, 1 = groundwater mg/L; date_days = days since 1970-01-01, the sampling date).', `No data is written as ${VTK_NODATA} (for example the head of a dry cell); set it as the no-data value in ParaView. Boreholes unticked on the maps are left out.`,
     `Units: ${units.map((u, i) => `${i} ${u}`).join('; ')}. Boreholes: ${list.map((b, i) => `${i} ${b.name}`).join('; ')}.`];
   if (M && !M.error) { const g = M.grid, pts = [], polys = [], sid = [];
-    const surf = (zOf, id) => { const base = pts.length; for (let r = 0; r < g.nrow; r++) for (let c = 0; c < g.ncol; c++) { const [E, N] = g.cellCentre(r, c); pts.push([E, N, zOf(r, c)]); }
-      for (let r = 0; r < g.nrow - 1; r++) for (let c = 0; c < g.ncol - 1; c++) { const a = base + r * g.ncol + c; polys.push([a, a + 1, a + 1 + g.ncol, a + g.ncol]); sid.push(id); } };
+    const ok = []; const surf = (zOf, id) => { const base = pts.length; for (let r = 0; r < g.nrow; r++) for (let c = 0; c < g.ncol; c++) { const [E, N] = g.cellCentre(r, c), z = zOf(r, c); ok.push(Number.isFinite(z)); pts.push([E, N, Number.isFinite(z) ? z : g.top[r * g.ncol + c]]); }   // a point with no value sits at the ground and its faces are left out
+      for (let r = 0; r < g.nrow - 1; r++) for (let c = 0; c < g.ncol - 1; c++) { const a = base + r * g.ncol + c, q = [a, a + 1, a + 1 + g.ncol, a + g.ncol]; if (q.some(i => !ok[i])) continue; polys.push(q); sid.push(id); } };
     surf((r, c) => g.top[r * g.ncol + c], 0); M.units.forEach((u, k) => surf((r, c) => g.botm[k][r * g.ncol + c], k + 1));
     f['surfaces.vtp'] = vtkPoly(pts, { polys }, { surface: sid });
     const act = []; for (let k = 0; k < g.nlay; k++) for (let r = 0; r < g.nrow; r++) for (let c = 0; c < g.ncol; c++) if (g.idomain[k][r * g.ncol + c] === 1) act.push([k, r, c]);
@@ -5078,10 +5097,10 @@ function gwReportPages() {
 /* a simple flowing layout of headings, paragraphs and tables in SVG; what does not fit says so */
 function gwBlocksSVG(blocks, w, h) {
   const o = [], fs = 10, lh = 13, pad = 10, cw = fs * .5; let y = pad + 4, cut = false;
-  const line = (t, x, yy, st = '') => o.push(`<text x="${x.toFixed(1)}" y="${yy.toFixed(1)}" style="font:${st}${fs}px Arial,sans-serif;fill:#1c2329">${esc(t)}</text>`);
+  const line = (t, x, yy, st = '', col = '#1c2329') => o.push(`<text x="${x.toFixed(1)}" y="${yy.toFixed(1)}" style="font:${st}${fs}px Arial,sans-serif;fill:${col}">${esc(t)}</text>`);
   for (const b of blocks) { if (cut) break;
     if (b.h) { if (y + 18 > h - pad) { cut = true; break; } y += 6; o.push(`<text x="${pad}" y="${(y + 8).toFixed(1)}" style="font:700 11.5px Arial,sans-serif;fill:#1c2329">${esc(b.h)}</text>`); y += 16; continue; }
-    if (b.p) { const L = String(b.p).split('\n').flatMap(q => wrap(q, Math.floor((w - 2 * pad) / cw))); for (const t of L) { if (y + lh > h - pad) { cut = true; break; } line(t, pad, y + 9, b.warn ? 'italic ' : ''); y += lh; } y += 3; if (b.warn) o.splice(o.length - L.length, L.length, ...o.slice(o.length - L.length).map(x => x.replace('fill:#1c2329', 'fill:#b4451a'))); continue; }
+    if (b.p) { const L = String(b.p).split('\n').flatMap(q => wrap(q, Math.floor((w - 2 * pad) / cw))); for (const t of L) { if (y + lh > h - pad) { cut = true; break; } line(t, pad, y + 9, b.warn ? 'italic ' : '', b.warn ? '#b4451a' : undefined); y += lh; } y += 3; continue; }
     if (b.t) { const W0 = w - 2 * pad, ws = b.cols.map(c => c * W0), xsOf = ws.map((_, i) => pad + ws.slice(0, i).reduce((a, v) => a + v, 0));
       b.t.forEach((row, ri) => { const cells = row.map((c, i) => wrap(String(c ?? '–'), Math.max(4, Math.floor((ws[i] - 6) / cw)))), n = Math.max(...cells.map(c => c.length)), rh = n * lh + 3;
         if (y + rh > h - pad) { cut = true; return; } if (cut) return;
@@ -5103,6 +5122,7 @@ function gwReportSVG(kind, w, h) {
   if (kind === 'gwsum') {
     const B = [{ h: 'Groundwater model: MODFLOW 6.8.1 (U.S. Geological Survey, public domain)' },
       { p: 'Everything on this page and in the model figures is model output (MODFLOW 6), not measured. It is a screening-to-intermediate model built from this project’s borehole logs, water levels, slug tests and laboratory results, and calibrated to the measured heads.' },
+      ...(cs && !S.gwm?.run?.ok ? [{ p: `No MODFLOW 6 results are drawn in this report’s figures: ${S.gwm?.err ? 'the model run failed (' + S.gwm.err + ')' : S.gwm?.busy ? 'a model run was in progress' : window.desktop?.mf6Run ? 'the model has not been run' : 'the model needs the desktop app'}. The figures show measured data and the screening forecast only.`, warn: true }] : []),
       ...(stale ? [{ p: `The project data or model settings changed after the calibration of ${cs.at.slice(0, 10)}: the model must be calibrated again before these results are relied on.`, warn: true }] : []),
       { h: 'Set-up' },
       { t: [['Item', 'Value', 'Basis'],
@@ -10193,7 +10213,7 @@ document.addEventListener('click', e => {
     case 'load-xs': loadXsExample(); break;
     case 'tut-xsec': tutStart('xsec'); break;
     case 'v3d-reset': v3dView(true); break;
-    case 'v3d-report': if (S.v3d?.ok && !S.readOnly) { v3dRender(); const img = S.v3d.renderer.domElement.toDataURL('image/png'), L = repLayout(), leg = $('#v3d-legend')?.textContent || '';
+    case 'v3d-report': if (S.v3d?.ok && !S.readOnly) { const img = v3dCapture(1600).canvas.toDataURL('image/jpeg', .86), L = repLayout(), leg = $('#v3d-legend')?.textContent || '';   // JPEG at most 1600 px wide, as for other pictures, so the layout stays small
       L.pages.push(newPage('free', { orient: 'land', title: '3D VIEW OF THE SITE', items: [newItem('image', LB.x, LB.y, { w: LB.w, h: LB.h - 92, o: { img } }), newItem('text', LB.x, LB.y + LB.h - 84, { w: LB.w, h: 84, o: { size: 9, text: `View saved ${new Date().toISOString().slice(0, 10)}. ${leg}` } })] }));
       saveLayout(L); toast('3D view added to the report as a page.'); } break;
     case 'gw-report': if (!S.readOnly) { const L = repLayout(); L.pages.push(...gwReportPages()); saveLayout(L); toast('Model pages added to the report: summary, calibration, cross-section, plan and limits.'); } break;
@@ -10242,7 +10262,7 @@ document.addEventListener('change', e => {
   if (t.dataset?.gwft) { const [i, k] = t.dataset.gwft.split('|'), fs = [...(gwSaved().features || [])], v = t.value;
     fs[+i] = { ...fs[+i], [k]: k === 'type' || k === 'name' ? v : k === 'pts' ? v.split(';').map(q => q.trim().split(/[\s,]+/).map(Number)).filter(q => q.length === 2 && q.every(Number.isFinite)) : v === '' ? null : +v };
     if (k === 'stage') Object.assign(fs[+i], { elev: fs[+i].stage, head: fs[+i].stage }); setGwm({ features: fs }); return; }
-  if (t.id === 'v3d-ve') { S.v3dVe = +t.value || 0; v3dBuild(); return; }
+  if (t.id === 'v3d-ve') { S.v3dVe = +t.value || 0; if (S.v3d) S.v3d.orbit = null; v3dBuild(); return; }
   if (t.id?.startsWith('v3d-lyr-')) { const k = t.id.slice(8); S.v3dOff = { ...(S.v3dOff || {}), [k]: !t.checked }; if (S.v3d?.groups?.[k]) { S.v3d.groups[k].visible = t.checked; v3dRender(); } return; }
   if (t.id === 'gwm-tcal') { setGwm({ transport: { ...(gwSaved().transport || {}), calibrate: t.checked } }); return; }
   if (t.dataset?.mdl) { setModel(t.dataset.mdl, t.value); return; }
