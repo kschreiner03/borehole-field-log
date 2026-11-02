@@ -921,6 +921,31 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('plumes: field honours the data', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        const G = XS_GEOM, pts = plumePoints(G.pos, 'groundwater', 'benzene', S.xs.date, true).filter(p => !p.lt);
+        const elev = p => p.b.elevation - (p.top + p.bot) / 2;
+        const g = plumeField(G.pos, { ...S.xs, shape: 'guided' }, G, 4);
+        want(g.method === 'guided', 'guided when the forecast runs: ' + g.method + ' ' + g.note);
+        for (const p of pts) { const [c] = g.at(p.d, elev(p)); want(Math.abs(Math.log10(c) - Math.log10(p.v)) < .005, 'guided equals ' + p.b.name + ': ' + c + ' vs ' + p.v); }
+        want(g.c.every(Number.isFinite) && g.a.every(Number.isFinite), 'guided grid finite');
+        const d = plumeField(G.pos, { ...S.xs, shape: 'data' }, G, 4), p0 = pts[1];
+        want(d.method === 'data', 'data method');
+        const [c0] = d.at(p0.d, elev(p0)); want(Math.abs(Math.log10(c0) - Math.log10(p0.v)) < .005, 'data equals the result at the screen');
+        want(d.at(p0.d, p0.b.elevation - p0.bot - .5)[1] === 0, 'data: nothing 0.5 m below the screen');
+        want(d.at(p0.d, p0.b.elevation - p0.top + .5)[1] === 0, 'data: nothing above the water table or screen');
+        const flat = { ...S.xs, shape: 'guided' }, sav = gwFlow; window.gwFlow = () => ({ error: 'test: no flow' });
+        const fb = plumeField(G.pos, flat, G, 4); window.gwFlow = sav;
+        want(fb.method === 'data' && /forecast/i.test(fb.note) && /no flow/.test(fb.note), 'falls back to data with the reason: ' + fb.method + ' ' + fb.note);
+        const one = plumeField([G.pos[0], G.pos[0]], { ...S.xs, shape: 'data' }, G, 4); want(one.c.every(Number.isFinite) && one.a.every(Number.isFinite), 'same-position wells give a finite grid');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
