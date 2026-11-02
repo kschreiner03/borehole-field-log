@@ -3972,6 +3972,62 @@ function plumeContours(P, levels) {
   const segs = levels.flatMap(level => tinLine(P, tris, Math.log10(level)).map(([a, b]) => ({ level, a, b })));
   return { tris, segs, bands: tinBands(P, tris, levels.map(Math.log10)) };
 }
+/* a plume as a concentration field over the drawing, sampled on a grid of `cell` px. at(d, e) gives [concentration, weight 0–1]
+   for a distance along the section (m) and an elevation. Groundwater:
+   - 'guided': the forecast's field, scaled at each well so it equals the measured result at the screen midpoint; the scale
+     (log10, clamped to ±2) is blended linearly between wells. Falls back to 'data' with the reason when the forecast can't run.
+   - 'data': log10 blended between wells across the screened depth only, fading to nothing within 0.35 m outside the screens.
+   Soil and vapour: the triangulated network of samples, inside the data only. Every field fades out over 5 m past the
+   outermost data point and stays below the water table (groundwater). */
+const PF_FADE = 5, PF_SCREEN = .35, PF_CLAMP = 2;
+function plumeField(pos, xs, G, cell = 4) {
+  const medium = xs.medium || 'soil', param = medium === 'vapour' ? '' : xs.param, date = xs.date || '';
+  const lv = plumeLevels(medium, param), pts = plumePoints(pos, medium, param, date, !!xs.round).filter(p => !(p.lt && lv.length && p.v >= lv[0].v));
+  const lerp = (arr, d) => { if (!arr.length) return 0; if (d <= arr[0][0]) return arr[0][1]; for (let i = 1; i < arr.length; i++) if (d <= arr[i][0]) { const [a, va] = arr[i - 1], [b, vb] = arr[i]; return b - a > 1e-9 ? va + (vb - va) * (d - a) / (b - a) : vb; } return arr[arr.length - 1][1]; };
+  const byD = arr => arr.sort((p, q) => p[0] - q[0]);
+  const dMin = pts.length ? Math.min(...pts.map(p => p.d)) : 0, dMax = pts.length ? Math.max(...pts.map(p => p.d)) : 0;
+  const fade = d => d < dMin ? Math.max(0, 1 - (dMin - d) / PF_FADE) : d > dMax ? Math.max(0, 1 - (d - dMax) / PF_FADE) : 1;
+  const lg = v => Math.log10(Math.max(v, 1e-12));
+  let method = medium === 'groundwater' ? (xs.shape === 'data' ? 'data' : 'guided') : 'points', note = '', at;
+  if (medium === 'groundwater') {
+    const wtE = byD(pos.map(p => { const w = waterAt(p.b, date); return w && p.b.elevation != null ? [p.d, p.b.elevation - w.depth] : null; }).filter(Boolean));
+    const mid = p => p.b.elevation - (p.top + p.bot) / 2;
+    let run = null;
+    if (method === 'guided') {
+      run = modelRun(date, xs);
+      const why = !run.ok ? run.missing.join('; ') : run.P.param !== param ? `the forecast is set up for ${LAB_PARAMS[run.P.param]?.label || run.P.param}` : !pts.length ? 'no results to match' : '';
+      if (why) { method = 'data'; note = `Shown as data only: the forecast can't shape this plume (${why}).`; }
+    }
+    if (method === 'guided') {
+      const P = run.P, when = P.at || date, cAt = (d, e) => { const [E, N] = G.pos.at(d); return modelAt(P, E, N, e, when).c; };
+      const res = byD(pts.map(p => { const m = cAt(p.d, mid(p)) || 0; return [p.d, p.lt && m <= p.v ? 0 : Math.max(-PF_CLAMP, Math.min(PF_CLAMP, lg(p.v) - lg(Math.max(m, 1e-6))))]; }));
+      at = (d, e) => { const c = cAt(d, e); return c == null ? [0, 0] : [c * Math.pow(10, lerp(res, d)), fade(d)]; };
+      note = 'Interpreted: forecast shape matched to measured results';
+    } else {
+      const lc = byD(pts.map(p => [p.d, lg(p.v)])), tE = byD(pts.map(p => [p.d, p.b.elevation - p.top])), bE = byD(pts.map(p => [p.d, p.b.elevation - p.bot]));
+      at = (d, e) => { if (!pts.length || (wtE.length && e > lerp(wtE, d) + 1e-9)) return [0, 0]; const top = lerp(tE, d), bot = lerp(bE, d), out = e > top ? e - top : e < bot ? bot - e : 0;
+        return out >= PF_SCREEN ? [0, 0] : [Math.pow(10, lerp(lc, d)), fade(d) * (1 - out / PF_SCREEN)]; };
+      note = (note ? note + ' ' : '') + 'No data above or below the well screens';
+    }
+  } else {
+    // soil and vapour: barycentric interpolation of log10 on the triangulated samples, in drawing coordinates
+    const P = []; for (const p of pts) { const q = [G.X(p.d), G.Y(p.b.elevation - p.top), lg(p.v)]; if (!P.some(o => Math.abs(o[0] - q[0]) < 1e-3 && Math.abs(o[1] - q[1]) < 1e-3)) P.push(q); }
+    const tris = P.length >= 3 ? delaunay(P).filter(([a, b, c]) => Math.abs((P[b][0] - P[a][0]) * (P[c][1] - P[a][1]) - (P[c][0] - P[a][0]) * (P[b][1] - P[a][1])) > 1e-6) : [];
+    at = (d, e) => { const x = G.X(d), y = G.Y(e);
+      for (const [a, b, c] of tris) { const A = P[a], B = P[b], C = P[c], den = (B[1] - C[1]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[1] - C[1]);
+        const l1 = ((B[1] - C[1]) * (x - C[0]) + (C[0] - B[0]) * (y - C[1])) / den, l2 = ((C[1] - A[1]) * (x - C[0]) + (A[0] - C[0]) * (y - C[1])) / den, l3 = 1 - l1 - l2;
+        if (l1 >= -1e-9 && l2 >= -1e-9 && l3 >= -1e-9) return [Math.pow(10, l1 * A[2] + l2 * B[2] + l3 * C[2]), 1]; }
+      return [0, 0]; };
+    note = 'Interpolated between samples';
+  }
+  const x0 = G.X(0), x1 = G.X(G.maxD), y0 = G.m.t, y1 = G.m.t + G.plotH, nx = Math.max(2, Math.ceil((x1 - x0) / cell)), ny = Math.max(2, Math.ceil((y1 - y0) / cell));
+  const c = new Float32Array((nx + 1) * (ny + 1)), a = new Float32Array((nx + 1) * (ny + 1));
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) {
+    const x = x0 + (x1 - x0) * i / nx, y = y0 + (y1 - y0) * j / ny, d = (x - G.X(0)) / (G.X(G.maxD) - G.X(0) || 1) * G.maxD, e = G.e1 - (y - G.m.t) / G.plotH * (G.e1 - G.e0);
+    const [v, w] = at(d, e); c[j * (nx + 1) + i] = Number.isFinite(v) ? v : 0; a[j * (nx + 1) + i] = Number.isFinite(w) ? w : 0;
+  }
+  return { nx, ny, x0, x1, y0, y1, c, a, at, method, note, pts, lv, medium, param };
+}
 let XS_LAST = [];
 const xsLastPts = () => XS_LAST;
 const XS_RAMP = ['#fdd49e', '#fc8d59', '#d7301f', '#7f0000'];   // below the first level, ×1–10, ×10–100, over ×100 (sequential, not the water blue)
