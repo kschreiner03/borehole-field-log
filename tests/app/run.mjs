@@ -1341,6 +1341,24 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('pdf log: test column headings and scale numbers do not clash', async run => {
+    const r = await run(`(async () => {
+      loadDlExample(); await new Promise(r => setTimeout(r, 300));
+      const b = projList().find(b => (b.samples || []).some(s => s.lab)); S.sel = b.id;
+      const keep = S.co.graphs; S.co.graphs = Object.keys(graphSeries()).filter(k => k.startsWith('lab:')).slice(0, 3).map(series => ({ series, type: 'points' }));
+      const host = document.createElement('div'); host.style.cssText = 'position:absolute;left:0;top:0'; document.body.appendChild(host);
+      const keepL = S.co.layout; S.co.layout = { ...(keepL || {}), graph: 'narrow' };
+      host.innerHTML = pageSVG(b, 0, 1); S.co.graphs = keep; S.co.layout = keepL;
+      const svg = host.querySelector('svg'), bands = [...svg.querySelectorAll('rect')].filter(x => x.getAttribute('style')?.includes('#e8ecf0')), hy = +bands[0].getAttribute('y'), by0 = hy + +bands[0].getAttribute('height');
+      const T = [...svg.querySelectorAll('text')].filter(t => { const y = +t.getAttribute('y'); return y > hy && y < by0 && t.textContent.trim(); }).map(t => ({ t: t.textContent, b: t.getBoundingClientRect() }));
+      /* the small key symbols (dots, squares, triangles) count too */
+      T.push(...[...svg.querySelectorAll('circle,rect,path')].map(e => ({ t: e.tagName, b: e.getBoundingClientRect() })).filter(e => e.b.y > hy && e.b.y + e.b.height < by0 && e.b.width < 14 && e.b.height < 9 && e.b.width > 0));
+      const hit = [];
+      for (let i = 0; i < T.length; i++) for (let j = i + 1; j < T.length; j++) { const a = T[i].b, c = T[j].b; if (a.x < c.x + c.width + 2 && c.x < a.x + a.width + 2 && a.y < c.y + c.height - .3 && c.y < a.y + a.height - .3) hit.push(T[i].t + ' / ' + T[j].t); }
+      host.remove(); return { n: T.length, hit };
+    })()`);
+    expect(r.n > 10 && !r.hit.length, 'header text overlaps: ' + JSON.stringify(r));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
