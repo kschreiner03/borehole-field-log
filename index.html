@@ -1824,6 +1824,7 @@ const LAYER_DEFS = [   // top of the list draws on top, as in a GIS
   ['wl', 'Water elevations', '<text x="1" y="12" style="font:600 9.5px var(--f-body);fill:var(--water)">.42</text>'],
   ['sec', 'Section line A–A′', '<path d="M1 8h14" style="stroke:var(--accent)" stroke-width="2" stroke-dasharray="4 2"/>'],
   ['flow', 'Flow arrow', '<path d="M2 12L13 4M13 4H8.5M13 4v4.5" style="stroke:var(--water)" stroke-width="1.6" fill="none"/>'],
+  ['gwm', 'Groundwater model (MODFLOW 6)', '<path d="M1 12c3-3 5 1 8-1s4-3 6-2" stroke="#6a51a3" stroke-width="1.3" stroke-dasharray="3 2" fill="none"/><path d="M2 6h11" stroke="#3f007d" stroke-width="1.6"/>'],
   ['contours', 'Water-table contours', '<path d="M1 11c3-4 5 1 8-2s4-4 6-3" style="stroke:var(--water)" stroke-width="1.3" fill="none"/><path d="M1 15c3-4 5 1 8-2" style="stroke:var(--water)" stroke-width="1.3" fill="none" opacity=".5"/>'],
   ['feat', 'Site shapes', '<path d="M2 13l3-9 7 2 2 6z" style="fill:#e8e5de;stroke:#7a4b1d" stroke-dasharray="3 1.5"/>'],
   ['grid', 'Coordinate grid', '<path d="M1 5.5h14M1 10.5h14M5.5 1v14M10.5 1v14" style="stroke:var(--muted)" stroke-width=".8"/>'],
@@ -1944,7 +1945,7 @@ document.addEventListener('submit', e => { const f = e.target.closest?.('[data-m
 function layersPanelHTML() {
   const site = siteOf(), F = gwFlow(), ps = projList();
   const rows = LAYER_DEFS.map(([k, label, sw]) => {
-    const na = k === 'img' ? !site?.img : k === 'ortho' ? !imageryOf().length : k === 'feat' ? !featsOf().length : k === 'contours' ? gwHeads(mapList()).wells.length < 3 : k === 'flow' ? !!F.error : k === 'sec' ? sectionList().filter(b => b.easting != null).length < 2 : false;
+    const na = k === 'img' ? !site?.img : k === 'ortho' ? !imageryOf().length : k === 'feat' ? !featsOf().length : k === 'contours' ? gwHeads(mapList()).wells.length < 3 : k === 'flow' ? !!F.error : k === 'gwm' ? !S.gw?.run?.ok : k === 'sec' ? sectionList().filter(b => b.easting != null).length < 2 : false;
     return `<li><label class="lyr${na ? ' na' : ''}" title="${na ? 'Nothing to draw yet' : 'Show on the site plan and location plan'}"><input type="checkbox" data-lyr="${k}" ${lyrOn(k) ? 'checked' : ''}><svg class="sw" viewBox="0 0 16 16" aria-hidden="true">${sw}</svg><span>${esc(label)}</span></label></li>`;
   }).join('');
   const bh = ps.map(b => `<label class="lyr"><input type="checkbox" class="vis" data-vis="${esc(b.id)}" ${onMap(b) ? 'checked' : ''}>${bhGlyph(b.well?.installed)}<span>${esc(b.name || 'Untitled')}</span></label>`).join('');
@@ -7630,6 +7631,23 @@ function planSVG(W, H, interactive) {
     if (!F.error && !F.flat) {
       const mx = X(F.E0), my = Y(F.N0), fx2 = -F.bx / F.i, fy2 = F.by / F.i, len = 54;
       o.push(`<g><title>${esc(`Groundwater flow ${Math.round(F.az)}° (${F.dir}), i = ${F.i.toFixed(4)}, ${F.method.toLowerCase()} on ${F.n} wells`)}</title><line x1="${mx - fx2 * len / 2}" y1="${my - fy2 * len / 2}" x2="${mx + fx2 * len / 2}" y2="${my + fy2 * len / 2}" style="stroke:var(--water)" stroke-width="3.5" stroke-linecap="round"/><path d="M${mx + fx2 * (len / 2 + 12)} ${my + fy2 * (len / 2 + 12)}l${-fx2 * 15 - fy2 * 8} ${-fy2 * 15 + fx2 * 8}l${fy2 * 16} ${-fx2 * 16}z" style="fill:var(--water)"/><text x="${mx + 10}" y="${my + 22}" style="font:700 10.5px var(--f-label);fill:var(--water)">GW flow ${Math.round(F.az)}° ${F.dir}</text></g>`);
+    }
+  }
+  // the groundwater model (MODFLOW 6): its area, simulated water-table contours and flow paths from the source
+  if (S.gw?.run?.ok && S.gw.M && !S.gw.M.error && S.lyr.gwm !== false) { const M = S.gw.M, g = M.grid, R = S.gw.run;
+    const corners = [[0, 0], [g.ncol * g.cell, 0], [g.ncol * g.cell, g.Lv], [0, g.Lv]].map(([x, y]) => g.toWorld(x, y)).map(([e, n]) => [X(e), Y(n)]);
+    o.push(`<path data-gw-area="1" d="M${corners.map(q => q.map(v => v.toFixed(1)).join(' ')).join('L')}Z" fill="none" stroke="#6a51a3" stroke-width="1" stroke-dasharray="6 4"><title>MODFLOW 6 model area (${g.nrow} × ${g.ncol} cells of ${g.cell} m, ${g.nlay} layers)</title></path>`);
+    const xs2 = corners.map(q => q[0]), ys2 = corners.map(q => q[1]), sx0 = Math.max(0, Math.min(...xs2)), sx1 = Math.min(W, Math.max(...xs2)), sy0 = Math.max(0, Math.min(...ys2)), sy1 = Math.min(H, Math.max(...ys2));
+    if (sx1 > sx0 && sy1 > sy0) { const nx = Math.max(2, Math.ceil((sx1 - sx0) / 7)), ny = Math.max(2, Math.ceil((sy1 - sy0) / 7)), c = new Float32Array((nx + 1) * (ny + 1)), a = new Float32Array(c.length); let lo = Infinity, hi = -Infinity;
+      for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { const px = sx0 + (sx1 - sx0) * i / nx, py = sy0 + (sy1 - sy0) * j / ny, e = cx + (px - W / 2) / sc, n = cy - (py - H / 2) / sc, h = gwWaterTable(M, R.layers, e, n), k = j * (nx + 1) + i;
+        if (h == null) continue; c[k] = h; a[k] = 1; lo = Math.min(lo, h); hi = Math.max(hi, h); }
+      if (hi > lo) { const step = [.02, .05, .1, .2, .25, .5, 1, 2, 5].find(st => (hi - lo) / st <= 10) || 10, gg = { nx, ny, x0: sx0, x1: sx1, y0: sy0, y1: sy1, c, a };
+        for (let lv = Math.ceil(lo / step) * step; lv <= hi + 1e-9; lv += step) { const lines = fieldContours(gg, lv, .5, true); if (!lines.length) continue;
+          o.push(`<path data-gw-plan-wt="${lv.toFixed(3)}" d="${lines.map(l => l.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')).join('')}" fill="none" stroke="#6a51a3" stroke-width="1" stroke-dasharray="4 3"><title>Model water table ${lv.toFixed(2)} m (MODFLOW 6, ${esc(gwCalLabel())}), not measured</title></path>`);
+          const L = lines.reduce((b, l) => l.length > b.length ? l : b, []), q = L[Math.floor(L.length * .3)]; if (q) o.push(`<text x="${q[0].toFixed(1)}" y="${(q[1] - 3).toFixed(1)}" text-anchor="middle" style="font:9px Arial,sans-serif;fill:#54278f;paint-order:stroke;stroke:#fff;stroke-width:2.5px">${lv.toFixed(step < .1 ? 2 : step < 1 ? 1 : 0)}</text>`); } } }
+    for (const path of S.gw.paths || []) {
+      o.push(`<path data-gw-path="1" d="${path.map((p, i) => `${i ? 'L' : 'M'}${X(p.E).toFixed(1)} ${Y(p.N).toFixed(1)}`).join('')}" fill="none" stroke="#3f007d" stroke-width="1.6"><title>Flow path of water from the source (MODFLOW 6 flows, ${esc(gwCalLabel())}), not measured</title></path>`);
+      for (const yr of [1, 5, 10, 25]) { const q = path.find(p => p.t >= yr * 365.25); if (!q) break; o.push(`<g data-gw-tt="${yr}"><circle cx="${X(q.E).toFixed(1)}" cy="${Y(q.N).toFixed(1)}" r="2.6" fill="#fff" stroke="#3f007d"/><text x="${(X(q.E) + 4).toFixed(1)}" y="${(Y(q.N) - 4).toFixed(1)}" style="font:9px Arial,sans-serif;fill:#3f007d;paint-order:stroke;stroke:#fff;stroke-width:2.5px">${yr} yr</text></g>`); }
     }
   }
   const chosen = sectionList().filter(b => b.easting != null);
