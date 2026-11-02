@@ -1461,6 +1461,38 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('report: groundwater model output', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        for (const k of ['gwsum', 'gwcal', 'gwpar', 'gwlim']) want(RITEMS[k], 'report item ' + k);
+        want(REPORT_PRESETS.gwm, 'a groundwater model report preset');
+        // not calibrated yet: the summary says so
+        let svg = itemInner(newItem('gwsum'), 700, 900); want(/MODFLOW 6/.test(svg) && /not calibrated/i.test(svg), 'summary before calibration says not calibrated');
+        const M = gwModel(), C = await gwCalibrate(M, { maxIter: 3 });
+        setGwm({ calib: { mode: 'steady', pv: C.pv, params: C.params, stats: C.stats, residuals: C.residuals, css: C.css, corr: C.corr, warnings: C.warnings, round: M.round, rounds: [M.round], at: new Date().toISOString(), runs: C.runs, iterations: C.iterations, key: gwInputsKey(gwModel()) }, transport: { on: true } });
+        await gwEnsure(true);
+        svg = itemInner(newItem('gwsum'), 700, 900);
+        for (const t of ['MODFLOW 6', 'not measured', 'RMSE', 'Calibration round', M.units[0].u, 'How to read', 'Transport']) want(svg.includes(t), 'summary includes ' + t);
+        const cal = itemInner(newItem('gwcal'), 700, 600); want(/<circle/.test(cal) && /Residual/.test(cal) && C.residuals.every(q => cal.includes(q.b)), 'calibration plot and residual table with every well');
+        const par = itemInner(newItem('gwpar'), 700, 400); want(/95 %/.test(par) && C.params.every(p => par.includes(p.label)), 'parameter table');
+        const lim = itemInner(newItem('gwlim'), RITEMS.gwlim[1], RITEMS.gwlim[2]); want(/Langevin/.test(lim) && /Tiedeman/.test(lim), 'limits with references');
+        // the Model page appends the model pages; the section and plan in them show the model
+        goTab('gwm'); await w(300); const before = repLayout().pages.length; document.querySelector('[data-act="gw-report"]').click(); await w(200);
+        const L = repLayout(), added = L.pages.slice(before); want(added.length >= 4 && added.some(p => p.items.some(x => x.t === 'gwsum')) && added.some(p => p.items.some(x => x.t === 'section')) && added.some(p => p.items.some(x => x.t === 'plan')), 'model pages appended: ' + added.map(p => p.title));
+        const secIt = added.flatMap(p => p.items).find(x => x.t === 'section'); want(/data-gw-wt/.test(itemInner(secIt, secIt.w, secIt.h)) && /MODFLOW 6/.test(itemInner(secIt, secIt.w, secIt.h)), 'report cross-section carries the model results');
+        const planIt = added.flatMap(p => p.items).find(x => x.t === 'plan'); want(/data-gw-path/.test(itemInner(planIt, planIt.w, planIt.h)), 'report plan carries the flow paths');
+        // 3D view to the report as a dated picture with its legend
+        goTab('v3d'); await w(900); const n0 = repLayout().pages.length; document.querySelector('[data-act="v3d-report"]').click(); await w(400);
+        const pg = repLayout().pages[n0]; want(pg && pg.items.some(x => x.t === 'image' && /^data:image\\/png/.test(x.o.img)) && pg.items.some(x => x.t === 'text' && /exaggeration/.test(x.o.text)), '3D view added as a picture with its legend');
+        // export runs the model first if needed and produces the PDF
+        S.gwm.run = null; const bytes = await buildReportBytes(); want(bytes && bytes.length > 10000 && S.gwm.run?.ok, 'report exports with fresh model results: ' + (bytes && bytes.length));
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
