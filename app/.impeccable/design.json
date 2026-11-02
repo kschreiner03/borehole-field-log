@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-30T00:00:00Z",
+  "title": "Design System: Borehole Field Log",
+  "extensions": {
+    "colorMeta": {
+      "slate-teal": {
+        "role": "primary",
+        "displayName": "Slate Teal",
+        "canonical": "#245b78",
+        "tonalRamp": [
+          "#172831",
+          "#244556",
+          "#2f637f",
+          "#3782a9",
+          "#5ea4c9",
+          "#99c1d6",
+          "#cedfe8",
+          "#eef4f6"
+        ]
+      },
+      "water": {
+        "role": "secondary",
+        "displayName": "Water",
+        "canonical": "#2867a8",
+        "tonalRamp": [
+          "#152333",
+          "#203d5a",
+          "#295684",
+          "#2f6fb2",
+          "#5793d1",
+          "#94b7db",
+          "#ccdbea",
+          "#eef2f7"
+        ]
+      },
+      "positive": {
+        "role": "tertiary",
+        "displayName": "Positive",
+        "canonical": "#287a52",
+        "tonalRamp": [
+          "#173024",
+          "#25553e",
+          "#317c58",
+          "#3aa672",
+          "#62c695",
+          "#9bd5b8",
+          "#cfe8dc",
+          "#eef6f2"
+        ]
+      },
+      "negative": {
+        "role": "tertiary",
+        "displayName": "Negative",
+        "canonical": "#b42318",
+        "tonalRamp": [
+          "#361411",
+          "#611e19",
+          "#8f261e",
+          "#c12a1f",
+          "#e05348",
+          "#e3928c",
+          "#eecbc9",
+          "#f8edec"
+        ]
+      },
+      "warning": {
+        "role": "tertiary",
+        "displayName": "Warning",
+        "canonical": "#a3470b",
+        "tonalRamp": [
+          "#391f0f",
+          "#663514",
+          "#984916",
+          "#cd5d13",
+          "#eb823d",
+          "#eaad86",
+          "#f0d7c6",
+          "#f9f1ec"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#1f2937",
+        "tonalRamp": [
+          "#1d232a",
+          "#303b4a",
+          "#42536b",
+          "#536b8e",
+          "#788fb0",
+          "#a8b5c8",
+          "#d5dae2",
+          "#f0f2f4"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Ground",
+        "canonical": "#f3f4f6",
+        "tonalRamp": [
+          "#202327",
+          "#373b44",
+          "#4c5361",
+          "#616b7f",
+          "#868fa2",
+          "#afb5c0",
+          "#d8dadf",
+          "#f1f2f3"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Title",
+        "purpose": "Borehole or project name in the work area."
+      },
+      "section": {
+        "displayName": "Section",
+        "purpose": "Panel headers and dialog titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Forms, tables, tree and menus."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels and table headers."
+      },
+      "status": {
+        "displayName": "Status",
+        "purpose": "Status bar and breadcrumbs."
+      },
+      "drawing": {
+        "displayName": "Drawing",
+        "purpose": "Ticks and labels on logs and charts, in the export fonts."
+      }
+    },
+    "shadows": [
+      {
+        "name": "menu",
+        "value": "0 6px 18px rgba(16, 24, 40, .14)",
+        "purpose": "Menus and drop-downs."
+      },
+      {
+        "name": "dialog",
+        "value": "0 16px 40px rgba(16, 24, 40, .22)",
+        "purpose": "Dialogs and the find palette."
+      }
+    ],
+    "motion": [],
+    "breakpoints": [
+      {
+        "name": "compact-toolbar",
+        "value": "1100px"
+      },
+      {
+        "name": "compact-status",
+        "value": "1280px"
+      },
+      {
+        "name": "stacked",
+        "value": "860px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled action in a view.",
+      "html": "<button class=\"ds-btn-primary\">Download PDF</button>",
+      "css": ".ds-btn-primary { height: 28px; padding: 0 10px; border: 1px solid #245b78; border-radius: 3px; background: #245b78; color: #fff; font: 500 13px \"Segoe UI Variable Text\", \"Segoe UI\", system-ui, -apple-system, Roboto, \"Helvetica Neue\", Arial, sans-serif; cursor: pointer; } .ds-btn-primary:hover { background: #1b4760; border-color: #1b4760; } .ds-btn-primary:focus-visible { outline: 2px solid #245b78; outline-offset: 1px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Every other command.",
+      "html": "<button class=\"ds-btn\">Check log</button>",
+      "css": ".ds-btn { height: 28px; padding: 0 10px; border: 1px solid #b9c0c9; border-radius: 3px; background: #fff; color: #1f2937; font: 400 13px \"Segoe UI Variable Text\", \"Segoe UI\", system-ui, -apple-system, Roboto, \"Helvetica Neue\", Arial, sans-serif; cursor: pointer; } .ds-btn:hover { background: #e8eff3; border-color: #8f99a5; } .ds-btn:active { background: #dbe7ee; } .ds-btn:focus-visible { outline: 2px solid #245b78; outline-offset: 1px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Labelled 30px field.",
+      "html": "<label class=\"ds-fld\"><span>Ground elevation (m)</span><input class=\"ds-input\" value=\"652.85\"></label>",
+      "css": ".ds-fld { display: grid; gap: 3px; font: 600 12px \"Segoe UI Variable Text\", \"Segoe UI\", system-ui, -apple-system, Roboto, \"Helvetica Neue\", Arial, sans-serif; color: #576272; } .ds-input { height: 30px; padding: 0 8px; border: 1px solid #949eaa; border-radius: 3px; background: #fff; color: #1f2937; font: 13px \"Segoe UI Variable Text\", \"Segoe UI\", system-ui, -apple-system, Roboto, \"Helvetica Neue\", Arial, sans-serif; } .ds-input:hover { border-color: #6f7a87; } .ds-input:focus { outline: 0; border-color: #245b78; box-shadow: 0 0 0 2px rgba(36,91,120,.22); }"
+    },
+    {
+      "name": "Tree Item",
+      "kind": "nav",
+      "refersTo": "nav-item-selected",
+      "description": "Project tree row; selected takes the selected fill.",
+      "html": "<div class=\"ds-tree\"><button class=\"ds-nv\">Overview</button><button class=\"ds-nv\" aria-current=\"page\">Data tables</button></div>",
+      "css": ".ds-tree { display: grid; width: 220px; } .ds-nv { height: 28px; padding: 0 8px; border: 0; border-radius: 3px; background: none; text-align: left; font: 13px \"Segoe UI Variable Text\", \"Segoe UI\", system-ui, -apple-system, Roboto, \"Helvetica Neue\", Arial, sans-serif; color: #1f2937; cursor: pointer; } .ds-nv:hover { background: #e8eff3; } .ds-nv[aria-current=\"page\"] { background: #dbe7ee; font-weight: 600; }"
+    },
+    {
+      "name": "Status Tag",
+      "kind": "chip",
+      "refersTo": "status tag",
+      "description": "Draft, For review, Issued: square, tinted, worded.",
+      "html": "<span class=\"ds-tag ds-draft\">Draft</span> <span class=\"ds-tag ds-review\">For review</span> <span class=\"ds-tag ds-issued\">Issued</span>",
+      "css": ".ds-tag { display: inline-block; padding: 0 6px; border: 1px solid; border-radius: 3px; font: 600 11px/18px \"Segoe UI Variable Text\", \"Segoe UI\", system-ui, -apple-system, Roboto, \"Helvetica Neue\", Arial, sans-serif; } .ds-draft { color: #6b5508; background: #fbf3d6; border-color: #ecd98f; } .ds-review { color: #8a3d0a; background: #fcebdd; border-color: #f0c39d; } .ds-issued { color: #1c5a37; background: #e1f2e7; border-color: #a9d8b9; }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Square white panel with a raised header band.",
+      "html": "<section class=\"ds-panel\"><header>Soil layers</header><div class=\"ds-body\">4 layers · 0.00–6.00 m</div></section>",
+      "css": ".ds-panel { border: 1px solid #d5d9df; background: #fff; width: 320px; font: 13px \"Segoe UI Variable Text\", \"Segoe UI\", system-ui, -apple-system, Roboto, \"Helvetica Neue\", Arial, sans-serif; color: #1f2937; } .ds-panel header { height: 34px; display: flex; align-items: center; padding: 0 12px; background: #f7f8fa; border-bottom: 1px solid #d5d9df; font-weight: 600; } .ds-body { padding: 12px; }"
+    },
+    {
+      "name": "Status Bar",
+      "kind": "custom",
+      "refersTo": "status-bar",
+      "description": "Always-on save state, borehole and problems.",
+      "html": "<footer class=\"ds-sb\"><span class=\"ds-ok\">Saved on this computer</span><span>Borehole <b>BH24-02</b> · Draft</span><span>No problems found</span></footer>",
+      "css": ".ds-sb { display: flex; height: 24px; background: #eceef1; border-top: 1px solid #d5d9df; font: 12px \"Segoe UI Variable Text\", \"Segoe UI\", system-ui, -apple-system, Roboto, \"Helvetica Neue\", Arial, sans-serif; color: #576272; } .ds-sb span { display: flex; align-items: center; gap: 6px; padding: 0 10px; border-right: 1px solid #d5d9df; } .ds-sb b { color: #1f2937; } .ds-ok { color: #1f2937; } .ds-ok::before { content: \"\"; width: 7px; height: 7px; border-radius: 50%; background: #287a52; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Borehole Is the Document",
+    "overview": "A conventional engineering desktop workspace: menu bar, toolbar, project tree, work area and an always-on status bar. Colour does a job or stays out: cool grey and white chrome, one slate-teal for action, selection and focus, and soil, water and status hues only on data.",
+    "keyCharacteristics": [
+      "Cool grey ground, white panels, 1px rules, no resting shadows.",
+      "One slate-teal for action, selection and focus.",
+      "Square panels and tables, 3px controls, 4px menus, 5px dialogs.",
+      "The system UI font at 13px for everything on screen; drawings in the export fonts.",
+      "Compact office density (28px toolbar buttons, 30px inputs and rows); field mode and Quick Log keep 44–56px targets."
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "Slate teal appears only on the primary action, selection and focus; a second filled primary in the same view is a defect.",
+        "section": "colors"
+      },
+      {
+        "name": "The Data-Only Hue Rule",
+        "body": "Soil, water and status colours live on data and status tags, never on chrome.",
+        "section": "colors"
+      },
+      {
+        "name": "The Preview Is the PDF Rule",
+        "body": "Drawings on screen use the export's fonts; never restyle a drawing in the UI face.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Resting Shadow Rule",
+        "body": "Anything that sits in the layout is drawn with a border, never a shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep ground and surface the only two grounds, with raised for headers.",
+      "Do give each view one filled primary action.",
+      "Do report save state and problems in the status bar, in words.",
+      "Do keep field mode and Quick Log targets at 44px or more."
+    ],
+    "donts": [
+      "Don't use pills, gradients, glows, glass or resting shadows.",
+      "Don't nest panels or round panels and tables.",
+      "Don't draw icons with text characters; draw them as SVG.",
+      "Don't restyle log drawings in the UI font.",
+      "Don't add a dark theme; light only."
+    ]
+  }
+}
