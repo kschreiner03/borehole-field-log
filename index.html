@@ -4096,6 +4096,12 @@ const MODEL_FIELDS = [   // key, label, unit
   ['start', 'Release began (blank = long-term steady state)', 'date'], ['at', 'Forecast date (blank = date shown)', 'date']];
 const MODEL_COLS = ['#efedf5', '#bcbddc', '#807dba', '#54278f'];   // model output: purple family, never the plume oranges or the water blue
 /* everything the forecast needs, each value with where it came from, or the list of what is missing */
+/* vertical dispersivity presets, as listed in the BIOSCREEN 1.3 User's Manual (EPA/600/R-96/087, 1996), p. 19 */
+const AZ_RULES = {
+  '': ['0 (BIOSCREEN default)', () => 0, 'about 0: no vertical spreading (BIOSCREEN default; conservative)'],
+  astm: ['0.05 × αx (ASTM 1995)', ax => .05 * ax, '0.05 × αx (ASTM 1995, as listed in the BIOSCREEN User\u2019s Manual, EPA/600/R-96/087, p. 19)'],
+  epa: ['0.025 × αx (EPA 1986, low end)', ax => .025 * ax, '0.025 × αx, low end of 0.025–0.1 αx (EPA 1986, as listed in the BIOSCREEN User\u2019s Manual, EPA/600/R-96/087, p. 19)']
+};
 function modelRun(date, xs = S.xs) {
   const site = siteOf() || {}, u = site.model || {}, missing = [], P = { src: {} }, G = XS_GEOM;
   const val = (k, v, src) => { if (u[k] != null && u[k] !== '') { P[k] = +u[k]; P.src[k] = 'entered'; } else { P[k] = v; P.src[k] = src; } };
@@ -4104,14 +4110,14 @@ function modelRun(date, xs = S.xs) {
   for (const k of ['koc', 'H', 'sol', 'hl']) { P[k] = chem[k]; P.src[k] = chem.src[k]; } missing.push(...chem.missing);
   const geo = [...(!G || !G.located ? ['The forecast needs borehole coordinates to place the section on the flow direction.'] : []), ...(!G || G.noElev ? ['The forecast needs ground elevations to calculate heads.'] : [])];
   if (geo.length) return { ok: false, missing: geo, P };
-  const F = gwFlow(); if (F.error) return { ok: false, missing: ['Groundwater flow: ' + F.error], P };
+  const F = gwFlow(mapList(), u.at || date || undefined); if (F.error) return { ok: false, missing: ['Groundwater flow: ' + F.error], P };
   if (F.flat || !(F.i > 0)) return { ok: false, missing: ['The water table is too flat to define a flow direction.'], P };
   if (F.K == null) missing.push('hydraulic conductivity (add a slug test)');
   const soil = CCME_SOIL[u.soil === 'fine' ? 'fine' : 'coarse'];
   for (const k of ['foc', 'rhob', 'thw', 'tha', 'I']) val(k, soil[k], CCME_SRC);
   for (const k of ['Y', 'Z', 'L', 'da']) val(k, CCME_SITE[k], CCME_SRC);
   const Lp = Math.max(1, G.maxD); val('ax', xuEckstein(Lp), `Xu and Eckstein (1995) for a plume length of ${Lp.toFixed(0)} m (the section length; assumed)`);
-  val('ay', P.ax / 10, 'ax / 10 (Gelhar et al. 1992; assumed)'); val('az', 0, 'about 0: no vertical spreading (BIOSCREEN default; conservative)');
+  val('ay', P.ax / 10, 'ax / 10 (Gelhar et al. 1992; assumed)'); const azr = AZ_RULES[u.azRule] || AZ_RULES['']; val('az', azr[1](P.ax), azr[2]);
   val('srcHl', null, 'constant source (conservative)'); P.start = u.start || ''; P.at = u.at || date || '';
   if (P.srcHl > 0 && !P.start) missing.push('a release date: a source half-life needs one (at steady state a decaying source would be gone)');
   P.v = F.K != null ? F.v * 86400 : null; P.src.v = F.K != null ? `K·i/nₑ from the flow calculation (${F.nK} slug test${F.nK > 1 ? 's' : ''}, nₑ ${F.ne} assumed)` : '';
@@ -4177,11 +4183,12 @@ function xsModelHTML() {
   const fmt = v => v == null || !isFinite(v) ? '' : +(+v).toPrecision(4);
   return `<section class="sec" id="xs-model-sec"><header><h3>Forecast (model)</h3><span class="note">Domenico (1987) as in BIOSCREEN 1.4 · always labelled “Model, not measured”</span><span class="sp"></span><label class="check"><input type="checkbox" id="xs-model" ${S.xs.model ? 'checked' : ''}> Show on the section</label></header><div class="body">
     ${S.xs.model ? `${run.missing.length ? `<p class="note" style="color:var(--warn,#a3470b)">Not drawn yet: ${esc(run.missing.join('; '))}.</p>` : ''}
-    <div class="fields" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+    <div class="fields" style="grid-template-columns:repeat(5,minmax(0,1fr))">
       <div class="fld"><label for="mdl-param">Compound</label><select id="mdl-param" data-mdl="param" ${ro}>${Object.keys(CHEM).map(p => `<option value="${p}" ${P.param === p ? 'selected' : ''}>${esc(LAB_PARAMS[p].label)}${CHEM[p].mixture ? ' (mixture, not modelled)' : ''}</option>`).join('')}</select></div>
       <div class="fld"><label for="mdl-src">Source from</label><select id="mdl-src" data-mdl="src" ${ro}><option value="gw" ${(u.src || 'gw') === 'gw' ? 'selected' : ''}>Groundwater result at a well</option><option value="soil" ${u.src === 'soil' ? 'selected' : ''}>Soil results, leached by recharge</option></select></div>
       <div class="fld"><label for="mdl-bh">Source borehole</label><select id="mdl-bh" data-mdl="srcBh" ${ro}>${wellsOpt}</select></div>
-      <div class="fld"><label for="mdl-soil">Soil (defaults)</label><select id="mdl-soil" data-mdl="soil" ${ro}><option value="coarse" ${u.soil !== 'fine' ? 'selected' : ''}>Coarse</option><option value="fine" ${u.soil === 'fine' ? 'selected' : ''}>Fine</option></select></div></div>
+      <div class="fld"><label for="mdl-soil">Soil (defaults)</label><select id="mdl-soil" data-mdl="soil" ${ro}><option value="coarse" ${u.soil !== 'fine' ? 'selected' : ''}>Coarse</option><option value="fine" ${u.soil === 'fine' ? 'selected' : ''}>Fine</option></select></div>
+      <div class="fld"><label for="mdl-azrule">Vertical spreading</label><select id="mdl-azrule" data-mdl="azRule" ${ro}>${Object.entries(AZ_RULES).map(([k, r]) => `<option value="${k}" ${(u.azRule || '') === k ? 'selected' : ''}>${esc(r[0])}</option>`).join('')}</select></div></div>
     <div class="scroll-x"><table class="sum"><thead><tr><th>Input</th><th class="r">Value</th><th>Unit</th><th>Source</th></tr></thead><tbody>
       ${MODEL_FIELDS.map(([k, t, un]) => `<tr><td>${esc(t)}</td><td class="r"><input ${un === 'date' ? 'type="date"' : 'type="number" step="any"'} data-mdl="${k}" value="${esc(u[k] ?? '')}" placeholder="${esc(un === 'date' ? '' : String(fmt(P[k])))}" style="width:9em" ${ro}></td><td>${esc(un === 'date' ? '' : un)}</td><td class="note">${esc(u[k] != null && u[k] !== '' ? 'entered' : P.src[k] || (k === 'hl' ? 'no biodegradation (conservative)' : ''))}</td></tr>`).join('')}
       <tr><td>Groundwater velocity</td><td class="r">${fmt(P.v)}</td><td>m/day</td><td class="note">${esc(P.src.v || '')}</td></tr>
@@ -4228,7 +4235,7 @@ function xsChecksHTML(run) {
   return `<h4 style="margin:14px 0 6px">Checks</h4><div class="scroll-x"><table class="sum" id="xs-checks"><thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead><tbody>${C.checks.map(c => `<tr><td>${esc(c.name)}</td><td><span class="pill ${c.info ? 'draft' : c.ok ? 'issued' : 'review'}">${c.info ? 'Noted' : c.ok ? 'Passed' : 'Look at this'}</span></td><td class="note">${esc(c.detail)}</td></tr>`).join('')}</tbody></table></div>
     ${C.residuals.length ? `<div class="scroll-x"><table class="sum" style="margin-top:8px"><thead><tr><th>Well</th><th>Date</th><th class="r">Measured (mg/L)</th><th class="r">Forecast (mg/L)</th><th class="r">log₁₀ measured/forecast</th></tr></thead><tbody>${C.residuals.map(x => `<tr><td>${esc(x.b.name)}</td><td>${esc(x.date)}</td><td class="r">${x.nd ? '&lt;' : ''}${sig(x.meas)}</td><td class="r">${sig(x.pred)}</td><td class="r">${x.agreeND ? 'both below the detection limit' : x.dlog == null ? '—' : x.dlog.toFixed(2)}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
 }
-function setModel(k, v) { if (S.readOnly) return; const m = { ...(siteOf()?.model || {}) }; if (v === '' || v == null) delete m[k]; else m[k] = ['param', 'src', 'srcBh', 'soil', 'start', 'at'].includes(k) ? v : +v; setSite({ ...(siteOf() || {}), model: m }); renderView(true); }
+function setModel(k, v) { if (S.readOnly) return; const m = { ...(siteOf()?.model || {}) }; if (v === '' || v == null) delete m[k]; else m[k] = ['param', 'src', 'srcBh', 'soil', 'start', 'at', 'azRule'].includes(k) ? v : +v; setSite({ ...(siteOf() || {}), model: m }); renderView(true); }
 function setXs(k, v) { S.xs = { ...S.xs, [k]: v }; lsSet('bhlog.xs', JSON.stringify(S.xs)); redrawSec(); }
 function readingFor(b) {
   if (!S.round) return latestWater(b);
@@ -7023,18 +7030,18 @@ function gsdSVG(W = 640, H = 320) {
    Gradient i = √(bx² + by²); flow is down the gradient, azimuth = atan2(−bx, −by) clockwise from grid north.
    With hydraulic conductivity K (geometric mean of this project's slug tests): Darcy flux q = K·i, average linear velocity v = K·i / nₑ. */
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-function gwFlow(list = mapList()) {
-  // one set of levels from one round: the chosen date, else the latest round with at least 3 standpipe readings
-  const { round, wells } = gwHeads(list);
+function gwFlow(list = mapList(), asOf) {
+  // one set of levels from one round: the chosen date, else the latest round (on or before asOf, when given) with at least 3 standpipe readings
+  const { round, wells } = gwHeads(list, asOf);
   const out = { wells, n: wells.length, method: wells.length === 3 ? 'Three-point problem' : 'Least-squares planar fit' };
   if (wells.length < 3) return { ...out, error: `Needs a water level in at least 3 boreholes that have coordinates and a ground elevation (${wells.length} available${S.round ? ' for this date' : ''}).` };
   return gwFlowFit(list, out, round, wells);
 }
 /* one set of hydraulic heads from one round: the chosen date, else the latest round with at least 3 standpipe readings */
-function gwHeads(list = mapList()) {
+function gwHeads(list = mapList(), asOf) {
   const located = list.filter(b => b.easting != null && b.northing != null && b.elevation != null);
   const near = (b, d) => { const t0 = Date.parse(d); let best = null, bd = Infinity; for (const w of monitoring(b)) { if (!w.date || w.depth == null) continue; const dd = Math.abs(Date.parse(w.date) - t0); if (dd < bd) { bd = dd; best = w; } } return bd <= 31 * 864e5 ? best : null; };
-  const round = S.round || roundDates().find(d => located.filter(b => near(b, d)).length >= 3) || '';
+  const round = S.round || roundDates().filter(d => !asOf || d <= asOf).find(d => located.filter(b => near(b, d)).length >= 3) || '';
   const wells = located.map(b => {
     const w = round ? near(b, round) : (b.water || []).filter(x => x.depth != null && x.kind !== 'strike').sort(byDate).pop();
     return w ? { b, w, e: b.easting, n: b.northing, h: b.elevation - w.depth } : null;

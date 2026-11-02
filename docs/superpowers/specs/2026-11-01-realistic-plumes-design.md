@@ -30,7 +30,7 @@ The user wants the plume to look realistic while staying defensible: nothing dra
 3. Layers: Measured, Forecast or Compare. In Compare, the measured plume uses the chosen style and the forecast is purple dashed contour lines only. Forecast alone uses the same style in the purple family.
 4. Forecast realism:
    - the forecast's water table and flow are taken from the round on or before the date shown, not the latest round;
-   - vertical dispersivity gets a choice: 0 (BIOSCREEN default, conservative, current) or a published ratio to αx. The ratio is offered only if its source is checked during the build; otherwise it stays as an entered value.
+   - vertical dispersivity gets a choice: 0 (BIOSCREEN default, conservative, current), 0.05 αx (ASTM 1995) or 0.025 αx (low end of EPA 1986's 0.025–0.1 αx). Both ratios were checked against the BIOSCREEN 1.3 User's Manual (EPA/600/R-96/087), p. 19, during the build. A typed value still wins.
 5. Soil steps back while a plume is shown: soil colours turn grey (a "Keep soil colours" switch turns this off), and soil below the water table gets a faint tint.
 6. Result markers sit on the borehole column at the screen midpoint, with their value, hollow for non-detects. Water-level labels no longer overlap.
 
