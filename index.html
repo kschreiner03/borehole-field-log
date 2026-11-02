@@ -21,6 +21,14 @@
   --f-mono: Consolas, "SF Mono", Menlo, ui-monospace, monospace;
 }
 * { box-sizing: border-box; }
+/* tutorial: a highlight around the control being explained, and a card beside it */
+#tut-hole { position: fixed; z-index: 900; pointer-events: none; border: 2px solid var(--accent); border-radius: 6px; box-shadow: 0 0 0 9999px rgba(20, 28, 36, .38); transition: all .18s ease; }
+#tut { position: fixed; z-index: 901; width: min(380px, calc(100vw - 32px)); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .22); padding: 14px 16px 12px; font: 14px/1.5 var(--f-body); }
+#tut .tut-k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+#tut h4 { margin: 2px 0 6px; font-size: 15px; }
+#tut p, #tut li { margin: 0 0 6px; } #tut ul { margin: 0 0 6px; padding-left: 18px; }
+#tut .tut-b { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; } #tut .tut-x { position: absolute; top: 6px; right: 8px; border: 0; background: none; font-size: 18px; color: var(--muted); cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { #tut-hole { transition: none; } }
 html, body { min-height: 100%; }
 body { background: var(--bg); color: var(--ink); font: 13.5px/1.45 var(--f-body); }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--accent-2); }
@@ -1812,7 +1820,7 @@ const jsonLS = (k, d) => { try { return JSON.parse(lsGet(k) || 'null') ?? d; } c
 S.offMap = new Set(jsonLS('bhlog.offmap', [])); S.fold = new Set(jsonLS('bhlog.fold', ['lyr'])); S.lyr = { img: true, grid: true, labels: true, wl: true, sec: true, ...jsonLS('bhlog.lyr', {}) };
 const onMap = b => !S.offMap.has(b.id);
 const mapList = () => projList().filter(onMap);
-const MAP_TABS = ['home', 'site', 'gw', 'contam', 'xsec', 'reports', 'compose'];
+const MAP_TABS = ['home', 'site', 'gw', 'contam', 'xsec', 'gwm', 'reports', 'compose'];
 function saveVis() { lsSet('bhlog.offmap', JSON.stringify([...S.offMap])); lsSet('bhlog.lyr', JSON.stringify(S.lyr)); renderList(sortedList()); if (MAP_TABS.includes(S.tab)) renderView(true); }
 function hiddenNote() {
   const n = projList().filter(b => !onMap(b)).length;
@@ -1824,6 +1832,7 @@ const LAYER_DEFS = [   // top of the list draws on top, as in a GIS
   ['wl', 'Water elevations', '<text x="1" y="12" style="font:600 9.5px var(--f-body);fill:var(--water)">.42</text>'],
   ['sec', 'Section line A–A′', '<path d="M1 8h14" style="stroke:var(--accent)" stroke-width="2" stroke-dasharray="4 2"/>'],
   ['flow', 'Flow arrow', '<path d="M2 12L13 4M13 4H8.5M13 4v4.5" style="stroke:var(--water)" stroke-width="1.6" fill="none"/>'],
+  ['gwm', 'Groundwater model (MODFLOW 6)', '<path d="M1 12c3-3 5 1 8-1s4-3 6-2" stroke="#6a51a3" stroke-width="1.3" stroke-dasharray="3 2" fill="none"/><path d="M2 6h11" stroke="#3f007d" stroke-width="1.6"/>'],
   ['contours', 'Water-table contours', '<path d="M1 11c3-4 5 1 8-2s4-4 6-3" style="stroke:var(--water)" stroke-width="1.3" fill="none"/><path d="M1 15c3-4 5 1 8-2" style="stroke:var(--water)" stroke-width="1.3" fill="none" opacity=".5"/>'],
   ['feat', 'Site shapes', '<path d="M2 13l3-9 7 2 2 6z" style="fill:#e8e5de;stroke:#7a4b1d" stroke-dasharray="3 1.5"/>'],
   ['grid', 'Coordinate grid', '<path d="M1 5.5h14M1 10.5h14M5.5 1v14M10.5 1v14" style="stroke:var(--muted)" stroke-width=".8"/>'],
@@ -1850,13 +1859,13 @@ function treeGroup(key, label, count, kids, extra = '') {
   return `<li class="tg${open ? ' open' : ''}"><div class="tr">${extra}<button class="tw" data-fold="${key}" aria-expanded="${open}" title="${open ? 'Collapse' : 'Expand'} ${esc(label)}">${TW}<span>${esc(label)}</span></button>${count != null ? `<span class="tc">${count}</span>` : ''}</div>${open ? `<ul class="tk">${kids}</ul>` : ''}</li>`;
 }
 const BH_TABS = ['log', 'edit', 'report'];
-const NAV_LABEL = { xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
-const NAV_ICON = { xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
+const NAV_LABEL = { gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
+const NAV_ICON = { gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const bhGlyph = well => `<svg class="bhg" viewBox="0 0 16 16" aria-hidden="true">${well ? '<circle cx="8" cy="8" r="4.6" fill="#fff" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/>' : '<circle cx="8" cy="8" r="4.6" fill="currentColor"/>'}</svg>`;
 /* the sidebar is the project as a tree: project pages, and each borehole with its own pages nested under it when chosen */
 /* the left side: a rail of project pages, then the project's boreholes as a list with a filter, status chips and a sort */
-const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['xsec', 'Section'], ['compose', 'Reports']];
+const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['xsec', 'Section'], ['gwm', 'Model'], ['compose', 'Reports']];
 const BH_ICON = '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M8 9h8M8 14h8"/>';
 S.bl = { q: '', st: lsGet('bhlog.blSt') || 'all', sort: lsGet('bhlog.blSort') || 'name' };
 const blMeta = b => { const w = latestWater(b), v = vapourMax(b, null, null); return { d: depthOf(b), w: w ? w.depth : null, v: v ? v.cvc : null }; };
@@ -1944,7 +1953,7 @@ document.addEventListener('submit', e => { const f = e.target.closest?.('[data-m
 function layersPanelHTML() {
   const site = siteOf(), F = gwFlow(), ps = projList();
   const rows = LAYER_DEFS.map(([k, label, sw]) => {
-    const na = k === 'img' ? !site?.img : k === 'ortho' ? !imageryOf().length : k === 'feat' ? !featsOf().length : k === 'contours' ? gwHeads(mapList()).wells.length < 3 : k === 'flow' ? !!F.error : k === 'sec' ? sectionList().filter(b => b.easting != null).length < 2 : false;
+    const na = k === 'img' ? !site?.img : k === 'ortho' ? !imageryOf().length : k === 'feat' ? !featsOf().length : k === 'contours' ? gwHeads(mapList()).wells.length < 3 : k === 'flow' ? !!F.error : k === 'gwm' ? !S.gwm?.run?.ok : k === 'sec' ? sectionList().filter(b => b.easting != null).length < 2 : false;
     return `<li><label class="lyr${na ? ' na' : ''}" title="${na ? 'Nothing to draw yet' : 'Show on the site plan and location plan'}"><input type="checkbox" data-lyr="${k}" ${lyrOn(k) ? 'checked' : ''}><svg class="sw" viewBox="0 0 16 16" aria-hidden="true">${sw}</svg><span>${esc(label)}</span></label></li>`;
   }).join('');
   const bh = ps.map(b => `<label class="lyr"><input type="checkbox" class="vis" data-vis="${esc(b.id)}" ${onMap(b) ? 'checked' : ''}>${bhGlyph(b.well?.installed)}<span>${esc(b.name || 'Untitled')}</span></label>`).join('');
@@ -2564,6 +2573,7 @@ function renderView(full) {
   else if (S.tab === 'report') { v.innerHTML = reportHTML(b); }
   else if (S.tab === 'site') { v.innerHTML = siteHTML(); drawSite(); }
   else if (S.tab === 'xsec') { v.innerHTML = xsecHTML(); drawXsec(); }
+  else if (S.tab === 'gwm') { v.innerHTML = gwmHTML(); gwEnsure(); }
   else if (S.tab === 'home') { v.innerHTML = homeHTML(); }
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
   else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); }
@@ -3683,6 +3693,11 @@ const MOD_CHIPS = ['silty', 'sandy', 'clayey', 'gravelly', 'some silt', 'some sa
 const OTHER_CHIPS = ['trace coal', 'oxide staining', 'gypsum crystals', 'rootlets', 'trace organics', 'sand lenses', 'silt laminations', 'cobbles', 'boulders', 'slickensided', 'fissured', 'blocky'];
 const splitTerms = v => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
 const chips = (k, v, list) => `<div class="chips">${list.map(t => `<button type="button" class="chip" data-chip="${k}" data-term="${esc(t)}" aria-pressed="${splitTerms(v).includes(t)}">${esc(t)}</button>`).join('')}</div>`;
+/* a borehole's logged units, paired by name (or by the alias set on the Cross-section page), neighbouring layers of one unit merged */
+function xsUnits(b) { const alias = siteOf()?.xsec?.alias || {}, out = [];
+  for (const l of (b.layers || []).filter(l => l.top != null && l.bottom > l.top).sort((a, c) => a.top - c.top)) { const u = alias[b.id + '|' + defaultUnit(l)] || defaultUnit(l), last = out[out.length - 1];
+    if (last && last.u === u && Math.abs(last.bot - l.top) < 1e-6) last.bot = l.bottom; else out.push({ u, top: l.top, bot: l.bottom, fill: soilOf(l.uscs)?.fill || 'panel-2' }); }
+  return out; }
 const defaultUnit = l => l.unit || (l.origin && l.origin !== 'bedrock' ? ORIGINS[l.origin] : '') || (soilOf(l.uscs)?.group === 'rock' ? 'Bedrock' : soilOf(l.uscs)?.p ? soilOf(l.uscs).p[0] + soilOf(l.uscs).p.slice(1).toLowerCase() : '');
 const descHTML = l => { const d = composeDesc(l); return d.name ? `<b>${esc(d.name)}</b>${d.body ? ', ' + esc(d.body) : ''}` : esc(d.text); };
 function waterOut(b, w) {
@@ -4007,10 +4022,11 @@ function plumeField(pos, xs, G, cell = 4) {
     const extraNote = L => L.extra.length ? ` ${L.extra.map(p => p.b.name).join(', ')} left out (a third screen at the same spot).` : '';
     let run = null, guided = null;
     if (method === 'guided') {
-      run = modelRun(date, xs);
+      const mf = gwConcSampler(date, param);
+      run = mf ? { ok: true, P: { param } } : modelRun(date, xs);
       let why = !run.ok ? run.missing.join('; ') : run.P.param !== param ? `the forecast is set up for ${LAB_PARAMS[run.P.param]?.label || run.P.param}` : !pts.length ? 'no results to match' : '';
       if (!why) {
-        const P = run.P, when = P.at || date, cAt = (d, e) => { const [E, N] = G.pos.at(d); return modelAt(P, E, N, e, when).c; };
+        const P = run.P, when = P.at || date, cAt = mf ? mf.cAt : (d, e) => { const [E, N] = G.pos.at(d); return modelAt(P, E, N, e, when).c; };
         // every result, including non-detects with a high detection limit: their limit is an upper bound on the plume
         const all = plumePoints(pos, medium, param, date, !!xs.round), res = new Map(), off = [];
         for (const p of all) { const m = cAt(p.d, mid(p)) || 0;
@@ -4020,7 +4036,7 @@ function plumeField(pos, xs, G, cell = 4) {
         if (off.length) why = `the forecast is near zero or more than 100× off at ${off.join(', ')}, so its shape can't be matched to the result${off.length > 1 ? 's' : ''} there`;
         else { const Lv = levels(all), rAt = twoLevel(Lv, p => res.get(p));
           at = (d, e) => { const c = cAt(d, e); return c == null ? [0, 0] : [c * Math.pow(10, rAt(d, e)), fade(d)]; };
-          guided = 'Interpreted: forecast shape matched to measured results' + extraNote(Lv); }
+          guided = `Interpreted: ${mf ? 'MODFLOW 6 plume' : 'forecast'} shape matched to measured results` + extraNote(Lv); }
       }
       if (why) { method = 'data'; note = `Shown as data only, because the forecast can't shape this plume: ${why.replace(/[.\s]+$/, '')}.`; }
     }
@@ -4053,9 +4069,9 @@ function plumeField(pos, xs, G, cell = 4) {
 }
 /* contour lines of a field at one level (marching squares on log10, cells with weight under minA left out), joined into
    continuous polylines in drawing coordinates */
-function fieldContours(g, level, minA = .5) {
-  const { nx, ny, c, a, x0, x1, y0, y1 } = g, L = Math.log10(level), sx = (x1 - x0) / nx, sy = (y1 - y0) / ny, segs = [];
-  const val = k => a[k] < minA || !(c[k] > 0) ? -99 : Math.log10(c[k]), W = nx + 1;
+function fieldContours(g, level, minA = .5, lin = false) {
+  const { nx, ny, c, a, x0, x1, y0, y1 } = g, L = lin ? level : Math.log10(level), sx = (x1 - x0) / nx, sy = (y1 - y0) / ny, segs = [];
+  const val = lin ? k => a[k] < minA ? -1e9 : c[k] : k => a[k] < minA || !(c[k] > 0) ? -99 : Math.log10(c[k]), W = nx + 1;
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const k = j * W + i, q = [val(k), val(k + 1), val(k + W + 1), val(k + W)], p = [[0, 0], [1, 0], [1, 1], [0, 1]], pts = [];
     for (let e = 0; e < 4; e++) { const u = q[e], w = q[(e + 1) % 4]; if ((u >= L) !== (w >= L)) { const f = (L - u) / (w - u), A = p[e], B = p[(e + 1) % 4]; pts.push([x0 + (i + A[0] + (B[0] - A[0]) * f) * sx, y0 + (j + A[1] + (B[1] - A[1]) * f) * sy]); } }
@@ -4306,6 +4322,21 @@ function modelGrid(date, res = 6, xs = S.xs) {
   const reach = Math.max(0, ...segs.filter(s => s.k === 0).flatMap(s => [toXd(s.a), toXd(s.b)]));
   return { run, cells, pts, tris, segs, lv, reach, len: G.maxD, bands: lv.length ? tinBands(pts, tris, lv.map(l => Math.log10(l.v))) : [] };
 }
+/* the forecast from the MODFLOW 6 transport run, on the shared renderer */
+function modelSVGmf6(date, xs, mf) {
+  const G = XS_GEOM, T = mf.T, o = [], x0 = G.X(0), x1 = G.X(G.maxD), y0 = G.m.t, y1 = G.m.t + G.plotH, nx = Math.max(2, Math.ceil((x1 - x0) / 4)), ny = Math.max(2, Math.ceil((y1 - y0) / 4));
+  const c = new Float32Array((nx + 1) * (ny + 1)), a = new Float32Array(c.length);
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { const v = mf.cAt(G.maxD * i / nx, G.e1 - (j / ny) * (G.e1 - G.e0)), k = j * (nx + 1) + i; c[k] = v > 0 ? v : 0; a[k] = v == null ? 0 : 1; }
+  const g = { nx, ny, x0, x1, y0, y1, c, a, lv: plumeLevels('groundwater', T.param), medium: 'groundwater', param: T.param }, beside = xs.plume !== false && (xs.param || xs.medium === 'vapour');
+  o.push(fieldSVG(g, { style: xs.style || 'graded', family: 'model', dashed: !!beside, name: LAB_PARAMS[T.param].label }));
+  if (g.lv.length) { let lx = G.m.l; const ly = G.H - 8 - G.plH, head = 'Model (MODFLOW 6), not measured:';
+    o.push(`<g data-model-legend="1"><text x="${lx}" y="${ly}" class="lbl2" style="font-weight:600;fill:#54278f">${head}</text>`); lx += head.length * 6 + 10;
+    if (beside) o.push(`<path d="M${lx} ${ly - 4}h18" stroke="#3f007d" stroke-width="1.4" stroke-dasharray="5 3"/><text x="${lx + 24}" y="${ly}" class="lbl2">${esc(`dashed lines at ${g.lv.map(l => l.label.split(' (')[0]).join(', ')}`)}</text>`);
+    else g.lv.forEach((l, k) => { const t = `≥ ${l.label}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="9" fill="${PLUME_RAMP.model[k + 1]}" stroke="#3f007d" stroke-width=".6"/><text x="${lx + 14}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 24 + t.length * 5.6; });
+    o.push('</g>'); }
+  o.push(`<text data-model-caption="1" x="${G.m.l + 24}" y="34" style="font:700 11px Arial,sans-serif;fill:#54278f">${esc(`Model (MODFLOW 6 transport), not measured: ${LAB_PARAMS[T.param].label} on ${mf.date} (release from ${T.start}); source ${T.P.srcBh.name} ${(+T.c0.toPrecision(3)).toLocaleString('en-CA')} mg/L; flow ${gwCalLabel()}`)}</text>`);
+  return o.join('');
+}
 /* the forecast as a field on the same grid as the measured plume, for the shared renderer */
 function modelField(run, date, G, cell = 4) {
   const P = run.P, when = P.at || date, x0 = G.X(0), x1 = G.X(G.maxD), y0 = G.m.t, y1 = G.m.t + G.plotH, nx = Math.max(2, Math.ceil((x1 - x0) / cell)), ny = Math.max(2, Math.ceil((y1 - y0) / cell));
@@ -4317,21 +4348,638 @@ function modelField(run, date, G, cell = 4) {
   return { nx, ny, x0, x1, y0, y1, c, a, lv: plumeLevels('groundwater', P.param), medium: 'groundwater', param: P.param };
 }
 function modelSVG(date, xs = S.xs) {
+  const mf = gwConcSampler(date, siteOf()?.model?.param || xs.param); if (mf) return modelSVGmf6(date, xs, mf);
   const G = XS_GEOM, g = modelGrid(date, 6, xs), o = [], P = g.run.P;
   if (!g.run.ok) return `<text class="lbl2" x="${G.m.l + 24}" y="${G.m.t - 22}" style="fill:#54278f">Forecast not drawn: ${esc(g.run.missing.join('; '))}</text>`;
   const beside = xs.plume !== false && (xs.param || xs.medium === 'vapour');   // compare: the forecast as dashed lines beside the measured plume
   o.push(fieldSVG(modelField(g.run, date, G, 4), { style: xs.style || 'graded', family: 'model', dashed: !!beside, name: LAB_PARAMS[P.param].label }));
-  if (g.lv.length) { let lx = G.m.l; const ly = G.H - 8 - G.plH, head = 'Model, not measured (forecast):';
+  if (g.lv.length) { let lx = G.m.l; const ly = G.H - 8 - G.plH - (G.gwH ? 0 : 0), head = 'Model, not measured (forecast):';
     o.push(`<g data-model-legend="1"><text x="${lx}" y="${ly}" class="lbl2" style="font-weight:600;fill:#54278f">${head}</text>`); lx += head.length * 6 + 10;
     const beside = xs.plume !== false && (xs.param || xs.medium === 'vapour');
     if (beside) { const t = `dashed lines at ${g.lv.map(l => l.label.split(' (')[0]).join(', ')}`; o.push(`<path d="M${lx} ${ly - 4}h18" stroke="#3f007d" stroke-width="1.4" stroke-dasharray="5 3"/><text x="${lx + 24}" y="${ly}" class="lbl2">${esc(t)}</text>`); }
     else g.lv.forEach((l, k) => { const t = `≥ ${l.label}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="9" fill="${PLUME_RAMP.model[k + 1]}" stroke="#3f007d" stroke-width=".6"/><text x="${lx + 14}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 24 + t.length * 5.6; });
     o.push('</g>'); }
   const when = P.start ? `on ${P.at || today()} (release from ${P.start})` : 'long-term (steady state)';
-  o.push(`<text x="${G.m.l + 24}" y="34" style="font:700 11px Arial,sans-serif;fill:#54278f">Model, not measured: ${esc(LAB_PARAMS[P.param].label)} in groundwater ${esc(when)}; source ${esc(P.srcBh.name)} ${(+P.C0.toPrecision(3)).toLocaleString('en-CA')} mg/L</text>`);
+  o.push(`<text data-model-caption="1" x="${G.m.l + 24}" y="34" style="font:700 11px Arial,sans-serif;fill:#54278f">Model, not measured: ${esc(LAB_PARAMS[P.param].label)} in groundwater ${esc(when)}; source ${esc(P.srcBh.name)} ${(+P.C0.toPrecision(3)).toLocaleString('en-CA')} mg/L</text>`);
   if (!g.lv.length) o.push(`<text class="lbl2" x="${G.m.l + 24}" y="${G.m.t - 10}" style="fill:#54278f">Enter a groundwater guideline (Water &amp; well) to contour the forecast.</text>`);
   return o.join('');
 }
+/* ---------- MODFLOW 6: input files from a model description, and readers for its binary outputs ----------
+   Input format: MODFLOW 6 Description of Input and Output, version 6.8.1 (USGS, mf6io.pdf). Cells are 0-based here and
+   written 1-based. A spec is { nper, periods: [[perlen, nstp, tsmult]], steady: [bool], dis: { nlay, nrow, ncol, delr, delc,
+   top, botm: [per layer], idomain?, xorigin?, yorigin?, angrot? }, npf: { icelltype, k, k33 } (per layer), ic, sto?,
+   chd/riv/drn/wel: [per period: [[l, r, c, ...values]]], rch: [per period: number | array], obs: [[name, l, r, c]], gwt? }.
+   A number is written as CONSTANT, an array (row by row) as INTERNAL. */
+function mf6Arr(v, ncol) {
+  if (typeof v === 'number') return `    CONSTANT ${mf6Num(v)}`;
+  // each row starts on a new line: MODFLOW reads an array row by row
+  const out = ['    INTERNAL FACTOR 1'], w = v.length % ncol === 0 ? ncol : v.length; for (let r = 0; r < v.length; r += w) for (let i = r; i < r + w; i += 10) out.push('      ' + Array.from(v.slice(i, Math.min(i + 10, r + w)), x => mf6Num(x)).join(' '));
+  return out.join('\n');
+}
+const mf6Num = x => Number.isInteger(x) ? String(x) : (+x).toPrecision(10).replace(/\.?0+(e|$)/, '$1');
+const mf6Layered = (name, vals, ncol) => `  ${name} LAYERED\n${vals.map(v => mf6Arr(v, ncol)).join('\n')}`;
+function mf6List(name, per, cols, opts = '') {
+  const max = Math.max(1, ...per.filter(Boolean).map(p => p.length));
+  return `BEGIN options\n${opts}END options\nBEGIN dimensions\n  MAXBOUND ${max}\nEND dimensions\n` +
+    per.map((p, i) => p ? `BEGIN period ${i + 1}\n${p.map(q => `  ${q[0] + 1} ${q[1] + 1} ${q[2] + 1} ${q.slice(3, 3 + cols).map(mf6Num).join(' ')}${q[3 + cols] != null ? ' ' + q[3 + cols] : ''}`).join('\n')}\nEND period ${i + 1}\n` : '').join('');
+}
+function mf6Files(spec) {
+  const d = spec.dis, nc = d.ncol, f = {}, pk = [], conv = spec.npf.icelltype.some(c => c > 0), outputs = ['gwf.hds', 'gwf.cbc', 'gwf.lst', 'mfsim.lst'];
+  f['sim.tdis'] = `BEGIN options\n  TIME_UNITS days\nEND options\nBEGIN dimensions\n  NPER ${spec.nper}\nEND dimensions\nBEGIN perioddata\n${spec.periods.map(p => '  ' + p.map(mf6Num).join(' ')).join('\n')}\nEND perioddata\n`;
+  const ims = `BEGIN options\n  COMPLEXITY ${conv ? 'complex' : 'moderate'}\nEND options\nBEGIN nonlinear\n  OUTER_DVCLOSE 1e-5\n  OUTER_MAXIMUM 150\nEND nonlinear\nBEGIN linear\n  INNER_DVCLOSE 1e-7\n  INNER_RCLOSE 1e-5\n  INNER_MAXIMUM 500\n  LINEAR_ACCELERATION bicgstab\nEND linear\n`;
+  f['sim.ims'] = ims;
+  f['gwf.dis'] = `BEGIN options\n  LENGTH_UNITS meters\n${d.xorigin != null ? `  XORIGIN ${mf6Num(d.xorigin)}\n  YORIGIN ${mf6Num(d.yorigin)}\n  ANGROT ${mf6Num(d.angrot || 0)}\n` : ''}END options\nBEGIN dimensions\n  NLAY ${d.nlay}\n  NROW ${d.nrow}\n  NCOL ${nc}\nEND dimensions\nBEGIN griddata\n  DELR\n${mf6Arr(d.delr, nc)}\n  DELC\n${mf6Arr(d.delc, nc)}\n  TOP\n${mf6Arr(d.top, nc)}\n${mf6Layered('BOTM', d.botm, nc)}\n${d.idomain ? mf6Layered('IDOMAIN', d.idomain, nc) + '\n' : ''}END griddata\n`; pk.push('DIS6 gwf.dis dis');
+  f['gwf.npf'] = `BEGIN options\n  SAVE_SPECIFIC_DISCHARGE\n  SAVE_FLOWS\nEND options\nBEGIN griddata\n${mf6Layered('ICELLTYPE', spec.npf.icelltype, nc)}\n${mf6Layered('K', spec.npf.k, nc)}\n${mf6Layered('K33', spec.npf.k33, nc)}\nEND griddata\n`; pk.push('NPF6 gwf.npf npf');
+  // starting heads: one value, one plan-view array used in every layer, or one array per layer
+  f['gwf.ic'] = `BEGIN griddata\n${typeof spec.ic === 'number' ? `  STRT\n${mf6Arr(spec.ic, nc)}` : mf6Layered('STRT', Array.isArray(spec.ic) && spec.ic.length === d.nlay ? spec.ic : Array.from({ length: d.nlay }, () => spec.ic), nc)}\nEND griddata\n`; pk.push('IC6 gwf.ic ic');
+  if (spec.sto) { f['gwf.sto'] = `BEGIN options\n  SAVE_FLOWS\nEND options\nBEGIN griddata\n${mf6Layered('ICONVERT', spec.npf.icelltype, nc)}\n${mf6Layered('SS', spec.sto.ss, nc)}\n${mf6Layered('SY', spec.sto.sy, nc)}\nEND griddata\n` + spec.steady.map((st, i) => `BEGIN period ${i + 1}\n  ${st ? 'STEADY-STATE' : 'TRANSIENT'}\nEND period ${i + 1}\n`).join(''); pk.push('STO6 gwf.sto sto'); }
+  if (spec.chd?.some(Boolean)) { f['gwf.chd'] = mf6List('chd', spec.chd, 1); pk.push('CHD6 gwf.chd chd'); }
+  if (spec.riv?.some(Boolean)) { f['gwf.riv'] = mf6List('riv', spec.riv, 3, '  BOUNDNAMES\n  SAVE_FLOWS\n'); pk.push('RIV6 gwf.riv riv'); }
+  if (spec.drn?.some(Boolean)) { f['gwf.drn'] = mf6List('drn', spec.drn, 2, '  BOUNDNAMES\n  SAVE_FLOWS\n'); pk.push('DRN6 gwf.drn drn'); }
+  if (spec.wel?.some(Boolean)) { f['gwf.wel'] = mf6List('wel', spec.wel, 1, '  BOUNDNAMES\n  SAVE_FLOWS\n'); pk.push('WEL6 gwf.wel wel'); }
+  if (spec.rch?.some(v => v != null)) { f['gwf.rch'] = `BEGIN options\n  READASARRAYS\n  SAVE_FLOWS\nEND options\n` + spec.rch.map((v, i) => v == null ? '' : `BEGIN period ${i + 1}\n  RECHARGE\n${mf6Arr(v, nc)}\nEND period ${i + 1}\n`).join(''); pk.push('RCH6 gwf.rch rch'); }
+  if (spec.obs?.length) { f['gwf.obs'] = `BEGIN options\n  DIGITS 12\nEND options\nBEGIN continuous FILEOUT gwf.obs.csv\n${spec.obs.map(o => `  ${o[0]} HEAD ${o[1] + 1} ${o[2] + 1} ${o[3] + 1}`).join('\n')}\nEND continuous\n`; pk.push('OBS6 gwf.obs obs'); outputs.push('gwf.obs.csv'); }
+  f['gwf.oc'] = `BEGIN options\n  HEAD FILEOUT gwf.hds\n  BUDGET FILEOUT gwf.cbc\nEND options\nBEGIN period 1\n  SAVE HEAD ${spec.saveAll === false ? 'LAST' : 'ALL'}\n  SAVE BUDGET ${spec.saveAll === false ? 'LAST' : 'ALL'}\nEND period 1\n`; pk.push('OC6 gwf.oc oc');
+  f['gwf.nam'] = `BEGIN options\n${conv ? '  NEWTON UNDER_RELAXATION\n' : ''}  SAVE_FLOWS\nEND options\nBEGIN packages\n${pk.map(x => '  ' + x).join('\n')}\nEND packages\n`;
+  let models = '  gwf6 gwf.nam gwf\n', exch = '', sol = '  ims6 sim.ims gwf\n';
+  if (spec.gwt) {
+    const t = spec.gwt, tp = ['DIS6 gwf.dis dis', 'IC6 gwt.ic ic', 'ADV6 gwt.adv adv', 'DSP6 gwt.dsp dsp', 'MST6 gwt.mst mst', 'SSM6 gwt.ssm ssm', 'OC6 gwt.oc oc'];
+    f['gwt.ic'] = `BEGIN griddata\n  STRT\n${mf6Arr(t.ic ?? 0, nc)}\nEND griddata\n`;
+    f['gwt.adv'] = 'BEGIN options\n  SCHEME TVD\nEND options\n';
+    f['gwt.dsp'] = `BEGIN options\nEND options\nBEGIN griddata\n  ALH\n${mf6Arr(t.al, nc)}\n  ATH1\n${mf6Arr(t.ath, nc)}\n  ATH2\n${mf6Arr(t.ath2 ?? t.atv, nc)}\n  ATV\n${mf6Arr(t.atv, nc)}\n  DIFFC\n${mf6Arr(t.diffc ?? 0, nc)}\nEND griddata\n`;
+    const dec = t.decay > 0;
+    f['gwt.mst'] = `BEGIN options\n${t.kd > 0 ? '  SORPTION LINEAR\n' : ''}${dec ? '  FIRST_ORDER_DECAY\n' : ''}END options\nBEGIN griddata\n${mf6Layered('POROSITY', t.porosity, nc)}\n${t.kd > 0 ? `  BULK_DENSITY\n${mf6Arr(t.rhob, nc)}\n  DISTCOEF\n${mf6Arr(t.kd, nc)}\n` : ''}${dec ? `  DECAY\n${mf6Arr(t.decay, nc)}\n${t.kd > 0 ? `  DECAY_SORBED\n${mf6Arr(t.decay, nc)}\n` : ''}` : ''}END griddata\n`;
+    f['gwt.ssm'] = 'BEGIN options\nEND options\nBEGIN sources\nEND sources\n';
+    if (t.cnc?.some(Boolean)) { f['gwt.cnc'] = mf6List('cnc', t.cnc, 1); tp.push('CNC6 gwt.cnc cnc'); }
+    if (t.obs?.length) { f['gwt.obs'] = `BEGIN options\n  DIGITS 12\nEND options\nBEGIN continuous FILEOUT gwt.obs.csv\n${t.obs.map(o => `  ${o[0]} CONCENTRATION ${o[1] + 1} ${o[2] + 1} ${o[3] + 1}`).join('\n')}\nEND continuous\n`; tp.push('OBS6 gwt.obs obs'); outputs.push('gwt.obs.csv'); }
+    f['gwt.oc'] = `BEGIN options\n  CONCENTRATION FILEOUT gwt.ucn\n  BUDGET FILEOUT gwt.cbc\nEND options\n` + spec.periods.map((p, i) => `BEGIN period ${i + 1}\n  SAVE CONCENTRATION ${t.saveAll || (t.savePeriods || []).includes(i) ? 'ALL' : 'LAST'}\nEND period ${i + 1}\n`).join('');
+    f['gwt.nam'] = `BEGIN options\n  SAVE_FLOWS\nEND options\nBEGIN packages\n${tp.map(x => '  ' + x).join('\n')}\nEND packages\n`;
+    f['sim.gwfgwt'] = 'BEGIN options\nEND options\n'; f['simt.ims'] = ims.replace('COMPLEXITY complex', 'COMPLEXITY moderate');
+    models += '  gwt6 gwt.nam gwt\n'; exch = '  GWF6-GWT6 sim.gwfgwt gwf gwt\n'; sol += '  ims6 simt.ims gwt\n'; outputs.push('gwt.ucn', 'gwt.lst');
+  }
+  f['mfsim.nam'] = `BEGIN options\nEND options\nBEGIN timing\n  TDIS6 sim.tdis\nEND timing\nBEGIN models\n${models}END models\nBEGIN exchanges\n${exch}END exchanges\nBEGIN solutiongroup 1\n${sol}END solutiongroup\n`;
+  return { files: f, outputs };
+}
+/* binary head or concentration file: records of kstp, kper, pertim, totim, text, ncol, nrow, ilay, then ncol × nrow doubles */
+function mf6ReadHeads(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), out = []; let o = 0;
+  while (o + 52 <= u8.byteLength) {
+    const kstp = dv.getInt32(o, true), kper = dv.getInt32(o + 4, true), totim = dv.getFloat64(o + 16, true), text = new TextDecoder().decode(u8.subarray(o + 24, o + 40)).trim();
+    const ncol = dv.getInt32(o + 40, true), nrow = dv.getInt32(o + 44, true), ilay = dv.getInt32(o + 48, true); o += 52;
+    const data = new Float64Array(ncol * nrow); for (let i = 0; i < data.length; i++) data[i] = dv.getFloat64(o + 8 * i, true); o += 8 * data.length;
+    out.push({ kstp, kper, totim, text, ncol, nrow, ilay, data });
+  }
+  return out;
+}
+/* the heads of one saved time as layers [ilay-1] of row-major arrays */
+function mf6Layers(recs, totim) { const t = totim ?? recs[recs.length - 1]?.totim, L = []; for (const r of recs) if (Math.abs(r.totim - t) < 1e-9) L[r.ilay - 1] = r.data; return { totim: t, layers: L }; }
+/* binary budget file: the records named `want` (e.g. DATA-SPDIS); method 1 = full array, method 6 = a list of cells with values */
+function mf6ReadBudget(u8, want) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), td = new TextDecoder(), out = []; let o = 0;
+  while (o + 64 <= u8.byteLength) {
+    const kstp = dv.getInt32(o, true), kper = dv.getInt32(o + 4, true), text = td.decode(u8.subarray(o + 8, o + 24)).trim(), n1 = dv.getInt32(o + 24, true), n2 = dv.getInt32(o + 28, true), n3 = dv.getInt32(o + 32, true);
+    const imeth = dv.getInt32(o + 36, true), totim = dv.getFloat64(o + 56, true); o += 64;
+    const rec = { kstp, kper, totim, text, imeth };
+    if (imeth === 1) { const n = Math.abs(n1 * n2 * n3); if (text === want) { rec.data = new Float64Array(n); for (let i = 0; i < n; i++) rec.data[i] = dv.getFloat64(o + 8 * i, true); } o += 8 * n; }
+    else if (imeth === 6) {
+      o += 64; const ndat = dv.getInt32(o, true); o += 4 + 16 * (ndat - 1); const nlist = dv.getInt32(o, true); o += 4;
+      if (text === want) { rec.list = []; for (let i = 0; i < nlist; i++) { const b = o + i * (8 + 8 * ndat), aux = []; for (let k = 1; k < ndat; k++) aux.push(dv.getFloat64(b + 8 + 8 * k, true)); rec.list.push({ id1: dv.getInt32(b, true), id2: dv.getInt32(b + 4, true), q: dv.getFloat64(b + 8, true), aux }); } }
+      o += nlist * (8 + 8 * ndat);
+    } else break;
+    if (text === want) out.push(rec);
+  }
+  return out;
+}
+function mf6ReadObs(csv) { const [head, ...rows] = csv.trim().split(/\r?\n/), cols = head.split(','), out = {}; cols.forEach(c => { out[c.toUpperCase()] = []; }); for (const r of rows) r.split(',').forEach((v, i) => out[cols[i].toUpperCase()].push(+v)); return out; }
+/* the largest percent discrepancy of any time step in a listing file */
+function mf6Discrepancy(lst) { const v = [...lst.matchAll(/PERCENT DISCREPANCY\s*=\s*(-?[\d.]+(?:E[+-]?\d+)?)/gi)].map(m => +m[1]); return v.length ? v.reduce((a, b) => Math.abs(b) > Math.abs(a) ? b : a, 0) : null; }
+/* ---------- the site groundwater model (MODFLOW 6) ----------
+   A 3D structured grid over the boreholes plus a margin, rotated so columns run along the fitted flow direction (rows are
+   numbered from the far side, as MODFLOW does). One layer per correlated unit; unit surfaces interpolated between boreholes by
+   inverse distance (power 2); a unit missing at a borehole thins to nothing there and cells under 0.1 m become vertical
+   pass-through cells (IDOMAIN −1). The base of the logs is the model bottom (no flow). Fixed heads on the upgradient and
+   downgradient faces from the calibration round's fitted water-table plane; no flow on the faces parallel to flow. */
+const GW_MIN_TH = .1, GW_DAY = 86400;
+function gwIdw(pts, x, y) { let sw = 0, sv = 0; for (const [px, py, v] of pts) { const d2 = (px - x) ** 2 + (py - y) ** 2; if (d2 < 1e-6) return v; const w = 1 / d2; sw += w; sv += w * v; } return sv / sw; }
+/* a rotated structured grid: local x along columns (the flow direction), local y across, rows numbered from the far side */
+function gwGrid({ xorigin, yorigin, ang, cell, nrow, ncol, top, botm, idomain }) {
+  const cs = Math.cos(ang), sn = Math.sin(ang), Lv = nrow * cell, nlay = botm.length;
+  const toWorld = (x, y) => [xorigin + x * cs - y * sn, yorigin + x * sn + y * cs], toLocal = (E, N) => [(E - xorigin) * cs + (N - yorigin) * sn, -(E - xorigin) * sn + (N - yorigin) * cs];
+  const cellCentre = (r, c) => toWorld((c + .5) * cell, Lv - (r + .5) * cell);
+  const cellOf = (E, N) => { const [x, y] = toLocal(E, N), c = Math.floor(x / cell), r = Math.floor((Lv - y) / cell); return r >= 0 && r < nrow && c >= 0 && c < ncol ? [r, c] : null; };
+  const layerAt = (r, c, z) => { let k = 0; while (k < nlay - 1 && (z < botm[k][r * ncol + c] || idomain[k][r * ncol + c] !== 1)) k++; return k; };
+  return { xorigin, yorigin, angrot: ang * 180 / Math.PI, cs, sn, cell, nrow, ncol, nlay, top, botm, idomain, toWorld, toLocal, cellCentre, cellOf, layerAt, Lv };
+}
+function gwModelSpec(list, site = siteOf() || {}, opts = {}) {
+  const u0 = site.gwModel || {}, located = list.filter(b => b.easting != null && b.northing != null && b.elevation != null);
+  if (located.length < 3) return { error: 'The model needs at least 3 boreholes with coordinates and a ground elevation.' };
+  const round = opts.round || u0.round || gwHeads(located).round;
+  const F0 = gwFlow(located, round); if (F0.error) return { error: 'Groundwater flow: ' + F0.error };
+  if (!(F0.i > 0)) return { error: 'The water table is too flat to define a flow direction.' };
+  const f = [-F0.bx / F0.i, -F0.by / F0.i], F = { ...F0, f }, ang = Math.atan2(f[1], f[0]), cs = Math.cos(ang), sn = Math.sin(ang);
+  const E0 = located.reduce((a, b) => a + b.easting, 0) / located.length, N0 = located.reduce((a, b) => a + b.northing, 0) / located.length;
+  const loc = (E, N) => [(E - E0) * cs + (N - N0) * sn, -(E - E0) * sn + (N - N0) * cs];
+  const P = located.map(b => loc(b.easting, b.northing)), xs = P.map(p => p[0]), ys = P.map(p => p[1]);
+  const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 20), margin = u0.margin ?? Math.max(20, .5 * span);
+  const xa = Math.min(...xs) - margin, xb = Math.max(...xs) + margin, ya = Math.min(...ys) - margin, yb = Math.max(...ys) + margin;
+  const cell = u0.cell || opts.cell || Math.max(1, Math.ceil(Math.max((xb - xa) / 80, (yb - ya) / 60))), ncol = Math.ceil((xb - xa) / cell), nrow = Math.ceil((yb - ya) / cell);
+  const xorigin = E0 + xa * cs - ya * sn, yorigin = N0 + xa * sn + ya * cs, Lv = nrow * cell;
+  const toLocal = (E, N) => [(E - xorigin) * cs + (N - yorigin) * sn, -(E - xorigin) * sn + (N - yorigin) * cs];
+  // units in order of depth (mean middle depth where present)
+  const byB = new Map(located.map(b => [b, xsUnits(b)])), names = [...new Set([...byB.values()].flatMap(us => us.map(u => u.u)))];
+  if (!names.length) return { error: 'The boreholes have no logged soil layers to build model layers from.' };
+  const mean = n => { const v = [...byB.values()].flatMap(us => us.filter(u => u.u === n).map(u => (u.top + u.bot) / 2)); return v.reduce((a, b) => a + b, 0) / v.length; };
+  names.sort((a, b) => mean(a) - mean(b));
+  // the base of each unit at each borehole (elevation); a unit missing has zero thickness at the base of the unit above; known only down to the base of the log
+  const pts = names.map(() => []), topPts = located.map((b, i) => [P[i][0] - xa, P[i][1] - ya, b.elevation]);
+  located.forEach((b, i) => { const us = byB.get(b), logBot = Math.max(0, ...us.map(u => u.bot)); let prev = 0, deepest = -1;
+    names.forEach((n, k) => { const u = us.find(x => x.u === n); if (u) deepest = k; });
+    names.forEach((n, k) => { const u = us.find(x => x.u === n), base = u ? Math.max(u.bot, prev) : prev; if (k <= deepest || u) pts[k].push([P[i][0] - xa, P[i][1] - ya, b.elevation - Math.min(base, logBot)]); prev = Math.max(prev, base); }); });
+  const n2 = nrow * ncol, top = new Float64Array(n2), botm = names.map(() => new Float64Array(n2)), idomain = names.map(() => new Int32Array(n2).fill(1));
+  for (let r = 0; r < nrow; r++) for (let c = 0; c < ncol; c++) {
+    const x = (c + .5) * cell, y = Lv - (r + .5) * cell, i = r * ncol + c; top[i] = gwIdw(topPts, x, y); let above = top[i];
+    names.forEach((n, k) => { let z = pts[k].length ? Math.min(gwIdw(pts[k], x, y), above) : above;
+      if (above - z < GW_MIN_TH) { z = above - .01; idomain[k][i] = -1; } botm[k][i] = z; above = z; });
+    // the bottom layer always carries flow
+    if (idomain[names.length - 1][i] === -1) { botm[names.length - 1][i] = Math.min(botm[names.length - 1][i], top[i] - GW_MIN_TH * names.length) ; idomain[names.length - 1][i] = 1; }
+  }
+  // hydraulic conductivity per unit: slug tests screened in the unit (geometric mean), else estimated by calibration
+  const slugIn = n => located.flatMap(b => { const w = b.well; if (!w?.installed || w.screenTop == null) return []; const mid = (w.screenTop + w.screenBottom) / 2, u = byB.get(b).find(x => mid >= x.top && mid <= x.bot);
+    return u?.u === n ? (b.slug || []).map(hvorslev).filter(r => r && r.valid && r.K > 0).map(r => r.K * GW_DAY) : []; });
+  const allK = located.flatMap(b => (b.slug || []).map(hvorslev).filter(r => r && r.valid && r.K > 0).map(r => r.K * GW_DAY)), gm = a => Math.exp(a.reduce((t, k) => t + Math.log(k), 0) / a.length);
+  const units = names.map((n, k) => { const e = (u0.units || {})[n] || {}, ks = slugIn(n);
+    const k0 = e.k != null ? +e.k : ks.length ? gm(ks) : allK.length ? gm(allK) : 1;
+    return { u: n, k: k0, kSrc: e.k != null ? 'entered' : ks.length ? `slug test${ks.length > 1 ? 's' : ''} (${ks.length}, geometric mean)` : 'estimated by calibration (start value: ' + (allK.length ? 'site slug-test mean' : '1 m/day') + ')',
+      prior: e.k == null && ks.length ? Math.log10(gm(ks)) : null, calib: e.k == null && !ks.length, kv: e.kv ?? .1, kvSrc: e.kv != null ? 'entered' : 'assumed Kv/Kh = 0.1',
+      sy: e.sy ?? null, ne: e.ne ?? (S.co.ne ?? .25) }; });
+  const rch = u0.rch != null ? +u0.rch : CCME_SOIL[u0.soil === 'fine' ? 'fine' : 'coarse'].I / 365.25, rchSrc = u0.rch != null ? 'entered' : `${CCME_SRC} (infiltration ${CCME_SOIL[u0.soil === 'fine' ? 'fine' : 'coarse'].I} m/year; start value)`;
+  // head observations: each well read in the round, in the layer holding its screen middle
+  const grid = gwGrid({ xorigin, yorigin, ang, cell, nrow, ncol, top, botm, idomain }), { cellOf, layerAt } = grid;
+  const obs = gwHeads(located, round).wells.map((w, j) => { const rc = cellOf(w.e, w.n); if (!rc) return null; const sc = w.b.well, z = sc?.screenTop != null ? w.b.elevation - (sc.screenTop + sc.screenBottom) / 2 : w.h;
+    const [x, y] = toLocal(w.e, w.n); return { name: 'h' + (j + 1), b: w.b, r: rc[0], c: rc[1], l: layerAt(rc[0], rc[1], z), x, y, h: w.h, date: w.w.date }; }).filter(Boolean);
+  const params = [...units.filter(u => u.calib).map(u => ({ key: 'k:' + u.u, label: `K, ${u.u}`, unit: 'm/day', value: u.k, prior: u.prior, src: u.kSrc })),
+    { key: 'rch', label: 'Recharge', unit: 'm/day', value: rch, prior: null, src: rchSrc }];
+  // features with everything they need; the rest are skipped and named
+  const notes = [], ok = v => v != null && v !== '' && Number.isFinite(+v), need = { riv: ['stage', 'cond', 'rbot'], drn: ['elev', 'cond'], wel: ['rate'], chd: ['head'] };
+  const features = (u0.features || []).filter(ft => { const miss = (need[ft.type] || []).filter(k => !ok(ft[k])), where = gwFeatureCells(grid, ft).length;
+    const why = !where ? 'no location inside the model' : miss.length ? 'missing ' + miss.join(', ') : ft.type === 'riv' && +ft.rbot >= +ft.stage ? 'bed bottom is not below the stage' : '';
+    if (why) notes.push(`${ft.name || 'A ' + ({ riv: 'river', drn: 'drain', wel: 'well', chd: 'fixed head' }[ft.type] || 'feature')} was left out: ${why}.`); return !why; });
+  const M = { round, F, grid, units, obs, params, rch, features, notes, list: located }; M.spec = gwSpec(M); return M;
+}
+/* the MODFLOW 6 spec of a model with parameter values applied (pv: {key: value}); steady state unless periods are given */
+function gwSpec(M, pv = {}, extra = {}) {
+  const g = M.grid, val = p => pv[p.key] ?? p.value, K = M.units.map(u => pv['k:' + u.u] ?? u.k), R = pv.rch ?? M.rch, shift = pv.shift ?? 0, n2 = g.nrow * g.ncol;
+  const chd = []; for (let r = 0; r < g.nrow; r++) for (const c of [0, g.ncol - 1]) { const [E, N] = g.cellCentre(r, c), h = M.F.fit({ e: E, n: N }) + shift;
+    for (let k = 0; k < g.nlay; k++) if (g.idomain[k][r * g.ncol + c] === 1 && h > g.botm[k][r * g.ncol + c]) chd.push([k, r, c, h]); }
+  const strt = new Float64Array(n2); for (let r = 0; r < g.nrow; r++) for (let c = 0; c < g.ncol; c++) { const [E, N] = g.cellCentre(r, c); strt[r * g.ncol + c] = M.F.fit({ e: E, n: N }); }
+  const feat = { riv: [], drn: [], wel: [] };
+  for (const ft of M.features || []) { const cells = gwFeatureCells(g, ft); for (const [r, c] of cells) {
+    const k = ft.type === 'wel' ? g.layerAt(r, c, ft.z ?? -Infinity) : ft.type === 'riv' ? g.layerAt(r, c, +ft.rbot) : ft.type === 'drn' ? g.layerAt(r, c, +ft.elev) : 0, each = 1 / cells.length;
+    if (ft.type === 'chd') { for (let kk = 0; kk < g.nlay; kk++) if (g.idomain[kk][r * g.ncol + c] === 1 && +ft.head > g.botm[kk][r * g.ncol + c]) chd.push([kk, r, c, +ft.head]); continue; }
+    if (ft.type === 'riv') feat.riv.push([k, r, c, +ft.stage, +ft.cond, +ft.rbot, ft.name ? `'${String(ft.name).replace(/\W/g, '').slice(0, 30)}'` : undefined]);
+    if (ft.type === 'drn') feat.drn.push([k, r, c, +ft.elev, +ft.cond, ft.name ? `'${String(ft.name).replace(/\W/g, '').slice(0, 30)}'` : undefined]);
+    if (ft.type === 'wel') feat.wel.push([k, r, c, +ft.rate * each, ft.name ? `'${String(ft.name).replace(/\W/g, '').slice(0, 30)}'` : undefined]); } }
+  return { nper: 1, periods: [[1, 1, 1]], steady: [true], saveAll: true,
+    dis: { nlay: g.nlay, nrow: g.nrow, ncol: g.ncol, delr: g.cell, delc: g.cell, top: g.top, botm: g.botm, idomain: g.idomain, xorigin: g.xorigin, yorigin: g.yorigin, angrot: g.angrot },
+    npf: { icelltype: M.units.map(() => 1), k: K, k33: K.map((k, i) => k * M.units[i].kv) }, ic: strt,
+    chd: [chd], rch: [R], riv: feat.riv.length ? [feat.riv] : null, drn: feat.drn.length ? [feat.drn] : null, wel: feat.wel.length ? [feat.wel] : null, ...extra };
+}
+/* the cells a feature touches: a point, or a polyline sampled every half cell */
+function gwFeatureCells(g, ft) { const pts = (ft.pts || []).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1])), out = new Map();
+  const add = (E, N) => { const rc = g.cellOf(E, N); if (rc) out.set(rc.join(','), rc); };
+  if (pts.length === 1) add(...pts[0]); for (let i = 1; i < pts.length; i++) { const [a, b] = [pts[i - 1], pts[i]], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / (g.cell / 2))); for (let j = 0; j <= n; j++) add(a[0] + (b[0] - a[0]) * j / n, a[1] + (b[1] - a[1]) * j / n); }
+  return [...out.values()]; }
+/* a head at a point in one layer: bilinear between cell centres (inactive or dry cells left out) */
+function gwHeadAt(g, layers, k, x, y) {
+  const fc = x / g.cell - .5, fr = (g.Lv - y) / g.cell - .5, c0 = Math.max(0, Math.min(g.ncol - 2, Math.floor(fc))), r0 = Math.max(0, Math.min(g.nrow - 2, Math.floor(fr))), tx = Math.max(0, Math.min(1, fc - c0)), ty = Math.max(0, Math.min(1, fr - r0));
+  let s = 0, w = 0; for (const [r, c, ww] of [[r0, c0, (1 - tx) * (1 - ty)], [r0, c0 + 1, tx * (1 - ty)], [r0 + 1, c0, (1 - tx) * ty], [r0 + 1, c0 + 1, tx * ty]]) {
+    let kk = k; while (kk < g.nlay - 1 && g.idomain[kk][r * g.ncol + c] !== 1) kk++; const h = layers[kk]?.[r * g.ncol + c]; if (h == null || Math.abs(h) > 1e20 || ww <= 0) continue; s += h * ww; w += ww; }
+  return w > 0 ? s / w : null;
+}
+/* one run: heads, simulated heads at the observations, mass balance */
+async function gwRun(M, pv = {}, extra = {}) {
+  if (!window.desktop?.mf6Run) return { ok: false, error: 'The groundwater model runs MODFLOW 6, which needs the desktop app.' };
+  const spec = gwSpec(M, pv, extra), { files, outputs } = mf6Files(spec), res = await window.desktop.mf6Run({ files, outputs });
+  if (!res.ok) return { ok: false, error: res.error || 'MODFLOW 6 did not finish.', files };
+  const H = mf6ReadHeads(res.files['gwf.hds']), last = mf6Layers(H), sim = M.obs.map(o => gwHeadAt(M.grid, last.layers, o.l, o.x, o.y));
+  return { ok: true, spec, files, out: res.files, heads: H, layers: last.layers, sim, discrepancy: mf6Discrepancy(new TextDecoder().decode(res.files['gwf.lst'])), seconds: res.seconds };
+}
+/* ---------- transient flow across the monitoring rounds ----------
+   Period 1 is steady state at the first round; each later round ends a transient period (time steps of about 10 days).
+   The fixed heads on the two faces follow each round's fitted water-table plane; recharge is the calibrated rate times a
+   multiplier per period ('rch@<i>', 1 unless calibrated); specific yield 'sy' (start 0.2, assumed) and specific storage
+   1e-5 /m (assumed) in every layer. */
+function gwTransientSetup(M) {
+  if (M.T) return M.T;
+  const cands = [...new Set(M.list.flatMap(b => monitoring(b).filter(w => w.date && w.depth != null).map(w => w.date)))].sort(), rounds = [];
+  for (const d of cands) { if (rounds.length && (Date.parse(d) - Date.parse(rounds[rounds.length - 1])) / 864e5 <= 7) continue; if (gwHeads(M.list, d, true).wells.length >= 3) rounds.push(d); }
+  const periods = rounds.map((d, i) => i ? (() => { const L = (Date.parse(d) - Date.parse(rounds[i - 1])) / 864e5; return [L, Math.max(2, Math.ceil(L / 10)), 1]; })() : [1, 1, 1]);
+  const planes = rounds.map(d => gwFlow(M.list, d, true)), g = M.grid;
+  M.obsT = rounds.flatMap((d, per) => gwHeads(M.list, d, true).wells.map((w, j) => { const rc = g.cellOf(w.e, w.n); if (!rc) return null; const sc = w.b.well, z = sc?.screenTop != null ? w.b.elevation - (sc.screenTop + sc.screenBottom) / 2 : w.h, [x, y] = g.toLocal(w.e, w.n);
+    return { name: `h${per + 1}_${j + 1}`, b: w.b, r: rc[0], c: rc[1], l: g.layerAt(rc[0], rc[1], z), x, y, h: w.h, date: d, per }; }).filter(Boolean));
+  let t = 0; const ends = periods.map(p => (t += p[0]));
+  return (M.T = { rounds, periods, planes, ends });
+}
+function gwSpecTransient(M, pv = {}) {
+  const T = gwTransientSetup(M), g = M.grid, base = gwSpec(M, pv), shift = pv.shift ?? 0;
+  const chd = T.planes.map(F => { if (F.error) return null; const out = []; for (let r = 0; r < g.nrow; r++) for (const c of [0, g.ncol - 1]) { const [E, N] = g.cellCentre(r, c), h = F.fit({ e: E, n: N }) + shift;
+    for (let k = 0; k < g.nlay; k++) if (g.idomain[k][r * g.ncol + c] === 1 && h > g.botm[k][r * g.ncol + c]) out.push([k, r, c, h]); } return out; });
+  const R = pv.rch ?? M.rch, sy = pv.sy ?? null;
+  return { ...base, nper: T.periods.length, periods: T.periods, steady: T.periods.map((_, i) => i === 0), chd, rch: T.periods.map((_, i) => R * (pv['rch@' + i] ?? 1)),
+    riv: base.riv, drn: base.drn, wel: base.wel, sto: { ss: M.units.map(() => 1e-5), sy: M.units.map(u => sy ?? u.sy ?? .2) } };
+}
+async function gwRunTransient(M, pv = {}) {
+  if (!window.desktop?.mf6Run) return { ok: false, error: 'The groundwater model runs MODFLOW 6, which needs the desktop app.' };
+  const T = gwTransientSetup(M), spec = gwSpecTransient(M, pv), { files, outputs } = mf6Files(spec), res = await window.desktop.mf6Run({ files, outputs });
+  if (!res.ok) return { ok: false, error: res.error || 'MODFLOW 6 did not finish.', files };
+  const H = mf6ReadHeads(res.files['gwf.hds']), byPer = T.ends.map(t => mf6Layers(H, H.reduce((b, r) => Math.abs(r.totim - t) < Math.abs(b - t) ? r.totim : b, H[0].totim)).layers);
+  const sim = M.obsT.map(o => gwHeadAt(M.grid, byPer[o.per], o.l, o.x, o.y));
+  return { ok: true, spec, files, out: res.files, heads: H, byPer, layers: byPer[byPer.length - 1], sim, discrepancy: mf6Discrepancy(new TextDecoder().decode(res.files['gwf.lst'])), seconds: res.seconds };
+}
+/* ---------- transport (MODFLOW 6 GWT) on the calibrated steady flow ----------
+   Chemistry, source and dispersivities come from the forecast panel (the same cited table and entries the Domenico forecast
+   uses). The source is a constant concentration C0 from the release date in the source well's cells: across flow over the
+   source width Y, and from the water table down the source depth Z. TVD advection; linear sorption Kd = Koc·foc with the bulk
+   density; first-order decay only with an entered half-life. Output at every sampling round and yearly to the horizon. */
+async function gwTransport(M, pv = {}, opts = {}) {
+  if (!window.desktop?.mf6Run) return { ok: false, error: 'The groundwater model runs MODFLOW 6, which needs the desktop app.' };
+  const run = modelRun(opts.date || S.xs.date || '', { ...S.xs, param: opts.param || siteOf()?.model?.param || S.xs.param });
+  if (!run.ok) return { ok: false, error: 'Transport needs the forecast inputs: ' + run.missing.join('; ') };
+  const P = run.P; if (!P.start) return { ok: false, error: 'Transport needs a release date (Forecast panel).' };
+  const g = M.grid, param = P.param, src = P.srcBh, rc = g.cellOf(src.easting, src.northing); if (!rc) return { ok: false, error: `The source well ${src.name} is outside the model.` };
+  const samples = M.list.flatMap(b => (b.gwSamples || []).filter(s => s.date && s.date >= P.start && gwVal(s, param)).map(s => ({ b, s, r: gwVal(s, param) })));
+  const last = samples.reduce((a, x) => x.s.date > a ? x.s.date : a, S.xs.date || today()), horizon = new Date(Date.parse(last) + (opts.years ?? 5) * 365.25 * 864e5).toISOString().slice(0, 10);
+  const dates = new Set(samples.map(x => x.s.date)); for (let y = +P.start.slice(0, 4) + 1; `${y}${P.start.slice(4)}` <= horizon; y++) dates.add(`${y}${P.start.slice(4)}`); (opts.dates || []).forEach(d => d > P.start && dates.add(d));
+  const out = [...dates].filter(d => d > P.start).sort(), days = d => (Date.parse(d) - Date.parse(P.start)) / 864e5;
+  const periods = out.map((d, i) => { const L = days(d) - (i ? days(out[i - 1]) : 0); return [L, Math.max(1, Math.ceil(L / 15)), 1]; });
+  // source cells
+  const wt = M.F.fit({ e: src.easting, n: src.northing }), half = Math.max(0, Math.floor(P.Y / 2 / g.cell)), cnc = [], c0 = (opts.c0 ?? P.C0);
+  for (let r = rc[0] - half; r <= rc[0] + half; r++) { if (r < 0 || r >= g.nrow) continue;
+    for (let k = 0; k < g.nlay; k++) { const i = r * g.ncol + rc[1], tp = k ? g.botm[k - 1][i] : g.top[i], bt = g.botm[k][i]; if (g.idomain[k][i] === 1 && bt < wt && tp > wt - P.Z) cnc.push([k, r, rc[1], c0]); } }
+  if (!cnc.length) return { ok: false, error: 'No active model cells at the source depth.' };
+  const base = gwSpec(M, pv), kd = P.koc != null ? P.koc * P.foc : 0;
+  const spec = { ...base, nper: periods.length, periods, steady: periods.map(() => true), saveAll: false,
+    gwt: { porosity: M.units.map(u => u.ne), rhob: P.rhob, kd, decay: P.hl > 0 ? Math.LN2 / P.hl : 0, al: P.ax, ath: P.ay, atv: P.az, cnc: [cnc], savePeriods: periods.map((_, i) => i) } };
+  const { files, outputs } = mf6Files(spec), res = await window.desktop.mf6Run({ files, outputs });
+  if (!res.ok) return { ok: false, error: res.error || 'MODFLOW 6 did not finish.', files };
+  const U = mf6ReadHeads(res.files['gwt.ucn']), tset = [...new Set(U.map(r => r.totim))];
+  const times = out.map((d, i) => { const t = days(d), tt = tset.reduce((b, x) => Math.abs(x - t) < Math.abs(b - t) ? x : b, tset[0]); return { date: d, totim: tt, layers: mf6Layers(U, tt).layers }; });
+  const obs = samples.map(({ b, s, r }) => { const rcb = g.cellOf(b.easting, b.northing); if (!rcb || !b.well?.screenTop) return null; const z = b.elevation - (b.well.screenTop + b.well.screenBottom) / 2, k = g.layerAt(rcb[0], rcb[1], z), [x, y] = g.toLocal(b.easting, b.northing);
+    const T = times.find(q => q.date === s.date); const sim = T ? Math.max(0, gwHeadAt(g, T.layers, k, x, y) ?? 0) : NaN; return { b, name: b.name, date: s.date, meas: r.v, lt: !!r.lt, sim }; }).filter(Boolean);
+  const lr = obs.map(o => o.lt ? (o.sim > o.meas ? Math.log10(o.sim / o.meas) : 0) : o.sim > 1e-9 ? Math.log10(o.sim / o.meas) : null).filter(v => v != null);
+  const fit = { n: lr.length, meLog: lr.reduce((a, v) => a + v, 0) / (lr.length || 1), rmsLog: Math.sqrt(lr.reduce((a, v) => a + v * v, 0) / (lr.length || 1)) };
+  const result = { ok: true, P, c0, kd, cells: cnc, times, obs, fit, disc: mf6Discrepancy(new TextDecoder().decode(res.files['gwt.lst'])), files, param, start: P.start };
+  if (opts.calibrate) {
+    // concentrations scale with C0, so the best source concentration in log terms is the measured/simulated geometric mean ratio
+    const det = obs.filter(o => !o.lt && o.sim > 1e-9); if (!det.length) return { ...result, warnings: ['No detected results to calibrate the source against.'] };
+    const m = 10 ** (det.reduce((a, o) => a + Math.log10(o.meas / o.sim), 0) / det.length), T2 = await gwTransport(M, pv, { ...opts, calibrate: false, c0: c0 * m });
+    return T2.ok && T2.fit.rmsLog <= fit.rmsLog ? { ...T2, c0Src: `calibrated (×${m.toPrecision(3)} the measured ${(+P.C0.toPrecision(3))} mg/L)` } : { ...result, c0Src: 'measured at the source (calibration did not improve the fit)' };
+  }
+  return { ...result, c0Src: P.src.C0 || 'measured at the source' };
+}
+/* ---------- flow paths from MODFLOW 6's specific discharge (DATA-SPDIS, in the grid's own axes) ----------
+   Velocity = q / effective porosity, interpolated bilinearly between cell centres in the particle's layer; the vertical
+   component is the cell's. Midpoint (RK2) steps of a fifth of a cell. Times are for water; a sorbing solute is slower by R. */
+function gwVelocity(G, spdis, ne) {
+  const n2 = G.nrow * G.ncol, qx = new Float64Array(G.nlay * n2).fill(NaN), qy = new Float64Array(G.nlay * n2).fill(NaN), qz = new Float64Array(G.nlay * n2).fill(NaN);
+  for (const e of spdis) { const i = e.id1 - 1; if (i >= 0 && i < qx.length) { qx[i] = e.aux[0]; qy[i] = e.aux[1]; qz[i] = e.aux[2]; } }
+  const zTop = (k, i) => k ? G.botm[k - 1][i] : G.top[i];
+  const layerOfZ = (r, c, z) => { const i = r * G.ncol + c; for (let k = 0; k < G.nlay; k++) if (G.idomain[k][i] === 1 && z >= G.botm[k][i] && z <= zTop(k, i) + 1e-9) return k; for (let k = 0; k < G.nlay; k++) if (G.idomain[k][i] === 1) return z > zTop(k, i) ? k : -1; return -1; };
+  return (x, y, z) => {
+    const fc = x / G.cell - .5, fr = (G.Lv - y) / G.cell - .5, c = Math.floor(x / G.cell), r = Math.floor((G.Lv - y) / G.cell);
+    if (r < 0 || r >= G.nrow || c < 0 || c >= G.ncol) return null;
+    const k = layerOfZ(r, c, z); if (k < 0) return null;
+    const c0 = Math.max(0, Math.min(G.ncol - 2, Math.floor(fc))), r0 = Math.max(0, Math.min(G.nrow - 2, Math.floor(fr))), tx = Math.max(0, Math.min(1, fc - c0)), ty = Math.max(0, Math.min(1, fr - r0));
+    let vx = 0, vy = 0, w = 0; for (const [rr, cc, ww] of [[r0, c0, (1 - tx) * (1 - ty)], [r0, c0 + 1, tx * (1 - ty)], [r0 + 1, c0, (1 - tx) * ty], [r0 + 1, c0 + 1, tx * ty]]) {
+      const i = k * n2 + rr * G.ncol + cc; if (!(ww > 0) || !Number.isFinite(qx[i])) continue; vx += qx[i] * ww; vy += qy[i] * ww; w += ww; }
+    const ic = k * n2 + r * G.ncol + c; if (!(w > 0) || !Number.isFinite(qz[ic])) return null;
+    const n = ne[k] ?? ne[0]; return { vx: vx / w / n, vy: vy / w / n, vz: qz[ic] / n, r, c, k };
+  };
+}
+function gwPathline(G, spdis, ne, E, N, z, opts = {}) {
+  const vel = gwVelocity(G, spdis, ne), tmax = opts.tmax ?? 100 * 365.25, out = []; let [x, y] = G.toLocal(E, N), t = 0;
+  for (let step = 0; step < 20000; step++) {
+    const v = vel(x, y, z); if (!v) break; out.push({ E: G.toWorld(x, y)[0], N: G.toWorld(x, y)[1], z, t });
+    if (v.c === 0 && step > 0 || v.c === G.ncol - 1 || t >= tmax) break;   // fixed-head faces take the water out
+    const sp = Math.hypot(v.vx, v.vy, v.vz); if (!(sp > 1e-12)) break;
+    const dt = Math.min(.2 * G.cell / sp, tmax - t), m = vel(x + v.vx * dt / 2, y + v.vy * dt / 2, z + v.vz * dt / 2) || v;
+    x += m.vx * dt; y += m.vy * dt; z += m.vz * dt; t += dt;
+  }
+  return out;
+}
+/* paths from the forecast's source well: three particles across the source width, a metre below the water table */
+function gwSourcePaths(M, run, opts = {}) {
+  const u = siteOf()?.model || {}, src = S.bh.get(u.srcBh); if (!src || src.easting == null || !run?.out?.['gwf.cbc']) return [];   // no source well chosen: no paths
+  const q = mf6ReadBudget(run.out['gwf.cbc'], 'DATA-SPDIS').pop(); if (!q) return [];
+  const G = M.grid, [x0, y0] = G.toLocal(src.easting, src.northing), Y = u.Y ?? CCME_SITE.Y, wt = M.F.fit({ e: src.easting, n: src.northing });
+  return [-Y / 3, 0, Y / 3].map(dy => { const [E, N] = G.toWorld(x0, y0 + dy); return gwPathline(G, q.list, M.units.map(x => x.ne), E, N, wt - 1, opts); }).filter(p => p.length > 1);
+}
+/* ---------- the model on the cross-section ----------
+   Values at a point on the section: bilinear between cell centres within a layer, linear in elevation between the layers'
+   cell centres (so layer boundaries don't show as steps). */
+function gwPointSampler(M, layersOf) {
+  const g = M.grid;
+  return (E, N, e) => { const rc = g.cellOf(E, N); if (!rc) return null; const [x, y] = g.toLocal(E, N), i = rc[0] * g.ncol + rc[1], col = [];
+    for (let k = 0; k < g.nlay; k++) { if (g.idomain[k][i] !== 1) continue; const tp = k ? g.botm[k - 1][i] : g.top[i], v = gwHeadAt(g, layersOf, k, x, y); if (v != null) col.push([(tp + g.botm[k][i]) / 2, v]); }
+    if (!col.length) return null; if (e >= col[0][0]) return col[0][1]; if (e <= col[col.length - 1][0]) return col[col.length - 1][1];
+    for (let j = 1; j < col.length; j++) if (e >= col[j][0]) { const [za, va] = col[j - 1], [zb, vb] = col[j]; return vb + (va - vb) * (e - zb) / (za - zb); } return col[col.length - 1][1]; };
+}
+/* the simulated water table at a point: the head of the uppermost layer that is not dry */
+function gwWaterTable(M, layers, E, N) { const g = M.grid, rc = g.cellOf(E, N); if (!rc) return null; const [x, y] = g.toLocal(E, N), i = rc[0] * g.ncol + rc[1];
+  for (let k = 0; k < g.nlay; k++) { if (g.idomain[k][i] !== 1) continue; const h = gwHeadAt(g, layers, k, x, y); if (h != null && h > g.botm[k][i]) return h; } return null; }
+/* the MODFLOW 6 concentration at a section point on a date (linear in time between saved outputs; nothing before the release) */
+function gwConcSampler(date, param) {
+  const M = gwModel(), T = S.gwm?.trans, G = XS_GEOM, R = S.gwm?.run; if (!T?.ok || !M || M.error || !G || !R || (param && T.param !== param)) return null;
+  const d = date || T.times[T.times.length - 1].date, t = (Date.parse(d) - Date.parse(T.start)) / 864e5;
+  const i = T.times.findIndex(q => q.totim >= t - 1e-6), a = i <= 0 ? null : T.times[i - 1], b = i < 0 ? T.times[T.times.length - 1] : T.times[i];
+  const sb = gwPointSampler(M, b.layers), sa = a ? gwPointSampler(M, a.layers) : null, f = i < 0 ? 1 : a ? (t - a.totim) / (b.totim - a.totim) : Math.max(0, t / b.totim);
+  const cAt = (dd, e) => { if (t <= 0) return 0; const [E, N] = G.pos.at(dd), wt = gwWaterTable(M, R.layers, E, N); if (wt == null || e > wt) return null;
+    const vb = sb(E, N, e); if (vb == null) return null; const va = sa ? sa(E, N, e) ?? 0 : 0; return Math.max(0, va + (vb - va) * Math.min(1, Math.max(0, f))); };
+  return { cAt, T, date: d };
+}
+const gwCalLabel = () => { const c = gwSaved().calibT || gwSaved().calib; return c ? `calibrated to ${c.mode === 'transient' ? `${c.rounds.length} rounds` : c.round}, RMSE ${(+c.stats.rmse).toPrecision(2)} m` : 'not calibrated'; };
+/* water table, head contours and flow arrows of the model in the section plane */
+function gwSectionSVG(G) {
+  const M = gwModel(), R = S.gwm?.run; if (!M || M.error || !R?.ok) return null;
+  const head = gwPointSampler(M, R.layers), wtAt = d => { const [E, N] = G.pos.at(d); return gwWaterTable(M, R.layers, E, N); }, under = [], over = [];
+  const X = G.X, Y = G.Y, n = 120, wt = Array.from({ length: n + 1 }, (_, i) => { const d = G.maxD * i / n; return [d, wtAt(d)]; });
+  // the model's water table, in pieces where it is defined
+  let path = ''; wt.forEach(([d, h], i) => { if (h == null) return; path += `${!path || wt[i - 1]?.[1] == null ? 'M' : 'L'}${X(d).toFixed(1)} ${Y(h).toFixed(1)}`; });
+  if (path) under.push(`<path data-gw-wt="1" d="${path}" fill="none" stroke="#3f007d" stroke-width="1.4" stroke-dasharray="1.5 2.5" stroke-linecap="round"><title>Model water table (MODFLOW 6, ${esc(gwCalLabel())}), not measured</title></path>`);
+  // heads on a grid in the section plane, below the model water table
+  const x0 = X(0), x1 = X(G.maxD), y0 = G.m.t, y1 = G.m.t + G.plotH, nx = Math.max(2, Math.ceil((x1 - x0) / 6)), ny = Math.max(2, Math.ceil((y1 - y0) / 6)), c = new Float32Array((nx + 1) * (ny + 1)), a = new Float32Array(c.length);
+  let hmin = Infinity, hmax = -Infinity;
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { const d = G.maxD * i / nx, e = G.e1 - (j / ny) * (G.e1 - G.e0), w = wtAt(d), [E, N] = G.pos.at(d), h = w != null && e <= w ? head(E, N, e) : null, k = j * (nx + 1) + i;
+    if (h == null) { a[k] = 0; continue; } c[k] = h; a[k] = 1; hmin = Math.min(hmin, h); hmax = Math.max(hmax, h); }
+  if (hmax > hmin) {
+    const step = [.02, .05, .1, .2, .25, .5, 1, 2, 5].find(s => (hmax - hmin) / s <= 10) || 10, g = { nx, ny, x0, x1, y0, y1, c, a };
+    for (let lv = Math.ceil(hmin / step) * step; lv <= hmax + 1e-9; lv += step) { const lines = fieldContours(g, lv, .5, true); if (!lines.length) continue;
+      under.push(`<path data-gw-head="${lv.toFixed(3)}" d="${lines.map(l => l.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')).join('')}" fill="none" stroke="#6a51a3" stroke-width=".7" opacity=".8"><title>Model head ${lv.toFixed(2)} m (MODFLOW 6), not measured</title></path>`);
+      const longest = lines.reduce((b, l) => l.length > b.length ? l : b, []), byY = [...longest].sort((p, r) => p[1] - r[1]), q = byY[Math.floor(byY.length * .8)];   // low on the line, clear of the water-level labels
+      if (q) over.push(`<text data-gw-hlabel="1" x="${q[0].toFixed(1)}" y="${(q[1] - 2).toFixed(1)}" text-anchor="middle" style="font:9.5px Arial,sans-serif;fill:#54278f;paint-order:stroke;stroke:#fff;stroke-width:2.5px">${lv.toFixed(step < .1 ? 2 : step < 1 ? 1 : 0)}</text>`); }
+  }
+  // flow arrows: the velocity in the plane of the section, drawn as it looks with the vertical exaggeration
+  const q = mf6ReadBudget(R.out['gwf.cbc'], 'DATA-SPDIS').pop();
+  if (q) { const vel = gwVelocity(M.grid, q.list, M.units.map(u => u.ne)), pxH = G.plotW / G.maxD, pxV = G.plotH / (G.e1 - G.e0), arr = [];
+    for (let px = x0 + 30; px < x1 - 10; px += 56) for (let py = y0 + 14; py < y1 - 8; py += 26) {
+      const d = (px - x0) / (x1 - x0) * G.maxD, e = G.e1 - (py - y0) / G.plotH * (G.e1 - G.e0), w = wtAt(d); if (w == null || e > w - .1) continue;
+      const [E, N] = G.pos.at(d), [E2, N2] = G.pos.at(Math.min(G.maxD, d + .5)), L = Math.hypot(E2 - E, N2 - N) || 1, ux = (E2 - E) / L, uy = (N2 - N) / L, [lx, ly] = M.grid.toLocal(E, N), v = vel(lx, ly, e); if (!v) continue;
+      const vE = v.vx * M.grid.cs - v.vy * M.grid.sn, vN = v.vx * M.grid.sn + v.vy * M.grid.cs, along = vE * ux + vN * uy, dx = along * pxH, dy = -v.vz * pxV, len = Math.hypot(dx, dy); if (!(len > 0)) continue;
+      arr.push([px, py, dx / len, dy / len, Math.hypot(along, v.vz)]); }
+    const vmax = Math.max(...arr.map(a => a[4]), 1e-12);
+    for (const [px, py, ux, uy, sp] of arr) { const l = 7 + 7 * Math.max(0, 1 + Math.log10(sp / vmax) / 2), hx = px + ux * l, hy = py + uy * l;
+      under.push(`<g data-gw-arrow="1" opacity=".75"><path d="M${(px - ux * l).toFixed(1)} ${(py - uy * l).toFixed(1)}L${hx.toFixed(1)} ${hy.toFixed(1)}" stroke="#3f007d" stroke-width=".9"/><path d="M${hx.toFixed(1)} ${hy.toFixed(1)}L${(hx - ux * 4 - uy * 2.4).toFixed(1)} ${(hy - uy * 4 + ux * 2.4).toFixed(1)}L${(hx - ux * 4 + uy * 2.4).toFixed(1)} ${(hy - uy * 4 - ux * 2.4).toFixed(1)}Z" fill="#3f007d"/><title>${esc(`Model flow ${(sp * 365.25).toPrecision(2)} m/year in the section plane (MODFLOW 6), not measured`)}</title></g>`); } }
+  return { under, over, legend: `Model flow (MODFLOW 6, ${gwCalLabel()}), not measured: dotted = water table; thin lines = heads (m); arrows = flow direction in this plane, vertical exaggerated` };
+}
+/* every unit's K not typed in by the user (slug-test units carry their prior), the recharge unless typed, and the boundary head shift */
+const gwDefaultKeys = M => [...M.units.filter(u => (gwSaved().units || {})[u.u]?.k == null).map(u => 'k:' + u.u), ...(gwSaved().rch == null ? ['rch'] : []), 'shift'];
+/* ---------- calibration: Levenberg–Marquardt on log10 parameters (as in PEST and UCODE), by repeated MODFLOW 6 runs ----------
+   Objective: Σ ((h_obs − h_sim)/σh)² + Σ ((log10 K_slug − log10 K)/σlogK)² over parameters with slug-test prior information.
+   σh = 0.1 m (head measurement and model error), σlogK = 0.5 (a factor of about 3). Statistics after Hill and Tiedeman (2007),
+   Effective Groundwater Model Calibration: composite scaled sensitivities, the parameter correlation matrix and linear 95 %
+   intervals from the covariance s²(JᵀWJ)⁻¹. */
+const GW_SIG_H = .1, GW_SIG_LOGK = .5, GW_BOUNDS = { k: [-5, 4], rch: [-6, -2], shift: null };
+function gwSolve(A, b) { const n = b.length, M = A.map((r, i) => [...r, b[i]]);
+  for (let i = 0; i < n; i++) { let p = i; for (let r = i + 1; r < n; r++) if (Math.abs(M[r][i]) > Math.abs(M[p][i])) p = r; [M[i], M[p]] = [M[p], M[i]]; if (Math.abs(M[i][i]) < 1e-300) return null;
+    for (let r = 0; r < n; r++) if (r !== i) { const f = M[r][i] / M[i][i]; for (let c = i; c <= n; c++) M[r][c] -= f * M[i][c]; } }
+  return M.map((r, i) => r[n] / r[i]); }
+function gwInv(A) { const n = A.length; return Array.from({ length: n }, (_, j) => gwSolve(A, Array.from({ length: n }, (_, i) => i === j ? 1 : 0))).reduce((m, col, j) => { if (!col || !m) return null; col.forEach((v, i) => { m[i][j] = v; }); return m; }, Array.from({ length: n }, () => new Array(n).fill(0))); }
+/* eigenvalues and vectors of a small symmetric matrix (Jacobi rotations) */
+function gwEig(A) { const n = A.length, a = A.map(r => [...r]), V = a.map((r, i) => r.map((_, j) => i === j ? 1 : 0));
+  for (let sweep = 0; sweep < 60; sweep++) { let off = 0; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) off += a[i][j] ** 2; if (off < 1e-20) break;
+    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) { if (Math.abs(a[p][q]) < 1e-300) continue; const th = (a[q][q] - a[p][p]) / (2 * a[p][q]), t = Math.sign(th || 1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), s = t * c;
+      for (let k = 0; k < n; k++) { const akp = a[k][p], akq = a[k][q]; a[k][p] = c * akp - s * akq; a[k][q] = s * akp + c * akq; }
+      for (let k = 0; k < n; k++) { const apk = a[p][k], aqk = a[q][k]; a[p][k] = c * apk - s * aqk; a[q][k] = s * apk + c * aqk; }
+      for (let k = 0; k < n; k++) { const vkp = V[k][p], vkq = V[k][q]; V[k][p] = c * vkp - s * vkq; V[k][q] = s * vkp + c * vkq; } } }
+  return { val: a.map((r, i) => r[i]), vec: V }; }
+const gwT975 = nu => { const z = 1.959964; return nu > 0 ? z + (z ** 3 + z) / (4 * nu) + (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * nu * nu) + (3 * z ** 7 + 19 * z ** 5 + 17 * z ** 3 - 15 * z) / (384 * nu ** 3) : Infinity; };
+async function gwCalibrate(M, opts = {}) {
+  const keys = opts.keys || M.params.map(p => p.key), prior = opts.prior !== false, maxIter = opts.maxIter ?? 10, tick = opts.onProgress || (() => {});
+  if (opts.transient) gwTransientSetup(M);
+  const OBS = opts.transient ? M.obsT : M.obs, runner = opts.transient ? gwRunTransient : gwRun, fixed = opts.fixed || {};
+  const def = k => { if (k === 'rch') return { key: k, label: 'Recharge', unit: 'm/day', start: M.rch, prior: null, b: GW_BOUNDS.rch };
+    if (k === 'sy') return { key: k, label: 'Specific yield', unit: '–', start: .2, prior: null, b: [-3, -.3] };
+    if (/^rch@\d+$/.test(k)) return { key: k, label: `Recharge multiplier, period ${+k.slice(4) + 1}`, unit: '×', start: 1, prior: null, b: [-1.5, 1.5] };
+    if (k === 'shift') return { key: k, label: 'Boundary head shift', unit: 'm', start: 0, prior: null, lin: true };
+    const u = M.units.find(x => 'k:' + x.u === k); return u ? { key: k, label: `K, ${u.u}`, unit: 'm/day', start: u.k, prior: prior ? u.prior : null, b: GW_BOUNDS.k } : null; };
+  const P = keys.map(def).filter(Boolean); if (!P.length) return { ok: false, error: 'Nothing to calibrate.' };
+  if (!OBS.length) return { ok: false, error: 'No measured heads in the calibration round.' };
+  const toV = x => Object.fromEntries(P.map((p, j) => [p.key, p.lin ? x[j] : 10 ** x[j]]));
+  let x = P.map(p => { const v = opts.start?.[p.key] ?? p.start; return p.lin ? v : Math.log10(v); });
+  const clamp = x => x.map((v, j) => P[j].b ? Math.max(P[j].b[0], Math.min(P[j].b[1], v)) : v);
+  // a trial that does not converge is a rejected step, not the end of the calibration
+  let runs = 0, failed = 0; const sim = async (x, soft) => { runs++; const r = await runner(M, { ...fixed, ...toV(x) }); if (!r.ok) { failed++; if (soft) return null; throw new Error(r.error); } return r; };
+  // residual vector (weighted): heads, then prior information
+  const resid = r => [...OBS.map((o, i) => r.sim[i] == null ? 0 : (o.h - r.sim[i]) / GW_SIG_H), ...P.flatMap((p, j) => p.prior != null ? [(p.prior - x[j]) / GW_SIG_LOGK] : [])];
+  const phiOf = (r, xx) => { const old = x; x = xx; const e = resid(r); x = old; return e.reduce((a, v) => a + v * v, 0); };
+  try {
+    let cur = await sim(x), phi = phiOf(cur, x), lam = .01, it = 0, J = null;
+    const jac = async (x, base) => { const h = P.map(p => p.lin ? .05 : .02), rs = await Promise.all(P.map(async (p, j) => { const xx = [...x]; xx[j] += h[j]; let r = await sim(xx, true); if (!r) { xx[j] -= 2 * h[j]; r = await sim(xx, true); if (r) h[j] = -h[j]; } return r; }));
+      return OBS.map((o, i) => P.map((p, j) => !rs[j] || base.sim[i] == null || rs[j].sim[i] == null ? 0 : (rs[j].sim[i] - base.sim[i]) / h[j])); };
+    for (; it < maxIter; it++) {
+      tick({ it, phi, runs }); J = await jac(x, cur);
+      const r = resid(cur), Jw = [...J.map(row => row.map(v => v / GW_SIG_H)), ...P.flatMap((p, j) => p.prior != null ? [P.map((_, k) => k === j ? 1 / GW_SIG_LOGK : 0)] : [])];
+      // note: the prior rows' residual falls as x rises, matching the head rows (h_obs − h_sim)
+      const JtJ = P.map((_, a) => P.map((_, b) => Jw.reduce((t, row) => t + row[a] * row[b], 0))), Jtr = P.map((_, a) => Jw.reduce((t, row, i) => t + row[a] * r[i], 0));
+      let improved = false;
+      for (let tries = 0; tries < 8; tries++) {
+        const dead = JtJ.map((row, a) => !(row[a] > 1e-10)), A = JtJ.map((row, a) => row.map((v, b) => dead[a] || dead[b] ? (a === b ? 1 : 0) : a === b ? v * (1 + lam) + 1e-12 : v)), rhs = Jtr.map((v, a) => dead[a] ? 0 : v), d = gwSolve(A, rhs); if (!d) { lam *= 10; continue; }
+        const xn = clamp(x.map((v, j) => v + d[j])), rn = await sim(xn, true), pn = rn ? phiOf(rn, xn) : Infinity;
+        if (pn < phi) { const rel = (phi - pn) / Math.max(phi, 1e-12); x = xn; cur = rn; phi = pn; lam = Math.max(lam / 10, 1e-6); improved = true; if (rel < .01) it = maxIter; break; }   // under 1 % better: converged
+        lam *= 10;
+      }
+      if (!improved) break;
+    }
+    J = await jac(x, cur);
+    // statistics
+    const res = OBS.map((o, i) => ({ name: o.name, b: o.b.name, date: o.date, h: o.h, sim: cur.sim[i], res: cur.sim[i] == null ? NaN : o.h - cur.sim[i] })), ok = res.filter(q => Number.isFinite(q.res)), n = ok.length;
+    const me = ok.reduce((a, q) => a + q.res, 0) / n, mae = ok.reduce((a, q) => a + Math.abs(q.res), 0) / n, rmse = Math.sqrt(ok.reduce((a, q) => a + q.res * q.res, 0) / n), hs = ok.map(q => q.h), range = Math.max(...hs) - Math.min(...hs);
+    const Jw = [...J.map(row => row.map(v => v / GW_SIG_H)), ...P.flatMap((p, j) => p.prior != null ? [P.map((_, k) => k === j ? 1 / GW_SIG_LOGK : 0)] : [])];
+    const JtJ = P.map((_, a) => P.map((_, b) => Jw.reduce((t, row) => t + row[a] * row[b], 0))), nd = Jw.length, dof = nd - P.length, s2 = dof > 0 ? phi / dof : NaN, inv = gwInv(JtJ.map((row, a) => row.map((v, b) => !(JtJ[a][a] > 1e-10) || !(JtJ[b][b] > 1e-10) ? (a === b ? 1 : 0) : a === b ? v + 1e-12 : v)));
+    const cov = inv && Number.isFinite(s2) ? inv.map(row => row.map(v => v * s2)) : null, tq = gwT975(dof);
+    const corr = P.map((_, a) => P.map((_, b) => cov ? cov[a][b] / Math.sqrt(Math.abs(cov[a][a] * cov[b][b])) : NaN));
+    // composite scaled sensitivity (per log10 unit ÷ ln 10 gives the sensitivity to a 1 % change, scaled by the head weight)
+    const css = Object.fromEntries(P.map((p, j) => [p.key, Math.sqrt(J.reduce((t, row) => t + (row[j] / (p.lin ? 1 : Math.LN10) / GW_SIG_H) ** 2, 0) / n)]));
+    const pv = { ...fixed, ...toV(x) }, params = P.map((p, j) => { const sd = cov ? Math.sqrt(Math.abs(cov[j][j])) : NaN; return { key: p.key, label: p.label, unit: p.unit, start: p.start, value: pv[p.key], prior: p.prior,
+      lo95: p.lin ? x[j] - tq * sd : 10 ** (x[j] - tq * sd), hi95: p.lin ? x[j] + tq * sd : 10 ** (x[j] + tq * sd) }; });
+    const warnings = [];
+    P.forEach((p, a) => P.forEach((q, b) => { if (b > a && Math.abs(corr[a][b]) > .95) warnings.push(`${p.label} and ${q.label.toLowerCase()} cannot be separated by these heads (correlation ${corr[a][b].toFixed(2)}): fix one from a measurement (a slug test, or a recharge estimate) or add flow data.`); }));
+    // a combination of several parameters the heads cannot pin down (for example every K and the recharge scaled together)
+    if (P.length > 2) { const sc = JtJ.map((row, a) => row.map((v, b) => v / Math.sqrt(JtJ[a][a] * JtJ[b][b] || 1))), E = gwEig(sc), i0 = E.val.indexOf(Math.min(...E.val));
+      if (E.val[i0] < 1e-3 && !warnings.length) warnings.push(`${P.filter((_, j) => Math.abs(E.vec[j][i0]) > .25).map(p => p.label).join(', ')} cannot be separated by these heads together (they can change together without changing the heads): fix one from a measurement or add flow data.`); }
+    if (dof <= 0) warnings.push('There are no more observations than parameters, so the fit statistics and intervals are not meaningful.');
+    if (failed) warnings.push(`${failed} trial run${failed > 1 ? 's' : ''} did not converge and ${failed > 1 ? 'were' : 'was'} set aside (the search stepped back).`);
+    P.forEach((p, j) => { if (J.every(row => row[j] === 0)) warnings.push(`The heads do not respond to ${p.label.toLowerCase()} (for example a layer above the water table): it is not calibrated by these data.`); });
+    P.forEach(p => { if (p.b && (Math.abs(Math.log10(pv[p.key]) - p.b[0]) < 1e-6 || Math.abs(Math.log10(pv[p.key]) - p.b[1]) < 1e-6)) warnings.push(`${p.label} stopped at its limit (${pv[p.key].toPrecision(2)} ${p.unit}).`); });
+    return { ok: true, pv, params, stats: { n, me, mae, rmse, range, srms: range > 0 ? rmse / range * 100 : NaN, disc: cur.discrepancy, phi, dof }, residuals: res, css, corr, warnings, iterations: it, runs, run: cur, round: M.round };
+  } catch (e) { return { ok: false, error: String(e.message || e) }; }
+}
+/* ---------- the Model page: set-up, runs, calibration and transport results (MODFLOW 6) ---------- */
+S.gwm = { busy: false, msg: '', err: '' };   // the groundwater model's session state (S.gw is the Water page's plot mode)
+const GW_ENGINE = 'MODFLOW 6.8.1 (USGS)';
+const gwSaved = () => siteOf()?.gwModel || {};
+function setGwm(patch) { if (S.readOnly) return; setSite({ ...(siteOf() || {}), gwModel: { ...gwSaved(), ...patch } }); S.gwm.run = null; S.gwm.key = null; }
+/* the inputs a calibration depends on; when they change the stored calibration is marked out of date */
+const gwInputsKey = M => JSON.stringify([M.rch, M.round, M.grid.nrow, M.grid.ncol, M.grid.cell, M.units.map(u => [u.u, u.calib ? null : u.k, u.kv]), M.features, M.obs.map(o => [o.b.id, +o.h.toFixed(3)])]);
+/* the model belongs to the open project and its current data: any change of project, logs, water levels, slug tests, results or
+   model settings rebuilds it and drops runs made from the old one */
+const gwHash = t => { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
+function gwKey() { const g = { ...gwSaved() }; delete g.calib; delete g.calibT; delete g.transport;
+  return projKey(cur()) + '|' + gwHash(JSON.stringify([projList().map(b => [b.id, b.easting, b.northing, b.elevation, b.layers, b.water, b.slug, b.well, b.gwSamples]), siteOf()?.xsec, siteOf()?.model, g, S.co.ne])); }
+function gwModel() { const k = gwKey(); if (S.gwm.key !== k || !S.gwm.M) Object.assign(S.gwm, { key: k, M: gwModelSpec(projList(), siteOf() || {}), run: null, trans: null, paths: [], err: '' }); return S.gwm.M; }
+const gwPv = () => { const g = gwSaved(), pv = { ...(g.calib?.pv || {}), ...(g.calibT?.pv || {}) };
+  for (const [u, e] of Object.entries(g.units || {})) if (e?.k != null) delete pv['k:' + u];   // a value the user typed wins over the calibration
+  if (g.rch != null) delete pv.rch; return pv; };
+/* runs the calibrated model once per session (and after changes), then redraws whatever shows its results */
+async function gwEnsure(force) {
+  if (!window.desktop?.mf6Run || S.gwm.busy) return; const M = gwModel(); if (M.error) return;
+  if (S.gwm.run && !force) return;
+  S.gwm.busy = true; S.gwm.msg = 'Running MODFLOW 6…'; gwRefresh();
+  try { const r = await gwRun(M, gwPv()); S.gwm.run = r.ok ? r : null; S.gwm.err = r.ok ? '' : r.error; S.gwm.paths = r.ok ? gwSourcePaths(M, r) : [];
+    if (r.ok && gwSaved().transport?.on && !S.gwm.trans) { S.gwm.msg = 'Running transport…'; gwRefresh(); S.gwm.trans = await gwTransport(M, gwPv(), { calibrate: !!gwSaved().transport.calibrate }); }
+  } finally { S.gwm.busy = false; S.gwm.msg = ''; gwRefresh(); }
+}
+function gwRefresh() { if (S.tab === 'gwm') { const v = $('#view'); if (v) v.innerHTML = gwmHTML(); } else if (S.tab === 'xsec') drawXsec(); else if (S.tab === 'site') drawSite?.(); }
+async function gwAct(act, t) {
+  if (S.readOnly && act !== 'gw-export') return;
+  const M = gwModel(); if (M.error) { toast(M.error); return; }
+  if (act === 'gw-feat-add') { setGwm({ features: [...(gwSaved().features || []), { type: 'riv', name: '', pts: [], stage: null, cond: 10, rbot: null }] }); gwRefresh(); return; }
+  if (act === 'gw-feat-del') { const i = +t.dataset.i; setGwm({ features: (gwSaved().features || []).filter((_, j) => j !== i) }); gwRefresh(); return; }
+  if (act === 'gw-export') { const r = S.gwm.run || (window.desktop?.mf6Run ? await gwRun(M, gwPv()) : null), files = r?.files || mf6Files(gwSpec(M, gwPv())).files;
+    const readme = `Borehole Field Log: MODFLOW 6 model exported ${new Date().toISOString().slice(0, 10)}\nProject: ${projKey(cur())}\nEngine: ${GW_ENGINE}. Run with: mf6 (in this folder).\nCalibration round: ${M.round}\nGrid: ${M.grid.nrow} rows × ${M.grid.ncol} columns × ${M.grid.nlay} layers, ${M.grid.cell} m cells, rotated ${M.grid.angrot.toFixed(1)}° (columns along the fitted flow direction).\nLayers: ${M.units.map((u, i) => `${i + 1} ${u.u} (K ${(gwPv()['k:' + u.u] ?? u.k).toPrecision(3)} m/day, ${gwPv()['k:' + u.u] != null ? 'calibrated' : u.kSrc})`).join('; ')}\n`;
+    const list = [...Object.entries(files).map(([name, data]) => ({ name: 'model/' + name, data })), ...Object.entries(r?.out || {}).map(([name, data]) => ({ name: 'output/' + name, data })), { name: 'README.txt', data: readme }];
+    if (S.gwm.trans?.files) for (const [name, data] of Object.entries(S.gwm.trans.files)) list.push({ name: 'transport/' + name, data });
+    saveFile(`groundwater-model-${(projKey(cur()) || 'project').replace(/[^\w-]+/g, '-').slice(0, 40)}.zip`, zipFiles(list)); return; }
+  if (!window.desktop?.mf6Run) return;
+  S.gwm.busy = true; S.gwm.err = ''; gwRefresh();
+  const tick = p => { S.gwm.msg = `Calibrating: iteration ${p.it + 1}, ${p.runs} MODFLOW runs, objective ${p.phi.toPrecision(4)}`; gwRefresh(); };
+  try {
+    if (act === 'gw-run') { S.gwm.key = null; gwModel(); S.gwm.busy = false; await gwEnsure(true); return; }
+    if (act === 'gw-cal' || act === 'gw-calt') {
+      const tr = act === 'gw-calt', keys = tr ? ['sy', ...gwTransientSetup(M).periods.slice(1).map((_, i) => 'rch@' + (i + 1))] : (gwSaved().keys || gwDefaultKeys(M));
+      const C = await gwCalibrate(M, { keys, transient: tr, fixed: tr ? gwSaved().calib?.pv || {} : {}, prior: gwSaved().prior !== false, onProgress: tick });
+      if (!C.ok) { S.gwm.err = C.error; return; }
+      const keep = { mode: tr ? 'transient' : 'steady', pv: C.pv, params: C.params, stats: C.stats, residuals: C.residuals, css: C.css, corr: C.corr, warnings: C.warnings, round: M.round, rounds: tr ? gwTransientSetup(M).rounds : [M.round], at: new Date().toISOString(), runs: C.runs, iterations: C.iterations, key: gwInputsKey(M) };
+      setGwm(tr ? { calibT: keep } : { calib: keep, calibT: null }); S.gwm.trans = null; S.gwm.busy = false; await gwEnsure(true); return;
+    }
+    if (act === 'gw-trans') { setGwm({ transport: { on: true, calibrate: !!gwSaved().transport?.calibrate } }); S.gwm.run = null; S.gwm.trans = null; S.gwm.busy = false; await gwEnsure(true); return; }
+  } finally { S.gwm.busy = false; S.gwm.msg = ''; gwRefresh(); }
+}
+function gwmHTML() {
+  const desk = !!window.desktop?.mf6Run, M = gwModel(), g = gwSaved(), c = g.calib, ct = g.calibT, pv = gwPv(), ro = S.readOnly || !desk || S.gwm.busy ? 'disabled' : '', f3 = v => v == null || !Number.isFinite(+v) ? '–' : (+v).toPrecision(3), f2 = v => v == null || !Number.isFinite(+v) ? '–' : (+v).toFixed(2);
+  if (M.error) return `<div class="gw-page"><section class="sec"><header><h3>Groundwater model</h3><span class="note">${GW_ENGINE}</span></header><div class="body"><p class="note" style="color:var(--warn,#a3470b)">The model can't be built yet: ${esc(M.error)}</p></div></section></div>`;
+  const stale = c && c.key !== gwInputsKey(M), rounds = [...new Set(M.list.flatMap(b => monitoring(b).filter(w => w.date).map(w => w.date)))].sort();
+  const unitRow = u => { const cal = pv['k:' + u.u]; return `<tr><td>${esc(u.u)}</td><td class="r"><input type="number" step="any" data-gwu="${esc(u.u)}|k" value="${esc(g.units?.[u.u]?.k ?? '')}" placeholder="${f3(cal ?? u.k)}" style="width:7em" ${S.readOnly ? 'disabled' : ''}></td><td>m/day</td><td class="note">${esc(cal != null ? `calibrated (${GW_ENGINE.split(' (')[0]}); start: ${u.kSrc}` : u.kSrc)}</td><td class="r"><input type="number" step="any" data-gwu="${esc(u.u)}|kv" value="${esc(g.units?.[u.u]?.kv ?? '')}" placeholder="${u.kv}" style="width:5em" ${S.readOnly ? 'disabled' : ''}></td><td class="note">${esc(u.kvSrc)}</td><td class="r">${f2(u.ne)}</td></tr>`; };
+  const featRow = (ft, i) => `<tr><td><select data-gwft="${i}|type" ${S.readOnly ? 'disabled' : ''}>${[['riv', 'River or creek'], ['drn', 'Drain'], ['wel', 'Pumping well'], ['chd', 'Fixed head']].map(([v, t]) => `<option value="${v}" ${ft.type === v ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
+    <td><input data-gwft="${i}|name" value="${esc(ft.name || '')}" style="width:8em" ${S.readOnly ? 'disabled' : ''}></td><td><input data-gwft="${i}|pts" value="${esc((ft.pts || []).map(p => p.join(' ')).join('; '))}" placeholder="E N; E N (UTM)" style="width:16em" ${S.readOnly ? 'disabled' : ''}></td>
+    ${[['stage', 'Stage / elevation / head (m)'], ['cond', 'Conductance (m²/day)'], ['rbot', 'Bed bottom (m)'], ['rate', 'Rate (m³/day, − = pumping)']].map(([k, t]) => `<td><input type="number" step="any" data-gwft="${i}|${k}" value="${esc(ft[k] ?? '')}" title="${t}" placeholder="${t.split(' (')[0]}" style="width:7em" ${S.readOnly ? 'disabled' : ''}></td>`).join('')}
+    <td><button class="btn" data-act="gw-feat-del" data-i="${i}" ${S.readOnly ? 'disabled' : ''}>Remove</button></td></tr>`;
+  const statsT = (C, title) => !C ? '' : `<h4 style="margin:12px 0 6px">${esc(title)}</h4><table class="sum"><tbody>
+      <tr><td>Observations</td><td class="r">${C.stats.n}</td><td>Mean error</td><td class="r">${f3(C.stats.me)} m</td><td>Mean absolute error</td><td class="r">${f3(C.stats.mae)} m</td></tr>
+      <tr><td>RMSE</td><td class="r">${f3(C.stats.rmse)} m</td><td>Head range</td><td class="r">${f3(C.stats.range)} m</td><td>RMSE ÷ range</td><td class="r">${f2(C.stats.srms)} %</td></tr>
+      <tr><td>Mass-balance discrepancy</td><td class="r">${f3(C.stats.disc)} %</td><td>Iterations / runs</td><td class="r">${C.iterations} / ${C.runs}</td><td>Calibrated</td><td class="r">${esc(C.at.slice(0, 16).replace('T', ' '))}</td></tr></tbody></table>
+    <table class="sum" style="margin-top:8px"><thead><tr><th>Parameter</th><th class="r">Start</th><th class="r">Calibrated</th><th class="r">95 % interval</th><th class="r">Sensitivity (CSS)</th><th>Prior</th></tr></thead><tbody>
+      ${C.params.map(p => `<tr><td>${esc(p.label)}</td><td class="r">${f3(p.start)} ${esc(p.unit)}</td><td class="r"><b>${f3(p.value)}</b> ${esc(p.unit)}</td><td class="r">${f3(p.lo95)} – ${f3(p.hi95)}</td><td class="r">${f3(C.css[p.key])}</td><td class="note">${p.prior != null ? `slug tests, ${f3(10 ** p.prior)} m/day` : '–'}</td></tr>`).join('')}</tbody></table>
+    ${C.params.length > 1 ? `<table class="sum" style="margin-top:8px"><caption class="note" style="text-align:left">Parameter correlation</caption><thead><tr><th></th>${C.params.map(p => `<th class="r">${esc(p.label)}</th>`).join('')}</tr></thead><tbody>${C.params.map((p, a) => `<tr><td>${esc(p.label)}</td>${C.params.map((q, b) => `<td class="r" style="${a !== b && Math.abs(C.corr[a][b]) > .95 ? 'color:var(--warn,#a3470b);font-weight:600' : ''}">${f2(C.corr[a][b])}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''}
+    ${C.warnings.length ? `<ul class="note" style="color:var(--warn,#a3470b)">${C.warnings.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`;
+  const scatter = C => { if (!C) return ''; const pts = C.residuals.filter(q => Number.isFinite(q.sim)), lo = Math.min(...pts.flatMap(q => [q.h, q.sim])), hi = Math.max(...pts.flatMap(q => [q.h, q.sim])), pad = (hi - lo) * .08 || .1, a = lo - pad, b = hi + pad, X = v => 40 + (v - a) / (b - a) * 200, Y = v => 220 - (v - a) / (b - a) * 200;
+    return `<div id="gwm-scatter"><svg width="250" height="250" role="img" aria-label="Simulated against measured heads" style="font:10px Arial,sans-serif"><rect x="40" y="20" width="200" height="200" fill="#fff" stroke="#ccc"/><path d="M${X(a)} ${Y(a)}L${X(b)} ${Y(b)}" stroke="#888" stroke-dasharray="4 3"/>
+      ${pts.map(q => `<circle cx="${X(q.h).toFixed(1)}" cy="${Y(q.sim).toFixed(1)}" r="3" fill="#756bb1" stroke="#3f007d"><title>${esc(`${q.b}${q.date ? ' ' + q.date : ''}: measured ${q.h.toFixed(2)}, simulated ${q.sim.toFixed(2)} m`)}</title></circle>`).join('')}
+      <text x="140" y="245" text-anchor="middle">Measured head (m)</text><text x="12" y="120" transform="rotate(-90 12 120)" text-anchor="middle">Simulated head (m)</text><text x="44" y="32">${a.toFixed(1)}–${b.toFixed(1)} m; dashed = 1:1</text></svg></div>`; };
+  const resT = C => !C ? '' : `<div class="scroll-x" style="max-height:260px;overflow:auto"><table class="sum" id="gwm-res"><thead><tr><th>Well</th><th>Date</th><th class="r">Measured (m)</th><th class="r">Simulated (m)</th><th class="r">Residual (m)</th></tr></thead><tbody>${C.residuals.map(q => `<tr><td>${esc(q.b)}</td><td>${esc(q.date || C.round)}</td><td class="r">${f2(q.h)}</td><td class="r">${f2(q.sim)}</td><td class="r">${Number.isFinite(q.res) ? (q.res > 0 ? '+' : '') + q.res.toFixed(3) : 'dry'}</td></tr>`).join('')}</tbody></table></div>`;
+  const T = S.gwm.trans;
+  return `<div class="gw-page">
+    <section class="sec"><header><h3>Groundwater model</h3><button class="btn link" data-act="tut-gwm">Tutorial</button><span class="note">${GW_ENGINE} · public domain · labelled “Model (MODFLOW 6), not measured” wherever it is drawn</span><span class="sp"></span>
+      <button class="btn" data-act="gw-run" ${ro}>Run model</button><button class="btn primary" data-act="gw-cal" ${ro}>Calibrate (steady)</button><button class="btn" data-act="gw-calt" ${ro || !c ? 'disabled' : ''} title="${c ? 'Specific yield and recharge per period, against every round' : 'Calibrate the steady model first'}">Calibrate (all rounds)</button><button class="btn" data-act="gw-trans" ${ro}>Run transport</button><button class="btn" data-act="gw-export" ${S.gwm.busy ? 'disabled' : ''}>Export model files</button></header>
+      <div class="body">
+      ${!desk ? `<p class="note" style="color:var(--warn,#a3470b)">The groundwater model runs MODFLOW 6 on this computer, so it needs the desktop app. The cross-section keeps the Domenico forecast.</p>` : ''}
+      ${S.gwm.msg ? `<p class="note"><b>${esc(S.gwm.msg)}</b></p>` : ''}${S.gwm.err ? `<p class="note" style="color:var(--warn,#a3470b)">MODFLOW 6: ${esc(S.gwm.err)}</p>` : ''}
+      ${stale ? `<p class="note" style="color:var(--warn,#a3470b)">The inputs changed after the last calibration (${esc(c.at.slice(0, 10))}): calibrate again before relying on the results.</p>` : ''}
+      <p class="note" id="gwm-grid">Grid ${M.grid.nrow} rows × ${M.grid.ncol} columns × ${M.grid.nlay} layers of ${M.grid.cell} m, rotated ${M.grid.angrot.toFixed(1)}° so columns follow the fitted flow direction (${M.F.az.toFixed(0)}° from north). Fixed heads on the upgradient and downgradient faces from the ${esc(M.round)} water-table plane; no flow on the sides and through the base of the logs. ${S.gwm.run ? `Last run: ${f3(S.gwm.run.seconds)} s, mass-balance discrepancy ${f3(S.gwm.run.discrepancy)} %.` : ''}</p>
+      <div class="fields" id="gwm-setup" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+        <div class="fld"><label for="gwm-round">Calibration round</label><select id="gwm-round" data-gwm="round" ${S.readOnly ? 'disabled' : ''}>${rounds.map(d => `<option value="${d}" ${d === M.round ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
+        <div class="fld"><label for="gwm-cell">Cell size (m)</label><input id="gwm-cell" type="number" step="any" data-gwm="cell" value="${esc(g.cell ?? '')}" placeholder="${M.grid.cell}" ${S.readOnly ? 'disabled' : ''}></div>
+        <div class="fld"><label for="gwm-margin">Margin around the boreholes (m)</label><input id="gwm-margin" type="number" step="any" data-gwm="margin" value="${esc(g.margin ?? '')}" placeholder="auto" ${S.readOnly ? 'disabled' : ''}></div>
+        <div class="fld"><label for="gwm-rch">Recharge (m/day)</label><input id="gwm-rch" type="number" step="any" data-gwm="rch" value="${esc(g.rch ?? '')}" placeholder="${f3(pv.rch ?? M.rch)}" ${S.readOnly ? 'disabled' : ''}></div>
+        <div class="fld"><label for="gwm-prior">Slug tests in calibration</label><select id="gwm-prior" data-gwm="prior" ${S.readOnly ? 'disabled' : ''}><option value="1" ${g.prior !== false ? 'selected' : ''}>As prior information</option><option value="0" ${g.prior === false ? 'selected' : ''}>Not used</option></select></div></div>
+      <p class="note">Recharge: ${esc(pv.rch != null ? 'calibrated; start ' : '')}${esc(M.params.find(p => p.key === 'rch')?.src || '')}. Effective porosity ${f2(S.co.ne ?? .25)} (assumed; Settings).</p>
+      <h4 style="margin:12px 0 6px">Layers</h4>
+      <div class="scroll-x"><table class="sum" id="gwm-units"><thead><tr><th>Unit (model layer)</th><th class="r">K</th><th>Unit</th><th>Source</th><th class="r">Kv/Kh</th><th>Source</th><th class="r">nₑ</th></tr></thead><tbody>${M.units.map(unitRow).join('')}</tbody></table></div>
+      <h4 style="margin:12px 0 6px">Boundary features <button class="btn" data-act="gw-feat-add" ${S.readOnly ? 'disabled' : ''}>Add</button></h4>
+      <div class="scroll-x"><table class="sum" id="gwm-feat"><thead><tr><th>Type</th><th>Name</th><th>Location</th><th>Stage / elevation / head</th><th>Conductance</th><th>Bed bottom</th><th>Rate</th><th></th></tr></thead><tbody>${(g.features || []).map(featRow).join('')}</tbody></table></div>
+      ${M.notes.length ? `<p class="note" style="color:var(--warn,#a3470b)">${M.notes.map(esc).join(' ')}</p>` : ''}
+      ${!(g.features || []).length ? '<p class="note">None: the model is driven by the two fixed-head faces and recharge. Add a creek, drain or pumping well where one controls the water table.</p>' : ''}
+      </div></section>
+    <section class="sec" id="gwm-cal-sec"><header><h3>Calibration</h3><span class="note">Levenberg–Marquardt on log parameters; statistics after Hill and Tiedeman (2007)</span></header><div class="body">
+      ${!c ? '<p class="note">Not calibrated yet. Calibrate (steady) fits the layers without slug tests and the recharge to the measured heads of the calibration round.</p>' : `<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start"><div style="flex:1;min-width:420px">${statsT(c, `Steady state, ${c.round}`)}${statsT(ct, `All rounds (${(ct?.rounds || []).length})`)}</div>${scatter(ct || c)}</div>${resT(ct || c)}`}
+    </div></section>
+    <section class="sec" id="gwm-trans-sec"><header><h3>Transport</h3><span class="note">MODFLOW 6 GWT: TVD advection, dispersion, linear sorption${T?.P?.hl > 0 ? ', first-order decay' : ''}; inputs from the Forecast panel on the Section page</span><span class="sp"></span><label class="check"><input type="checkbox" id="gwm-tcal" ${g.transport?.calibrate ? 'checked' : ''} ${S.readOnly ? 'disabled' : ''}> Calibrate the source concentration</label></header><div class="body">
+      ${!T ? '<p class="note">Not run. Run transport uses the forecast set-up (compound, source well, release date, dispersivities) on the calibrated flow.</p>' : !T.ok ? `<p class="note" style="color:var(--warn,#a3470b)">${esc(T.error)}</p>` : `<p class="note">${esc(LAB_PARAMS[T.param].label)} from ${esc(T.P.srcBh.name)} since ${esc(T.start)}: source ${f3(T.c0)} mg/L (${esc(T.c0Src)}), Kd ${f3(T.kd)} L/kg, αL ${f3(T.P.ax)} m, αT ${f3(T.P.ay)} m, αV ${f3(T.P.az)} m, ${T.cells.length} source cells. Fit to ${T.fit.n} results: log RMS ${f3(T.fit.rmsLog)} (1 = a factor of 10), mean log error ${f3(T.fit.meLog)}. Mass-balance discrepancy ${f3(T.disc)} %.</p>
+        <div class="scroll-x" style="max-height:240px;overflow:auto"><table class="sum" id="gwm-trans"><thead><tr><th>Well</th><th>Date</th><th class="r">Measured (mg/L)</th><th class="r">Simulated (mg/L)</th><th class="r">Ratio</th></tr></thead><tbody>${T.obs.map(o => `<tr><td>${esc(o.name)}</td><td>${esc(o.date)}</td><td class="r">${o.lt ? '<' : ''}${f3(o.meas)}</td><td class="r">${f3(o.sim)}</td><td class="r">${o.lt ? (o.sim <= o.meas ? 'agrees (not detected)' : '×' + f2(o.sim / o.meas) + ' above the limit') : o.sim > 0 ? '×' + f2(o.sim / o.meas) : '–'}</td></tr>`).join('')}</tbody></table></div>`}
+    </div></section>
+    <section class="sec" id="gwm-limits"><header><h3>Limits</h3></header><div class="body"><p class="note">A screening-to-intermediate model built from the logs: layers are interpolated between boreholes (inverse distance), each layer is uniform, the base of the logs is treated as impermeable, and the boundaries come from the fitted water-table plane unless features are added. Heads alone cannot separate recharge from conductivity; slug tests (prior information) or flow data are needed. Transport uses steady flow, a constant source and no NAPL. Check the calibration statistics and residuals before using results.</p></div></section></div>`;
+}
+/* ---------- tutorials: a guided walk through the Section and Model pages on the cross-section example ----------
+   Each step can switch page, highlights one real control, and explains what it does and why. Nothing is changed for the
+   user except loading the (fictional) example project if it is not open. */
+const TUTORIALS = {
+  xsec: { title: 'Cross-section', steps: [
+    { tab: 'xsec', sel: null, title: 'What the cross-section shows', body: '<p>One drawing of what the ground is, where the water is and where the contamination is, on any date you have data for.</p><p>Everything measured is drawn solid. Everything interpreted between boreholes is dashed, hatched or labelled “interpreted”, and anything from a model is purple and labelled “Model, not measured”.</p><p>This tour uses the fictional cross-section example, so you can try things freely.</p>' },
+    { tab: 'xsec', sel: '.sec-chips', title: 'Choose the section line', body: '<p>Click boreholes in the order the section should run. Until you pick two, the line is a best-fit through all of them.</p><p>Boreholes off the line are projected onto it, and their distance from the line is printed under the drawing (for example “13.6 m S”).</p>' },
+    { tab: 'xsec', sel: '#xs-draw', title: 'Read the drawing', body: '<ul><li><b>Columns</b> are the logs, exactly as logged.</li><li><b>Shaded bands</b> join the same unit between boreholes (interpreted). A unit missing next door pinches out halfway.</li><li><b>Blue ticks</b> are measured water levels; the dashed blue line joins readings from the same round only.</li><li>The <b>ground line</b> is measured at each borehole and dashed between.</li></ul>' },
+    { tab: 'xsec', sel: '#xs-corr-sec', title: 'Pair layers by hand', body: '<p>Units are joined by name. When loggers named the same layer differently (here BH-8 logged “Till” for “Clay till”), pick the group it belongs to and the join is redrawn.</p>' },
+    { tab: 'xsec', sel: '#xs-asof', title: 'Pick the date', body: '<p>“As of” shows water levels and results as they stood on that date: each borehole shows its latest reading on or before it, with its age on hover.</p>' },
+    { tab: 'xsec', sel: '.xs-ctl', title: 'Choose what to plot', body: '<p>Pick the medium (soil, groundwater or headspace vapour) and the parameter. Media are never mixed in one plume.</p><p><b>This round only</b> hides results older than 7 days, so you never contour old and new data together.</p>' },
+    { tab: 'xsec', sel: '#xs-shape', title: 'Plume shape', body: '<p><b>Model-guided</b> (groundwater) takes its shape from the model (MODFLOW 6 when it has been run, else the Domenico forecast) and is corrected to equal every measured result at its well screen. It is labelled “Interpreted”.</p><p><b>Data only</b> blends results between wells across the screened depths and draws nothing above or below the screens.</p>' },
+    { tab: 'xsec', sel: '#xs-style', title: 'Drawing style and layers', body: '<p>Graded shading, contour lines or filled bands at 1×, 10× and 100× the guideline.</p><p>Use the layer list next to it to show the measured plume, the forecast, or both: in Compare the forecast is dashed purple lines, so the two never blend.</p>' },
+    { tab: 'xsec', sel: '#xs-date', title: 'Play through time', body: '<p>The slider stops at every real sampling or water-level date. Press <b>Play</b> to watch the water table and plume change round by round.</p>' },
+    { tab: 'xsec', sel: '#xs-model-sec', title: 'The forecast', body: '<p>A labelled screening forecast (Domenico 1987, as in BIOSCREEN 1.4) from a source well. Every input shows its value, unit and source; anything you type is marked “entered”.</p><p>When the MODFLOW 6 model has been run on the Model page, the section uses its plume instead and says so.</p>' },
+    { tab: 'xsec', sel: '#xs-checks', title: 'Checks you can show a reviewer', body: '<p>The forecast is checked live against exact solutions and a published example, and compared with your later sampling rounds well by well.</p><p>Anything that needs a look is marked “Look at this” with the reason.</p>' },
+    { tab: 'xsec', sel: '#prail [data-tab="compose"]', title: 'Put it in a report', body: '<p>On Reports, add a section item to a page: it keeps its own date, plume, shape and style, and every “interpreted” and “model” label prints with it.</p><p>Next: the groundwater model tutorial (Help › Tutorial: groundwater model).</p>' },
+  ] },
+  gwm: { title: 'Groundwater model', steps: [
+    { tab: 'gwm', sel: null, title: 'A MODFLOW 6 model from your logs', body: '<p>The app builds a 3D groundwater model from the project: layers from the logs, conductivity from slug tests, heads from your water levels. It runs the USGS’s MODFLOW 6 on this computer (desktop app only).</p><p>Results feed the cross-section and the map, always labelled “Model (MODFLOW 6), not measured”.</p>' },
+    { tab: 'gwm', sel: '#gwm-grid', title: 'The grid and its edges', body: '<p>The grid covers the boreholes plus a margin and is turned so its columns follow the fitted flow direction.</p><p>Water levels are fixed on the upstream and downstream edges from the calibration round’s water table; the sides and the base of the logs let no water through. These are the model’s biggest assumptions.</p>' },
+    { tab: 'gwm', sel: '#gwm-setup', title: 'Set-up', body: '<ul><li><b>Calibration round</b>: the water levels the model is fitted to.</li><li><b>Cell size</b>: smaller is more detailed and slower.</li><li><b>Recharge</b>: a start value from CCME (2008); calibration adjusts it.</li><li><b>Slug tests</b>: used as prior information, so measured conductivity is kept unless the heads clearly disagree.</li></ul>' },
+    { tab: 'gwm', sel: '#gwm-units', title: 'Layers and conductivity', body: '<p>One model layer per unit you paired on the Section page. Each conductivity says where it came from: slug tests screened in that unit, a value you entered, or “estimated by calibration”.</p><p>No textbook value is ever filled in as if it were site data.</p>' },
+    { tab: 'gwm', sel: '#gwm-feat', title: 'Creeks, drains and wells', body: '<p>Add a feature where it controls the water table: a creek (stage, bed conductance, bed bottom), a drain (elevation, conductance), a pumping well (rate, negative for pumping) or a fixed head. Give its location as UTM points, “E N; E N” for a line.</p>' },
+    { tab: 'gwm', sel: '[data-act="gw-cal"]', title: 'Calibrate', body: '<p><b>Calibrate (steady)</b> adjusts the unknown conductivities and the recharge until the model matches the measured heads (Levenberg–Marquardt, as in PEST). It runs MODFLOW many times and shows its progress.</p><p>Then <b>Calibrate (all rounds)</b> fits specific yield and seasonal recharge to every monitoring round.</p>' },
+    { tab: 'gwm', sel: '#gwm-cal-sec', title: 'Judge the fit', body: '<ul><li><b>RMSE</b> and <b>RMSE ÷ range</b>: how far the model is from the measured heads overall.</li><li><b>Mean error</b>: whether it is biased high or low.</li><li><b>Mass-balance discrepancy</b>: should be tiny.</li><li><b>95 % interval</b> and <b>sensitivity</b>: how well each value is pinned down.</li><li><b>Correlation</b> in red, and warnings: values the heads cannot separate.</li></ul><p>The plot shows simulated against measured heads: points near the dashed 1:1 line are a good fit.</p>' },
+    { tab: 'gwm', sel: '#gwm-trans-sec', title: 'Contaminant transport', body: '<p><b>Run transport</b> moves the contaminant with MODFLOW 6’s transport model, using the compound, source well, release date and dispersivities from the Forecast panel, with sorption and (if you enter a half-life) decay.</p><p>Each measured result is compared with the model. Tick “Calibrate the source concentration” to fit the source strength.</p>' },
+    { tab: 'xsec', sel: '#xs-draw', title: 'See it on the section', body: '<p>After a run, the section adds the model’s water table (dotted purple), head contours (thin purple lines, in metres) and flow arrows.</p><p>The forecast becomes the MODFLOW 6 plume, and the model-guided shape follows it while still matching every measured result.</p>' },
+    { tab: 'site', sel: '#plan', title: 'And on the map', body: '<p>The map shows the model area, its simulated water-table contours and flow paths from the source with 1, 5, 10 and 25-year marks. Turn them off under Layers › Groundwater model.</p>' },
+    { tab: 'gwm', sel: '[data-act="gw-export"]', title: 'Hand it to a reviewer', body: '<p><b>Export model files</b> saves the MODFLOW 6 input files and outputs as a zip with a short read-me, so a hydrogeologist can rerun and check them in standard tools.</p>' },
+    { tab: 'gwm', sel: '#gwm-limits', title: 'Know the limits', body: '<p>Layers are interpolated between boreholes and each is uniform; heads alone cannot separate recharge from conductivity; transport uses steady flow and a constant source. Read the warnings and residuals before relying on a result.</p>' },
+  ] },
+};
+function tutStart(k) {
+  const T = TUTORIALS[k]; if (!T) return;
+  if (projKey(cur()) !== XS_PROJ) { if (S.readOnly) { toast('Open the cross-section example to follow the tutorial.'); return; } loadXsExample(); }
+  S.tut = { k, i: 0 }; setTimeout(tutShow, 150);
+}
+function tutClose() { S.tut = null; $('#tut')?.remove(); $('#tut-hole')?.remove(); }
+function tutGo(d) { if (!S.tut) return; const N = TUTORIALS[S.tut.k].steps.length, i = S.tut.i + d; if (i >= N) { tutClose(); return; } S.tut.i = Math.max(0, i); tutShow(); }
+function tutShow() {
+  if (!S.tut) return; const T = TUTORIALS[S.tut.k], st = T.steps[S.tut.i], N = T.steps.length;
+  if (st.tab && S.tab !== st.tab) goTab(st.tab);
+  let card = $('#tut'); if (!card) { card = document.createElement('div'); card.id = 'tut'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-live', 'polite'); document.body.append(card); }
+  card.setAttribute('aria-label', `${T.title} tutorial`);
+  card.innerHTML = `<button class="tut-x" data-act="tut-close" aria-label="Close the tutorial">×</button><div class="tut-k">${esc(T.title)} tutorial · Step ${S.tut.i + 1} of ${N}</div><h4>${esc(st.title)}</h4>${st.body}
+    <div class="tut-b"><button class="btn" data-act="tut-back" ${S.tut.i ? '' : 'disabled'}>Back</button><button class="btn primary" data-act="tut-next">${S.tut.i === N - 1 ? 'Done' : 'Next'}</button></div>`;
+  const place = () => {
+    if (!S.tut) return; const el = st.sel ? document.querySelector(st.sel) : null; let hole = $('#tut-hole');
+    if (!el) { hole?.remove(); Object.assign(card.style, { left: `${Math.max(16, (innerWidth - card.offsetWidth) / 2)}px`, top: `${Math.max(16, (innerHeight - card.offsetHeight) / 2.4)}px` }); return; }
+    if (!hole) { hole = document.createElement('div'); hole.id = 'tut-hole'; document.body.append(hole); }
+    const r = el.getBoundingClientRect(), p = 6, w = Math.min(r.width, innerWidth - 32), h = Math.min(r.height, innerHeight * .6);
+    Object.assign(hole.style, { left: `${r.left - p}px`, top: `${r.top - p}px`, width: `${w + 2 * p}px`, height: `${h + 2 * p}px` });
+    const below = r.top + h + p + 12, ch = card.offsetHeight, top = below + ch < innerHeight - 8 ? below : r.top - p - 12 - ch >= 8 ? r.top - p - 12 - ch : Math.max(8, innerHeight - ch - 8);
+    Object.assign(card.style, { left: `${Math.min(Math.max(16, r.left), innerWidth - card.offsetWidth - 16)}px`, top: `${top}px` });
+  };
+  requestAnimationFrame(() => { const el = st.sel ? document.querySelector(st.sel) : null; if (el) el.scrollIntoView({ block: 'center', behavior: 'instant' }); setTimeout(place, 60); });
+  card.querySelector('[data-act="tut-next"]').focus({ preventScroll: true });
+}
+addEventListener('resize', () => S.tut && tutShow());
+document.addEventListener('keydown', e => { if (!S.tut) return; if (e.key === 'Escape') { tutClose(); e.preventDefault(); } else if (e.key === 'ArrowRight' && !e.target.closest?.('input, select, textarea')) tutGo(1); else if (e.key === 'ArrowLeft' && !e.target.closest?.('input, select, textarea')) tutGo(-1); }, true);
 function xsModelHTML() {
   const u = siteOf()?.model || {}, run = S.xs.model ? modelRun(S.xs.date || '') : null, P = run?.P || { src: {} }, ro = S.readOnly ? 'disabled' : '';
   const wellsOpt = projList().filter(b => b.easting != null).map(b => `<option value="${esc(b.id)}" ${P.srcBh?.id === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
@@ -4502,8 +5150,8 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const su = b => b.well?.installed && b.well.stickup > 0 ? b.well.stickup : 0;
   let W = forceW || Math.max(el.clientWidth, 600), H = fillH || secOpt('h'); const m = { l: 62, r: 64, t: 70, b: 30 };
   // room under the drawing for offset labels (three staggered rows) and the plume legend
-  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 34 : 0, mdH = xs?.model ? 20 : 0;
-  m.b += offH + plH + mdH; if (!fillH) H += offH + plH + mdH;
+  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 34 : 0, mdH = xs?.model ? 20 : 0, gwH = xs && xs.gwFlow !== false && S.gwm?.run?.ok ? 18 : 0;
+  m.b += offH + plH + mdH + gwH; if (!fillH) H += offH + plH + mdH + gwH;
   // the forecast caption gets its own line under the header, above the borehole names
   if (mdH) { m.t += 16; if (!fillH) H += 16; }
   const maxD = pos[pos.length - 1].d || 1;
@@ -4531,7 +5179,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const plumeOn = xs && ((xs.plume !== false && (xs.param || xs.medium === 'vapour')) || xs.model), soilStyle = plumeOn && !xs.soilColour ? 'filter:grayscale(1) opacity(.75)' : '';
   if (S.sec.units !== false) {
     o.push(`<g data-soil="1" style="${soilStyle}">`);
-    const alias = siteOf()?.xsec?.alias || {}, units = b => { const out = []; for (const l of (b.layers || []).filter(l => l.top != null && l.bottom > l.top).sort((a, c) => a.top - c.top)) { const u = alias[b.id + '|' + defaultUnit(l)] || defaultUnit(l); const last = out[out.length - 1]; if (last && last.u === u && Math.abs(last.bot - l.top) < 1e-6) last.bot = l.bottom; else out.push({ u, top: l.top, bot: l.bottom, fill: soilOf(l.uscs)?.fill || 'panel-2' }); } return out; };
+    const units = xsUnits;
     const U2 = pos.map(p => units(p.b));
     for (let i = 0; i < pos.length - 1; i++) {
       const A = pos[i], B = pos[i + 1], xa = X(A.d) + bw / 2, xb = X(B.d) - bw / 2, xm = xa + (xb - xa) / 3, xm2 = xb - (xb - xa) / 3, ea = top(A.b), eb = top(B.b);
@@ -4544,17 +5192,20 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
     }
     const seen = new Map(); U2.flat().forEach(u => seen.has(u.u) || seen.set(u.u, u.fill));
     let lx = m.l;
-    for (const [u, fl] of seen) { o.push(`<rect x="${lx}" y="${H - 16 - plH - mdH}" width="12" height="9" style="fill:var(--${fl});stroke:var(--muted)" fill-opacity=".6"/><text x="${lx + 16}" y="${H - 8 - plH - mdH}" class="lbl2">${esc(u)}</text>`); lx += 26 + u.length * 5.6; }
+    for (const [u, fl] of seen) { o.push(`<rect x="${lx}" y="${H - 16 - plH - mdH - gwH}" width="12" height="9" style="fill:var(--${fl});stroke:var(--muted)" fill-opacity=".6"/><text x="${lx + 16}" y="${H - 8 - plH - mdH - gwH}" class="lbl2">${esc(u)}</text>`); lx += 26 + u.length * 5.6; }
     o.push('</g>');
   }
   // interpreted and modelled concentrations stay below the ground line
   const gclip = 'gc' + Math.random().toString(36).slice(2, 8), gl = pos.map(p => [X(p.d), Y(top(p.b))]);
   o.push(`<defs><clipPath id="${gclip}"><path d="M0 ${gl[0][1]}${gl.map(q => `L${q[0]} ${q[1]}`).join('')}L${W} ${gl[gl.length - 1][1]}L${W} ${H}L0 ${H}Z"/></clipPath></defs>`);
-  XS_GEOM = { X, Y, m, plotW, plotH, maxD, e0, e1, W, H, pos, located, noElev, plH, mdH, gclip, labels: [] };
+  XS_GEOM = { X, Y, m, plotW, plotH, maxD, e0, e1, W, H, pos, located, noElev, plH, mdH, gwH, gclip, labels: [] };
+  const gs = gwH ? gwSectionSVG(XS_GEOM) : null;
   if (xs && S.sec.water !== false) { const sat = pos.map(p => ({ p, w: wOf(p.b) })).filter(x => x.w && x.w.kind !== 'strike' && x.w.depth != null);
     if (sat.length >= 2) o.push(`<path data-sat="1" d="M${X(sat[0].p.d)} ${Y(e0)}${sat.map(x => `L${X(x.p.d)} ${Y(top(x.p.b) - x.w.depth)}`).join('')}L${X(sat[sat.length - 1].p.d)} ${Y(e0)}Z" clip-path="url(#${gclip})" style="fill:var(--water)" fill-opacity=".07"><title>Below the water table on the date shown</title></path>`); }
   if (xs?.model) o.push(modelSVG(xs.date || '', xs));
   if (xs && xs.plume !== false && (xs.param || xs.medium === 'vapour')) o.push(plumeSVG(pos, xs, X, Y, top, bw, W, H, m));
+  // the model's flow over the plume shading, under the borehole columns
+  if (gs) { o.push(`<g clip-path="url(#${gclip})">`, ...gs.under, '</g>'); (XS_GEOM.over ||= []).push(...gs.over, `<text class="lbl2" data-gw-legend="1" x="${m.l}" y="${H - 8 - plH - mdH}" style="fill:#3f007d">${esc(gs.legend)}</text>`); }
   const colsSVG = []; { const o = colsSVG;
   for (const p of pos) {
     const x = X(p.d) - bw / 2, e = top(p.b);
@@ -6946,7 +7597,7 @@ function drawSite() { drawPlan(); drawPlasticity(); }
 /* the Cross-section page: the section line, the drawing and everything drawn on it */
 function xsecHTML() {
   return `<div class="xs-page">
-    <section class="sec"><header><h3>Cross-section A–A′</h3><span class="sp"></span><label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">${xsPlumeCtl()}${secToolsHTML()}
+    <section class="sec"><header><h3>Cross-section A–A′</h3><button class="btn link" data-act="tut-xsec">Tutorial</button><span class="sp"></span><label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">${xsPlumeCtl()}${secToolsHTML()}
       <div class="scroll-x" id="xs-draw"></div>
       <div class="legend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--earth)" stroke-width="2" stroke-dasharray="6 3"/></svg>Ground surface (measured at boreholes, interpolated between)</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="6 3"/></svg>Water table (interpolated)</span><span><svg width="22" height="12" aria-hidden="true"><rect x="7" y="0" width="8" height="12" style="fill:var(--panel);stroke:var(--ink)"/><path d="M9 6h4M9 9h4" style="stroke:var(--ink)"/></svg>Slotted interval</span><span><svg width="22" height="12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" style="fill:var(--s-clay);stroke:var(--muted)" fill-opacity=".38" stroke-dasharray="4 2"/></svg>Interpreted between boreholes</span></div>
       <p class="note" id="xs-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
@@ -6960,7 +7611,7 @@ function xsCorrHTML() {
   for (const b of sectionList()) for (const u of [...new Set((b.layers || []).filter(l => l.bottom > l.top).map(defaultUnit))]) rows.push([b, u]);
   const names = [...new Set(rows.map(r => r[1]))];
   if (!rows.length) return '';
-  return `<section class="sec"><header><h3>Layer correlation</h3><span class="note">Units of the same name are joined between boreholes; pair others here</span></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th>Borehole</th><th>Logged unit</th><th>Joined as</th></tr></thead><tbody>
+  return `<section class="sec" id="xs-corr-sec"><header><h3>Layer correlation</h3><span class="note">Units of the same name are joined between boreholes; pair others here</span></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th>Borehole</th><th>Logged unit</th><th>Joined as</th></tr></thead><tbody>
     ${rows.map(([b, u]) => { const k = b.id + '|' + u; return `<tr><td>${esc(b.name)}</td><td>${esc(u)}</td><td><select data-xsalias="${esc(k)}" aria-label="${esc(`${b.name} ${u} joined as`)}" ${S.readOnly ? 'disabled' : ''}><option value="">${esc(u)} (as logged)</option>${names.filter(n => n !== u).map(n => `<option value="${esc(n)}" ${al[k] === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></td></tr>`; }).join('')}
     </tbody></table></div><p class="note">Pairings are an interpretation and are drawn dashed like every other link between boreholes.</p></div></section>`;
 }
@@ -7065,6 +7716,23 @@ function planSVG(W, H, interactive) {
     if (!F.error && !F.flat) {
       const mx = X(F.E0), my = Y(F.N0), fx2 = -F.bx / F.i, fy2 = F.by / F.i, len = 54;
       o.push(`<g><title>${esc(`Groundwater flow ${Math.round(F.az)}° (${F.dir}), i = ${F.i.toFixed(4)}, ${F.method.toLowerCase()} on ${F.n} wells`)}</title><line x1="${mx - fx2 * len / 2}" y1="${my - fy2 * len / 2}" x2="${mx + fx2 * len / 2}" y2="${my + fy2 * len / 2}" style="stroke:var(--water)" stroke-width="3.5" stroke-linecap="round"/><path d="M${mx + fx2 * (len / 2 + 12)} ${my + fy2 * (len / 2 + 12)}l${-fx2 * 15 - fy2 * 8} ${-fy2 * 15 + fx2 * 8}l${fy2 * 16} ${-fx2 * 16}z" style="fill:var(--water)"/><text x="${mx + 10}" y="${my + 22}" style="font:700 10.5px var(--f-label);fill:var(--water)">GW flow ${Math.round(F.az)}° ${F.dir}</text></g>`);
+    }
+  }
+  // the groundwater model (MODFLOW 6): its area, simulated water-table contours and flow paths from the source
+  if (projList().length && gwModel() && S.gwm?.run?.ok && !S.gwm.M.error && S.lyr.gwm !== false) { const M = S.gwm.M, g = M.grid, R = S.gwm.run;
+    const corners = [[0, 0], [g.ncol * g.cell, 0], [g.ncol * g.cell, g.Lv], [0, g.Lv]].map(([x, y]) => g.toWorld(x, y)).map(([e, n]) => [X(e), Y(n)]);
+    o.push(`<path data-gw-area="1" d="M${corners.map(q => q.map(v => v.toFixed(1)).join(' ')).join('L')}Z" fill="none" stroke="#6a51a3" stroke-width="1" stroke-dasharray="6 4"><title>MODFLOW 6 model area (${g.nrow} × ${g.ncol} cells of ${g.cell} m, ${g.nlay} layers)</title></path>`);
+    const xs2 = corners.map(q => q[0]), ys2 = corners.map(q => q[1]), sx0 = Math.max(0, Math.min(...xs2)), sx1 = Math.min(W, Math.max(...xs2)), sy0 = Math.max(0, Math.min(...ys2)), sy1 = Math.min(H, Math.max(...ys2));
+    if (sx1 > sx0 && sy1 > sy0) { const nx = Math.max(2, Math.ceil((sx1 - sx0) / 7)), ny = Math.max(2, Math.ceil((sy1 - sy0) / 7)), c = new Float32Array((nx + 1) * (ny + 1)), a = new Float32Array(c.length); let lo = Infinity, hi = -Infinity;
+      for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { const px = sx0 + (sx1 - sx0) * i / nx, py = sy0 + (sy1 - sy0) * j / ny, e = cx + (px - W / 2) / sc, n = cy - (py - H / 2) / sc, h = gwWaterTable(M, R.layers, e, n), k = j * (nx + 1) + i;
+        if (h == null) continue; c[k] = h; a[k] = 1; lo = Math.min(lo, h); hi = Math.max(hi, h); }
+      if (hi > lo) { const step = [.02, .05, .1, .2, .25, .5, 1, 2, 5].find(st => (hi - lo) / st <= 10) || 10, gg = { nx, ny, x0: sx0, x1: sx1, y0: sy0, y1: sy1, c, a };
+        for (let lv = Math.ceil(lo / step) * step; lv <= hi + 1e-9; lv += step) { const lines = fieldContours(gg, lv, .5, true); if (!lines.length) continue;
+          o.push(`<path data-gw-plan-wt="${lv.toFixed(3)}" d="${lines.map(l => l.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')).join('')}" fill="none" stroke="#6a51a3" stroke-width="1" stroke-dasharray="4 3"><title>Model water table ${lv.toFixed(2)} m (MODFLOW 6, ${esc(gwCalLabel())}), not measured</title></path>`);
+          const L = lines.reduce((b, l) => l.length > b.length ? l : b, []), q = L[Math.floor(L.length * .3)]; if (q) o.push(`<text x="${q[0].toFixed(1)}" y="${(q[1] - 3).toFixed(1)}" text-anchor="middle" style="font:9px Arial,sans-serif;fill:#54278f;paint-order:stroke;stroke:#fff;stroke-width:2.5px">${lv.toFixed(step < .1 ? 2 : step < 1 ? 1 : 0)}</text>`); } } }
+    for (const path of S.gwm.paths || []) {
+      o.push(`<path data-gw-path="1" d="${path.map((p, i) => `${i ? 'L' : 'M'}${X(p.E).toFixed(1)} ${Y(p.N).toFixed(1)}`).join('')}" fill="none" stroke="#3f007d" stroke-width="1.6"><title>Flow path of water from the source (MODFLOW 6 flows, ${esc(gwCalLabel())}), not measured</title></path>`);
+      for (const yr of [1, 5, 10, 25]) { const q = path.find(p => p.t >= yr * 365.25); if (!q) break; o.push(`<g data-gw-tt="${yr}"><circle cx="${X(q.E).toFixed(1)}" cy="${Y(q.N).toFixed(1)}" r="2.6" fill="#fff" stroke="#3f007d"/><text x="${(X(q.E) + 4).toFixed(1)}" y="${(Y(q.N) - 4).toFixed(1)}" style="font:9px Arial,sans-serif;fill:#3f007d;paint-order:stroke;stroke:#fff;stroke-width:2.5px">${yr} yr</text></g>`); }
     }
   }
   const chosen = sectionList().filter(b => b.easting != null);
@@ -7197,18 +7865,18 @@ function gsdSVG(W = 640, H = 320) {
    Gradient i = √(bx² + by²); flow is down the gradient, azimuth = atan2(−bx, −by) clockwise from grid north.
    With hydraulic conductivity K (geometric mean of this project's slug tests): Darcy flux q = K·i, average linear velocity v = K·i / nₑ. */
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-function gwFlow(list = mapList(), asOf) {
+function gwFlow(list = mapList(), asOf, exact) {
   // one set of levels from one round: the chosen date, else the latest round (on or before asOf, when given) with at least 3 standpipe readings
-  const { round, wells } = gwHeads(list, asOf);
+  const { round, wells } = gwHeads(list, asOf, exact);
   const out = { wells, n: wells.length, method: wells.length === 3 ? 'Three-point problem' : 'Least-squares planar fit' };
   if (wells.length < 3) return { ...out, error: `Needs a water level in at least 3 boreholes that have coordinates and a ground elevation (${wells.length} available${S.round ? ' for this date' : ''}).` };
   return gwFlowFit(list, out, round, wells);
 }
 /* one set of hydraulic heads from one round: the chosen date, else the latest round with at least 3 standpipe readings */
-function gwHeads(list = mapList(), asOf) {
+function gwHeads(list = mapList(), asOf, exact) {
   const located = list.filter(b => b.easting != null && b.northing != null && b.elevation != null);
   const near = (b, d) => { const t0 = Date.parse(d); let best = null, bd = Infinity; for (const w of monitoring(b)) { if (!w.date || w.depth == null) continue; const dd = Math.abs(Date.parse(w.date) - t0); if (dd < bd) { bd = dd; best = w; } } return bd <= 31 * 864e5 ? best : null; };
-  const round = S.round || roundDates().filter(d => !asOf || d <= asOf).find(d => located.filter(b => near(b, d)).length >= 3) || '';
+  const round = exact ? asOf : S.round || roundDates().filter(d => !asOf || d <= asOf).find(d => located.filter(b => near(b, d)).length >= 3) || '';
   const wells = located.map(b => {
     const w = round ? near(b, round) : (b.water || []).filter(x => x.depth != null && x.kind !== 'strike').sort(byDate).pop();
     return w ? { b, w, e: b.easting, n: b.northing, h: b.elevation - w.depth } : null;
@@ -9289,6 +9957,12 @@ document.addEventListener('click', e => {
     case 'load-sk': loadSkExample(); break;
     case 'load-dl': loadDlExample(); break;
     case 'load-xs': loadXsExample(); break;
+    case 'tut-xsec': tutStart('xsec'); break;
+    case 'tut-gwm': tutStart('gwm'); break;
+    case 'tut-next': tutGo(1); break;
+    case 'tut-back': tutGo(-1); break;
+    case 'tut-close': tutClose(); break;
+    case 'gw-run': case 'gw-cal': case 'gw-calt': case 'gw-trans': case 'gw-export': case 'gw-feat-add': case 'gw-feat-del': gwAct(act, t); break;
     case 'grid-bh': if (b) { S.gridOne = true; S.tsheet = 'layers'; lsSet('bhlog.tsheet', 'layers'); goTab('table'); setTimeout(() => $('.dgrid input')?.focus(), 0); } break;
     case 'clear-examples': for (const x of [...S.bh.values()]) if (x.example) store.remove(x.id); S.formStale = true; render(); break;
     case 'delete': openDelete(); break;
@@ -9321,6 +9995,13 @@ document.addEventListener('change', e => {
   if (t.id === 'xs-layer') { S.xs = { ...S.xs, plume: t.value !== 'model', model: t.value !== 'meas' }; setXs('layer', t.value); renderView(true); return; }
   if (t.id === 'xs-shape' || t.id === 'xs-style') { setXs(t.id.slice(3), t.value); return; }
   if (t.id === 'xs-soilcol') { setXs('soilColour', t.checked); return; }
+  // groundwater model inputs
+  if (t.dataset?.gwm) { const k = t.dataset.gwm, v = t.value === '' ? null : k === 'round' ? t.value : k === 'prior' ? t.value === '1' : +t.value; setGwm({ [k]: v }); S.gwm.trans = null; gwRefresh(); return; }
+  if (t.dataset?.gwu) { const [u, k] = t.dataset.gwu.split('|'), us = { ...(gwSaved().units || {}) }; us[u] = { ...(us[u] || {}), [k]: t.value === '' ? undefined : +t.value }; setGwm({ units: us }); gwRefresh(); return; }
+  if (t.dataset?.gwft) { const [i, k] = t.dataset.gwft.split('|'), fs = [...(gwSaved().features || [])], v = t.value;
+    fs[+i] = { ...fs[+i], [k]: k === 'type' || k === 'name' ? v : k === 'pts' ? v.split(';').map(q => q.trim().split(/[\s,]+/).map(Number)).filter(q => q.length === 2 && q.every(Number.isFinite)) : v === '' ? null : +v };
+    if (k === 'stage') Object.assign(fs[+i], { elev: fs[+i].stage, head: fs[+i].stage }); setGwm({ features: fs }); return; }
+  if (t.id === 'gwm-tcal') { setGwm({ transport: { ...(gwSaved().transport || {}), calibrate: t.checked } }); return; }
   if (t.dataset?.mdl) { setModel(t.dataset.mdl, t.value); return; }
   if (t.dataset?.gw || t.dataset?.gwlt || t.dataset?.gwf || t.dataset?.gwguide) { gwChange(t); return; }
   if (t.dataset?.xsalias != null && !S.readOnly) { const x = siteOf()?.xsec || {}, al = { ...(x.alias || {}) }; if (t.value) al[t.dataset.xsalias] = t.value; else delete al[t.dataset.xsalias]; setSite({ ...(siteOf() || {}), xsec: { ...x, alias: al } }); redrawSec(); }
@@ -9400,7 +10081,7 @@ const MENUS = [
     ['Duplicate', 'duplicate'], ['Save as template', 'bh-tpl'], ['Delete…', 'delete']]],
   ['Tools', [['Find anything…', 'find', 'Mod+K'], ['Log columns…', 'log-cols'], ['Graphs…', 'graphs'], ['Company, logo and initials…', 'settings'], '-', ['Load example: oil lease delineation', 'load-lloyd'], ['Load example: service-station plume', 'load-sk'], ['Load example: Dawn Lake excavation', 'load-dl'], ['Load example: cross-section and plume', 'load-xs']]],
   ['Reports', [['This log (PDF)', 'pdf-one', 'Mod+P'], ['All logs in the project (PDF)', 'pdf-all'], ['Report appendix (PDF)…', 'appendix'], ['Location plan (PDF)', 'plan-pdf'], '-', ['Report editor', 'tab:compose'], ['Excel workbook…', 'export']]],
-  ['Help', [['Keyboard shortcuts', 'shortcuts', 'F1'], ['About Borehole Field Log', 'about']]],
+  ['Help', [['Tutorial: cross-section', 'tut-xsec'], ['Tutorial: groundwater model', 'tut-gwm'], '-', ['Keyboard shortcuts', 'shortcuts', 'F1'], ['About Borehole Field Log', 'about']]],
 ];
 const IS_MAC = /Mac|iP(hone|ad|od)/.test(navigator.platform);
 const keyLabel = k => k ? (IS_MAC ? k.replace(/Mod\+/, '⌘').replace(/Shift\+/, '⇧').replace(/Alt\+/, '⌥') : k.replace(/Mod\+/, 'Ctrl+')) : '';
