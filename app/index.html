@@ -1566,6 +1566,22 @@ function blankBorehole(name) {
    features (where the layer had them, else by their place in the description), so nothing typed is lost. */
 const LT_CW = 'brown|grey|gray|black|red|orange|yellow|green|blue|white|tan|olive|mottled';
 const LT_COLOUR = new RegExp(`^(?:(?:dark|light|pale|mottled|reddish|greyish|grayish|yellowish|olive)\\s+)*(?:${LT_CW})(?:\\s*(?:-|/|and|to|\\s)\\s*(?:dark\\s+|light\\s+)?(?:${LT_CW}))*$`, 'i');
+/* a group symbol from the words, as a logger assigns one by the visual-manual method: the main soil and its "-y" word, grading,
+   plasticity and some/with fines ("silty sand" SM, "sand, some silt" SP-SM, "clay, high plastic" CH, "organic silt" OL) */
+function ltInfer(head, all) {
+  const h = head.toLowerCase(), m = /\b(?:(silty|clayey|sandy|gravelly)\s+)?(?:(organic)\s+)?(sand|gravel|silt|clay)\b(?:\s+and\s+(sand|gravel|silt|clay)\b)?/.exec(h); if (!m) return null;
+  const [, adj, org, noun, and2] = m, a = all.toLowerCase(), pl = /\bhigh(?:ly)?\s+plastic|\bfat\b/.test(a) ? 'H' : /\bintermediate(?:ly)?\s+plastic/.test(a) ? 'I' : 'L', well = /\bwell[-\s]graded\b/.test(a);
+  const fines = /\b(?:some|with)\s+silt\b/.test(a) ? 'M' : /\b(?:some|with)\s+clay\b/.test(a) ? 'C' : '', mods = [], y = { sand: 'sandy', gravel: 'gravelly', silt: 'silty', clay: 'clayey' };
+  let code;
+  if (noun === 'sand' || noun === 'gravel') { const G = noun === 'sand' ? 'S' : 'G';
+    if (adj === 'silty' || adj === 'clayey') code = G + (adj === 'silty' ? 'M' : 'C');
+    else { code = G + (well ? 'W' : 'P') + (fines ? '-' + G + fines : ''); if (adj) mods.push(adj); } }
+  else if (noun === 'clay') { code = org ? 'OH' : 'C' + pl; if (adj) mods.push(adj); }
+  else { code = org ? 'OL' : 'M' + pl; if (adj) mods.push(adj); }
+  if (and2 && and2 !== noun) mods.push(y[and2]);
+  if (!SOILS[code]) code = code.slice(0, 2);
+  return SOILS[code] ? { code, mods, rest: head.slice(0, m.index) + head.slice(m.index + m[0].length) } : null;
+}
 function parseLayerText(text, prev) {
   let t = String(text || '').replace(/\s+/g, ' ').trim(); const o = { uscs: '', mods: '', consistency: '', moisture: '', colour: '', origin: '', other: '', hz: '' }, mods = [], other = [];
   const toM = (v, u) => u ? (/^f/i.test(u) || u === "'" ? v / FT : v) : fromD(v);
@@ -1582,7 +1598,8 @@ function parseLayerText(text, prev) {
   if (code && isCode(code)) head = head.replace(`(${code})`, ''); else if (first && isCode(first) && (first === first.toUpperCase() || head.trim().split(' ').length <= 3)) { code = first; head = head.slice(first.length); } else code = null;
   if (code) o.uscs = code.toUpperCase();
   else { const hits = Object.entries(SOILS).filter(([, v]) => v.p && new RegExp(`\\b${v.p.replace(/[,]/g, '\\,')}\\b`, 'i').test(head)), long = Math.max(0, ...hits.map(([, v]) => v.p.length)), top = hits.filter(([, v]) => v.p.length === long);
-    if (top.length === 1) o.uscs = top[0][0]; }
+    if (top.length === 1) o.uscs = top[0][0];
+    else { const inf = ltInfer(head, t); if (inf) { o.uscs = inf.code; o.inferred = true; head = inf.rest; mods.push(...inf.mods); } } }
   const s = soilOf(o.uscs); if (s?.p) head = head.replace(new RegExp(`\\b${s.p.replace(/[,]/g, '\\,')}\\b`, 'i'), ''); head = head.replace(/^[\s:–-]+|[\s:–-]+$/g, '');
   if (head) parts.unshift(head);
   const proper = (list, x) => list.find(v => v && v.toLowerCase() === x.toLowerCase()), had = (f, x) => String(prev?.[f] || '').toLowerCase().split(/,\s*/).includes(x); let past = false;   // modifiers, grading, consistency, moisture, colour, then other features
@@ -1630,7 +1647,7 @@ function layerApplyText(b, l, text, o = {}) {
   b.layers.sort((a, c) => (a.top ?? 0) - (c.top ?? 0)); logChange(b, 'Soil layers'); store.save(b); return '';
 }
 const ltApply = layerApplyText;
-function ltRead(text, l) { const q = parseLayerText(text, l); if (q.error) return q.error; return [q.top != null ? `${fx(q.top)}–${fu(q.bottom)}` : '', q.depthOnly ? 'depths only; the description stays' : '', q.uscs, q.mods, q.consistency, q.moisture, q.colour, q.origin && ORIGINS[q.origin], q.other && `other: ${q.other}`].filter(Boolean).join(' · ') || 'Nothing recognised yet'; }
+function ltRead(text, l) { const q = parseLayerText(text, l); if (q.error) return q.error; return [q.top != null ? `${fx(q.top)}–${fu(q.bottom)}` : '', q.depthOnly ? 'depths only; the description stays' : '', q.uscs && q.uscs + (q.inferred ? ' (from the words)' : ''), q.mods, q.consistency, q.moisture, q.colour, q.origin && ORIGINS[q.origin], q.other && `other: ${q.other}`].filter(Boolean).join(' · ') || 'Nothing recognised yet'; }
 /* the panel stays on the layer it edited, wherever the layer sorted to */
 function ltShow(b, l) { if (S.drawer?.kind === 'layer') { S.drawer.i = S.layer = b.layers.indexOf(l); renderDrawer(); } redrawLog(); }
 /* typing straight onto the log: a text box over the layer's description; Enter applies, Escape leaves it */
