@@ -1777,6 +1777,23 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('borehole numbers start again in each project', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, made = [];
+      try {
+        const add = (name, project) => { const b = blankBorehole(name); b.project = project; S.bh.set(b.id, b); made.push(b.id); return b; };
+        for (let i = 1; i <= 7; i++) add('BH' + String(i).padStart(2, '0'), 'Old job');
+        const f = add('BH01', 'Fresh job'); S.sel = f.id;
+        want(nextName() === 'BH02', 'new project continues from its own boreholes: ' + nextName());
+        const o = add('BH26-01', 'Pattern job'); add('BH26-02', 'Pattern job'); add('MW26-01', 'Pattern job'); S.sel = o.id;
+        want(nextName() === 'BH26-03', 'follows the project\\'s own naming: ' + nextName());
+        const e = add('Pit A', 'Empty job'); S.sel = e.id; want(nextName() === 'BH01', 'no numbered boreholes yet: BH01: ' + nextName());
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      finally { for (const id of made) S.bh.delete(id); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
