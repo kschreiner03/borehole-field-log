@@ -1665,10 +1665,15 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('input', e => { const t = e.target; if (t.id === 'lt-type') $('#lt-read').textContent = 'Reads as: ' + ltRead(t.value, cur()?.layers[+t.dataset.ltl]); if (t.id === 'lt-new') $('#lt-new-read').textContent = t.value.trim() ? 'Reads as: ' + ltRead(t.value) : ''; });
 function newLayer(top) { return { id: uid('l'), top, bottom: null, hz: '', uscs: '', mods: '', consistency: '', moisture: '', colour: '', other: '', origin: '' }; }
-function nextName() {
-  let max = 0;
-  for (const b of S.bh.values()) { const m = /^BH[-\s]?(\d+)$/i.exec((b.name || '').trim()); if (m) max = Math.max(max, +m[1]); }
-  return 'BH' + String(max + 1).padStart(2, '0');
+/* the next borehole name in a project: numbered from that project's boreholes only, following its own BH series ("BH26-07" → "BH26-08"); BH01 for the first */
+function nextName(project = (cur() || projList()[0])?.project || '') {
+  const series = new Map();
+  for (const b of S.bh.values()) {
+    if ((b.project || '') !== project) continue; const m = /^(BH[^\d]*(?:\d+-)?)(\d+)$/i.exec((b.name || '').trim()); if (!m) continue;
+    const k = m[1].toUpperCase(), q = series.get(k) || { n: 0, max: 0, w: 0, p: m[1] }; q.n++; q.max = Math.max(q.max, +m[2]); q.w = Math.max(q.w, m[2].length); series.set(k, q);
+  }
+  const q = [...series.values()].sort((a, c) => c.n - a.n || c.max - a.max)[0];
+  return q ? q.p + String(q.max + 1).padStart(q.w, '0') : 'BH01';
 }
 /* bring older or imported records onto the current model */
 function normalize(b) {
