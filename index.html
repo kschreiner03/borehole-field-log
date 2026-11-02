@@ -1812,7 +1812,7 @@ const jsonLS = (k, d) => { try { return JSON.parse(lsGet(k) || 'null') ?? d; } c
 S.offMap = new Set(jsonLS('bhlog.offmap', [])); S.fold = new Set(jsonLS('bhlog.fold', ['lyr'])); S.lyr = { img: true, grid: true, labels: true, wl: true, sec: true, ...jsonLS('bhlog.lyr', {}) };
 const onMap = b => !S.offMap.has(b.id);
 const mapList = () => projList().filter(onMap);
-const MAP_TABS = ['home', 'site', 'gw', 'contam', 'xsec', 'reports', 'compose'];
+const MAP_TABS = ['home', 'site', 'gw', 'contam', 'xsec', 'gwm', 'reports', 'compose'];
 function saveVis() { lsSet('bhlog.offmap', JSON.stringify([...S.offMap])); lsSet('bhlog.lyr', JSON.stringify(S.lyr)); renderList(sortedList()); if (MAP_TABS.includes(S.tab)) renderView(true); }
 function hiddenNote() {
   const n = projList().filter(b => !onMap(b)).length;
@@ -1850,13 +1850,13 @@ function treeGroup(key, label, count, kids, extra = '') {
   return `<li class="tg${open ? ' open' : ''}"><div class="tr">${extra}<button class="tw" data-fold="${key}" aria-expanded="${open}" title="${open ? 'Collapse' : 'Expand'} ${esc(label)}">${TW}<span>${esc(label)}</span></button>${count != null ? `<span class="tc">${count}</span>` : ''}</div>${open ? `<ul class="tk">${kids}</ul>` : ''}</li>`;
 }
 const BH_TABS = ['log', 'edit', 'report'];
-const NAV_LABEL = { xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
-const NAV_ICON = { xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
+const NAV_LABEL = { gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
+const NAV_ICON = { gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const bhGlyph = well => `<svg class="bhg" viewBox="0 0 16 16" aria-hidden="true">${well ? '<circle cx="8" cy="8" r="4.6" fill="#fff" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/>' : '<circle cx="8" cy="8" r="4.6" fill="currentColor"/>'}</svg>`;
 /* the sidebar is the project as a tree: project pages, and each borehole with its own pages nested under it when chosen */
 /* the left side: a rail of project pages, then the project's boreholes as a list with a filter, status chips and a sort */
-const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['xsec', 'Section'], ['compose', 'Reports']];
+const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['xsec', 'Section'], ['gwm', 'Model'], ['compose', 'Reports']];
 const BH_ICON = '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M8 9h8M8 14h8"/>';
 S.bl = { q: '', st: lsGet('bhlog.blSt') || 'all', sort: lsGet('bhlog.blSort') || 'name' };
 const blMeta = b => { const w = latestWater(b), v = vapourMax(b, null, null); return { d: depthOf(b), w: w ? w.depth : null, v: v ? v.cvc : null }; };
@@ -2564,6 +2564,7 @@ function renderView(full) {
   else if (S.tab === 'report') { v.innerHTML = reportHTML(b); }
   else if (S.tab === 'site') { v.innerHTML = siteHTML(); drawSite(); }
   else if (S.tab === 'xsec') { v.innerHTML = xsecHTML(); drawXsec(); }
+  else if (S.tab === 'gwm') { v.innerHTML = gwmHTML(); gwEnsure(); }
   else if (S.tab === 'home') { v.innerHTML = homeHTML(); }
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
   else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); }
@@ -4359,7 +4360,7 @@ function mf6List(name, per, cols, opts = '') {
 function mf6Files(spec) {
   const d = spec.dis, nc = d.ncol, f = {}, pk = [], conv = spec.npf.icelltype.some(c => c > 0), outputs = ['gwf.hds', 'gwf.cbc', 'gwf.lst', 'mfsim.lst'];
   f['sim.tdis'] = `BEGIN options\n  TIME_UNITS days\nEND options\nBEGIN dimensions\n  NPER ${spec.nper}\nEND dimensions\nBEGIN perioddata\n${spec.periods.map(p => '  ' + p.map(mf6Num).join(' ')).join('\n')}\nEND perioddata\n`;
-  const ims = `BEGIN options\n  COMPLEXITY ${conv ? 'complex' : 'moderate'}\nEND options\nBEGIN nonlinear\n  OUTER_DVCLOSE 1e-5\n  OUTER_MAXIMUM 300\nEND nonlinear\nBEGIN linear\n  INNER_DVCLOSE 1e-7\n  INNER_RCLOSE 1e-5\n  INNER_MAXIMUM 500\n  LINEAR_ACCELERATION bicgstab\nEND linear\n`;
+  const ims = `BEGIN options\n  COMPLEXITY ${conv ? 'complex' : 'moderate'}\nEND options\nBEGIN nonlinear\n  OUTER_DVCLOSE 1e-5\n  OUTER_MAXIMUM 150\nEND nonlinear\nBEGIN linear\n  INNER_DVCLOSE 1e-7\n  INNER_RCLOSE 1e-5\n  INNER_MAXIMUM 500\n  LINEAR_ACCELERATION bicgstab\nEND linear\n`;
   f['sim.ims'] = ims;
   f['gwf.dis'] = `BEGIN options\n  LENGTH_UNITS meters\n${d.xorigin != null ? `  XORIGIN ${mf6Num(d.xorigin)}\n  YORIGIN ${mf6Num(d.yorigin)}\n  ANGROT ${mf6Num(d.angrot || 0)}\n` : ''}END options\nBEGIN dimensions\n  NLAY ${d.nlay}\n  NROW ${d.nrow}\n  NCOL ${nc}\nEND dimensions\nBEGIN griddata\n  DELR\n${mf6Arr(d.delr, nc)}\n  DELC\n${mf6Arr(d.delc, nc)}\n  TOP\n${mf6Arr(d.top, nc)}\n${mf6Layered('BOTM', d.botm, nc)}\n${d.idomain ? mf6Layered('IDOMAIN', d.idomain, nc) + '\n' : ''}END griddata\n`; pk.push('DIS6 gwf.dis dis');
   f['gwf.npf'] = `BEGIN options\n  SAVE_SPECIFIC_DISCHARGE\n  SAVE_FLOWS\nEND options\nBEGIN griddata\n${mf6Layered('ICELLTYPE', spec.npf.icelltype, nc)}\n${mf6Layered('K', spec.npf.k, nc)}\n${mf6Layered('K33', spec.npf.k33, nc)}\nEND griddata\n`; pk.push('NPF6 gwf.npf npf');
@@ -4483,7 +4484,7 @@ function gwModelSpec(list, site = siteOf() || {}, opts = {}) {
   const units = names.map((n, k) => { const e = (u0.units || {})[n] || {}, ks = slugIn(n);
     const k0 = e.k != null ? +e.k : ks.length ? gm(ks) : allK.length ? gm(allK) : 1;
     return { u: n, k: k0, kSrc: e.k != null ? 'entered' : ks.length ? `slug test${ks.length > 1 ? 's' : ''} (${ks.length}, geometric mean)` : 'estimated by calibration (start value: ' + (allK.length ? 'site slug-test mean' : '1 m/day') + ')',
-      prior: e.k == null && ks.length ? Math.log10(gm(ks)) : null, calib: e.k == null, kv: e.kv ?? .1, kvSrc: e.kv != null ? 'entered' : 'assumed Kv/Kh = 0.1',
+      prior: e.k == null && ks.length ? Math.log10(gm(ks)) : null, calib: e.k == null && !ks.length, kv: e.kv ?? .1, kvSrc: e.kv != null ? 'entered' : 'assumed Kv/Kh = 0.1',
       sy: e.sy ?? null, ne: e.ne ?? (S.co.ne ?? .25) }; });
   const rch = u0.rch != null ? +u0.rch : CCME_SOIL[u0.soil === 'fine' ? 'fine' : 'coarse'].I / 365.25, rchSrc = u0.rch != null ? 'entered' : `${CCME_SRC} (infiltration ${CCME_SOIL[u0.soil === 'fine' ? 'fine' : 'coarse'].I} m/year; start value)`;
   // head observations: each well read in the round, in the layer holding its screen middle
@@ -4662,7 +4663,7 @@ function gwEig(A) { const n = A.length, a = A.map(r => [...r]), V = a.map((r, i)
   return { val: a.map((r, i) => r[i]), vec: V }; }
 const gwT975 = nu => { const z = 1.959964; return nu > 0 ? z + (z ** 3 + z) / (4 * nu) + (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * nu * nu) + (3 * z ** 7 + 19 * z ** 5 + 17 * z ** 3 - 15 * z) / (384 * nu ** 3) : Infinity; };
 async function gwCalibrate(M, opts = {}) {
-  const keys = opts.keys || M.params.map(p => p.key), prior = opts.prior !== false, maxIter = opts.maxIter ?? 12, tick = opts.onProgress || (() => {});
+  const keys = opts.keys || M.params.map(p => p.key), prior = opts.prior !== false, maxIter = opts.maxIter ?? 10, tick = opts.onProgress || (() => {});
   if (opts.transient) gwTransientSetup(M);
   const OBS = opts.transient ? M.obsT : M.obs, runner = opts.transient ? gwRunTransient : gwRun, fixed = opts.fixed || {};
   const def = k => { if (k === 'rch') return { key: k, label: 'Recharge', unit: 'm/day', start: M.rch, prior: null, b: GW_BOUNDS.rch };
@@ -4675,14 +4676,15 @@ async function gwCalibrate(M, opts = {}) {
   const toV = x => Object.fromEntries(P.map((p, j) => [p.key, p.lin ? x[j] : 10 ** x[j]]));
   let x = P.map(p => { const v = opts.start?.[p.key] ?? p.start; return p.lin ? v : Math.log10(v); });
   const clamp = x => x.map((v, j) => P[j].b ? Math.max(P[j].b[0], Math.min(P[j].b[1], v)) : v);
-  let runs = 0; const sim = async x => { runs++; const r = await runner(M, { ...fixed, ...toV(x) }); if (!r.ok) throw new Error(r.error); return r; };
+  // a trial that does not converge is a rejected step, not the end of the calibration
+  let runs = 0, failed = 0; const sim = async (x, soft) => { runs++; const r = await runner(M, { ...fixed, ...toV(x) }); if (!r.ok) { failed++; if (soft) return null; throw new Error(r.error); } return r; };
   // residual vector (weighted): heads, then prior information
   const resid = r => [...OBS.map((o, i) => r.sim[i] == null ? 0 : (o.h - r.sim[i]) / GW_SIG_H), ...P.flatMap((p, j) => p.prior != null ? [(p.prior - x[j]) / GW_SIG_LOGK] : [])];
   const phiOf = (r, xx) => { const old = x; x = xx; const e = resid(r); x = old; return e.reduce((a, v) => a + v * v, 0); };
   try {
     let cur = await sim(x), phi = phiOf(cur, x), lam = .01, it = 0, J = null;
-    const jac = async (x, base) => { const h = P.map(p => p.lin ? .05 : .02), rs = await Promise.all(P.map((p, j) => { const xx = [...x]; xx[j] += h[j]; return sim(xx); }));
-      return OBS.map((o, i) => P.map((p, j) => base.sim[i] == null || rs[j].sim[i] == null ? 0 : (rs[j].sim[i] - base.sim[i]) / h[j])); };
+    const jac = async (x, base) => { const h = P.map(p => p.lin ? .05 : .02), rs = await Promise.all(P.map(async (p, j) => { const xx = [...x]; xx[j] += h[j]; let r = await sim(xx, true); if (!r) { xx[j] -= 2 * h[j]; r = await sim(xx, true); if (r) h[j] = -h[j]; } return r; }));
+      return OBS.map((o, i) => P.map((p, j) => !rs[j] || base.sim[i] == null || rs[j].sim[i] == null ? 0 : (rs[j].sim[i] - base.sim[i]) / h[j])); };
     for (; it < maxIter; it++) {
       tick({ it, phi, runs }); J = await jac(x, cur);
       const r = resid(cur), Jw = [...J.map(row => row.map(v => v / GW_SIG_H)), ...P.flatMap((p, j) => p.prior != null ? [P.map((_, k) => k === j ? 1 / GW_SIG_LOGK : 0)] : [])];
@@ -4691,8 +4693,8 @@ async function gwCalibrate(M, opts = {}) {
       let improved = false;
       for (let tries = 0; tries < 8; tries++) {
         const A = JtJ.map((row, a) => row.map((v, b) => a === b ? v * (1 + lam) + 1e-12 : v)), d = gwSolve(A, Jtr); if (!d) { lam *= 10; continue; }
-        const xn = clamp(x.map((v, j) => v + d[j])), rn = await sim(xn), pn = phiOf(rn, xn);
-        if (pn < phi) { const rel = (phi - pn) / Math.max(phi, 1e-12); x = xn; cur = rn; phi = pn; lam = Math.max(lam / 10, 1e-6); improved = true; if (rel < 1e-4) it = maxIter; break; }
+        const xn = clamp(x.map((v, j) => v + d[j])), rn = await sim(xn, true), pn = rn ? phiOf(rn, xn) : Infinity;
+        if (pn < phi) { const rel = (phi - pn) / Math.max(phi, 1e-12); x = xn; cur = rn; phi = pn; lam = Math.max(lam / 10, 1e-6); improved = true; if (rel < .01) it = maxIter; break; }   // under 1 % better: converged
         lam *= 10;
       }
       if (!improved) break;
@@ -4715,9 +4717,108 @@ async function gwCalibrate(M, opts = {}) {
     if (P.length > 2) { const sc = JtJ.map((row, a) => row.map((v, b) => v / Math.sqrt(JtJ[a][a] * JtJ[b][b] || 1))), E = gwEig(sc), i0 = E.val.indexOf(Math.min(...E.val));
       if (E.val[i0] < 1e-3 && !warnings.length) warnings.push(`${P.filter((_, j) => Math.abs(E.vec[j][i0]) > .25).map(p => p.label).join(', ')} cannot be separated by these heads together (they can change together without changing the heads): fix one from a measurement or add flow data.`); }
     if (dof <= 0) warnings.push('There are no more observations than parameters, so the fit statistics and intervals are not meaningful.');
+    if (failed) warnings.push(`${failed} trial run${failed > 1 ? 's' : ''} did not converge and ${failed > 1 ? 'were' : 'was'} set aside (the search stepped back).`);
+    P.forEach((p, j) => { if (J.every(row => row[j] === 0)) warnings.push(`The heads do not respond to ${p.label.toLowerCase()} (for example a layer above the water table): it is not calibrated by these data.`); });
     P.forEach(p => { if (p.b && (Math.abs(Math.log10(pv[p.key]) - p.b[0]) < 1e-6 || Math.abs(Math.log10(pv[p.key]) - p.b[1]) < 1e-6)) warnings.push(`${p.label} stopped at its limit (${pv[p.key].toPrecision(2)} ${p.unit}).`); });
     return { ok: true, pv, params, stats: { n, me, mae, rmse, range, srms: range > 0 ? rmse / range * 100 : NaN, disc: cur.discrepancy, phi, dof }, residuals: res, css, corr, warnings, iterations: it, runs, run: cur, round: M.round };
   } catch (e) { return { ok: false, error: String(e.message || e) }; }
+}
+/* ---------- the Model page: set-up, runs, calibration and transport results (MODFLOW 6) ---------- */
+S.gw = { busy: false, msg: '', err: '' };
+const GW_ENGINE = 'MODFLOW 6.8.1 (USGS)';
+const gwSaved = () => siteOf()?.gwModel || {};
+function setGwm(patch) { if (S.readOnly) return; setSite({ ...(siteOf() || {}), gwModel: { ...gwSaved(), ...patch } }); S.gw.run = null; S.gw.M = null; }
+/* the inputs a calibration depends on; when they change the stored calibration is marked out of date */
+const gwInputsKey = M => JSON.stringify([M.round, M.grid.nrow, M.grid.ncol, M.grid.cell, M.units.map(u => [u.u, u.calib ? null : u.k, u.kv]), M.features, M.obs.map(o => [o.b.id, +o.h.toFixed(3)])]);
+function gwModel() { if (!S.gw.M) { const M = gwModelSpec(projList(), siteOf() || {}); S.gw.M = M; } return S.gw.M; }
+const gwPv = () => ({ ...(gwSaved().calib?.pv || {}), ...(gwSaved().calibT?.pv || {}) });
+/* runs the calibrated model once per session (and after changes), then redraws whatever shows its results */
+async function gwEnsure(force) {
+  if (!window.desktop?.mf6Run || S.gw.busy) return; const M = gwModel(); if (M.error) return;
+  if (S.gw.run && !force) return;
+  S.gw.busy = true; S.gw.msg = 'Running MODFLOW 6…'; gwRefresh();
+  try { const r = await gwRun(M, gwPv()); S.gw.run = r.ok ? r : null; S.gw.err = r.ok ? '' : r.error; S.gw.paths = r.ok ? gwSourcePaths(M, r) : [];
+    if (r.ok && gwSaved().transport?.on && !S.gw.trans) { S.gw.msg = 'Running transport…'; gwRefresh(); S.gw.trans = await gwTransport(M, gwPv(), { calibrate: !!gwSaved().transport.calibrate }); }
+  } finally { S.gw.busy = false; S.gw.msg = ''; gwRefresh(); }
+}
+function gwRefresh() { if (S.tab === 'gwm') { const v = $('#view'); if (v) v.innerHTML = gwmHTML(); } else if (S.tab === 'xsec') drawXsec(); else if (S.tab === 'site') drawSite?.(); }
+async function gwAct(act, t) {
+  if (S.readOnly && act !== 'gw-export') return;
+  const M = gwModel(); if (M.error) { toast(M.error); return; }
+  if (act === 'gw-feat-add') { setGwm({ features: [...(gwSaved().features || []), { type: 'riv', name: '', pts: [], stage: null, cond: 10, rbot: null }] }); gwRefresh(); return; }
+  if (act === 'gw-feat-del') { const i = +t.dataset.i; setGwm({ features: (gwSaved().features || []).filter((_, j) => j !== i) }); gwRefresh(); return; }
+  if (act === 'gw-export') { const r = S.gw.run || (window.desktop?.mf6Run ? await gwRun(M, gwPv()) : null), files = r?.files || mf6Files(gwSpec(M, gwPv())).files;
+    const readme = `Borehole Field Log: MODFLOW 6 model exported ${new Date().toISOString().slice(0, 10)}\nProject: ${projKey(cur())}\nEngine: ${GW_ENGINE}. Run with: mf6 (in this folder).\nCalibration round: ${M.round}\nGrid: ${M.grid.nrow} rows × ${M.grid.ncol} columns × ${M.grid.nlay} layers, ${M.grid.cell} m cells, rotated ${M.grid.angrot.toFixed(1)}° (columns along the fitted flow direction).\nLayers: ${M.units.map((u, i) => `${i + 1} ${u.u} (K ${(gwPv()['k:' + u.u] ?? u.k).toPrecision(3)} m/day, ${gwPv()['k:' + u.u] != null ? 'calibrated' : u.kSrc})`).join('; ')}\n`;
+    const list = [...Object.entries(files).map(([name, data]) => ({ name: 'model/' + name, data })), ...Object.entries(r?.out || {}).map(([name, data]) => ({ name: 'output/' + name, data })), { name: 'README.txt', data: readme }];
+    if (S.gw.trans?.files) for (const [name, data] of Object.entries(S.gw.trans.files)) list.push({ name: 'transport/' + name, data });
+    saveFile(`groundwater-model-${(projKey(cur()) || 'project').replace(/[^\w-]+/g, '-').slice(0, 40)}.zip`, zipFiles(list)); return; }
+  if (!window.desktop?.mf6Run) return;
+  S.gw.busy = true; S.gw.err = ''; gwRefresh();
+  const tick = p => { S.gw.msg = `Calibrating: iteration ${p.it + 1}, ${p.runs} MODFLOW runs, objective ${p.phi.toPrecision(4)}`; gwRefresh(); };
+  try {
+    if (act === 'gw-run') { S.gw.trans = null; S.gw.run = null; S.gw.busy = false; await gwEnsure(true); return; }
+    if (act === 'gw-cal' || act === 'gw-calt') {
+      const tr = act === 'gw-calt', keys = tr ? ['sy', ...gwTransientSetup(M).periods.slice(1).map((_, i) => 'rch@' + (i + 1))] : (gwSaved().keys || M.params.map(p => p.key));
+      const C = await gwCalibrate(M, { keys, transient: tr, fixed: tr ? gwSaved().calib?.pv || {} : {}, prior: gwSaved().prior !== false, onProgress: tick });
+      if (!C.ok) { S.gw.err = C.error; return; }
+      const keep = { mode: tr ? 'transient' : 'steady', pv: C.pv, params: C.params, stats: C.stats, residuals: C.residuals, css: C.css, corr: C.corr, warnings: C.warnings, round: M.round, rounds: tr ? gwTransientSetup(M).rounds : [M.round], at: new Date().toISOString(), runs: C.runs, iterations: C.iterations, key: gwInputsKey(M) };
+      setGwm(tr ? { calibT: keep } : { calib: keep, calibT: null }); S.gw.trans = null; S.gw.busy = false; await gwEnsure(true); return;
+    }
+    if (act === 'gw-trans') { setGwm({ transport: { on: true, calibrate: !!gwSaved().transport?.calibrate } }); S.gw.run = null; S.gw.trans = null; S.gw.busy = false; await gwEnsure(true); return; }
+  } finally { S.gw.busy = false; S.gw.msg = ''; gwRefresh(); }
+}
+function gwmHTML() {
+  const desk = !!window.desktop?.mf6Run, M = gwModel(), g = gwSaved(), c = g.calib, ct = g.calibT, pv = gwPv(), ro = S.readOnly || !desk || S.gw.busy ? 'disabled' : '', f3 = v => v == null || !Number.isFinite(+v) ? '–' : (+v).toPrecision(3), f2 = v => v == null || !Number.isFinite(+v) ? '–' : (+v).toFixed(2);
+  if (M.error) return `<div class="gw-page"><section class="sec"><header><h3>Groundwater model</h3><span class="note">${GW_ENGINE}</span></header><div class="body"><p class="note" style="color:var(--warn,#a3470b)">The model can't be built yet: ${esc(M.error)}</p></div></section></div>`;
+  const stale = c && c.key !== gwInputsKey(M), rounds = [...new Set(M.list.flatMap(b => monitoring(b).filter(w => w.date).map(w => w.date)))].sort();
+  const unitRow = u => { const cal = pv['k:' + u.u]; return `<tr><td>${esc(u.u)}</td><td class="r"><input type="number" step="any" data-gwu="${esc(u.u)}|k" value="${esc(g.units?.[u.u]?.k ?? '')}" placeholder="${f3(cal ?? u.k)}" style="width:7em" ${S.readOnly ? 'disabled' : ''}></td><td>m/day</td><td class="note">${esc(cal != null ? `calibrated (${GW_ENGINE.split(' (')[0]}); start: ${u.kSrc}` : u.kSrc)}</td><td class="r"><input type="number" step="any" data-gwu="${esc(u.u)}|kv" value="${esc(g.units?.[u.u]?.kv ?? '')}" placeholder="${u.kv}" style="width:5em" ${S.readOnly ? 'disabled' : ''}></td><td class="note">${esc(u.kvSrc)}</td><td class="r">${f2(u.ne)}</td></tr>`; };
+  const featRow = (ft, i) => `<tr><td><select data-gwf="${i}|type" ${S.readOnly ? 'disabled' : ''}>${[['riv', 'River or creek'], ['drn', 'Drain'], ['wel', 'Pumping well'], ['chd', 'Fixed head']].map(([v, t]) => `<option value="${v}" ${ft.type === v ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
+    <td><input data-gwf="${i}|name" value="${esc(ft.name || '')}" style="width:8em" ${S.readOnly ? 'disabled' : ''}></td><td><input data-gwf="${i}|pts" value="${esc((ft.pts || []).map(p => p.join(' ')).join('; '))}" placeholder="E N; E N (UTM)" style="width:16em" ${S.readOnly ? 'disabled' : ''}></td>
+    ${[['stage', 'Stage / elevation / head (m)'], ['cond', 'Conductance (m²/day)'], ['rbot', 'Bed bottom (m)'], ['rate', 'Rate (m³/day, − = pumping)']].map(([k, t]) => `<td><input type="number" step="any" data-gwf="${i}|${k}" value="${esc(ft[k] ?? '')}" title="${t}" placeholder="${t.split(' (')[0]}" style="width:7em" ${S.readOnly ? 'disabled' : ''}></td>`).join('')}
+    <td><button class="btn" data-act="gw-feat-del" data-i="${i}" ${S.readOnly ? 'disabled' : ''}>Remove</button></td></tr>`;
+  const statsT = (C, title) => !C ? '' : `<h4 style="margin:12px 0 6px">${esc(title)}</h4><table class="sum"><tbody>
+      <tr><td>Observations</td><td class="r">${C.stats.n}</td><td>Mean error</td><td class="r">${f3(C.stats.me)} m</td><td>Mean absolute error</td><td class="r">${f3(C.stats.mae)} m</td></tr>
+      <tr><td>RMSE</td><td class="r">${f3(C.stats.rmse)} m</td><td>Head range</td><td class="r">${f3(C.stats.range)} m</td><td>RMSE ÷ range</td><td class="r">${f2(C.stats.srms)} %</td></tr>
+      <tr><td>Mass-balance discrepancy</td><td class="r">${f3(C.stats.disc)} %</td><td>Iterations / runs</td><td class="r">${C.iterations} / ${C.runs}</td><td>Calibrated</td><td class="r">${esc(C.at.slice(0, 16).replace('T', ' '))}</td></tr></tbody></table>
+    <table class="sum" style="margin-top:8px"><thead><tr><th>Parameter</th><th class="r">Start</th><th class="r">Calibrated</th><th class="r">95 % interval</th><th class="r">Sensitivity (CSS)</th><th>Prior</th></tr></thead><tbody>
+      ${C.params.map(p => `<tr><td>${esc(p.label)}</td><td class="r">${f3(p.start)} ${esc(p.unit)}</td><td class="r"><b>${f3(p.value)}</b> ${esc(p.unit)}</td><td class="r">${f3(p.lo95)} – ${f3(p.hi95)}</td><td class="r">${f3(C.css[p.key])}</td><td class="note">${p.prior != null ? `slug tests, ${f3(10 ** p.prior)} m/day` : '–'}</td></tr>`).join('')}</tbody></table>
+    ${C.params.length > 1 ? `<table class="sum" style="margin-top:8px"><caption class="note" style="text-align:left">Parameter correlation</caption><thead><tr><th></th>${C.params.map(p => `<th class="r">${esc(p.label)}</th>`).join('')}</tr></thead><tbody>${C.params.map((p, a) => `<tr><td>${esc(p.label)}</td>${C.params.map((q, b) => `<td class="r" style="${a !== b && Math.abs(C.corr[a][b]) > .95 ? 'color:var(--warn,#a3470b);font-weight:600' : ''}">${f2(C.corr[a][b])}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''}
+    ${C.warnings.length ? `<ul class="note" style="color:var(--warn,#a3470b)">${C.warnings.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`;
+  const scatter = C => { if (!C) return ''; const pts = C.residuals.filter(q => Number.isFinite(q.sim)), lo = Math.min(...pts.flatMap(q => [q.h, q.sim])), hi = Math.max(...pts.flatMap(q => [q.h, q.sim])), pad = (hi - lo) * .08 || .1, a = lo - pad, b = hi + pad, X = v => 40 + (v - a) / (b - a) * 200, Y = v => 220 - (v - a) / (b - a) * 200;
+    return `<div id="gwm-scatter"><svg width="250" height="250" role="img" aria-label="Simulated against measured heads" style="font:10px Arial,sans-serif"><rect x="40" y="20" width="200" height="200" fill="#fff" stroke="#ccc"/><path d="M${X(a)} ${Y(a)}L${X(b)} ${Y(b)}" stroke="#888" stroke-dasharray="4 3"/>
+      ${pts.map(q => `<circle cx="${X(q.h).toFixed(1)}" cy="${Y(q.sim).toFixed(1)}" r="3" fill="#756bb1" stroke="#3f007d"><title>${esc(`${q.b}${q.date ? ' ' + q.date : ''}: measured ${q.h.toFixed(2)}, simulated ${q.sim.toFixed(2)} m`)}</title></circle>`).join('')}
+      <text x="140" y="245" text-anchor="middle">Measured head (m)</text><text x="12" y="120" transform="rotate(-90 12 120)" text-anchor="middle">Simulated head (m)</text><text x="44" y="32">${a.toFixed(1)}–${b.toFixed(1)} m; dashed = 1:1</text></svg></div>`; };
+  const resT = C => !C ? '' : `<div class="scroll-x" style="max-height:260px;overflow:auto"><table class="sum" id="gwm-res"><thead><tr><th>Well</th><th>Date</th><th class="r">Measured (m)</th><th class="r">Simulated (m)</th><th class="r">Residual (m)</th></tr></thead><tbody>${C.residuals.map(q => `<tr><td>${esc(q.b)}</td><td>${esc(q.date || C.round)}</td><td class="r">${f2(q.h)}</td><td class="r">${f2(q.sim)}</td><td class="r">${Number.isFinite(q.res) ? (q.res > 0 ? '+' : '') + q.res.toFixed(3) : 'dry'}</td></tr>`).join('')}</tbody></table></div>`;
+  const T = S.gw.trans;
+  return `<div class="gw-page">
+    <section class="sec"><header><h3>Groundwater model</h3><span class="note">${GW_ENGINE} · public domain · labelled “Model (MODFLOW 6), not measured” wherever it is drawn</span><span class="sp"></span>
+      <button class="btn" data-act="gw-run" ${ro}>Run model</button><button class="btn primary" data-act="gw-cal" ${ro}>Calibrate (steady)</button><button class="btn" data-act="gw-calt" ${ro || !c ? 'disabled' : ''} title="${c ? 'Specific yield and recharge per period, against every round' : 'Calibrate the steady model first'}">Calibrate (all rounds)</button><button class="btn" data-act="gw-trans" ${ro}>Run transport</button><button class="btn" data-act="gw-export" ${S.gw.busy ? 'disabled' : ''}>Export model files</button></header>
+      <div class="body">
+      ${!desk ? `<p class="note" style="color:var(--warn,#a3470b)">The groundwater model runs MODFLOW 6 on this computer, so it needs the desktop app. The cross-section keeps the Domenico forecast.</p>` : ''}
+      ${S.gw.msg ? `<p class="note"><b>${esc(S.gw.msg)}</b></p>` : ''}${S.gw.err ? `<p class="note" style="color:var(--warn,#a3470b)">MODFLOW 6: ${esc(S.gw.err)}</p>` : ''}
+      ${stale ? `<p class="note" style="color:var(--warn,#a3470b)">The inputs changed after the last calibration (${esc(c.at.slice(0, 10))}): calibrate again before relying on the results.</p>` : ''}
+      <p class="note">Grid ${M.grid.nrow} rows × ${M.grid.ncol} columns × ${M.grid.nlay} layers of ${M.grid.cell} m, rotated ${M.grid.angrot.toFixed(1)}° so columns follow the fitted flow direction (${M.F.az.toFixed(0)}° from north). Fixed heads on the upgradient and downgradient faces from the ${esc(M.round)} water-table plane; no flow on the sides and through the base of the logs. ${S.gw.run ? `Last run: ${f3(S.gw.run.seconds)} s, mass-balance discrepancy ${f3(S.gw.run.discrepancy)} %.` : ''}</p>
+      <div class="fields" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+        <div class="fld"><label for="gwm-round">Calibration round</label><select id="gwm-round" data-gwm="round" ${S.readOnly ? 'disabled' : ''}>${rounds.map(d => `<option value="${d}" ${d === M.round ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
+        <div class="fld"><label for="gwm-cell">Cell size (m)</label><input id="gwm-cell" type="number" step="any" data-gwm="cell" value="${esc(g.cell ?? '')}" placeholder="${M.grid.cell}" ${S.readOnly ? 'disabled' : ''}></div>
+        <div class="fld"><label for="gwm-margin">Margin around the boreholes (m)</label><input id="gwm-margin" type="number" step="any" data-gwm="margin" value="${esc(g.margin ?? '')}" placeholder="auto" ${S.readOnly ? 'disabled' : ''}></div>
+        <div class="fld"><label for="gwm-rch">Recharge (m/day)</label><input id="gwm-rch" type="number" step="any" data-gwm="rch" value="${esc(g.rch ?? '')}" placeholder="${f3(pv.rch ?? M.rch)}" ${S.readOnly ? 'disabled' : ''}></div>
+        <div class="fld"><label for="gwm-prior">Slug tests in calibration</label><select id="gwm-prior" data-gwm="prior" ${S.readOnly ? 'disabled' : ''}><option value="1" ${g.prior !== false ? 'selected' : ''}>As prior information</option><option value="0" ${g.prior === false ? 'selected' : ''}>Not used</option></select></div></div>
+      <p class="note">Recharge: ${esc(pv.rch != null ? 'calibrated; start ' : '')}${esc(M.params.find(p => p.key === 'rch')?.src || '')}. Effective porosity ${f2(S.co.ne ?? .25)} (assumed; Settings).</p>
+      <h4 style="margin:12px 0 6px">Layers</h4>
+      <div class="scroll-x"><table class="sum" id="gwm-units"><thead><tr><th>Unit (model layer)</th><th class="r">K</th><th>Unit</th><th>Source</th><th class="r">Kv/Kh</th><th>Source</th><th class="r">nₑ</th></tr></thead><tbody>${M.units.map(unitRow).join('')}</tbody></table></div>
+      <h4 style="margin:12px 0 6px">Boundary features <button class="btn" data-act="gw-feat-add" ${S.readOnly ? 'disabled' : ''}>Add</button></h4>
+      <div class="scroll-x"><table class="sum" id="gwm-feat"><thead><tr><th>Type</th><th>Name</th><th>Location</th><th>Stage / elevation / head</th><th>Conductance</th><th>Bed bottom</th><th>Rate</th><th></th></tr></thead><tbody>${(g.features || []).map(featRow).join('')}</tbody></table></div>
+      ${!(g.features || []).length ? '<p class="note">None: the model is driven by the two fixed-head faces and recharge. Add a creek, drain or pumping well where one controls the water table.</p>' : ''}
+      </div></section>
+    <section class="sec"><header><h3>Calibration</h3><span class="note">Levenberg–Marquardt on log parameters; statistics after Hill and Tiedeman (2007)</span></header><div class="body">
+      ${!c ? '<p class="note">Not calibrated yet. Calibrate (steady) fits the layers without slug tests and the recharge to the measured heads of the calibration round.</p>' : `<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start"><div style="flex:1;min-width:420px">${statsT(c, `Steady state, ${c.round}`)}${statsT(ct, `All rounds (${(ct?.rounds || []).length})`)}</div>${scatter(ct || c)}</div>${resT(ct || c)}`}
+    </div></section>
+    <section class="sec"><header><h3>Transport</h3><span class="note">MODFLOW 6 GWT: TVD advection, dispersion, linear sorption${T?.P?.hl > 0 ? ', first-order decay' : ''}; inputs from the Forecast panel on the Section page</span><span class="sp"></span><label class="check"><input type="checkbox" id="gwm-tcal" ${g.transport?.calibrate ? 'checked' : ''} ${S.readOnly ? 'disabled' : ''}> Calibrate the source concentration</label></header><div class="body">
+      ${!T ? '<p class="note">Not run. Run transport uses the forecast set-up (compound, source well, release date, dispersivities) on the calibrated flow.</p>' : !T.ok ? `<p class="note" style="color:var(--warn,#a3470b)">${esc(T.error)}</p>` : `<p class="note">${esc(LAB_PARAMS[T.param].label)} from ${esc(T.P.srcBh.name)} since ${esc(T.start)}: source ${f3(T.c0)} mg/L (${esc(T.c0Src)}), Kd ${f3(T.kd)} L/kg, αL ${f3(T.P.ax)} m, αT ${f3(T.P.ay)} m, αV ${f3(T.P.az)} m, ${T.cells.length} source cells. Fit to ${T.fit.n} results: log RMS ${f3(T.fit.rmsLog)} (1 = a factor of 10), mean log error ${f3(T.fit.meLog)}. Mass-balance discrepancy ${f3(T.disc)} %.</p>
+        <div class="scroll-x" style="max-height:240px;overflow:auto"><table class="sum" id="gwm-trans"><thead><tr><th>Well</th><th>Date</th><th class="r">Measured (mg/L)</th><th class="r">Simulated (mg/L)</th><th class="r">Ratio</th></tr></thead><tbody>${T.obs.map(o => `<tr><td>${esc(o.name)}</td><td>${esc(o.date)}</td><td class="r">${o.lt ? '<' : ''}${f3(o.meas)}</td><td class="r">${f3(o.sim)}</td><td class="r">${o.lt ? (o.sim <= o.meas ? 'agrees (not detected)' : '×' + f2(o.sim / o.meas) + ' above the limit') : o.sim > 0 ? '×' + f2(o.sim / o.meas) : '–'}</td></tr>`).join('')}</tbody></table></div>`}
+    </div></section>
+    <section class="sec"><header><h3>Limits</h3></header><div class="body"><p class="note">A screening-to-intermediate model built from the logs: layers are interpolated between boreholes (inverse distance), each layer is uniform, the base of the logs is treated as impermeable, and the boundaries come from the fitted water-table plane unless features are added. Heads alone cannot separate recharge from conductivity; slug tests (prior information) or flow data are needed. Transport uses steady flow, a constant source and no NAPL. Check the calibration statistics and residuals before using results.</p></div></section></div>`;
 }
 function xsModelHTML() {
   const u = siteOf()?.model || {}, run = S.xs.model ? modelRun(S.xs.date || '') : null, P = run?.P || { src: {} }, ro = S.readOnly ? 'disabled' : '';
@@ -9676,6 +9777,7 @@ document.addEventListener('click', e => {
     case 'load-sk': loadSkExample(); break;
     case 'load-dl': loadDlExample(); break;
     case 'load-xs': loadXsExample(); break;
+    case 'gw-run': case 'gw-cal': case 'gw-calt': case 'gw-trans': case 'gw-export': case 'gw-feat-add': case 'gw-feat-del': gwAct(act, t); break;
     case 'grid-bh': if (b) { S.gridOne = true; S.tsheet = 'layers'; lsSet('bhlog.tsheet', 'layers'); goTab('table'); setTimeout(() => $('.dgrid input')?.focus(), 0); } break;
     case 'clear-examples': for (const x of [...S.bh.values()]) if (x.example) store.remove(x.id); S.formStale = true; render(); break;
     case 'delete': openDelete(); break;
@@ -9708,6 +9810,13 @@ document.addEventListener('change', e => {
   if (t.id === 'xs-layer') { S.xs = { ...S.xs, plume: t.value !== 'model', model: t.value !== 'meas' }; setXs('layer', t.value); renderView(true); return; }
   if (t.id === 'xs-shape' || t.id === 'xs-style') { setXs(t.id.slice(3), t.value); return; }
   if (t.id === 'xs-soilcol') { setXs('soilColour', t.checked); return; }
+  // groundwater model inputs
+  if (t.dataset?.gwm) { const k = t.dataset.gwm, v = t.value === '' ? null : k === 'round' ? t.value : k === 'prior' ? t.value === '1' : +t.value; setGwm({ [k]: v }); S.gw.trans = null; gwRefresh(); return; }
+  if (t.dataset?.gwu) { const [u, k] = t.dataset.gwu.split('|'), us = { ...(gwSaved().units || {}) }; us[u] = { ...(us[u] || {}), [k]: t.value === '' ? undefined : +t.value }; setGwm({ units: us }); gwRefresh(); return; }
+  if (t.dataset?.gwf) { const [i, k] = t.dataset.gwf.split('|'), fs = [...(gwSaved().features || [])], v = t.value;
+    fs[+i] = { ...fs[+i], [k]: k === 'type' || k === 'name' ? v : k === 'pts' ? v.split(';').map(q => q.trim().split(/[\s,]+/).map(Number)).filter(q => q.length === 2 && q.every(Number.isFinite)) : v === '' ? null : +v };
+    if (k === 'stage') Object.assign(fs[+i], { elev: fs[+i].stage, head: fs[+i].stage }); setGwm({ features: fs }); return; }
+  if (t.id === 'gwm-tcal') { setGwm({ transport: { ...(gwSaved().transport || {}), calibrate: t.checked } }); return; }
   if (t.dataset?.mdl) { setModel(t.dataset.mdl, t.value); return; }
   if (t.dataset?.gw || t.dataset?.gwlt || t.dataset?.gwf || t.dataset?.gwguide) { gwChange(t); return; }
   if (t.dataset?.xsalias != null && !S.readOnly) { const x = siteOf()?.xsec || {}, al = { ...(x.alias || {}) }; if (t.value) al[t.dataset.xsalias] = t.value; else delete al[t.dataset.xsalias]; setSite({ ...(siteOf() || {}), xsec: { ...x, alias: al } }); redrawSec(); }
