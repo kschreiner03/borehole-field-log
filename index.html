@@ -1280,7 +1280,8 @@ body.side-off .shell { --sidebar-width: 0px; } body.side-off .side { display: no
 .cmp-addmenu[hidden] { display: none; }
 .cmp-addg { display: flex; flex-direction: column; gap: 1px; } .cmp-addg b { margin-bottom: 3px; font: 600 11.5px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .cmp-addi { padding: 5px 6px; border: 0; border-radius: var(--r-sm); background: none; font: 13px var(--f-body); color: var(--ink); text-align: left; cursor: pointer; } .cmp-addi:hover, .cmp-addi:focus-visible { background: var(--hover); }
-.cmp-bar { display: none; position: absolute; top: 4px; right: 4px; z-index: 5; gap: 2px; padding: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: 0 2px 8px rgba(16, 24, 40, .14); transform: scale(calc(1 / var(--z, 1))); transform-origin: top right; }
+.cmp-bar { display: none; position: absolute; bottom: calc(100% + 4px); right: 0; z-index: 5; gap: 2px; padding: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: 0 2px 8px rgba(16, 24, 40, .14); transform: scale(calc(1 / var(--z, 1))); transform-origin: bottom right; }
+.cmp-box.bar-below .cmp-bar { bottom: auto; top: calc(100% + 4px); transform-origin: top right; }
 .cmp-box[aria-selected="true"] .cmp-bar { display: flex; }
 .cmp-bar .tb { min-height: 26px; padding: 0 5px; } .cmp-bar .tb svg { width: 15px; height: 15px; } .cmp-bar .del, .cmp-bar .del svg { color: var(--negative, #c4242a); }
 .ctl-gb .cmp-pageset, .ctl-gb .cmp-props { display: flex; flex-direction: column; gap: 8px; position: static; max-height: none; overflow: visible; }
@@ -9055,7 +9056,7 @@ function composeHTML() {
         <div class="cmp-body" style="left:${bd.x}px;top:${bd.y}px;width:${bd.w}px;height:${bd.h}px" aria-hidden="true"></div>
         ${['x', 'y'].map(a => (pg.guides?.[a] || []).map((v, gi) => `<div class="cmp-guide g${a}" data-gaxis="${a}" data-gi="${gi}" style="${a === 'x' ? 'left' : 'top'}:${v}px" title="Guide at ${(v / MMPX).toFixed(1)} mm: drag to move, drag onto the ruler to remove"></div>`).join('')).join('')}
         <div class="cmp-snaps" id="cmp-snaps" aria-hidden="true"></div>
-        ${pg.items.map(it => `<div class="cmp-box" data-box="${it.id}" aria-selected="${it.id === S.csel || !!S.cmulti?.has(it.id)}" title="${esc(RITEMS[it.t][0])}: drag to move, drag the corner to resize"><span class="cmp-tag">${esc(it.cap || RITEMS[it.t][0])}</span><span class="cmp-rz" data-rz aria-hidden="true"></span><span class="cmp-bar" role="toolbar" aria-label="Item"><button type="button" class="tb" data-act="cmp-copy" title="Duplicate">${svgI('<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>')}</button><button type="button" class="tb" data-act="cmp-front" title="Bring to front">${svgI('<rect x="4" y="4" width="11" height="11" rx="1"/><rect x="9" y="9" width="11" height="11" rx="1" fill="currentColor" fill-opacity=".25"/>')}</button><button type="button" class="tb del" data-act="cmp-del" title="Delete (Delete key)" aria-label="Delete">${svgI('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>')}</button></span></div>`).join('')}
+        ${pg.items.map(it => `<div class="cmp-box${it.y < 50 ? ' bar-below' : ''}" data-box="${it.id}" aria-selected="${it.id === S.csel || !!S.cmulti?.has(it.id)}" title="${esc(RITEMS[it.t][0])}: drag to move, drag the corner to resize"><span class="cmp-tag">${esc(it.cap || RITEMS[it.t][0])}</span><span class="cmp-rz" data-rz aria-hidden="true"></span>${S.readOnly ? '' : `<span class="cmp-bar" role="toolbar" aria-label="Item"><button type="button" class="tb" data-act="cmp-copy" title="Duplicate">${svgI('<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>')}</button><button type="button" class="tb" data-act="cmp-front" title="Bring to front">${svgI('<rect x="4" y="4" width="11" height="11" rx="1"/><rect x="9" y="9" width="11" height="11" rx="1" fill="currentColor" fill-opacity=".25"/>')}</button><button type="button" class="tb del" data-act="cmp-del" title="Delete (Delete key)" aria-label="Delete">${svgI('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>')}</button></span>`}</div>`).join('')}
       </div></div></div></div>
       <p class="note">Click an item to select it: drag to move, drag its corner to resize, use the buttons on its frame or the Delete key. Settings for the item and the page are in the panel on the right. The dashed line is the printable area.</p>`;
   } else {
@@ -9092,7 +9093,7 @@ function propsHTML() {
     <h4>Distribute</h4><div class="cmp-row"><button class="btn" data-cdist="h" ${S.cmulti.size < 3 ? 'disabled' : ''}>Horizontally</button><button class="btn" data-cdist="v" ${S.cmulti.size < 3 ? 'disabled' : ''}>Vertically</button></div>`;
   const pg = curPage(), it = pg?.items?.find(x => x.id === S.csel);
   const tbPanel = `<h3>Title block</h3><div class="cmp-geos">${[['fig', 'Figure no.'], ['rev', 'Revision'], ['drawn', 'Drawn by'], ['checked', 'Checked by'], ['date', 'Date']].map(([k, l]) => `<label class="cmp-geo"><span>${l}</span><input ${k === 'date' ? 'type="date"' : ''} data-tbf="${k}" value="${esc(pg?.tb?.[k] || '')}" ${S.readOnly ? 'readonly' : ''}></label>`).join('')}</div><p class="note">Company, project and number come from Settings and the project.</p>`;
-  if (!it) return tbPanel + `<h3>Diagram</h3><p class="note">Click a diagram on the page to change its size, scale, intervals and caption.</p><p class="note">Use the Add buttons above the page to place a site plan, cross-section, map, hydrograph, text or a picture.</p>`;
+  if (!it) return tbPanel + `<h3>Diagram</h3><p class="note">Click a diagram on the page to change its size, scale, intervals and caption.</p><p class="note">Use Add item above the page to place a site plan, cross-section, map, hydrograph, text or a picture.</p>`;
   const sel = (k, label, list) => `<label class="cmp-lbl" for="co-${k}">${label}</label><select id="co-${k}" data-copt="${k}">${list.map(([v, t]) => `<option value="${v}" ${String(it.o?.[k] ?? '') === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
   const geo = (k, label) => `<label class="cmp-geo"><span>${label}</span><input type="number" step="1" data-cgeo="${k}" value="${mm(it[k])}"><span class="note">mm</span></label>`;
   return `<h3>${esc(RITEMS[it.t][0])}</h3>
@@ -9161,6 +9162,7 @@ const clampIt = (it, pg = curPage()) => { const d = pgDims(pg); it.w = Math.max(
 function composeAct(act, el) {
   const L = repLayout(), pg = curPage(), it = pg.items?.find(x => x.id === S.csel), i = S.cpage;
   if (act === 'cmp-pdf') { buildReport(); return; }
+  if (S.readOnly && ['cmp-del', 'cmp-copy', 'cmp-front'].includes(act)) return;
   if (act === 'cmp-up' && i > 0) { [L.pages[i - 1], L.pages[i]] = [L.pages[i], L.pages[i - 1]]; S.cpage--; }
   if (act === 'cmp-down' && i < L.pages.length - 1) { [L.pages[i + 1], L.pages[i]] = [L.pages[i], L.pages[i + 1]]; S.cpage++; }
   const many = S.csort && S.csortSel?.size ? L.pages.filter(p => S.csortSel.has(p.id)) : null, targets = many || [pg];
@@ -9172,7 +9174,7 @@ function composeAct(act, el) {
     else if (p.kind === 'free') { p.orient = p.orient === 'land' ? undefined : 'land'; for (const x of p.items || []) clampIt(x, p); }
   }
   if (act === 'cmp-xs-use' && it?.t === 'section') { it.o = { ...it.o, xs: structuredClone(S.xs) }; }
-  if (act === 'cmp-del' && (it || S.cmulti?.size)) { const gone = S.cmulti?.size > 1 ? S.cmulti : new Set([it.id]); pg.items = pg.items.filter(x => !gone.has(x.id)); S.csel = null; S.cmulti = new Set(); }
+  if (act === 'cmp-del' && (it || S.cmulti?.size)) { const gone = S.cmulti?.size > 1 && (!it || S.cmulti.has(it.id)) ? S.cmulti : new Set([it?.id ?? [...S.cmulti][0]]); pg.items = pg.items.filter(x => !gone.has(x.id)); S.csel = null; S.cmulti = new Set(); }
   if (act === 'cmp-front' && it) { pg.items = [...pg.items.filter(x => x !== it), it]; }
   if (act === 'cmp-copy' && it) { const c = { ...structuredClone(it), id: uid('it'), x: it.x + 18, y: it.y + 18 }; clampIt(c); pg.items.push(c); S.csel = c.id; }
   if (act === 'cmp-img') { $('#cmp-img-file').click(); return; }
@@ -9257,11 +9259,12 @@ let cDrag = null;
 document.addEventListener('click', e => { const m = $('.cmp-addmenu'); if (m && !m.hidden && !e.target.closest?.('.cmp-addwrap')) m.hidden = true; });
 document.addEventListener('keydown', e => { const m = $('.cmp-addmenu'); if (e.key === 'Escape' && m && !m.hidden) { m.hidden = true; e.stopPropagation(); } }, true);
 document.addEventListener('pointerdown', e => {
-  const box = e.target.closest('.cmp-box'); if (!box || e.target.closest('.cmp-bar')) return;
+  const box = e.target.closest('.cmp-box'); if (!box) return;
+  if (e.target.closest('.cmp-bar')) { S.csel = box.dataset.box; if (!S.cmulti?.has(S.csel)) S.cmulti = new Set(); return; }   // the buttons act on the item they sit on
   const it = curPage().items.find(x => x.id === box.dataset.box); if (!it) return;
   if (e.shiftKey || e.ctrlKey || e.metaKey) { const m = S.cmulti ||= new Set(); if (S.csel && !m.size) m.add(S.csel); m.has(it.id) ? m.delete(it.id) : m.add(it.id); S.csel = it.id; }
   else if (!S.cmulti?.has(it.id)) { S.cmulti = new Set(); S.csel = it.id; }
-  document.querySelectorAll('.cmp-box').forEach(b => b.setAttribute('aria-selected', String(b.dataset.box === S.csel || !!S.cmulti?.has(b.dataset.box)))); $('#cmp-props').innerHTML = propsHTML();
+  document.querySelectorAll('.cmp-box').forEach(b => b.setAttribute('aria-selected', String(b.dataset.box === S.csel || !!S.cmulti?.has(b.dataset.box)))); const pp = $('#cmp-props'); if (pp) pp.innerHTML = propsHTML();
   const group = S.cmulti?.size > 1 && S.cmulti.has(it.id) ? selItems().filter(x => x !== it).map(x => ({ x, ox: x.x, oy: x.y })) : [];
   cDrag = { it, box, group, rz: !!e.target.closest('[data-rz]') && !group.length, sx: e.clientX, sy: e.clientY, x: it.x, y: it.y, w: it.w, h: it.h, moved: false };
   try { box.setPointerCapture(e.pointerId); } catch { /* pointer already released */ } e.preventDefault();
@@ -9293,7 +9296,7 @@ document.addEventListener('keydown', e => {
   if (mv) { e.preventDefault(); it.x += mv[0]; it.y += mv[1]; clampIt(it); commit(); }
   else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); composeAct('cmp-del'); }
 });
-document.addEventListener('dblclick', e => { const box = e.target.closest('.cmp-box'); if (box && curPage().items.find(x => x.id === box.dataset.box)?.t === 'text') $('#cp-text')?.focus(); });
+document.addEventListener('dblclick', e => { const box = e.target.closest('.cmp-box'); if (box && !e.target.closest('.cmp-bar') && curPage().items.find(x => x.id === box.dataset.box)?.t === 'text') $('#cp-text')?.focus(); });
 function composeChange(t) {
   const L = repLayout(), pg = curPage(), it = pg.items?.find(x => x.id === S.csel);
   if (t.id === 'cmp-title') pg.title = t.value;
@@ -10343,7 +10346,7 @@ document.addEventListener('click', e => {
     else { S.csortSel = new Set([id]); S.csortLast = i; }
     rerenderCompose(); return;
   }
-  const cp = e.target.closest('[data-cpage]'); if (cp) { S.cpage = +cp.dataset.cpage; S.csel = null; rerenderCompose(); return; }
+  const cp = e.target.closest('[data-cpage]'); if (cp) { S.cpage = +cp.dataset.cpage; S.csel = null; S.cmulti = new Set(); rerenderCompose(); return; }
   const ca = e.target.closest('[data-cadd]'); if (ca) { const pg = curPage(), k = ca.dataset.cadd, bd = bodyOf(pg), low = Math.max(bd.y, ...pg.items.map(x => x.y + x.h + 12)), it = newItem(k, bd.x, low + RITEMS[k][2] <= bd.y + bd.h ? low : bd.y); if (RITEMS[k][1] === BODY.w) it.w = bd.w; if (k === 'section') it.o.xs = structuredClone(S.xs);
     if (k === 'scalebar') { const m = pg.items.find(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); it.frame = false; if (m) { it.o = { link: m.id }; it.x = m.x + 10; it.y = m.y + m.h - it.h - 10; } }   // inside its map's bottom-left corner
     clampIt(it); pg.items.push(it); S.csel = it.id; commit(); return; }
@@ -10386,8 +10389,8 @@ document.addEventListener('click', e => {
     case 'go-lab': if (b) { S.dtab = 'samples'; lsSet('bhlog.dtab', 'samples'); goTab('edit'); } break;
     case 'go-details': if (b) { S.dtab = 'details'; lsSet('bhlog.dtab', 'details'); goTab('edit'); } break;
     case 'go-slug': if (S.tab !== 'gw') goTab('gw'); setTimeout(() => [...document.querySelectorAll('#view h3')].find(h => /slug/i.test(h.textContent))?.closest('section')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60); break;
-    case 'cmp-import': case 'cmp-rot-l': case 'cmp-rot-r':
     case 'cmp-addmenu': { const m = $('.cmp-addmenu'); if (m) m.hidden = !m.hidden; break; }
+    case 'cmp-import': case 'cmp-rot-l': case 'cmp-rot-r':
     case 'cmp-xs-use': case 'cmp-pdf': case 'cmp-up': case 'cmp-down': case 'cmp-dup': case 'cmp-delpage': case 'cmp-del': case 'cmp-front': case 'cmp-copy': case 'cmp-img':
     case 'cmp-tpl-apply': case 'cmp-tpl-save': case 'cmp-tpl-save-go': case 'cmp-tpl-del': case 'cmp-tpl-del-go': composeAct(act); break;
     case 'bh-tpl': saveBhTemplate(); break;
@@ -10532,7 +10535,7 @@ document.addEventListener('change', e => {
   if (e.target.id === 'map-file') { const f = e.target.files[0]; if (f) (e.target.dataset.mode === 'imp-loc' ? importLocations : importShapes)(f); e.target.value = ''; return; }
   if (e.target.dataset.mfeat) { const f = featsOf().find(x => x.id === S.mapSel); if (f) { f[e.target.dataset.mfeat] = e.target.value; saveFeats(featsOf()); drawPlan(); } return; }
   if (e.target.id === 'mf-place') { S.placeId = e.target.value; return; }
-  if (S.tab === 'compose' && (e.target.closest('.cmp') || e.target.id === 'cmp-img-file' || e.target.id === 'rep-file')) { composeChange(e.target); return; }
+  if (S.tab === 'compose' && (e.target.closest('.cmp, #ctl') || e.target.id === 'cmp-img-file' || e.target.id === 'rep-file')) { composeChange(e.target); return; }
   if (e.target.dataset.secshow) { setSec(e.target.dataset.secshow, e.target.checked); return; }
   if (e.target.dataset.vis) { e.target.checked ? S.offMap.delete(e.target.dataset.vis) : S.offMap.add(e.target.dataset.vis); saveVis(); return; }
   if (e.target.dataset.visgrp) { const g = e.target.dataset.visgrp; for (const b of projList().filter(b => !!b.well?.installed === (g === 'mw'))) e.target.checked ? S.offMap.delete(b.id) : S.offMap.add(b.id); saveVis(); return; }
