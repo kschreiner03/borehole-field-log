@@ -3928,7 +3928,7 @@ function waterAt(b, date) {
 }
 const sameRound = (a, c) => a?.date && c?.date && Math.abs(Date.parse(a.date) - Date.parse(c.date)) <= 7 * 864e5;
 /* Cross-section page state: the date shown, the plume medium and parameter, and which layers are drawn */
-S.xs = { date: '', medium: 'soil', param: '', round: false, plume: true, model: false, ...jsonLS('bhlog.xs', {}) };
+S.xs = { date: '', medium: 'soil', param: '', round: false, plume: true, model: false, shape: 'guided', style: 'graded', ...jsonLS('bhlog.xs', {}) };
 /* every date the section can be shown at: when soil was sampled (drilling), groundwater samples and water readings */
 const soilDate = b => b.dateEnd || b.date || '';
 function xsDates(list) {
@@ -3972,6 +3972,147 @@ function plumeContours(P, levels) {
   const segs = levels.flatMap(level => tinLine(P, tris, Math.log10(level)).map(([a, b]) => ({ level, a, b })));
   return { tris, segs, bands: tinBands(P, tris, levels.map(Math.log10)) };
 }
+/* a plume as a concentration field over the drawing, sampled on a grid of `cell` px. at(d, e) gives [concentration, weight 0–1]
+   for a distance along the section (m) and an elevation. Groundwater:
+   - 'guided': the forecast's field, scaled at each well so it equals the measured result at the screen midpoint; the scale
+     (log10, clamped to ±2) is blended smoothly between wells (monotone cubic, exact at each well). Falls back to 'data' with the reason when the forecast can't run.
+   - 'data': log10 blended between wells across the screened depth only, fading to nothing within 0.35 m outside the screens.
+   Soil and vapour: the triangulated network of samples, inside the data only. Every field fades out over 5 m past the
+   outermost data point and stays below the water table (groundwater). */
+const PF_FADE = 5, PF_SCREEN = .35, PF_CLAMP = 2;
+function plumeField(pos, xs, G, cell = 4) {
+  const medium = xs.medium || 'soil', param = medium === 'vapour' ? '' : xs.param, date = xs.date || '';
+  const lv = plumeLevels(medium, param), pts = plumePoints(pos, medium, param, date, !!xs.round).filter(p => !(p.lt && lv.length && p.v >= lv[0].v));
+  const lerp = (arr, d) => { if (!arr.length) return 0; if (d <= arr[0][0]) return arr[0][1]; for (let i = 1; i < arr.length; i++) if (d <= arr[i][0]) { const [a, va] = arr[i - 1], [b, vb] = arr[i]; return b - a > 1e-9 ? va + (vb - va) * (d - a) / (b - a) : vb; } return arr[arr.length - 1][1]; };
+  const byD = arr => arr.sort((p, q) => p[0] - q[0]);
+  // smooth blend through the wells (monotone cubic, Fritsch and Carlson 1980): equal at each well, no overshoot, no seams
+  const smooth = arr => { const P = arr.filter((q, i) => !i || q[0] - arr[i - 1][0] > 1e-6), n = P.length; if (n < 3) return d => lerp(P, d);
+    const h = P.slice(1).map((q, i) => q[0] - P[i][0]), dl = P.slice(1).map((q, i) => (q[1] - P[i][1]) / h[i]), m = P.map((q, i) => !i ? dl[0] : i === n - 1 ? dl[n - 2] : dl[i - 1] * dl[i] <= 0 ? 0 : (dl[i - 1] + dl[i]) / 2);
+    for (let i = 0; i < n - 1; i++) { if (dl[i] === 0) { m[i] = m[i + 1] = 0; continue; } const a = m[i] / dl[i], b = m[i + 1] / dl[i], t = a * a + b * b; if (t > 9) { const k = 3 / Math.sqrt(t); m[i] = k * a * dl[i]; m[i + 1] = k * b * dl[i]; } }
+    return d => { if (d <= P[0][0]) return P[0][1]; if (d >= P[n - 1][0]) return P[n - 1][1]; let i = 0; while (d > P[i + 1][0]) i++; const t = (d - P[i][0]) / h[i], t2 = t * t, t3 = t2 * t;
+      return (2 * t3 - 3 * t2 + 1) * P[i][1] + (t3 - 2 * t2 + t) * h[i] * m[i] + (-2 * t3 + 3 * t2) * P[i + 1][1] + (t3 - t2) * h[i] * m[i + 1]; }; };
+  const dMin = pts.length ? Math.min(...pts.map(p => p.d)) : 0, dMax = pts.length ? Math.max(...pts.map(p => p.d)) : 0;
+  const fade = d => d < dMin ? Math.max(0, 1 - (dMin - d) / PF_FADE) : d > dMax ? Math.max(0, 1 - (d - dMax) / PF_FADE) : 1;
+  const lg = v => Math.log10(Math.max(v, 1e-12));
+  let method = medium === 'groundwater' ? (xs.shape === 'data' ? 'data' : 'guided') : 'points', note = '', at;
+  if (medium === 'groundwater') {
+    const wtE = byD(pos.map(p => { const w = waterAt(p.b, date); return w && p.b.elevation != null ? [p.d, p.b.elevation - w.depth] : null; }).filter(Boolean));
+    const mid = p => p.b.elevation - (p.top + p.bot) / 2;
+    // screens grouped by position along the section: the shallowest and the deepest at each position make two levels, so a
+    // nested well keeps its own result; a third screen at the same spot is named in the note
+    const levels = list => { const at = []; for (const p of [...list].sort((q, r) => q.d - r.d)) { const g = at.find(x => Math.abs(x.d - p.d) < .5); g ? g.ps.push(p) : at.push({ d: p.d, ps: [p] }); }
+      at.forEach(g => g.ps.sort((q, r) => mid(r) - mid(q))); return { at, top: at.map(g => g.ps[0]), bot: at.map(g => g.ps[g.ps.length - 1]), extra: at.flatMap(g => g.ps.slice(1, -1)) }; };
+    const twoLevel = (Lv, val) => { const s0 = smooth(byD(Lv.top.map(p => [p.d, val(p)]))), s1 = smooth(byD(Lv.bot.map(p => [p.d, val(p)]))), m0 = byD(Lv.top.map(p => [p.d, mid(p)])), m1 = byD(Lv.bot.map(p => [p.d, mid(p)]));
+      return (d, e) => { const a0 = lerp(m0, d), a1 = lerp(m1, d); if (a0 - a1 < .1) return s0(d); const t = Math.max(0, Math.min(1, (a0 - e) / (a0 - a1))); return s0(d) + (s1(d) - s0(d)) * t; }; };
+    const extraNote = L => L.extra.length ? ` ${L.extra.map(p => p.b.name).join(', ')} left out (a third screen at the same spot).` : '';
+    let run = null, guided = null;
+    if (method === 'guided') {
+      run = modelRun(date, xs);
+      let why = !run.ok ? run.missing.join('; ') : run.P.param !== param ? `the forecast is set up for ${LAB_PARAMS[run.P.param]?.label || run.P.param}` : !pts.length ? 'no results to match' : '';
+      if (!why) {
+        const P = run.P, when = P.at || date, cAt = (d, e) => { const [E, N] = G.pos.at(d); return modelAt(P, E, N, e, when).c; };
+        // every result, including non-detects with a high detection limit: their limit is an upper bound on the plume
+        const all = plumePoints(pos, medium, param, date, !!xs.round), res = new Map(), off = [];
+        for (const p of all) { const m = cAt(p.d, mid(p)) || 0;
+          if (p.lt) res.set(p, m > 0 ? Math.min(0, lg(p.v) - lg(m)) : 0);   // capped at the detection limit, never raised
+          else if (!(m > 1e-6) || Math.abs(lg(p.v) - lg(m)) > PF_CLAMP) off.push(p.b.name);
+          else res.set(p, lg(p.v) - lg(m)); }
+        if (off.length) why = `the forecast is near zero or more than 100× off at ${off.join(', ')}, so its shape can't be matched to the result${off.length > 1 ? 's' : ''} there`;
+        else { const Lv = levels(all), rAt = twoLevel(Lv, p => res.get(p));
+          at = (d, e) => { const c = cAt(d, e); return c == null ? [0, 0] : [c * Math.pow(10, rAt(d, e)), fade(d)]; };
+          guided = 'Interpreted: forecast shape matched to measured results' + extraNote(Lv); }
+      }
+      if (why) { method = 'data'; note = `Shown as data only, because the forecast can't shape this plume: ${why.replace(/[.\s]+$/, '')}.`; }
+    }
+    if (method === 'guided') note = guided;
+    else {
+      const Lv = levels(pts), band = sel => { const ps = Lv[sel], lc = byD(ps.map(p => [p.d, lg(p.v)])), tE = byD(ps.map(p => [p.d, p.b.elevation - p.top])), bE = byD(ps.map(p => [p.d, p.b.elevation - p.bot]));
+        return (d, e) => { const top = lerp(tE, d), bot = lerp(bE, d), out = e > top ? e - top : e < bot ? bot - e : 0; return out >= PF_SCREEN ? [0, 0] : [Math.pow(10, lerp(lc, d)), fade(d) * (1 - out / PF_SCREEN)]; }; };
+      const b0 = pts.length ? band('top') : null, b1 = pts.length ? band('bot') : null;
+      at = (d, e) => { if (!pts.length || (wtE.length && e > lerp(wtE, d) + 1e-9)) return [0, 0]; const u = b0(d, e), v = b1(d, e); return v[1] > u[1] || (v[1] === u[1] && v[0] > u[0]) ? v : u; };
+      note = (note ? note + ' ' : '') + 'No data above or below the well screens.' + extraNote(Lv);
+    }
+  } else {
+    // soil and vapour: barycentric interpolation of log10 on the triangulated samples, in drawing coordinates
+    const P = []; for (const p of pts) { const q = [G.X(p.d), G.Y(p.b.elevation - p.top), lg(p.v)]; if (!P.some(o => Math.abs(o[0] - q[0]) < 1e-3 && Math.abs(o[1] - q[1]) < 1e-3)) P.push(q); }
+    const tris = P.length >= 3 ? delaunay(P).filter(([a, b, c]) => Math.abs((P[b][0] - P[a][0]) * (P[c][1] - P[a][1]) - (P[c][0] - P[a][0]) * (P[b][1] - P[a][1])) > 1e-6) : [];
+    at = (d, e) => { const x = G.X(d), y = G.Y(e);
+      for (const [a, b, c] of tris) { const A = P[a], B = P[b], C = P[c], den = (B[1] - C[1]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[1] - C[1]);
+        const l1 = ((B[1] - C[1]) * (x - C[0]) + (C[0] - B[0]) * (y - C[1])) / den, l2 = ((C[1] - A[1]) * (x - C[0]) + (A[0] - C[0]) * (y - C[1])) / den, l3 = 1 - l1 - l2;
+        if (l1 >= -1e-9 && l2 >= -1e-9 && l3 >= -1e-9) return [Math.pow(10, l1 * A[2] + l2 * B[2] + l3 * C[2]), 1]; }
+      return [0, 0]; };
+    note = 'Interpolated between samples';
+  }
+  const x0 = G.X(0), x1 = G.X(G.maxD), y0 = G.m.t, y1 = G.m.t + G.plotH, nx = Math.max(2, Math.ceil((x1 - x0) / cell)), ny = Math.max(2, Math.ceil((y1 - y0) / cell));
+  const c = new Float32Array((nx + 1) * (ny + 1)), a = new Float32Array((nx + 1) * (ny + 1));
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) {
+    const x = x0 + (x1 - x0) * i / nx, y = y0 + (y1 - y0) * j / ny, d = (x - G.X(0)) / (G.X(G.maxD) - G.X(0) || 1) * G.maxD, e = G.e1 - (y - G.m.t) / G.plotH * (G.e1 - G.e0);
+    const [v, w] = at(d, e); c[j * (nx + 1) + i] = Number.isFinite(v) ? v : 0; a[j * (nx + 1) + i] = Number.isFinite(w) ? w : 0;
+  }
+  return { nx, ny, x0, x1, y0, y1, c, a, at, method, note, pts, lv, medium, param };
+}
+/* contour lines of a field at one level (marching squares on log10, cells with weight under minA left out), joined into
+   continuous polylines in drawing coordinates */
+function fieldContours(g, level, minA = .5) {
+  const { nx, ny, c, a, x0, x1, y0, y1 } = g, L = Math.log10(level), sx = (x1 - x0) / nx, sy = (y1 - y0) / ny, segs = [];
+  const val = k => a[k] < minA || !(c[k] > 0) ? -99 : Math.log10(c[k]), W = nx + 1;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const k = j * W + i, q = [val(k), val(k + 1), val(k + W + 1), val(k + W)], p = [[0, 0], [1, 0], [1, 1], [0, 1]], pts = [];
+    for (let e = 0; e < 4; e++) { const u = q[e], w = q[(e + 1) % 4]; if ((u >= L) !== (w >= L)) { const f = (L - u) / (w - u), A = p[e], B = p[(e + 1) % 4]; pts.push([x0 + (i + A[0] + (B[0] - A[0]) * f) * sx, y0 + (j + A[1] + (B[1] - A[1]) * f) * sy]); } }
+    if (pts.length >= 2) segs.push([pts[0], pts[1]]); if (pts.length === 4) segs.push([pts[2], pts[3]]);
+  }
+  const key = q => Math.round(q[0] * 100) + ',' + Math.round(q[1] * 100), at = new Map(), used = new Uint8Array(segs.length), out = [];
+  segs.forEach((sg, i) => sg.forEach(q => { const k = key(q); at.has(k) ? at.get(k).push(i) : at.set(k, [i]); }));
+  segs.forEach((sg, i) => {
+    if (used[i]) return; used[i] = 1; const line = [sg[0], sg[1]];
+    for (const end of [1, 0]) { let q = end ? line[line.length - 1] : line[0], j;
+      while ((j = (at.get(key(q)) || []).find(n => !used[n])) != null) { used[j] = 1; const r = key(segs[j][0]) === key(q) ? segs[j][1] : segs[j][0]; end ? line.push(r) : line.unshift(r); q = r; } }
+    out.push(line);
+  });
+  return out;
+}
+const PLUME_RAMP = { meas: ['#fee8c8', '#fdbb84', '#e34a33', '#99000d'], model: ['#efedf5', '#bcbddc', '#756bb1', '#3f007d'] };   // sequential reds measured, purples model; neither is the water blue
+const hexMix = (cols, f) => { f = Math.max(0, Math.min(1, f)) * (cols.length - 1); const i = Math.min(cols.length - 2, Math.floor(f)), u = f - i, h = s => [1, 3, 5].map(k => parseInt(s.slice(k, k + 2), 16)), A = h(cols[i]), B = h(cols[i + 1]); return `rgb(${A.map((v, k) => Math.round(v + (B[k] - v) * u)).join(',')})`; };
+const fmtLevel = v => (+(+v).toPrecision(3)).toLocaleString('en-CA', { maximumSignificantDigits: 3 });
+/* draws a field in one of three styles: 'lines' (labelled contours over a light tint), 'graded' (colour deepening with log
+   concentration, thin contours) or 'bands' (filled steps at each level). dashed = contour lines only, dashed (the forecast
+   beside a measured plume). Cells are merged into runs of equal colour to keep the drawing light. */
+function fieldSVG(g, { style = 'graded', family = 'meas', dashed = false, name = '' } = {}) {
+  const G = XS_GEOM, lv = g.lv || [], cols = PLUME_RAMP[family], line = family === 'model' ? '#3f007d' : '#7f0000', o = [];
+  if (!lv.length) return '';
+  const unit = g.medium === 'vapour' ? 'ppm' : g.medium === 'groundwater' ? 'mg/L' : LAB_PARAMS[g.param]?.unit || '';
+  const { nx, ny, c, a, x0, x1, y0, y1 } = g, sx = (x1 - x0) / nx, sy = (y1 - y0) / ny, W = nx + 1, l0 = Math.log10(lv[0].v), l3 = Math.log10(lv[0].v * 300);
+  const cell = (i, j) => { const k = j * W + i; return [(c[k] + c[k + 1] + c[k + W] + c[k + W + 1]) / 4, (a[k] + a[k + 1] + a[k + W] + a[k + W + 1]) / 4]; };
+  const colourOf = style === 'graded' ? (v, w) => { if (!(v >= lv[0].v * .6) || w <= .02) return null; const lg = Math.log10(v), al = Math.round(Math.min(1, (lg - Math.log10(lv[0].v * .6)) / .22) * w * .85 * 10) / 10; return al > 0 ? [hexMix(cols, Math.round((lg - l0) / (l3 - l0) * 20) / 20), al] : null; }
+    : style === 'bands' ? (v, w) => { if (!(v >= lv[0].v) || w <= .02) return null; const k = lv.filter(l => v >= l.v).length; return [cols[k], Math.round((.5 + k * .13) * w * 10) / 10]; }
+    : (v, w) => v >= lv[0].v && w > .3 ? [cols[1], Math.round(.25 * w * 10) / 10] : null;
+  const attr = style === 'graded' ? 'data-cell' : style === 'bands' ? 'data-band' : 'data-tint';
+  if (!dashed) {
+    o.push(`<g clip-path="url(#${G.gclip})" shape-rendering="crispEdges" ${family === 'model' ? 'data-model-fill="1"' : ''}>`);
+    for (let j = 0; j < ny; j++) { let run = null;
+      const flush = () => { if (run && run.col) o.push(`<rect ${attr}="1" x="${(x0 + run.i * sx).toFixed(2)}" y="${(y0 + j * sy).toFixed(2)}" width="${(run.n * sx).toFixed(2)}" height="${sy.toFixed(2)}" fill="${run.col[0]}" fill-opacity="${run.col[1]}"/>`); };
+      for (let i = 0; i < nx; i++) { const [v, w] = cell(i, j), col = colourOf(v, w), k = col ? col.join('|') : '';
+        if (run && run.k === k) run.n++; else { flush(); run = { i, n: 1, k, col }; } }
+      flush(); }
+    o.push('</g>');
+  }
+  o.push(`<g clip-path="url(#${G.gclip})">`);
+  const labels = [];
+  lv.forEach((l, k) => {
+    const lines = fieldContours(g, l.v); if (!lines.length) return;
+    const wdt = dashed ? 1.2 + k * .3 : style === 'lines' ? 1.1 + k * .5 : .8 + k * .2;
+    o.push(`<path ${family === 'model' ? 'data-model-contour' : 'data-contour'}="${[1, 10, 100][k]}" d="${lines.map(ln => ln.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')).join('')}" fill="none" stroke="${line}" stroke-width="${wdt}" stroke-linejoin="round"${dashed ? ' stroke-dasharray="5 3"' : ''}><title>${esc(`${family === 'model' ? 'Model, not measured: ' : ''}${name} ${l.label}${family === 'model' ? '' : ', ' + (g.note ? g.note[0].toLowerCase() + g.note.slice(1) : 'interpolated')}`)}</title></path>`);
+    if (style === 'lines' || k === 0 || dashed && k === 0) {
+      const topY = Math.min(...lines.flat().map(q => q[1])); let best = null; for (const ln of lines) for (const q of ln) { if (q[0] > x1 - 70 || q[1] < y0 + 6 || q[1] > y1 - 18 || (!dashed && q[1] < topY + 16)) continue; if (!best || (dashed ? q[1] > best[1] : q[0] > best[0])) best = q; }
+      if (best && !dashed) { const near = lines.flat().filter(q => q[0] > best[0] - 30); best = [best[0], (Math.min(...near.map(q => q[1])) + Math.max(...near.map(q => q[1]))) / 2]; }   // beside the tip, halfway down it
+      if (best && !(dashed && k)) { let lx = best[0] + 4, ly = best[1] + (dashed ? 12 : 4); const tw = 130;   // step clear of labels already placed
+        for (let n = 0; n < 6 && (G.labels || []).some(q => Math.abs(q[1] - ly) < 12 && lx < q[0] + q[2] && q[0] < lx + tw); n++) ly += 13;
+        (G.labels ||= []).push([lx, ly, tw]); best = [lx - 4, ly - (dashed ? 12 : 4)]; labels.push(`<text data-clabel="${[1, 10, 100][k]}" x="${(best[0] + 4).toFixed(1)}" y="${(best[1] + (dashed ? 12 : 4)).toFixed(1)}" style="font:600 10.5px Arial,sans-serif;fill:${line};paint-order:stroke;stroke:#fff;stroke-width:3px">${esc(`${family === 'model' ? 'forecast ' : k === 0 && g.medium !== 'vapour' ? 'guideline ' : ''}${fmtLevel(l.v)} ${unit}`)}</text>`); }
+    }
+  });
+  o.push('</g>'); (G.over ||= []).push(...labels);
+  return o.join('');
+}
 let XS_LAST = [];
 const xsLastPts = () => XS_LAST;
 const XS_RAMP = ['#fdd49e', '#fc8d59', '#d7301f', '#7f0000'];   // below the first level, ×1–10, ×10–100, over ×100 (sequential, not the water blue)
@@ -3993,27 +4134,31 @@ function plumeSVG(pos, xs, X, Y, top, bw, W, H, m) {
     if (seen.has(k)) { const q = seen.get(k); q[2] = Math.max(q[2], z); } else { const q = [x, y, z]; seen.set(k, q); P.push(q); }
   }
   XS_LAST = P;
-  if (lv.length && P.length >= 3) {
-    const C = plumeContours(P, lv.map(l => l.v));
-    o.push(`<defs>${[1, 2, 3].map(k => `<pattern id="${uid2}${k}" width="${8 - k * 1.5}" height="${8 - k * 1.5}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0v${8 - k * 1.5}" stroke="${XS_RAMP[k]}" stroke-width="1.1"/></pattern>`).join('')}</defs>`);
-    o.push(`<g clip-path="url(#${XS_GEOM?.gclip})">`);
-    C.bands.forEach((polys, k) => { if (k) for (const pg of polys) o.push(`<path d="${pg.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')}Z" fill="url(#${uid2}${k})" opacity=".8"/>`); });
-    lv.forEach((l, i) => { const segs = C.segs.filter(sg => sg.level === l.v); if (segs.length) o.push(`<path data-contour="${[1, 10, 100][i]}" d="${segs.map(sg => `M${sg.a[0].toFixed(1)} ${sg.a[1].toFixed(1)}L${sg.b[0].toFixed(1)} ${sg.b[1].toFixed(1)}`).join('')}" fill="none" stroke="${XS_RAMP[i + 1]}" stroke-width="${1.2 + i * .4}" stroke-dasharray="5 3"><title>${esc(name)} ${esc(l.label)}, interpolated between samples</title></path>`); });
-    o.push('</g>');
-  }
+  const g = lv.length ? plumeField(pos, xs, XS_GEOM, 4) : null;
+  if (g) o.push(fieldSVG(g, { style: xs.style || 'graded', family: 'meas', name }));
   const notes = [hiND.length ? `${hiND.length} non-detect${hiND.length > 1 ? 's' : ''} with a detection limit at or above the ${lv[0]?.label.split(' (')[0]} left out of the contours` : '', pts.undated ? `${pts.undated} undated result${pts.undated > 1 ? 's' : ''} not shown` : ''].filter(Boolean);
   if (notes.length) o.push(`<text class="lbl2" x="${m.l + 24}" y="${m.t - 8}" style="fill:var(--warn,#a3470b)">${esc(notes.join('; '))}.</text>`);
+  const over = (XS_GEOM.over ||= []), unit = medium === 'vapour' ? 'ppm' : medium === 'groundwater' ? 'mg/L' : LAB_PARAMS[param]?.unit || '', R = PLUME_RAMP.meas;
   for (const p of pts) {
-    const x = X(p.d), y1 = Y(top(p.b) - p.top), y2 = Y(top(p.b) - p.bot), c = XS_RAMP[cls(p.v)], tip = `${p.b.name}: ${name} ${p.lt ? '<' : ''}${(+p.v).toLocaleString('en-CA', { maximumSignificantDigits: 4 })} ${medium === 'vapour' ? 'ppm' : medium === 'groundwater' ? 'mg/L' : LAB_PARAMS[param]?.unit || ''}${p.lt ? ' (not detected)' : ''}, ${p.top === p.bot ? fu(p.top) : `${fx(p.top)}–${fu(p.bot)}`} · sampled ${p.date}${p.age > 0 ? `, ${p.age} days before the date shown` : ''}`;
-    if (p.top === p.bot) o.push(`<circle data-pt="1" data-lt="${p.lt ? 1 : 0}" cx="${x + bw / 2 + 7}" cy="${y1}" r="4.2" fill="${p.lt ? '#fff' : c}" stroke="${p.lt ? '#7f0000' : '#3a1a00'}" stroke-width="1"><title>${esc(tip)}</title></circle>`);
-    else o.push(`<rect data-pt="1" data-lt="${p.lt ? 1 : 0}" x="${x + bw / 2 + 3}" y="${y1}" width="8" height="${Math.max(2, y2 - y1)}" fill="${p.lt ? '#fff' : c}" stroke="#3a1a00" stroke-width="1"><title>${esc(tip)}</title></rect>`);
+    const x = X(p.d), y = Y(top(p.b) - (p.top + p.bot) / 2), k = cls(p.v), c = R[k], val = `${p.lt ? '<' : ''}${(+p.v).toLocaleString('en-CA', { maximumSignificantDigits: 3 })}`;
+    const tip = `${p.b.name}: ${name} ${val} ${unit}${p.lt ? ' (not detected)' : ''}, ${p.top === p.bot ? fu(p.top) : `screen ${fx(p.top)}–${fu(p.bot)}, shown at its middle`} · sampled ${p.date}${p.age > 0 ? `, ${p.age} days before the date shown` : ''}`;
+    over.push(`<circle data-pt="1" data-lt="${p.lt ? 1 : 0}" cx="${x}" cy="${y.toFixed(1)}" r="${medium === 'groundwater' ? 4.6 : 3.8}" fill="${p.lt ? '#fff' : c}" stroke="#4d0000" stroke-width="${p.lt ? 1.3 : 1.1}"${p.lt ? ' stroke-dasharray="2 1.5"' : ''}><title>${esc(tip)}</title></circle>`);
+    if (medium === 'groundwater') over.push(`<text x="${x + bw / 2 + 4}" y="${(y + 3.5).toFixed(1)}" style="font:600 10px Arial,sans-serif;fill:#4d0000;paint-order:stroke;stroke:#fff;stroke-width:3px">${esc(val)}</text>`);
   }
-  const items = lv.length ? [`Below ${lv[0].label.split(' (')[0]}`, ...lv.map(l => `≥ ${l.label}`)] : ['No guideline set, so no contours'];
-  let lx = m.l; const ly = H - 8;
+  // legend: what is shown, in the chosen style, and how it was shaped
+  const style = xs.style || 'graded', gid = 'pg' + Math.random().toString(36).slice(2, 7); let lx = m.l; const ly = H - 22;
   const head = `${name}${medium === 'vapour' ? '' : ', ' + medium}${xs.date ? `, as of ${xs.date}` : ', latest'}${xs.round ? ', this round only' : ''}:`;
-  o.push(`<text x="${lx}" y="${ly}" class="lbl2" style="font-weight:600">${esc(head)}</text>`); lx += head.length * 6 + 10;
-  items.forEach((t, i) => { o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="9" fill="${lv.length ? XS_RAMP[i] : '#fff'}" stroke="#3a1a00" stroke-width=".6"/><text x="${lx + 14}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 24 + t.length * 5.6; });
-  o.push(`<circle cx="${lx + 5}" cy="${ly - 4}" r="4" fill="#fff" stroke="#7f0000"/><text x="${lx + 13}" y="${ly}" class="lbl2">not detected · hatched = interpolated</text>`);
+  o.push(`<text x="${lx}" y="${ly}" class="lbl2" style="font-weight:600">${esc(head)}</text>`); lx += textW(head, '600 11px ' + labelFont()) + 10;
+  const sw = (t, el) => { o.push(el(lx), `<text x="${lx + 22}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 30 + textW(t, '11px ' + labelFont()); };
+  if (!lv.length) sw('no guideline set, so no contours', x => `<rect x="${x}" y="${ly - 9}" width="16" height="9" fill="#fff" stroke="#3a1a00" stroke-width=".6"/>`);
+  else if (style === 'graded') { o.push(`<defs><linearGradient id="${gid}">${R.map((c, i) => `<stop offset="${i / (R.length - 1)}" stop-color="${c}"/>`).join('')}</linearGradient></defs>`);
+    const t = `${fmtLevel(lv[0].v)} → ${fmtLevel(lv[0].v * 300)} ${unit} (log scale), lines at ${lv.map(l => fmtLevel(l.v)).join(' / ')}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="60" height="9" fill="url(#${gid})" stroke="#3a1a00" stroke-width=".6"/><text x="${lx + 66}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 74 + textW(t, '11px ' + labelFont()); }
+  else if (style === 'bands') lv.forEach((l, i) => sw(`≥ ${l.label}`, x => `<rect x="${x}" y="${ly - 9}" width="16" height="9" fill="${R[i + 1]}" stroke="#3a1a00" stroke-width=".6"/>`));
+  else sw(`lines at ${lv.map(l => fmtLevel(l.v)).join(', ')} ${unit} (${lv.map(l => l.label.split(' (')[0]).join(', ')})`, x => `<path d="M${x} ${ly - 4}h16" stroke="#7f0000" stroke-width="1.6"/>`);
+  sw('below first level', x => `<circle cx="${x + 8}" cy="${ly - 4}" r="4" fill="${R[0]}" stroke="#4d0000"/>`);
+  sw('not detected', x => `<circle cx="${x + 8}" cy="${ly - 4}" r="4" fill="#fff" stroke="#4d0000" stroke-width="1.3" stroke-dasharray="2 1.5"/>`);
+  if (g?.note) { const room = W - m.l - 8, f = 'italic 11px ' + labelFont(); let t = g.note; while (t.length > 8 && textW(t, f) > room) t = t.slice(0, -2).trimEnd() + '…';
+    o.push(`<text data-fnote="1" x="${m.l}" y="${H - 8}" class="lbl2" style="font-style:italic"><title>${esc(g.note)}</title>${esc(t)}</text>`); }
   return o.join('');
 }
 /* ---------- forecast: cited properties and transport solutions ---------- */
@@ -4096,6 +4241,12 @@ const MODEL_FIELDS = [   // key, label, unit
   ['start', 'Release began (blank = long-term steady state)', 'date'], ['at', 'Forecast date (blank = date shown)', 'date']];
 const MODEL_COLS = ['#efedf5', '#bcbddc', '#807dba', '#54278f'];   // model output: purple family, never the plume oranges or the water blue
 /* everything the forecast needs, each value with where it came from, or the list of what is missing */
+/* vertical dispersivity presets, as listed in the BIOSCREEN 1.3 User's Manual (EPA/600/R-96/087, 1996), p. 19 */
+const AZ_RULES = {
+  '': ['0 (BIOSCREEN default)', () => 0, 'about 0: no vertical spreading (BIOSCREEN default; conservative)'],
+  astm: ['0.05 × αx (ASTM 1995)', ax => .05 * ax, '0.05 × αx (ASTM 1995, as listed in the BIOSCREEN User\u2019s Manual, EPA/600/R-96/087, p. 19)'],
+  epa: ['0.025 × αx (EPA 1986, low end)', ax => .025 * ax, '0.025 × αx, low end of 0.025–0.1 αx (EPA 1986, as listed in the BIOSCREEN User\u2019s Manual, EPA/600/R-96/087, p. 19)']
+};
 function modelRun(date, xs = S.xs) {
   const site = siteOf() || {}, u = site.model || {}, missing = [], P = { src: {} }, G = XS_GEOM;
   const val = (k, v, src) => { if (u[k] != null && u[k] !== '') { P[k] = +u[k]; P.src[k] = 'entered'; } else { P[k] = v; P.src[k] = src; } };
@@ -4104,14 +4255,14 @@ function modelRun(date, xs = S.xs) {
   for (const k of ['koc', 'H', 'sol', 'hl']) { P[k] = chem[k]; P.src[k] = chem.src[k]; } missing.push(...chem.missing);
   const geo = [...(!G || !G.located ? ['The forecast needs borehole coordinates to place the section on the flow direction.'] : []), ...(!G || G.noElev ? ['The forecast needs ground elevations to calculate heads.'] : [])];
   if (geo.length) return { ok: false, missing: geo, P };
-  const F = gwFlow(); if (F.error) return { ok: false, missing: ['Groundwater flow: ' + F.error], P };
+  const F = gwFlow(mapList(), u.at || date || undefined); if (F.error) return { ok: false, missing: ['Groundwater flow: ' + F.error], P };
   if (F.flat || !(F.i > 0)) return { ok: false, missing: ['The water table is too flat to define a flow direction.'], P };
   if (F.K == null) missing.push('hydraulic conductivity (add a slug test)');
   const soil = CCME_SOIL[u.soil === 'fine' ? 'fine' : 'coarse'];
   for (const k of ['foc', 'rhob', 'thw', 'tha', 'I']) val(k, soil[k], CCME_SRC);
   for (const k of ['Y', 'Z', 'L', 'da']) val(k, CCME_SITE[k], CCME_SRC);
   const Lp = Math.max(1, G.maxD); val('ax', xuEckstein(Lp), `Xu and Eckstein (1995) for a plume length of ${Lp.toFixed(0)} m (the section length; assumed)`);
-  val('ay', P.ax / 10, 'ax / 10 (Gelhar et al. 1992; assumed)'); val('az', 0, 'about 0: no vertical spreading (BIOSCREEN default; conservative)');
+  val('ay', P.ax / 10, 'ax / 10 (Gelhar et al. 1992; assumed)'); const azr = AZ_RULES[u.azRule] || AZ_RULES['']; val('az', azr[1](P.ax), azr[2]);
   val('srcHl', null, 'constant source (conservative)'); P.start = u.start || ''; P.at = u.at || date || '';
   if (P.srcHl > 0 && !P.start) missing.push('a release date: a source half-life needs one (at steady state a decaying source would be gone)');
   P.v = F.K != null ? F.v * 86400 : null; P.src.v = F.K != null ? `K·i/nₑ from the flow calculation (${F.nK} slug test${F.nK > 1 ? 's' : ''}, nₑ ${F.ne} assumed)` : '';
@@ -4155,16 +4306,26 @@ function modelGrid(date, res = 6, xs = S.xs) {
   const reach = Math.max(0, ...segs.filter(s => s.k === 0).flatMap(s => [toXd(s.a), toXd(s.b)]));
   return { run, cells, pts, tris, segs, lv, reach, len: G.maxD, bands: lv.length ? tinBands(pts, tris, lv.map(l => Math.log10(l.v))) : [] };
 }
+/* the forecast as a field on the same grid as the measured plume, for the shared renderer */
+function modelField(run, date, G, cell = 4) {
+  const P = run.P, when = P.at || date, x0 = G.X(0), x1 = G.X(G.maxD), y0 = G.m.t, y1 = G.m.t + G.plotH, nx = Math.max(2, Math.ceil((x1 - x0) / cell)), ny = Math.max(2, Math.ceil((y1 - y0) / cell));
+  const c = new Float32Array((nx + 1) * (ny + 1)), a = new Float32Array((nx + 1) * (ny + 1));
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) {
+    const d = (i / nx) * G.maxD, e = G.e1 - (j / ny) * (G.e1 - G.e0), [E, N] = G.pos.at(d), r = modelAt(P, E, N, e, when), k = j * (nx + 1) + i;
+    c[k] = r.c > 0 && Number.isFinite(r.c) ? r.c : 0; a[k] = r.c == null ? 0 : 1;
+  }
+  return { nx, ny, x0, x1, y0, y1, c, a, lv: plumeLevels('groundwater', P.param), medium: 'groundwater', param: P.param };
+}
 function modelSVG(date, xs = S.xs) {
   const G = XS_GEOM, g = modelGrid(date, 6, xs), o = [], P = g.run.P;
   if (!g.run.ok) return `<text class="lbl2" x="${G.m.l + 24}" y="${G.m.t - 22}" style="fill:#54278f">Forecast not drawn: ${esc(g.run.missing.join('; '))}</text>`;
-  o.push(`<g clip-path="url(#${G.gclip})">`);
-  g.bands.forEach((polys, k) => { if (k) for (const pg of polys) o.push(`<path d="${pg.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')}Z" fill="${MODEL_COLS[k]}" opacity=".45"/>`); });
-  g.lv.forEach((l, k) => { const s2 = g.segs.filter(sg => sg.k === k); if (s2.length) o.push(`<path data-model-contour="${[1, 10, 100][k]}" d="${s2.map(sg => `M${sg.a[0].toFixed(1)} ${sg.a[1].toFixed(1)}L${sg.b[0].toFixed(1)} ${sg.b[1].toFixed(1)}`).join('')}" fill="none" stroke="${MODEL_COLS[k + 1]}" stroke-width="${1.4 + k * .4}"><title>Model, not measured: ${esc(LAB_PARAMS[P.param].label)} ${esc(l.label)}</title></path>`); });
-  o.push('</g>');
+  const beside = xs.plume !== false && (xs.param || xs.medium === 'vapour');   // compare: the forecast as dashed lines beside the measured plume
+  o.push(fieldSVG(modelField(g.run, date, G, 4), { style: xs.style || 'graded', family: 'model', dashed: !!beside, name: LAB_PARAMS[P.param].label }));
   if (g.lv.length) { let lx = G.m.l; const ly = G.H - 8 - G.plH, head = 'Model, not measured (forecast):';
     o.push(`<g data-model-legend="1"><text x="${lx}" y="${ly}" class="lbl2" style="font-weight:600;fill:#54278f">${head}</text>`); lx += head.length * 6 + 10;
-    g.lv.forEach((l, k) => { const t = `≥ ${l.label}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="9" fill="${MODEL_COLS[k + 1]}" stroke="#54278f" stroke-width=".6"/><text x="${lx + 14}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 24 + t.length * 5.6; });
+    const beside = xs.plume !== false && (xs.param || xs.medium === 'vapour');
+    if (beside) { const t = `dashed lines at ${g.lv.map(l => l.label.split(' (')[0]).join(', ')}`; o.push(`<path d="M${lx} ${ly - 4}h18" stroke="#3f007d" stroke-width="1.4" stroke-dasharray="5 3"/><text x="${lx + 24}" y="${ly}" class="lbl2">${esc(t)}</text>`); }
+    else g.lv.forEach((l, k) => { const t = `≥ ${l.label}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="9" fill="${PLUME_RAMP.model[k + 1]}" stroke="#3f007d" stroke-width=".6"/><text x="${lx + 14}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 24 + t.length * 5.6; });
     o.push('</g>'); }
   const when = P.start ? `on ${P.at || today()} (release from ${P.start})` : 'long-term (steady state)';
   o.push(`<text x="${G.m.l + 24}" y="34" style="font:700 11px Arial,sans-serif;fill:#54278f">Model, not measured: ${esc(LAB_PARAMS[P.param].label)} in groundwater ${esc(when)}; source ${esc(P.srcBh.name)} ${(+P.C0.toPrecision(3)).toLocaleString('en-CA')} mg/L</text>`);
@@ -4177,11 +4338,12 @@ function xsModelHTML() {
   const fmt = v => v == null || !isFinite(v) ? '' : +(+v).toPrecision(4);
   return `<section class="sec" id="xs-model-sec"><header><h3>Forecast (model)</h3><span class="note">Domenico (1987) as in BIOSCREEN 1.4 · always labelled “Model, not measured”</span><span class="sp"></span><label class="check"><input type="checkbox" id="xs-model" ${S.xs.model ? 'checked' : ''}> Show on the section</label></header><div class="body">
     ${S.xs.model ? `${run.missing.length ? `<p class="note" style="color:var(--warn,#a3470b)">Not drawn yet: ${esc(run.missing.join('; '))}.</p>` : ''}
-    <div class="fields" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+    <div class="fields" style="grid-template-columns:repeat(5,minmax(0,1fr))">
       <div class="fld"><label for="mdl-param">Compound</label><select id="mdl-param" data-mdl="param" ${ro}>${Object.keys(CHEM).map(p => `<option value="${p}" ${P.param === p ? 'selected' : ''}>${esc(LAB_PARAMS[p].label)}${CHEM[p].mixture ? ' (mixture, not modelled)' : ''}</option>`).join('')}</select></div>
       <div class="fld"><label for="mdl-src">Source from</label><select id="mdl-src" data-mdl="src" ${ro}><option value="gw" ${(u.src || 'gw') === 'gw' ? 'selected' : ''}>Groundwater result at a well</option><option value="soil" ${u.src === 'soil' ? 'selected' : ''}>Soil results, leached by recharge</option></select></div>
       <div class="fld"><label for="mdl-bh">Source borehole</label><select id="mdl-bh" data-mdl="srcBh" ${ro}>${wellsOpt}</select></div>
-      <div class="fld"><label for="mdl-soil">Soil (defaults)</label><select id="mdl-soil" data-mdl="soil" ${ro}><option value="coarse" ${u.soil !== 'fine' ? 'selected' : ''}>Coarse</option><option value="fine" ${u.soil === 'fine' ? 'selected' : ''}>Fine</option></select></div></div>
+      <div class="fld"><label for="mdl-soil">Soil (defaults)</label><select id="mdl-soil" data-mdl="soil" ${ro}><option value="coarse" ${u.soil !== 'fine' ? 'selected' : ''}>Coarse</option><option value="fine" ${u.soil === 'fine' ? 'selected' : ''}>Fine</option></select></div>
+      <div class="fld"><label for="mdl-azrule">Vertical spreading</label><select id="mdl-azrule" data-mdl="azRule" ${ro}>${Object.entries(AZ_RULES).map(([k, r]) => `<option value="${k}" ${(u.azRule || '') === k ? 'selected' : ''}>${esc(r[0])}</option>`).join('')}</select></div></div>
     <div class="scroll-x"><table class="sum"><thead><tr><th>Input</th><th class="r">Value</th><th>Unit</th><th>Source</th></tr></thead><tbody>
       ${MODEL_FIELDS.map(([k, t, un]) => `<tr><td>${esc(t)}</td><td class="r"><input ${un === 'date' ? 'type="date"' : 'type="number" step="any"'} data-mdl="${k}" value="${esc(u[k] ?? '')}" placeholder="${esc(un === 'date' ? '' : String(fmt(P[k])))}" style="width:9em" ${ro}></td><td>${esc(un === 'date' ? '' : un)}</td><td class="note">${esc(u[k] != null && u[k] !== '' ? 'entered' : P.src[k] || (k === 'hl' ? 'no biodegradation (conservative)' : ''))}</td></tr>`).join('')}
       <tr><td>Groundwater velocity</td><td class="r">${fmt(P.v)}</td><td>m/day</td><td class="note">${esc(P.src.v || '')}</td></tr>
@@ -4228,7 +4390,7 @@ function xsChecksHTML(run) {
   return `<h4 style="margin:14px 0 6px">Checks</h4><div class="scroll-x"><table class="sum" id="xs-checks"><thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead><tbody>${C.checks.map(c => `<tr><td>${esc(c.name)}</td><td><span class="pill ${c.info ? 'draft' : c.ok ? 'issued' : 'review'}">${c.info ? 'Noted' : c.ok ? 'Passed' : 'Look at this'}</span></td><td class="note">${esc(c.detail)}</td></tr>`).join('')}</tbody></table></div>
     ${C.residuals.length ? `<div class="scroll-x"><table class="sum" style="margin-top:8px"><thead><tr><th>Well</th><th>Date</th><th class="r">Measured (mg/L)</th><th class="r">Forecast (mg/L)</th><th class="r">log₁₀ measured/forecast</th></tr></thead><tbody>${C.residuals.map(x => `<tr><td>${esc(x.b.name)}</td><td>${esc(x.date)}</td><td class="r">${x.nd ? '&lt;' : ''}${sig(x.meas)}</td><td class="r">${sig(x.pred)}</td><td class="r">${x.agreeND ? 'both below the detection limit' : x.dlog == null ? '—' : x.dlog.toFixed(2)}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
 }
-function setModel(k, v) { if (S.readOnly) return; const m = { ...(siteOf()?.model || {}) }; if (v === '' || v == null) delete m[k]; else m[k] = ['param', 'src', 'srcBh', 'soil', 'start', 'at'].includes(k) ? v : +v; setSite({ ...(siteOf() || {}), model: m }); renderView(true); }
+function setModel(k, v) { if (S.readOnly) return; const m = { ...(siteOf()?.model || {}) }; if (v === '' || v == null) delete m[k]; else m[k] = ['param', 'src', 'srcBh', 'soil', 'start', 'at', 'azRule'].includes(k) ? v : +v; setSite({ ...(siteOf() || {}), model: m }); renderView(true); }
 function setXs(k, v) { S.xs = { ...S.xs, [k]: v }; lsSet('bhlog.xs', JSON.stringify(S.xs)); redrawSec(); }
 function readingFor(b) {
   if (!S.round) return latestWater(b);
@@ -4340,7 +4502,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const su = b => b.well?.installed && b.well.stickup > 0 ? b.well.stickup : 0;
   let W = forceW || Math.max(el.clientWidth, 600), H = fillH || secOpt('h'); const m = { l: 62, r: 64, t: 70, b: 30 };
   // room under the drawing for offset labels (three staggered rows) and the plume legend
-  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 20 : 0, mdH = xs?.model ? 20 : 0;
+  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 34 : 0, mdH = xs?.model ? 20 : 0;
   m.b += offH + plH + mdH; if (!fillH) H += offH + plH + mdH;
   // the forecast caption gets its own line under the header, above the borehole names
   if (mdH) { m.t += 16; if (!fillH) H += 16; }
@@ -4366,7 +4528,9 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const bw = secOpt('bw');
   for (const p of pos) o.push(`<path d="M${X(p.d) - bw / 2 - 6} ${Y(top(p.b))}h${bw + 12}" style="stroke:var(--earth)" stroke-width="2.4"/>`);
   // interpreted units: join the top and base of the same unit in neighbouring boreholes; units missing next door pinch out halfway
+  const plumeOn = xs && ((xs.plume !== false && (xs.param || xs.medium === 'vapour')) || xs.model), soilStyle = plumeOn && !xs.soilColour ? 'filter:grayscale(1) opacity(.75)' : '';
   if (S.sec.units !== false) {
+    o.push(`<g data-soil="1" style="${soilStyle}">`);
     const alias = siteOf()?.xsec?.alias || {}, units = b => { const out = []; for (const l of (b.layers || []).filter(l => l.top != null && l.bottom > l.top).sort((a, c) => a.top - c.top)) { const u = alias[b.id + '|' + defaultUnit(l)] || defaultUnit(l); const last = out[out.length - 1]; if (last && last.u === u && Math.abs(last.bot - l.top) < 1e-6) last.bot = l.bottom; else out.push({ u, top: l.top, bot: l.bottom, fill: soilOf(l.uscs)?.fill || 'panel-2' }); } return out; };
     const U2 = pos.map(p => units(p.b));
     for (let i = 0; i < pos.length - 1; i++) {
@@ -4381,10 +4545,20 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
     const seen = new Map(); U2.flat().forEach(u => seen.has(u.u) || seen.set(u.u, u.fill));
     let lx = m.l;
     for (const [u, fl] of seen) { o.push(`<rect x="${lx}" y="${H - 16 - plH - mdH}" width="12" height="9" style="fill:var(--${fl});stroke:var(--muted)" fill-opacity=".6"/><text x="${lx + 16}" y="${H - 8 - plH - mdH}" class="lbl2">${esc(u)}</text>`); lx += 26 + u.length * 5.6; }
+    o.push('</g>');
   }
+  // interpreted and modelled concentrations stay below the ground line
+  const gclip = 'gc' + Math.random().toString(36).slice(2, 8), gl = pos.map(p => [X(p.d), Y(top(p.b))]);
+  o.push(`<defs><clipPath id="${gclip}"><path d="M0 ${gl[0][1]}${gl.map(q => `L${q[0]} ${q[1]}`).join('')}L${W} ${gl[gl.length - 1][1]}L${W} ${H}L0 ${H}Z"/></clipPath></defs>`);
+  XS_GEOM = { X, Y, m, plotW, plotH, maxD, e0, e1, W, H, pos, located, noElev, plH, mdH, gclip, labels: [] };
+  if (xs && S.sec.water !== false) { const sat = pos.map(p => ({ p, w: wOf(p.b) })).filter(x => x.w && x.w.kind !== 'strike' && x.w.depth != null);
+    if (sat.length >= 2) o.push(`<path data-sat="1" d="M${X(sat[0].p.d)} ${Y(e0)}${sat.map(x => `L${X(x.p.d)} ${Y(top(x.p.b) - x.w.depth)}`).join('')}L${X(sat[sat.length - 1].p.d)} ${Y(e0)}Z" clip-path="url(#${gclip})" style="fill:var(--water)" fill-opacity=".07"><title>Below the water table on the date shown</title></path>`); }
+  if (xs?.model) o.push(modelSVG(xs.date || '', xs));
+  if (xs && xs.plume !== false && (xs.param || xs.medium === 'vapour')) o.push(plumeSVG(pos, xs, X, Y, top, bw, W, H, m));
+  const colsSVG = []; { const o = colsSVG;
   for (const p of pos) {
     const x = X(p.d) - bw / 2, e = top(p.b);
-    for (const l of (p.b.layers || []).filter(l => l.top != null && l.bottom > l.top)) o.push(`<g><title>${esc(`${p.b.name}: ${(l.uscs || '').toUpperCase()} ${fx(l.top)}–${fu(l.bottom)}`)}</title>${soilRects(x, Y(e - l.top), bw, Y(e - l.bottom) - Y(e - l.top), l.uscs, l.origin, l.texture)}</g>`);
+    for (const l of (p.b.layers || []).filter(l => l.top != null && l.bottom > l.top)) o.push(`<g data-soil="1" style="${soilStyle}"><title>${esc(`${p.b.name}: ${(l.uscs || '').toUpperCase()} ${fx(l.top)}–${fu(l.bottom)}`)}</title>${soilRects(x, Y(e - l.top), bw, Y(e - l.bottom) - Y(e - l.top), l.uscs, l.origin, l.texture)}</g>`);
     o.push(`<rect x="${x}" y="${Y(e)}" width="${bw}" height="${Y(e - depthOf(p.b)) - Y(e)}" fill="none" style="stroke:var(--ink)"/>`);
     if (vapour) for (const sm of (p.b.samples || []).filter(sm => sm.cvc != null && sm.depth != null)) { const c = vapClass(sm.cvc), len = Math.log10(Math.max(1, Math.min(sm.cvc, 1e4))) / 4 * 34; o.push(`<rect x="${x + bw + 2}" y="${Y(e - sm.depth) - 3}" width="${Math.max(1.5, len)}" height="6" style="fill:${c[2] === '#ffffff' ? '#d9dcd8' : c[2]};stroke:var(--ink)" stroke-width=".4"><title>${esc(`${p.b.name} ${sampleId(sm)}: ${sm.cvc} ppm at ${fu(sm.depth)}`)}</title></rect>`); }
     const w = p.b.well;
@@ -4393,12 +4567,8 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
       o.push(`<g><title>${esc(`${p.b.name}: slotted ${fx(w.screenTop)}–${fu(w.screenBottom)}`)}</title><rect x="${px}" y="${Y(e + su(p.b))}" width="${pw}" height="${Y(e - w.screenTop) - Y(e + su(p.b))}" style="fill:var(--panel);stroke:var(--ink)" stroke-width=".8"/><rect x="${px}" y="${Y(e - w.screenTop)}" width="${pw}" height="${Y(e - w.screenBottom) - Y(e - w.screenTop)}" style="fill:var(--panel);stroke:var(--ink)" stroke-width=".8" stroke-dasharray="2 1.5"/></g>`);
     }
   }
-  // interpreted and modelled concentrations stay below the ground line
-  const gclip = 'gc' + Math.random().toString(36).slice(2, 8), gl = pos.map(p => [X(p.d), Y(top(p.b))]);
-  o.push(`<defs><clipPath id="${gclip}"><path d="M0 ${gl[0][1]}${gl.map(q => `L${q[0]} ${q[1]}`).join('')}L${W} ${gl[gl.length - 1][1]}L${W} ${H}L0 ${H}Z"/></clipPath></defs>`);
-  XS_GEOM = { X, Y, m, plotW, plotH, maxD, e0, e1, W, H, pos, located, noElev, plH, mdH, gclip };
-  if (xs?.model) o.push(modelSVG(xs.date || '', xs));
-  if (xs && xs.plume !== false && (xs.param || xs.medium === 'vapour')) o.push(plumeSVG(pos, xs, X, Y, top, bw, W, H, m));
+  }
+  o.push('<g data-col="1">', ...colsSVG, '</g>', ...(XS_GEOM.over || []));
   // offsets of boreholes projected onto a best-fit line, in up to three staggered rows under the drawing
   { const ends = [-Infinity, -Infinity, -Infinity], yb = m.t + plotH;
     for (const p of [...pos].sort((a, c) => a.d - c.d)) { if (Math.abs(p.off) < .5) continue; const t = `${fu(Math.abs(p.off), 1)} ${p.dir}`, w = t.length * 5.6, x = X(p.d);
@@ -4418,16 +4588,16 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   // the water table is joined only between static readings of the same round (within 7 days); the join is interpolated
   for (let i = 0; i < wpts.length - 1; i++) { const a = wpts[i], c = wpts[i + 1]; if (!xs) { o.push(`<path d="M${X(a.p.d)} ${Y(top(a.p.b) - a.w.depth)}L${X(c.p.d)} ${Y(top(c.p.b) - c.w.depth)}" fill="none" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="7 4"/>`); continue; }
     if (a.w.kind === 'static' && c.w.kind === 'static' && sameRound(a.w, c.w)) o.push(`<path data-wjoin="1" d="M${X(a.p.d) + bw / 2} ${Y(top(a.p.b) - a.w.depth)}L${X(c.p.d) - bw / 2} ${Y(top(c.p.b) - c.w.depth)}" fill="none" style="stroke:var(--water)" stroke-width="1.6" stroke-dasharray="7 4"><title>Water table interpolated between ${esc(a.p.b.name)} and ${esc(c.p.b.name)}</title></path>`); }
-  const lw = 44;
+  const wlBoxes = [];
   wpts.forEach((x, i) => {
     const xx = X(x.p.d), yy = Y(top(x.p.b) - x.w.depth);
-    const nextX = i < wpts.length - 1 ? X(wpts[i + 1].p.d) - bw / 2 : W - 4, prevX = i > 0 ? X(wpts[i - 1].p.d) + bw / 2 : m.l;
-    const roomR = nextX - (xx + bw / 2 + 4), roomL = (xx - bw / 2 - 4) - prevX;
     const val = noElev ? `−${fx(x.w.depth)}` : fx(top(x.p.b) - x.w.depth);
     const kind = x.w.kind || 'static', solid = kind !== 'strike' && kind !== 'seepage', kn = { static: 'static level', completion: 'on completion', seepage: 'seepage while drilling', strike: 'struck while drilling' }[kind] || kind;
     o.push(`<g data-wkind="${esc(kind)}"><title>${esc(`${x.p.b.name}: ${fu(x.w.depth)} below ground${noElev ? '' : `, el. ${fu(top(x.p.b) - x.w.depth)}`}, ${kn} (${x.w.date || 'undated'})`)}</title>${solid ? `<path data-wtick="1" d="M${xx - bw / 2 - 5} ${yy}h${bw + 10}" style="stroke:var(--water)" stroke-width="2.2"/>` : ''}<path d="M${xx - 6} ${yy - 10}h12l-6 9z" style="fill:${solid ? 'var(--water)' : 'var(--panel)'};stroke:${solid ? 'var(--panel)' : 'var(--water)'}" stroke-width="1.3"/>`);
-    if (roomR >= lw) o.push(`<rect x="${xx + bw / 2 + 3}" y="${yy - 15}" width="${lw}" height="14" rx="2" style="fill:var(--panel)" opacity=".92"/><text class="wl" x="${xx + bw / 2 + 5}" y="${yy - 4}">${val}</text>`);
-    else if (roomL >= lw) o.push(`<rect x="${xx - bw / 2 - 3 - lw}" y="${yy - 15}" width="${lw}" height="14" rx="2" style="fill:var(--panel)" opacity=".92"/><text class="wl" x="${xx - bw / 2 - 5}" y="${yy - 4}" text-anchor="end">${val}</text>`);
+    // the level's label: right of the borehole, else left, else above; never on top of a label already placed
+    const tw = textW(val, '600 11px ' + labelFont()) + 6, cand = [[xx + bw / 2 + 3, yy - 15], [xx - bw / 2 - 3 - tw, yy - 15], [xx - tw / 2, yy - 29]];
+    const spot = cand.find(([cx, cy]) => cx >= m.l && cx + tw <= W - 2 && !wlBoxes.some(([bx, by, bwid]) => cx < bx + bwid + 2 && bx < cx + tw + 2 && Math.abs(cy - by) < 15));
+    if (spot) { wlBoxes.push([spot[0], spot[1], tw]); o.push(`<rect x="${spot[0]}" y="${spot[1]}" width="${tw}" height="14" rx="2" style="fill:var(--panel)" opacity=".92"/><text class="wl" x="${spot[0] + 3}" y="${spot[1] + 11}">${val}</text>`); }
     o.push('</g>');
   });
   o.push('</svg>');
@@ -6802,6 +6972,10 @@ function xsPlumeCtl() {
     <select id="xs-medium" aria-label="Medium" style="width:auto">${[['soil', 'Soil (lab)'], ['groundwater', 'Groundwater (lab)'], ['vapour', 'Headspace vapour']].map(([v, t]) => `<option value="${v}" ${xs.medium === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
     ${xs.medium === 'vapour' ? '' : `<select id="xs-param" aria-label="Parameter" style="width:auto">${params.length ? params.map(p => `<option value="${p}" ${xs.param === p ? 'selected' : ''}>${esc(LAB_PARAMS[p].label)}</option>`).join('') : '<option value="">No results</option>'}</select>`}
     <label class="check" title="Show only results within 7 days of the date"><input type="checkbox" id="xs-round" ${xs.round ? 'checked' : ''}> This round only</label></span>
+    <span class="lay-ctl"><select id="xs-layer" aria-label="Layers" style="width:auto">${[['meas', 'Measured'], ['model', 'Forecast'], ['both', 'Compare measured and forecast']].map(([v, t]) => `<option value="${v}" ${(xs.plume !== false && xs.model ? 'both' : xs.model ? 'model' : 'meas') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+    ${xs.medium === 'groundwater' ? `<select id="xs-shape" aria-label="Plume shape" style="width:auto" title="Model-guided: the forecast's shape, matched to every measured result. Data only: blended between wells across the screens."><option value="guided" ${xs.shape !== 'data' ? 'selected' : ''}>Shape: model-guided</option><option value="data" ${xs.shape === 'data' ? 'selected' : ''}>Shape: data only</option></select>` : '<input type="hidden" id="xs-shape" value="data">'}
+    <select id="xs-style" aria-label="Drawing style" style="width:auto">${[['graded', 'Graded shading'], ['lines', 'Contour lines'], ['bands', 'Filled bands']].map(([v, t]) => `<option value="${v}" ${(xs.style || 'graded') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+    <label class="check"><input type="checkbox" id="xs-soilcol" ${xs.soilColour ? 'checked' : ''}> Keep soil colours</label></span>
     <span class="lay-ctl"><span class="note">Date</span><input type="range" id="xs-date" min="0" max="${Math.max(0, dates.length - 1)}" step="1" value="${Math.max(0, idx)}" ${dates.length ? '' : 'disabled'} aria-label="Date shown" style="width:180px"><span id="xs-date-l" class="note">${esc(xs.date || (dates.length ? `latest (${dates[dates.length - 1]})` : 'no dated data'))}</span>
     <button class="btn" id="xs-play" data-act="xs-play" ${dates.length < 2 ? 'disabled title="Needs results or readings on two or more dates"' : ''}>Play</button></span></div>`;
 }
@@ -7023,18 +7197,18 @@ function gsdSVG(W = 640, H = 320) {
    Gradient i = √(bx² + by²); flow is down the gradient, azimuth = atan2(−bx, −by) clockwise from grid north.
    With hydraulic conductivity K (geometric mean of this project's slug tests): Darcy flux q = K·i, average linear velocity v = K·i / nₑ. */
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-function gwFlow(list = mapList()) {
-  // one set of levels from one round: the chosen date, else the latest round with at least 3 standpipe readings
-  const { round, wells } = gwHeads(list);
+function gwFlow(list = mapList(), asOf) {
+  // one set of levels from one round: the chosen date, else the latest round (on or before asOf, when given) with at least 3 standpipe readings
+  const { round, wells } = gwHeads(list, asOf);
   const out = { wells, n: wells.length, method: wells.length === 3 ? 'Three-point problem' : 'Least-squares planar fit' };
   if (wells.length < 3) return { ...out, error: `Needs a water level in at least 3 boreholes that have coordinates and a ground elevation (${wells.length} available${S.round ? ' for this date' : ''}).` };
   return gwFlowFit(list, out, round, wells);
 }
 /* one set of hydraulic heads from one round: the chosen date, else the latest round with at least 3 standpipe readings */
-function gwHeads(list = mapList()) {
+function gwHeads(list = mapList(), asOf) {
   const located = list.filter(b => b.easting != null && b.northing != null && b.elevation != null);
   const near = (b, d) => { const t0 = Date.parse(d); let best = null, bd = Infinity; for (const w of monitoring(b)) { if (!w.date || w.depth == null) continue; const dd = Math.abs(Date.parse(w.date) - t0); if (dd < bd) { bd = dd; best = w; } } return bd <= 31 * 864e5 ? best : null; };
-  const round = S.round || roundDates().find(d => located.filter(b => near(b, d)).length >= 3) || '';
+  const round = S.round || roundDates().filter(d => !asOf || d <= asOf).find(d => located.filter(b => near(b, d)).length >= 3) || '';
   const wells = located.map(b => {
     const w = round ? near(b, round) : (b.water || []).filter(x => x.depth != null && x.kind !== 'strike').sort(byDate).pop();
     return w ? { b, w, e: b.easting, n: b.northing, h: b.elevation - w.depth } : null;
@@ -7498,7 +7672,7 @@ function itemInner(it, w, h) {
   if (it.t === 'shape') return shapeSVG(it, w, h);
   const out = withRO(ro, () => {
     if (it.t === 'plan') { const r = planSVG(w, h, false); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
-    if (it.t === 'section') return fromEl(el => { if (o.xs) RO.xs = o.xs; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
+    if (it.t === 'section') return fromEl(el => { if (o.xs) RO.xs = o.xs.shape ? o.xs : { ...o.xs, shape: 'data' }; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
     if (it.t === 'wt') return wtMapSVG(w, h)?.svg || msg('Needs water levels in at least 3 wells with coordinates and ground elevations.');
     if (it.t === 'vap') { const r = vapourMapSVG(w, h); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'flow') { const F = gwFlow(); return F.error ? msg(F.error) : flowPlanSVG(F, w, h); }
@@ -8912,11 +9086,11 @@ function loadXsExample() {
   if (S.readOnly) return;
   let list = sortedList().filter(b => b.project === XS_PROJ);
   if (!list.length) { for (const b of xsBoreholes()) { S.bh.set(b.id, normalize(b)); store.save(b); } list = sortedList().filter(b => b.project === XS_PROJ); }
-  const id = n => list.find(b => b.name === n)?.id, view = { date: '2024-05-14', medium: 'groundwater', param: 'benzene', round: true, plume: true, model: true };
+  const id = n => list.find(b => b.name === n)?.id, view = { date: '2024-05-14', medium: 'groundwater', param: 'benzene', round: true, plume: true, model: true, shape: 'guided', style: 'graded' };
   const pages = REPORT_PRESETS.env[1](); pages.splice(pages.findIndex(p => p.orient === 'land') + 1, 0, newPage('free', { orient: 'land', title: 'CROSS-SECTION A–A′: BENZENE IN GROUNDWATER, MAY 2024', items: [{ ...newItem('section', LB.x, LB.y, { w: LB.w, h: LB.h }), o: { xs: { ...view } } }] }));
   setSite({ guideSrc: 'Example screening values (fictional): replace with the guideline that applies to the site', guide: { benzene: .046, toluene: .52, ethylbenzene: .073, xylenes: .99 },
     gwGuide: { benzene: .005, toluene: .024, ethylbenzene: .0024, xylenes: .3 }, xsec: { alias: { [id('BH-8') + '|Till']: 'Clay till' } },
-    model: { param: 'benzene', src: 'gw', srcBh: id('MW-1'), start: '2021-06-01', ax: 2.5, ay: .25 }, report: { pages } }, XS_PROJ);
+    model: { param: 'benzene', src: 'gw', srcBh: id('MW-1'), start: '2021-06-01', ax: 2.5, ay: .25, az: .01 }, report: { pages } }, XS_PROJ);
   S.sel = id('MW-1'); S.layer = 0; S.round = ''; S.secIds = new Set(); S.xs = { ...S.xs, ...view }; lsSet('bhlog.xs', JSON.stringify(S.xs));
   S.tab = 'xsec'; S.formStale = true; render();
   toast('Loaded the cross-section example (fictional): 8 wells, 3 boreholes, 6 monitoring rounds, with plume and forecast.');
@@ -9144,6 +9318,9 @@ document.addEventListener('change', e => {
   if (t.id === 'xs-medium' || t.id === 'xs-param') { setXs(t.id.slice(3), t.value); renderView(true); return; }
   if (t.id === 'xs-round' || t.id === 'xs-plume') { setXs(t.id.slice(3), t.checked); return; }
   if (t.id === 'xs-model') { setXs('model', t.checked); renderView(true); return; }
+  if (t.id === 'xs-layer') { S.xs = { ...S.xs, plume: t.value !== 'model', model: t.value !== 'meas' }; setXs('layer', t.value); renderView(true); return; }
+  if (t.id === 'xs-shape' || t.id === 'xs-style') { setXs(t.id.slice(3), t.value); return; }
+  if (t.id === 'xs-soilcol') { setXs('soilColour', t.checked); return; }
   if (t.dataset?.mdl) { setModel(t.dataset.mdl, t.value); return; }
   if (t.dataset?.gw || t.dataset?.gwlt || t.dataset?.gwf || t.dataset?.gwguide) { gwChange(t); return; }
   if (t.dataset?.xsalias != null && !S.readOnly) { const x = siteOf()?.xsec || {}, al = { ...(x.alias || {}) }; if (t.value) al[t.dataset.xsalias] = t.value; else delete al[t.dataset.xsalias]; setSite({ ...(siteOf() || {}), xsec: { ...x, alias: al } }); redrawSec(); }
