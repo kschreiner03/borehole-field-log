@@ -525,7 +525,7 @@ app.whenReady().then(async () => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); await w(100);
       const tabs = [...document.querySelectorAll('#prail [data-tab]')].map(b => b.dataset.tab);
-      goTab('xsec'); await w(200); const svg = !!document.querySelector('#xs-draw svg'), chips = document.querySelectorAll('#view [data-secpick]').length;
+      goTab('xsec'); await w(200); const svg = !!document.querySelector('#xs-draw svg'), chips = document.querySelectorAll('#ctl [data-secpick]').length;   /* the section line moved into the settings panel */
       goTab('site'); await w(200); const link = !!document.querySelector('#view [data-tab="xsec"]'), old = !!document.querySelector('#section');
       return { tabs, svg, chips, link, old };
     })()`);
@@ -1487,6 +1487,45 @@ app.whenReady().then(async () => {
         want(h && h.left <= r1.left + 1 && h.right >= r1.right - 1 && h.top <= r1.top + 1 && h.bottom >= r1.bottom - 1, 'highlight covers the control: ' + JSON.stringify({ h, r1 }));
         tutClose();
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('ui: settings panel review fixes', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      const keepCo = structuredClone({ cols: S.co.cols, graphs: S.co.graphs, labGraph: S.co.labGraph });
+      try {
+        loadXsExample(); await w(300); S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {} };
+        /* 1: drawings are sized to the work area as it is with the panel */
+        goTab('home'); await w(200); goTab('xsec'); await w(400);
+        const fit = () => { const d = document.querySelector('#xs-draw'), sv = d.querySelector('svg'); return Math.abs(+sv.getAttribute('width') - d.clientWidth); };
+        want(fit() < 3, 'section fits after the panel appears: off by ' + fit());
+        document.querySelector('#ctl [data-act="ctl-toggle"]').click(); await w(300); want(fit() < 3, 'section fits after collapsing: off by ' + fit());
+        document.querySelector('#ctl [data-act="ctl-toggle"]').click(); await w(300); want(fit() < 3, 'section fits after expanding: off by ' + fit());
+        /* 2: every saved graph has a row, so it can be removed; graphs without data in this project are not drawn */
+        loadDlExample(); await w(300); const b = projList().find(b => (b.samples || []).some(s => s.lab)); S.sel = b.id;
+        S.co.cols = {}; S.co.graphs = [{ series: 'cvc', type: 'heat' }, { series: 'clay', type: 'points' }]; goTab('report'); await w(400);
+        want(document.querySelector('#ctl input[data-gtick="cvc"]')?.checked, 'old vapour colour-band graph has its own ticked row');
+        const ck = document.querySelector('#ctl input[data-gtick="clay"]'); want(ck?.checked && /no data/i.test(ck.closest('.gr-row').textContent), 'graph with no data in this project is listed and says so');
+        want(!graphsOf().some(g => g.series === 'clay'), 'a graph with no data in this project is not drawn');
+        const t1 = document.querySelector('#ctl input[data-gtick="cvc"]'); t1.checked = false; t1.dispatchEvent(new Event('change', { bubbles: true })); await w(300);
+        want(!(S.co.graphs || []).some(g => g.series === 'cvc'), 'unticking removes the old graph');
+        /* 3: ticking the legacy lab parameter switches its column on instead of drawing it twice */
+        S.co.graphs = []; S.co.cols = {}; S.co.labGraph = 'benzene'; renderView(true); await w(200);
+        const t2 = document.querySelector('#ctl input[data-gtick="lab:benzene"]'); t2.checked = true; t2.dispatchEvent(new Event('change', { bubbles: true })); await w(300);
+        want(S.co.cols.lab === 'on' && !(S.co.graphs || []).some(g => g.series === 'lab:benzene'), 'Benzene ticked once: ' + JSON.stringify({ c: S.co.cols, g: S.co.graphs }));
+        want(!/in this order/.test(document.querySelector('#ctl [data-ctlg="log-graphs"]').textContent), 'the note does not claim an order');
+        /* 5: the edit drawer does not take its width on top of the panel */
+        goTab('log'); await w(300); const m0 = document.querySelector('#main').getBoundingClientRect().width;
+        document.body.classList.add('drawer-open'); await w(100); const m1 = document.querySelector('#main').getBoundingClientRect().width; document.body.classList.remove('drawer-open');
+        want(m0 - m1 < 140, 'drawer takes at most what the panel does not already: ' + Math.round(m0 - m1));
+        /* 4: no borehole selected: no stale panel */
+        goTab('xsec'); await w(200); const keepBh = S.bh, keepSel = S.sel; S.bh = new Map(); S.sel = null; render(); await w(200); const startShown = !!document.querySelector('#main .start');
+        want(startShown && document.querySelector('#ctl').hidden, 'no panel on the start screen: ' + startShown);
+        S.bh = keepBh; S.sel = keepSel; render(); await w(200);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      finally { Object.assign(S.co, keepCo); }
       return F;
     })()`);
     expect(!r.length, r.join(' || '));
