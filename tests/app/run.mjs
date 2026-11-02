@@ -1593,6 +1593,35 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('3d: plume review fixes', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(300); const g = gwGuide().benzene, D = '2024-01-01';
+        const well = (id, E, N, st, sb, v, lt, wd = 1) => ({ id, name: id, easting: E, northing: N, elevation: 100, layers: [], well: { installed: true, screenTop: st, screenBottom: sb }, water: [{ date: D, depth: wd }], gwSamples: [{ date: D, res: { benzene: { v, lt } } }] });
+        /* C1: one well with a result */
+        let F1; try { F1 = plumeField3d([well('A', 0, 0, 2, 4, 1, false)], D, 'benzene'); } catch (e) { F.push('one well throws: ' + e.message); }
+        if (F1) { want(F1.at(0, 0, 97) > .9 && F1.at(6, 0, 97) === 0 && F1.at(3, 0, 97) > 0, 'one well: value at the well, gone 5 m away: ' + [F1.at(0, 0, 97), F1.at(3, 0, 97), F1.at(6, 0, 97)]); }
+        /* I1: non-detects at or above the guideline draw nothing */
+        const nd = plumeField3d([well('A', 0, 0, 2, 4, g * 2, true), well('B', 10, 0, 2, 4, g * 2, true), well('C', 0, 10, 2, 4, g * 2, true)], D, 'benzene');
+        want(!nd || nd.at(3, 3, 97) < g, 'non-detects above the guideline make no plume: ' + nd?.at(3, 3, 97));
+        /* I2: nested wells keep both screens and no band between them */
+        const ns = plumeField3d([well('S', 0, 0, 2, 4, 1, false), well('Dp', 0.2, 0, 10, 12, 1, false), well('X', 12, 0, 2, 4, 1, false)], D, 'benzene');
+        want(ns.at(0, 0, 89) > .9 && ns.at(0, 0, 97) > .9, 'both nested screens honoured at the well: ' + [ns.at(0, 0, 97), ns.at(0, 0, 89)]);
+        want(ns.at(4, 0, 93) === 0, 'no invented band between the screens: ' + ns.at(4, 0, 93));
+        /* I3: nothing above the water table */
+        const wt = plumeField3d([well('A', 0, 0, 1, 4, 1, false, 2.5)], D, 'benzene'); want(wt.at(0, 0, 98.3) === 0 && wt.at(0, 0, 97) > .9, 'band starts at the water level: ' + [wt.at(0, 0, 98.3), wt.at(0, 0, 97)]);
+        /* I4, I5: captions and legend match what is drawn */
+        S.v3dOff = {}; goTab('v3d'); for (let i = 0; i < 40 && !S.v3d?.ok; i++) await w(200); await w(300);
+        const cap = v3dCaptionText(); want(/interpreted from measured results/i.test(cap) && !/purple = model/.test(cap), 'saved image caption names the interpreted shells: ' + cap);
+        const lg = document.querySelector('#v3d-legend').textContent; want(S.v3d.plume.levels.every(l => lg.includes(l)) && S.v3d.plume.levels.length, 'legend lists the levels drawn: ' + lg.slice(-300));
+        const keepD = S.xs.date; S.xs.date = '2010-01-01'; v3dBuild(); await w(800);
+        want(!/shells at/.test(document.querySelector('#v3d-legend').textContent), 'no shells claimed when none are drawn'); S.xs.date = keepD;
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
