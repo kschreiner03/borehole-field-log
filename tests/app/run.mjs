@@ -1125,6 +1125,57 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('mf6: site model from the example', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        const M = gwModelSpec(sectionList(), siteOf());
+        want(!M.error, 'builds: ' + M.error);
+        const units = [...new Set(sectionList().flatMap(b => xsUnits(b).map(u => u.u)))];
+        want(M.units.length === units.length && M.spec.dis.nlay === units.length, 'one layer per correlated unit: ' + M.units.map(u => u.u) + ' vs ' + units);
+        want(M.spec.dis.idomain.some(L => Array.from(L).some(v => v === -1)), 'a pinched-out unit becomes pass-through cells');
+        const chd = M.spec.chd[0], nc = M.spec.dis.ncol; want(chd.length && chd.every(q => q[2] === 0 || q[2] === nc - 1), 'fixed heads on the upgradient and downgradient faces only');
+        const up = chd.filter(q => q[2] === 0).map(q => q[3]), dn = chd.filter(q => q[2] === nc - 1).map(q => q[3]); want(Math.min(...up) > Math.max(...dn), 'heads fall in the flow direction');
+        const wells = gwHeads(sectionList(), M.round).wells; want(M.obs.length === wells.length && M.obs.length >= 6, 'one head observation per well read in the round: ' + M.obs.length + ' / ' + wells.length);
+        want(M.units.some(u => /slug/.test(u.kSrc)) && M.units.every(u => u.kSrc), 'K sources: slug tests or calibration');
+        want(Math.abs(M.grid.angrot - Math.atan2(M.F.f[1], M.F.f[0]) * 180 / Math.PI) < 1e-6, 'grid columns run along the flow direction');
+        const res = await gwRun(M); want(res.ok, 'runs: ' + res.error);
+        want(Math.abs(res.discrepancy) < 1, 'mass balance under 1 %: ' + res.discrepancy);
+        want(res.sim.every(v => Number.isFinite(v)), 'simulated heads at every well');
+        const top = M.grid.cellCentre(0, 0); want(Number.isFinite(top[0]) && Number.isFinite(top[1]), 'cell centres in world coordinates');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
+  await check('mf6: calibration recovers known parameters', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(400);
+        const M = gwModelSpec(sectionList(), siteOf()), aq = M.units.find(u => u.prior != null);
+        // twin experiment: heads made by the model with known values, then calibrated from a start three times off
+        const truth = { rch: 3.2e-4 }, t = await gwRun(M, truth); want(t.ok, 'truth run: ' + t.error);
+        M.obs.forEach((o, i) => { o.h = t.sim[i]; });
+        const C = await gwCalibrate(M, { keys: ['rch'], start: { rch: truth.rch * 3 }, prior: false });
+        want(C.ok, 'calibrates: ' + C.error);
+        want(Math.abs(C.pv.rch / truth.rch - 1) < .05, 'recovers recharge within 5 %: ' + C.pv.rch + ' vs ' + truth.rch);
+        for (const k of ['n', 'me', 'mae', 'rmse', 'range', 'srms', 'disc']) want(Number.isFinite(C.stats[k]), 'statistic ' + k + ': ' + C.stats[k]);
+        want(C.stats.rmse < .005, 'fits the twin heads: RMSE ' + C.stats.rmse);
+        want(C.residuals.length === M.obs.length && C.residuals.every(x => x.name && Number.isFinite(x.res)), 'residual per well');
+        want(Number.isFinite(C.css.rch) && C.params[0].lo95 < C.pv.rch && C.params[0].hi95 > C.pv.rch, 'sensitivity and 95 % interval');
+        // every K and the recharge together, no prior: with fixed-head boundaries, scaling them all leaves the heads unchanged
+        const C2 = await gwCalibrate(M, { keys: [...M.units.map(u => 'k:' + u.u), 'rch'], prior: false, maxIter: 2 });
+        want(C2.ok && C2.warnings.some(x => /cannot be separated/.test(x)), 'warns that every K and recharge cannot be separated: ' + C2.warnings);
+        // with the slug-test prior the aquifer K stays near its measured value
+        const C3 = await gwCalibrate(M, { keys: ['k:' + aq.u, 'rch'], prior: true, maxIter: 6 });
+        want(C3.ok && Math.abs(Math.log10(C3.pv['k:' + aq.u]) - aq.prior) < .3, 'prior keeps K near the slug tests: ' + C3.pv['k:' + aq.u] + ' vs 10^' + aq.prior);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
