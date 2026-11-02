@@ -1064,10 +1064,10 @@ app.whenReady().then(async () => {
         want(det.every(c => c.getAttribute('fill') !== '#fff') && nd.length && nd.every(c => c.getAttribute('stroke-dasharray')), 'I5: detections filled, non-detects dashed and hollow');
         // I6: soil below the water table is tinted
         want(svg.querySelector('[data-sat]'), 'I6: saturated zone tinted');
-        // I7: a report item saved before this change draws data only
+        // I7 (changed at the user's request): a report item saved before the plume shapes gets today's model-guided look
         goTab('compose'); await w(200); const L = repLayout(), pi = L.pages.findIndex(p => p.items.some(x => x.t === 'section' && x.o?.xs)), it = L.pages[pi].items.find(x => x.t === 'section' && x.o?.xs);
         const old = { ...it.o.xs }; delete old.shape; it.o = { ...it.o, xs: old }; S.cpage = pi; rerenderCompose(); await w(300);
-        want((document.querySelector('.cmp-paper')?.innerHTML || '').includes('No data above or below the well screens'), 'I7: older report items keep data only');
+        want(!(document.querySelector('.cmp-paper')?.innerHTML || '').includes('No data above or below the well screens'), 'I7: older report items get the model-guided look');
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       return F;
     })()`);
