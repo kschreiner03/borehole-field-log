@@ -1622,6 +1622,38 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('report editor: delete on the item, settings in the panel, more room', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadXsExample(); await w(300); S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {} }; S.csort = false;
+        goTab('compose'); await w(300); const L = repLayout(); L.pages.push(newPage('free', { orient: 'port', items: [] })); S.cpage = L.pages.length - 1; rerenderCompose(); await w(200);
+        const side = document.querySelector('.side').getBoundingClientRect().width; want(side < 2, 'borehole list hidden on Reports: ' + side);
+        want(document.querySelector('#cmp-stage').getBoundingClientRect().width > 850, 'page area is wide: ' + Math.round(document.querySelector('#cmp-stage').getBoundingClientRect().width));
+        /* one Add menu instead of a wall of buttons */
+        const menu = document.querySelector('#view .cmp-addmenu'), btn = document.querySelector('#view [data-act="cmp-addmenu"]');
+        want(btn && menu && menu.hidden && menu.querySelector('[data-cadd="text"]'), 'Add item menu, closed until clicked');
+        btn.click(); await w(50); want(!document.querySelector('#view .cmp-addmenu').hidden, 'Add item opens the menu');
+        document.querySelector('#view .cmp-addmenu [data-cadd="text"]').click(); await w(200);
+        document.querySelector('#view [data-act="cmp-addmenu"]').click(); await w(50); document.querySelector('#view .cmp-addmenu [data-cadd="north"]').click(); await w(200);
+        want(curPage().items.length === 2 && document.querySelector('#view .cmp-addmenu').hidden, 'items added and the menu closes');
+        /* settings in the panel */
+        const it = curPage().items[1]; S.csel = it.id; rerenderCompose(); await w(200);
+        for (const sel of ['#cmp-props [data-cprop="cap"]', '#cmp-paper-size', '#cmp-title', '#cmp-tpl']) want(document.querySelector('#ctl ' + sel) && !document.querySelector('#view ' + sel), sel + ' is in the panel');
+        /* delete from the item itself */
+        const del = document.querySelector('.cmp-box[aria-selected="true"] .cmp-bar [data-act="cmp-del"]'); want(del, 'selected item has a Delete button on its frame');
+        del?.click(); await w(200); want(curPage().items.length === 1 && !curPage().items.includes(it), 'Delete on the frame removes it');
+        /* several selected: one Delete removes them all */
+        document.querySelector('#view [data-act="cmp-addmenu"]').click(); await w(50); document.querySelector('#view .cmp-addmenu [data-cadd="legend"]').click(); await w(200);
+        S.cmulti = new Set(curPage().items.map(x => x.id)); S.csel = curPage().items[0].id; rerenderCompose(); await w(200);
+        document.querySelector('.cmp-box[aria-selected="true"] .cmp-bar [data-act="cmp-del"]').click(); await w(200);
+        want(!curPage().items.length, 'Delete removes every selected item: ' + curPage().items.length);
+        goTab('xsec'); await w(200); want(document.querySelector('.side').getBoundingClientRect().width > 200, 'borehole list back on other pages');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: drawn on the map', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
