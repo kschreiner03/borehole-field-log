@@ -33,6 +33,6 @@ export async function runMf6({ bin, files, outputs = [], timeoutMs = 120000 }) {
     const res = {};
     for (const n of new Set([...outputs, 'mfsim.lst'])) if (existsSync(join(dir, n))) res[n] = new Uint8Array(await readFile(join(dir, n)));
     const ok = code === 0 && /Normal termination/.test(out);
-    return { ok, code, seconds: (Date.now() - t0) / 1000, stdout: out.slice(-4000), files: res, error: ok ? '' : timedOut ? `MODFLOW 6 did not finish within ${timeoutMs / 1000} s.` : (out.match(/ERROR[^\n]*(\n[^\n]+){0,6}/i)?.[0] || `MODFLOW 6 stopped (exit code ${code}).`).trim() };
+    return { ok, code, seconds: (Date.now() - t0) / 1000, stdout: out.slice(-4000), files: res, error: ok ? '' : timedOut ? `MODFLOW 6 did not finish within ${timeoutMs / 1000} s.` : (out.match(/ERROR REPORT:([\s\S]{0,800})/)?.[1].replace(/\s+/g, ' ').trim() || `MODFLOW 6 stopped (exit code ${code}).`) };
   } finally { await rm(dir, { recursive: true, force: true }); }
 }

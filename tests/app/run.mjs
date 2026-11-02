@@ -1099,6 +1099,32 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('mf6: flow against the analytical solution', async run => {
+    const r = await run(`(async () => {
+      const F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        // confined strip, fixed heads 16 and 14 m at cell centres 100 m apart, recharge R: h = h1 + (h2 - h1)x/L + R x(L - x)/(2T)
+        const n = 101, K = 2, b = 10, R = 4e-4, T = K * b, L = 100;
+        const spec = { nper: 1, periods: [[1, 1, 1]], steady: [true],
+          dis: { nlay: 1, nrow: 1, ncol: n, delr: 1, delc: 1, top: 10, botm: [0] },
+          npf: { icelltype: [0], k: [K], k33: [K] }, ic: 15,
+          chd: [[[0, 0, 0, 16], [0, 0, n - 1, 14]]], rch: [R],
+          obs: [['a', 0, 0, 25], ['b', 0, 0, 50], ['c', 0, 0, 80]] };
+        const { files, outputs } = mf6Files(spec);
+        const res = await window.desktop.mf6Run({ files, outputs });
+        want(res.ok, 'runs: ' + res.error);
+        const H = mf6ReadHeads(res.files['gwf.hds']), h = H[H.length - 1].data, obs = mf6ReadObs(new TextDecoder().decode(res.files['gwf.obs.csv']));
+        let worst = 0; for (let c = 0; c < n; c++) { const x = c, exact = 16 + (14 - 16) * x / L + R * x * (L - x) / (2 * T); worst = Math.max(worst, Math.abs(h[c] - exact)); }
+        want(worst < .001, 'matches the analytical solution within 1 mm: worst ' + worst.toExponential(2) + ' m');
+        for (const [nm, , , c] of spec.obs) want(Math.abs(obs[nm.toUpperCase()][0] - h[c]) < 1e-9, 'head file equals the observation output at ' + nm);
+        const disc = mf6Discrepancy(new TextDecoder().decode(res.files['gwf.lst']));
+        want(disc != null && Math.abs(disc) < 1, 'mass balance discrepancy under 1 %: ' + disc);
+        const Q = mf6ReadBudget(res.files['gwf.cbc'], 'DATA-SPDIS'); want(Q.length && Q[0].list.length === n && Math.abs(Q[0].list[50].aux[0] - K * .02) < 1e-3, 'specific discharge at the middle is K·Δh/L: ' + Q[0]?.list[50]?.aux);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  }, { mf6: true });
   await check('cross-section: borehole names never overlap', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
