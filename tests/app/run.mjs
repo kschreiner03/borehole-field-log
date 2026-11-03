@@ -2194,6 +2194,34 @@ app.whenReady().then(async () => {
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
   });
 
+  await check('locations: a GNSS survey export (point_name, north, east, elevation) sets boreholes, names matched without leading zeros', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        want(normName('BH26-4') === normName('bh 26-04') && normName('BH26-4') !== normName('BH2-64') && normName('MW-26-007') === normName('MW26-7'), 'names: ' + [normName('BH26-4'), normName('bh 26-04'), normName('BH2-64')]);
+        loadDlExample(); await w(300); const b1 = sortedList().find(b => b.name === 'BH26-01' && b.status !== 'issued'); want(!!b1, 'example has BH26-01');
+        const head = 'point_name,latitude,longitude,altitude,north,east,elevation,point_type,horizontal SD,vertical SD,reset time,convergence count,Q,Recorded at,latitude (WGS 84 Single),longitude (WGS 84 Single),altitude (WGS 84 Single) \\n';
+        const row = (nm, la, lo, z) => { const [e, n] = llToUtm(la, lo, z); return [nm, la, lo, 480.5, n.toFixed(3), e.toFixed(3), 480.5, 'Check Point', 0, 0, 1, 1, 16, '2026-07-22T16:02:01.951Z', la, lo, 482.4].join(',') + '\\n'; };
+        const csv = head + row('BH26-1', 58.3, -103.95, 13) + row('MW26-99', 58.3001, -103.9501, 13), [e1, n1] = llToUtm(58.3, -103.95, 13);
+        const n0 = projList().length; await importLocations(new File([csv], 'survey.csv', { type: 'text/csv' })); await w(200);
+        const dlg = document.body.innerText; want(/Updates BH26-01/.test(dlg), 'BH26-1 matches BH26-01: ' + dlg.slice(0, 200));
+        importLocationsGo(); await w(200);
+        want(b1.easting === +e1.toFixed(2) && b1.northing === +n1.toFixed(2) && b1.elevation === 480.5, 'north, east and elevation used as surveyed: ' + [b1.easting, b1.northing, b1.elevation]);
+        const nb = projList().find(b => b.name === 'MW26-99'); want(projList().length === n0 + 1 && nb?.well.installed, 'the new MW point is a monitoring well');
+        /* a project without a coordinate system: the zone comes from the longitude, so the map puts them in Saskatchewan, not zone 12 */
+        for (const b of projList()) b.crs = '';
+        await importLocations(new File([head + row('ZT-1', 58.3096, -103.9473, 13)], 'survey.csv', { type: 'text/csv' })); await w(150); importLocationsGo(); await w(150);
+        const z1 = projList().find(b => b.name === 'ZT-1'); want(/Zone 13/.test(z1?.crs || '') && crsZone() === 13, 'zone 13 from the longitude: ' + z1?.crs + ' / ' + crsZone());
+        const back = utmToLL(z1.easting, z1.northing, crsZone()); want(Math.abs(back[0] - 58.3096) < 1e-4 && Math.abs(back[1] + 103.9473) < 1e-4, 'back on the map where it was surveyed: ' + back);
+        /* a project in another zone: the latitude and longitude are converted into it */
+        for (const b of projList()) b.crs = 'UTM NAD83(CSRS) Zone 12';
+        await importLocations(new File([head + row('ZT-2', 58.3096, -103.9473, 13)], 'survey.csv', { type: 'text/csv' })); await w(150); importLocationsGo(); await w(150);
+        const z2 = projList().find(b => b.name === 'ZT-2'), [e12, n12] = llToUtm(58.3096, -103.9473, 12); want(Math.hypot(z2.easting - e12, z2.northing - n12) < .05, 'converted into the project zone: ' + [z2.easting, z2.northing, e12, n12]);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('Dawn Lake example: 10 boreholes, 9 wells with bentonite over sand, about 5 m deep', async run => {
     const r = await run(`(() => { loadDlExample(); const l = sortedList().filter(b => b.project === DL_PROJ), w = l.filter(b => b.well.installed);
       return { n: l.length, wells: w.length, ann: w.every(b => b.well.annulus.map(a => a.mat).join() === 'bentonite,sand'), depth: w.every(b => b.well.depth >= 4.8 && b.well.depth <= 5.5), vapour: l.every(b => b.samples.some(s => s.cvc != null)) }; })()`);

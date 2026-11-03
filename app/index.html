@@ -7860,16 +7860,23 @@ async function readTable(file) {
   if (window.XLSX && !/\.(csv|txt)$/i.test(file.name)) { const wb = XLSX.read(await file.arrayBuffer()); return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' }); }
   return parseCSVText(await file.text());
 }
-const LOC_COLS = { name: ['name', 'borehole', 'boreholeid', 'bh', 'bhid', 'well', 'wellid', 'id', 'locationid', 'pointid', 'station', 'testhole', 'hole', 'feature', 'label'], e: ['easting', 'east', 'x', 'e', 'utme', 'utmeasting', 'eastingm', 'xcoord', 'xcoordinate'], n: ['northing', 'north', 'y', 'n', 'utmn', 'utmnorthing', 'northingm', 'ycoord', 'ycoordinate'],
-  z: ['elevation', 'elev', 'groundelevation', 'groundelev', 'z', 'gse', 'groundsurface', 'surfaceelevation', 'elevationm'], lat: ['lat', 'latitude'], lon: ['lon', 'long', 'longitude', 'lng'], type: ['type', 'kind', 'welltype', 'installation', 'layer', 'category'] };
+const LOC_COLS = { name: ['name', 'borehole', 'boreholeid', 'bh', 'bhid', 'well', 'wellid', 'id', 'locationid', 'pointid', 'pointname', 'point', 'station', 'testhole', 'hole', 'feature', 'label'], e: ['easting', 'east', 'x', 'e', 'utme', 'utmeasting', 'eastingm', 'xcoord', 'xcoordinate'], n: ['northing', 'north', 'y', 'n', 'utmn', 'utmnorthing', 'northingm', 'ycoord', 'ycoordinate'],
+  z: ['elevation', 'elev', 'groundelevation', 'groundelev', 'z', 'gse', 'groundsurface', 'surfaceelevation', 'elevationm'], lat: ['lat', 'latitude'], lon: ['lon', 'long', 'longitude', 'lng'], type: ['type', 'kind', 'welltype', 'installation', 'layer', 'category', 'pointtype'] };
 function tableCols(head) { const h = head.map(normH), out = {}; for (const [k, al] of Object.entries(LOC_COLS)) { const i = h.findIndex(x => al.includes(x)); if (i >= 0) out[k] = i; } return out; }
 const numv = v => { const x = typeof v === 'number' ? v : parseFloat(String(v).replace(/[^0-9.+-eE]/g, '')); return isFinite(x) ? x : null; };
-function rowsToPoints(rows) {   // [{name, e, n, z, type}] with lat/lon converted
+/* [{name, e, n, z, type, ll, zone}]. Latitude and longitude are converted to the project's UTM zone. When a file has both, as GNSS survey
+   exports do, its easting and northing are used as surveyed if they are UTM in the project's zone (or the longitude's zone, for a project
+   without one), and the zone is kept so the boreholes can be labelled; otherwise the latitude and longitude are converted. */
+function rowsToPoints(rows) {
   const c = tableCols(rows[0] || []); if (c.name == null || ((c.e == null || c.n == null) && (c.lat == null || c.lon == null))) return null;
   return rows.slice(1).map(r => {
-    let e = c.e != null ? numv(r[c.e]) : null, n = c.n != null ? numv(r[c.n]) : null, ll = false;
-    if ((e == null || n == null) && c.lat != null) { const la = numv(r[c.lat]), lo = numv(r[c.lon]); if (la != null && lo != null) { [e, n] = llToUtm(la, lo, projZone(lo)); ll = projZone(lo); } }
-    return { name: String(r[c.name] ?? '').trim(), e: e != null ? +e.toFixed(2) : null, n: n != null ? +n.toFixed(2) : null, z: c.z != null ? numv(r[c.z]) : null, type: c.type != null ? String(r[c.type] || '') : '', ll };
+    let e = c.e != null ? numv(r[c.e]) : null, n = c.n != null ? numv(r[c.n]) : null, ll = false, zone = null;
+    const la = c.lat != null ? numv(r[c.lat]) : null, lo = c.lon != null ? numv(r[c.lon]) : null;
+    if (la != null && lo != null) {
+      zone = projZone(lo); const [e2, n2] = llToUtm(la, lo, zone);
+      if (e == null || n == null || Math.hypot(e - e2, n - n2) > 50) { e = e2; n = n2; ll = zone; }   // no easting/northing, or not UTM in this zone
+    }
+    return { name: String(r[c.name] ?? '').trim(), e: e != null ? +e.toFixed(2) : null, n: n != null ? +n.toFixed(2) : null, z: c.z != null ? numv(r[c.z]) : null, type: c.type != null ? String(r[c.type] || '') : '', ll, zone };
   }).filter(p => p.name);
 }
 function parseGeoJSON(txt) {
@@ -7928,7 +7935,8 @@ function vertexTableShapes(rows) {   // CSV / Excel: one row per vertex, grouped
   const groups = new Map(); for (const p of pts) { if (p.e == null) continue; if (!groups.has(p.name)) groups.set(p.name, { name: p.name, pts: [], hint: p.type || p.name }); groups.get(p.name).pts.push([p.e, p.n]); }
   return [...groups.values()].map(g => ({ ...g, type: g.pts.length === 1 ? 'point' : g.pts.length >= 3 && Math.hypot(g.pts[0][0] - g.pts.at(-1)[0], g.pts[0][1] - g.pts.at(-1)[1]) < 1e-6 ? 'polygon' : g.pts.length >= 4 ? 'polygon' : 'line' }));
 }
-const normName = s => String(s || '').toUpperCase().replace(/[\s_-]+/g, '');
+/* names match ignoring case, spaces, dashes beside letters and leading zeros: BH26-4, BH 26-04 and bh26-004 are one borehole, BH2-64 is another */
+const normName = s => String(s || '').toUpperCase().trim().replace(/[\s_-]+/g, '-').replace(/-(?=[A-Z])|(?<=[A-Z])-/g, '').replace(/\d+/g, d => String(+d));
 function findBh(name) { const k = normName(name); return projList().find(b => normName(b.name) === k); }
 
 async function importLocations(file) {
@@ -7937,7 +7945,7 @@ async function importLocations(file) {
   S._locImp = pts.filter(p => p.e != null && p.n != null);
   const row = p => { const b = findBh(p.name); return `<tr><td>${esc(p.name)}</td><td class="r">${p.e?.toFixed(2) ?? '—'}</td><td class="r">${p.n?.toFixed(2) ?? '—'}</td><td class="r">${p.z != null ? p.z.toFixed(2) : '—'}</td><td>${p.e == null ? '<span class="note">No coordinates; skipped</span>' : b ? (editable(b) ? `Updates ${esc(b.name)}` : `<span class="note">${esc(b.name)} is issued; skipped</span>`) : '<span class="note">Not in this project</span>'}</td></tr>`; };
   const nNew = S._locImp.filter(p => !findBh(p.name)).length, anyLL = pts.some(p => p.ll);
-  dialog(`Import locations from ${esc(file.name)}`, `<p class="note" style="margin:0">${pts.length} row${pts.length === 1 ? '' : 's'}. Names are matched to this project's boreholes, ignoring spaces and dashes.${anyLL ? ` Latitude and longitude were converted to UTM zone ${pts.find(p => p.ll)?.ll} (NAD83(CSRS) and WGS84 differ by about 1 m).` : ''}</p>
+  dialog(`Import locations from ${esc(file.name)}`, `<p class="note" style="margin:0">${pts.length} row${pts.length === 1 ? '' : 's'}. Names are matched to this project's boreholes, ignoring spaces and dashes.${anyLL ? ` Latitude and longitude were converted to UTM zone ${pts.find(p => p.ll)?.ll} (NAD83(CSRS) and WGS84 differ by about 1 m).` : pts.some(p => p.zone) ? ` Easting and northing are used as surveyed, in UTM zone ${pts.find(p => p.zone).zone} (from the longitude).` : ''}</p>
     <div class="scroll-x" style="max-height:320px;overflow:auto"><table class="sum"><thead><tr><th>Name</th><th class="r">Easting</th><th class="r">Northing</th><th class="r">Elevation</th><th>Result</th></tr></thead><tbody>${pts.map(row).join('')}</tbody></table></div>
     ${nNew ? `<label class="check"><input type="checkbox" id="li-new" checked> Create ${nNew} new borehole${nNew === 1 ? '' : 's'} for the names not in this project (a type column with “well” or “MW” marks a monitoring well)</label>` : ''}
     <label class="check"><input type="checkbox" id="li-z" ${pts.some(p => p.z != null) ? 'checked' : 'disabled'}> Also set ground elevations</label>`,
@@ -7950,7 +7958,7 @@ function importLocationsGo() {
     let b = findBh(p.name);
     if (!b && mk) { b = blankBorehole(p.name); if (base) for (const k of HEADER_COPY) b[k] = base[k]; if (/well|mw|standpipe|piez/i.test(p.type + ' ' + p.name.replace(/^BH/i, ''))) b.well.installed = true; S.bh.set(b.id, b); made++; }
     if (!b || !editable(b)) continue;
-    b.easting = p.e; b.northing = p.n; if (z && p.z != null) b.elevation = p.z; if (!b.crs) b.crs = crs || (p.ll ? `UTM NAD83(CSRS) Zone ${p.ll}` : '');
+    b.easting = p.e; b.northing = p.n; if (z && p.z != null) b.elevation = p.z; if (!b.crs) b.crs = crs || (p.zone ? `UTM NAD83(CSRS) Zone ${p.zone}` : '');
     logChange(b, 'Location set from imported file'); store.save(b); upd++;
   }
   S._locImp = null; closeOverlay(); render(); toast(`Set ${upd} location${upd === 1 ? '' : 's'}${made ? `, including ${made} new borehole${made === 1 ? '' : 's'}` : ''}.`);
