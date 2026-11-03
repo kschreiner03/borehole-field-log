@@ -1553,7 +1553,13 @@ const cur = () => S.bh.get(S.sel) || null;
 function projList() { const p = (cur() || sortedList()[0])?.project || ''; return sortedList().filter(b => (b.project || '') === p); }
 function sptN(s) { return s.b2 != null && s.b3 != null ? s.b2 + s.b3 : num(s.n); }
 function blowStr(s) { return [s.b1, s.b2, s.b3].some(v => v != null) ? [s.b1, s.b2, s.b3].map(v => v ?? '–').join('-') : ''; }
-const sampleId = s => `${s.type || ''}${s.no ?? ''}`;
+const sampleId = s => String(s.name || '').trim() || `${s.type || ''}${s.no ?? ''}`;   // the logger's own name, or type and number (SS2)
+const longestId = b => Math.max(0, ...(b.samples || []).map(s => sampleId(s).length));
+/* a font size that fits a sample name in a log column w wide (avg glyph about .6 em) */
+const idFont = (id, w, size) => +Math.min(size, (w - 4) / (Math.max(1, id.length) * .6)).toFixed(2);
+/* the next sample's name from the last one: its closing number counts up, keeping the zero padding (S3 → S4, BH1-SA09 → BH1-SA10) */
+const nextSampleName = n => { const m = String(n || '').trim().match(/^(.*?)(\d+)$/); return m ? m[1] + String(+m[2] + 1).padStart(m[2].length, '0') : ''; };
+const SAMPLE_PURPOSES = ['BTEX, PHC F1–F4', 'Metals', 'PAHs', 'Salinity', 'VOCs', 'Moisture content', 'Atterberg limits', 'Grain size', 'Sulphate', 'Headspace vapour', 'Archive (not submitted)'];
 function blankWell() { return { installed: false, type: 'standpipe', dia: 50, material: '50 mm PVC Sch 40', stickup: null, screenTop: null, screenBottom: null, slot: '', depth: null, annulus: [] }; }
 const HEADER_COPY = ['project', 'projNo', 'client', 'location', 'contractor', 'rig', 'method', 'diameter', 'crs', 'datum', 'logger', 'reviewer', 'hammer', 'er', 'noLiners', 'gamma', 'rodStick'];
 const DEFAULT_DISCLAIMER = 'Subsurface conditions are shown at the borehole location only and may vary between boreholes. Read this log together with the accompanying report.';
@@ -2540,13 +2546,15 @@ function sampleFormHTML(b, i, full) {
   const sm = b.samples[i]; if (!sm) return '';
   const L = LEN(), n2 = (k, v, label, extra = '') => `<div class="fld"><label for="s-${sm.id}-${k}">${label}</label><input id="s-${sm.id}-${k}" type="number" step="any" inputmode="decimal" data-sec="samples" data-i="${i}" data-k="${k}" value="${esc(v ?? '')}" ${extra}></div>`;
   const out = (k, label) => `<div class="fld"><label>${label}</label><div class="out" data-calc="${k}-${i}">—</div></div>`;
+  const spt = sm.type === 'SS' || [sm.b1, sm.b2, sm.b3, sm.n].some(v => v != null), core = sm.type === 'C' || sm.rec != null || sm.rqd != null;   // the SPT and core fields only where they apply
   return `<h4 class="ff-h">Sample</h4><div class="fields ff">
+      <div class="fld"><label for="s-${sm.id}-name">Name</label><input id="s-${sm.id}-name" type="text" data-sec="samples" data-i="${i}" data-k="name" value="${esc(sm.name || '')}" placeholder="${esc(sampleId({ ...sm, name: '' }))}" autocomplete="off"></div>
       ${n2('depth', f(sm.depth, 3), `Depth (${L})`)}
-      <div class="fld"><label for="s-${sm.id}-type">Type</label><select id="s-${sm.id}-type" data-sec="samples" data-i="${i}" data-k="type">${opt(Object.keys(SAMPLE_TYPES), sm.type, SAMPLE_TYPES)}</select></div>
-      ${n2('no', sm.no, 'Sample no.')}
-      <div class="fld wide"><label>Blows per ${INC()}</label><div class="blows3">${[1, 2, 3].map(n => `<input id="s-${sm.id}-b${n}" type="number" step="1" inputmode="numeric" data-sec="samples" data-i="${i}" data-k="b${n}" value="${esc(sm['b' + n] ?? '')}" placeholder="${n === 1 ? '1st (seating)' : n === 2 ? '2nd' : '3rd'}">`).join('')}</div></div>
-      ${n2('n', sm.n, 'SPT N', sm.b2 != null && sm.b3 != null ? 'readonly' : '')}${full ? out('n60', 'N60') + out('n160', '(N1)60') : ''}
-      ${full ? n2('rec', sm.rec, 'Recovery (%)') + n2('rqd', sm.rqd, 'RQD (%)') : ''}
+      <div class="fld"><label for="s-${sm.id}-type">Method</label><select id="s-${sm.id}-type" data-sec="samples" data-i="${i}" data-k="type">${opt(Object.keys(SAMPLE_TYPES), sm.type, SAMPLE_TYPES)}</select></div>
+      <div class="fld wide"><label for="s-${sm.id}-purpose">Purpose / analyses</label><input id="s-${sm.id}-purpose" type="text" list="sample-purposes" data-sec="samples" data-i="${i}" data-k="purpose" value="${esc(sm.purpose || '')}" placeholder="e.g. BTEX, PHC F1–F4; moisture content" autocomplete="off"><datalist id="sample-purposes">${SAMPLE_PURPOSES.map(v => `<option value="${esc(v)}">`).join('')}</datalist></div>
+      ${spt ? `<div class="fld wide"><label>Blows per ${INC()}</label><div class="blows3">${[1, 2, 3].map(n => `<input id="s-${sm.id}-b${n}" type="number" step="1" inputmode="numeric" data-sec="samples" data-i="${i}" data-k="b${n}" value="${esc(sm['b' + n] ?? '')}" placeholder="${n === 1 ? '1st (seating)' : n === 2 ? '2nd' : '3rd'}">`).join('')}</div></div>
+      ${n2('n', sm.n, 'SPT N', sm.b2 != null && sm.b3 != null ? 'readonly' : '')}${full ? out('n60', 'N60') + out('n160', '(N1)60') : ''}` : ''}
+      ${core ? n2('rec', sm.rec, 'Recovery (%)') + n2('rqd', sm.rqd, 'RQD (%)') : ''}
     </div>
     <h4 class="ff-h">Field and lab tests</h4><div class="fields ff">
       ${n2('w', sm.w, 'Water content w (%)')}${n2('pl', sm.pl, 'Plastic limit (%)')}${n2('ll', sm.ll, 'Liquid limit (%)')}
@@ -2668,7 +2676,7 @@ function wsAddRow(key) {
   const sh = sheetOf(key), r = gridAddRow(b, null, key); logChange(b, 'Log & data'); store.save(b);
   if (S.tab !== 'edit') { gridRedraw(); return; }
   wsGrids(); wsLog();
-  const ix = sheetRows(sh, [b]).findIndex(x => x.r === r), first = sh.cols.findIndex(c => !isCalc(c[2]) && r[c[0]] == null) ;
+  const ix = sheetRows(sh, [b]).findIndex(x => x.r === r), first = gridCols(sh, [b], true).findIndex(c => !isCalc(c[2]) && r[c[0]] == null);
   const el = document.querySelector(`.ws .dgrid[data-sheet="${key}"] input[data-r="${ix}"][data-c="${Math.max(0, first)}"]`); el?.focus(); el?.select();
 }
 /* the grid row with the cursor is the one the folded editor shows */
@@ -2868,9 +2876,11 @@ const SHEETS = {
     ['desc', 'Description', 'calc', (r, b) => plainDesc(r)]],
     blank: (b, prev) => newLayer(prev?.bottom ?? Math.max(0, ...b.layers.map(l => l.bottom ?? 0))) },
   samples: { name: 'Samples & SPT', key: 'samples', by: 'depth', cols: [
-    ['depth', 'Depth', 'depth'], ['type', 'Type', 'code', () => Object.keys(SAMPLE_TYPES)], ['no', 'No.', 'int'],
+    ['depth', 'Depth', 'depth'], ['name', 'Name', 'text', null, null, r => sampleId({ ...r, name: '' })], ['type', 'Method', 'code', () => Object.keys(SAMPLE_TYPES)], ['purpose', 'Purpose / analyses', 'text', () => SAMPLE_PURPOSES], ['no', 'No.', 'int'],
     ['b1', 'Blows 1', 'int'], ['b2', 'Blows 2', 'int'], ['b3', 'Blows 3', 'int'], ['n', 'N', 'calcnum', (r, b) => sptN(r)], ['rec', 'Rec. %', 'num'], ['rqd', 'RQD %', 'num'], ['note', 'Remarks', 'text']],
-    blank: (b, prev) => ({ id: uid('s'), no: Math.max(0, ...b.samples.map(x => x.no || 0)) + 1, depth: null, type: prev?.type || 'SS', b1: null, b2: null, b3: null, n: null, rec: null, rqd: null, w: null, pl: null, ll: null, pp: null, su: null, so4: null, note: '', lab: {}, labMeta: { lab: '', report: '', date: '' } }) },
+    /* one borehole's grid shows the SPT columns only when it has split spoons, recovery only with core; the name stands in for the number */
+    show: (k, list) => { const ts = new Set(list.flatMap(b => (b.samples || []).map(s => s.type))); return k === 'no' ? false : ['b1', 'b2', 'b3', 'n'].includes(k) ? ts.has('SS') : ['rec', 'rqd'].includes(k) ? ts.has('C') : true; },
+    blank: (b, prev) => ({ id: uid('s'), no: Math.max(0, ...b.samples.map(x => x.no || 0)) + 1, name: nextSampleName(prev?.name), purpose: prev?.purpose || '', depth: null, type: prev?.type || 'SS', b1: null, b2: null, b3: null, n: null, rec: null, rqd: null, w: null, pl: null, ll: null, pp: null, su: null, so4: null, note: '', lab: {}, labMeta: { lab: '', report: '', date: '' } }) },
   tests: { name: 'Field & lab tests', key: 'samples', by: 'depth', cols: [
     ['depth', 'Depth', 'depth'], ['id', 'Sample', 'calc', r => sampleId(r)], ['w', 'w (%)', 'num'], ['pl', 'PL (%)', 'num'], ['ll', 'LL (%)', 'num'], ['pi', 'PI', 'calc', r => r.ll != null && r.pl != null ? +(r.ll - r.pl).toFixed(1) : ''],
     ['pp', 'PP (kPa)', 'num'], ['su', 'Su vane (kPa)', 'num'], ['so4', 'SO₄ (%)', 'num'], ['cvc', 'Vapour (ppm)', 'num']],
@@ -2904,7 +2914,7 @@ function liveIssues(b) {
   for (const sm of b.samples) {
     if (sm.depth == null) add('samples', sm.id, 'depth', 'Missing the depth.');
     else if (b.layers.some(l => l.bottom != null) && sm.depth > eoh + 1e-6) add('samples', sm.id, 'depth', `Below the end of the borehole (${fd(eoh)}).`);
-    const key = sampleId(sm); if (sm.no != null) { if (seen.has(key)) add('samples', sm.id, 'no', `${key} is used twice.`); seen.set(key, sm); }
+    const key = sampleId(sm).toLowerCase(); if (sm.no != null || sm.name) { if (seen.has(key)) add('samples', sm.id, sm.name ? 'name' : 'no', `${sampleId(sm)} is used twice.`); seen.set(key, sm); }
     if (sm.rec != null && sm.rec > 100) add('samples', sm.id, 'rec', 'Recovery is over 100 %.');
     if (sm.rqd != null && (sm.rqd > 100 || (sm.rec != null && sm.rqd > sm.rec))) add('samples', sm.id, 'rqd', 'RQD can’t exceed the recovery.');
     if (sm.ll != null && sm.pl != null && sm.ll < sm.pl) add('samples', sm.id, 'll', 'LL is below PL.');
@@ -2953,17 +2963,19 @@ function cellParse(c, txt) {
 }
 /* one grid: a sheet's rows for the project ('all') or the selected borehole ('one'). The table carries its sheet and scope,
    so a page can hold several grids (the borehole workspace shows samples and tests together). */
+/* the columns a grid shows: all of them across the project (so pasted blocks line up), a sheet's own choice for one borehole */
+const gridCols = (sh, list, one) => one && sh.show ? sh.cols.filter(c => sh.show(c[0], list)) : sh.cols;
 function gridBlockHTML(key, scope) {
   const sh = sheetOf(key), list = scope === 'one' ? (cur() ? [cur()] : []) : projList(), rows = sheetRows(sh, list), iss = gridIssues(list, key), one = scope === 'one';
-  const L = LEN(), bad = Object.keys(iss).length, num = c => ['depth', 'num', 'int', 'calcnum', 'calcdepth'].includes(c[2]);
-  const head = sh.cols.map(c => `<th${num(c) ? ' class="r"' : ''}>${esc(c[1])}${['depth', 'calcdepth'].includes(c[2]) ? ` (${L})` : ''}</th>`).join('');
-  const dls = sh.cols.filter(c => c[3] && !isCalc(c[2])).map(c => `<datalist id="dl-${key}-${c[0]}">${c[3]().map(v => `<option value="${esc(v)}">`).join('')}</datalist>`).join('');
-  const body = rows.map(({ b, r }, i) => `<tr data-bh="${esc(b.id)}" data-id="${esc(r.id)}">${one ? '' : `<th class="bh">${esc(b.name || 'Untitled')}</th>`}${sh.cols.map((c, j) => {
+  const L = LEN(), bad = Object.keys(iss).length, num = c => ['depth', 'num', 'int', 'calcnum', 'calcdepth'].includes(c[2]), cols0 = gridCols(sh, list, one);
+  const head = cols0.map(c => `<th${num(c) ? ' class="r"' : ''}>${esc(c[1])}${['depth', 'calcdepth'].includes(c[2]) ? ` (${L})` : ''}</th>`).join('');
+  const dls = cols0.filter(c => c[3] && !isCalc(c[2])).map(c => `<datalist id="dl-${key}-${c[0]}">${c[3]().map(v => `<option value="${esc(v)}">`).join('')}</datalist>`).join('');
+  const body = rows.map(({ b, r }, i) => `<tr data-bh="${esc(b.id)}" data-id="${esc(r.id)}">${one ? '' : `<th class="bh">${esc(b.name || 'Untitled')}</th>`}${cols0.map((c, j) => {
     const calc = isCalc(c[2]), msg = iss[`${b.id}:${r.id}:${c[0]}`], cls = [num(c) ? 'r' : ['text', 'pick'].includes(c[2]) ? 'wide' : '', msg ? 'bad' : '', calc ? 'out' : ''].filter(Boolean).join(' ');
     return calc ? `<td class="${cls}"${msg ? ` title="${esc(msg)}"` : ''}>${esc(cellText(c, r, b))}</td>`
-      : `<td class="${cls}"${msg ? ` title="${esc(msg)}"` : ''}><input data-r="${i}" data-c="${j}" value="${esc(cellText(c, r, b))}" title="${esc(msg || cellText(c, r, b))}" ${c[3] ? `list="dl-${key}-${c[0]}"` : ''} ${editable(b) ? '' : 'readonly'} aria-label="${esc(`${b.name} ${c[1]}`)}" autocomplete="off"></td>`;
+      : `<td class="${cls}"${msg ? ` title="${esc(msg)}"` : ''}><input data-r="${i}" data-c="${j}" value="${esc(cellText(c, r, b))}" title="${esc(msg || cellText(c, r, b))}" ${c[3] ? `list="dl-${key}-${c[0]}"` : ''} ${c[5] ? `placeholder="${esc(c[5](r))}"` : ''} ${editable(b) ? '' : 'readonly'} aria-label="${esc(`${b.name} ${c[1]}`)}" autocomplete="off"></td>`;
   }).join('')}<td class="del">${editable(b) ? `<button class="x" data-tdel="${i}" aria-label="Delete row">${svgI('<path d="M6 6l12 12M18 6 6 18"/>')}</button>` : ''}</td></tr>`).join('');
-  const msgs = Object.values(iss), cols = sh.cols.length + (one ? 1 : 2);
+  const msgs = Object.values(iss), cols = cols0.length + (one ? 1 : 2);
   return `${bad ? `<div class="dg-issues" role="status"><b>${bad} problem${bad === 1 ? '' : 's'} to check</b> <span>${esc([...new Set(msgs)].map(m => one ? m.replace(/^[^:]*: /, '') : m).slice(0, 3).join(' · '))}${msgs.length > 3 ? ' …' : ''}</span></div>` : ''}
     <div class="dgrid-wrap"><table class="dgrid" data-sheet="${key}" data-scope="${one ? 'one' : 'all'}"><thead><tr>${one ? '' : '<th class="bh">Borehole</th>'}${head}<th></th></tr></thead><tbody>${body || `<tr><td colspan="${cols}" class="note">No rows yet.${list.some(editable) ? ' Add one, or paste from Excel into the first cell.' : ''}</td></tr>`}</tbody></table></div>
     ${one && list.some(editable) ? `<button class="tb dg-add" data-gadd="${key}">${ICON.add}Add row</button>` : ''}${dls}`;
@@ -3011,7 +3023,7 @@ function gridRedraw(focus) {
 }
 const gridCtx = el => {
   const t = el.closest('.dgrid'), key = t?.dataset.sheet || S.tsheet, sh = sheetOf(key), list = t?.dataset.scope === 'one' ? [cur()].filter(Boolean) : projList();
-  const rows = sheetRows(sh, list), i = +el.dataset.r, j = +el.dataset.c; return { key, sh, rows, i, j, row: rows[i], c: sh.cols[j] };
+  const rows = sheetRows(sh, list), i = +el.dataset.r, j = +el.dataset.c, cols = gridCols(sh, list, t?.dataset.scope === 'one'); return { key, sh, cols, rows, i, j, row: rows[i], c: cols[j] };
 };
 function gridAddRow(b, after, sheet = S.tsheet) {
   const sh = sheetOf(sheet), arr = b[sh.key], prev = after || [...arr].sort((x, y) => (x[sh.by] ?? 0) - (y[sh.by] ?? 0)).pop();
@@ -3040,7 +3052,7 @@ document.addEventListener('paste', e => {
   const txt = e.clipboardData?.getData('text/plain') || ''; if (!/[\t\n]/.test(txt.replace(/\r?\n$/, ''))) return;   // one value: an ordinary paste
   e.preventDefault();
   const grid = txt.replace(/\r/g, '').replace(/\n$/, '').split('\n').map(l => l.split('\t'));
-  const { key, sh, rows, i, j } = gridCtx(el);
+  const { key, sh, cols, rows, i, j } = gridCtx(el);
   /* a Borehole column (by its header, or names in the first pasted column) sends each row to that borehole, creating boreholes that don't exist */
   let data = grid, bhCol = -1;
   if (/^(borehole|bh|hole|location|well)/i.test(grid[0][0]?.trim() || '')) { bhCol = 0; data = grid.slice(1); }
@@ -3057,7 +3069,7 @@ document.addEventListener('paste', e => {
     const vals = bhCol === 0 ? line.slice(1) : line;
     let row = bhCol === 0 ? null : rows[k];
     if (!row || (target && row.b !== target)) { const b = target || rows[k - 1]?.b || rows[rows.length - 1]?.b || projList()[0]; if (!b) continue; if (!editable(b)) { locked.add(b.name); continue; } row = { b, r: gridAddRow(b, null, key) }; }
-    vals.forEach((txt, d) => { const c = sh.cols[(bhCol === 0 ? 0 : j) + d]; if (c) cells.push({ b: row.b, r: row.r, c, txt }); });
+    vals.forEach((txt, d) => { const c = cols[(bhCol === 0 ? 0 : j) + d]; if (c) cells.push({ b: row.b, r: row.r, c, txt }); });
     k++;
   }
   const bad = gridWrite(cells, key);
@@ -3587,7 +3599,7 @@ function logSVG(b, W) {
   if (descW < 260) { descW = 260; W = x + descW + fixedRight; }
   const cDs = { x: x + 10, w: descW - 20 }; x += descW;
   const cOb = { x, w: on('obs') ? 170 : 0 }; x += cOb.w;
-  const cSm = { x, w: 44 }; x += cSm.w;
+  const cSm = { x, w: Math.round(Math.min(96, Math.max(44, longestId(b) * 6.6 + 10))) }; x += cSm.w;   // wide enough for the sample names, up to a point
   const cTy = { x, w: 22 }; x += cTy.w;
   const cN = { x, w: on('n') ? 38 : 0 }; x += cN.w;
   const cNp = { x, w: on('nplot') ? 150 : 0 }; x += cNp.w;
@@ -3615,7 +3627,7 @@ function logSVG(b, W) {
   if (cE.w) head(cE, 'Elev.', `(${L})`);
   head(cG, 'Symbol', '');
   out.push(`<text class="lbl" x="${cDs.x}" y="46">Description</text><text class="lbl2" x="${cDs.x}" y="60">CFEM / Modified USCS</text>`);
-  head(cSm, 'No.', '', 'middle');
+  head(cSm, (b.samples || []).some(s => s.name) ? 'Sample' : 'No.', '', 'middle');
   if (cN.w) head(cN, 'N', '', 'middle');
   if (cWl.w) head(cWl, 'Standpipe', '', 'middle');
   if (cOb.w) head(cOb, 'Observations', '');
@@ -3693,7 +3705,7 @@ function logSVG(b, W) {
     if (y1 - y0 >= 4) out.push(`<path d="M${cSm.x} ${y0}H${cN.x + cN.w}M${cSm.x} ${y1}H${cN.x + cN.w}" style="stroke:var(--line)"/>`);
     out.push(sampleGlyph(cTy.x, cTy.w, y0, y1, s.type));
     if (Math.abs(ly - it.y) > .5) out.push(`<path d="M${cSm.x + cSm.w - 2} ${ly}L${cTy.x} ${it.y}" style="stroke:var(--muted)" fill="none"/>`);
-    out.push(`<text class="sv" x="${cSm.x + cSm.w / 2}" y="${ly + 4}" text-anchor="middle">${esc(sampleId(s))}</text>`);
+    out.push(`<text class="sv" x="${cSm.x + cSm.w / 2}" y="${ly + 4}" text-anchor="middle" style="font-size:${idFont(sampleId(s), cSm.w, 11)}px">${esc(sampleId(s))}</text>`);
     if (!cN.w) {}
     else if (N != null) out.push(`<text class="sv" x="${cN.x + cN.w / 2}" y="${ly + 4}" text-anchor="middle" style="font-weight:600">${N}</text>`);
     else if (s.type === 'C' && s.rec != null) out.push(`<text class="tick" x="${cN.x + cN.w / 2}" y="${ly + 4}" text-anchor="middle">${s.rec}%</text>`);
@@ -4075,6 +4087,7 @@ function onField(e) {
       const ni = document.getElementById(`s-${row.id}-n`);
       if (row.b2 != null && row.b3 != null) { row.n = row.b2 + row.b3; if (ni) { ni.value = row.n; ni.readOnly = true; } } else if (ni) ni.readOnly = false;
     }
+    if (sec === 'samples' && k === 'type') { const fm = t.closest('.lf-form, .dbody'); if (fm) { const si = +t.dataset.i; fm.innerHTML = sampleFormHTML(b, si, fm.classList.contains('lf-form')); fm.querySelector(`#s-${row.id}-type`)?.focus(); } }   // the SPT and core fields follow the method
     if (sec === 'water') { recomputeWater(row, b); refreshWaterOut(b); }
     if (sec === 'layers') { refreshLayerRow(b); checkLayers(b); }
   } else return;
@@ -6120,7 +6133,7 @@ function dataRows(bhs, unit) {
       [`Elevation ${u}`]: c(b.elevation), Datum: b.datum || '', 'Start date': b.date || '', 'End date': b.dateEnd || '', Contractor: b.contractor || '', Rig: b.rig || '', Method: b.method || '', 'Diameter (mm)': b.diameter ?? '',
       'Logged by': b.logger || '', 'Reviewed by': b.reviewer || '', Weather: b.weather || '', Termination: b.termination || '', [`Slough ${u}`]: c(b.slough), 'CSSC classification': [b.csscSub, b.csscGG].filter(Boolean).join(' '), Notes: b.notes || '' })),
     Layers: bhs.flatMap(b => (b.layers || []).map(l => ({ Borehole: b.name, [`From ${u}`]: c(l.top), [`To ${u}`]: c(l.bottom), Horizon: l.hz || '', Texture: texOf(l)?.name || '', Symbol: l.uscs || '', Modifiers: l.mods || '', Consistency: l.consistency || '', Moisture: l.moisture || '', Colour: l.colour || '', Other: l.other || '', Origin: ORIGINS[l.origin] || '', Description: composeDesc(l).text }))),
-    Samples: bhs.flatMap(b => (b.samples || []).map(s => ({ Borehole: b.name, [`Depth ${u}`]: c(s.depth), Type: s.type || '', No: s.no ?? '', Blows: blowStr(s), 'SPT N': sptN(s) ?? '', 'Recovery %': s.rec ?? '', RQD: s.rqd ?? '', w: s.w ?? '', PL: s.pl ?? '', LL: s.ll ?? '', PP: s.pp ?? '', Su: s.su ?? '', SO4: s.so4 ?? '', 'Vapour (ppm)': s.cvc ?? '', Remarks: s.note || '' }))),
+    Samples: bhs.flatMap(b => (b.samples || []).map(s => ({ Borehole: b.name, [`Depth ${u}`]: c(s.depth), Name: sampleId(s), Type: s.type || '', No: s.no ?? '', 'Purpose / analyses': s.purpose || '', Blows: blowStr(s), 'SPT N': sptN(s) ?? '', 'Recovery %': s.rec ?? '', RQD: s.rqd ?? '', w: s.w ?? '', PL: s.pl ?? '', LL: s.ll ?? '', PP: s.pp ?? '', Su: s.su ?? '', SO4: s.so4 ?? '', 'Vapour (ppm)': s.cvc ?? '', Remarks: s.note || '' }))),
     Water: bhs.flatMap(b => (b.water || []).filter(w => w.depth != null).map(w => ({ Borehole: b.name, Date: w.date || '', [`Depth to water ${u}`]: c(w.depth), Type: WATER_KINDS[w.kind] || '' }))),
   };
 }
@@ -6436,7 +6449,7 @@ async function xLogSheet(wb, b, paper) {
   add('depth', 7, `Depth (${U})`); add('elev', 7.5, `Elev. (${U})`); add('legend', 8, 'Soil symbol');
   if (well) { add('wl', 2.1, 'Standpipe'); add('wp', 2.5, '~'); add('wr', 2.1, '~'); }   // same overall width as the soil column, right beside it
   add('desc', 44, 'SOIL DESCRIPTION');
-  add('sid', 6.5, 'Sample'); add('blows', 8, 'Blows / ' + (S.units === 'ft' ? '6 in' : '150 mm')); add('n', 5, 'SPT N'); if (b.er != null) add('n60', 5, 'N60');
+  add('sid', Math.min(16, Math.max(6.5, longestId(b) * 1.1 + 1)), 'Sample'); add('blows', 8, 'Blows / ' + (S.units === 'ft' ? '6 in' : '150 mm')); add('n', 5, 'SPT N'); if (b.er != null) add('n60', 5, 'N60');
   add('nplot', 15, `SPT N (${NUNIT()})`, 'scale'); add('aplot', 15, 'PL —●— LL   w (%)', 'scale');
   add('w', 5, 'w (%)'); add('pp', 6, 'PP (kPa)'); add('su', 6, 'Su (kPa)'); add('so4', 6, 'SO4 (%)');
   add('gw', 4.5, 'GW');
@@ -7587,7 +7600,7 @@ function pageSVG(b, pi, pn) {
   // columns
   const cols = []; let x = M;
   const add = (k, w, h1, h2 = '') => { cols.push({ k, x, w, h1, h2 }); x += w; };
-  const RC = [on('obs') && ['ob', pdfW('obs'), 'Observations'], ['sid', 32, 'No.'], ['sty', 14, ''], on('blows') && ['blows', pdfW('blows'), 'Blows/', S.units === 'ft' ? '6 in' : '150 mm'], on('n') && ['n', pdfW('n'), 'N'],
+  const RC = [on('obs') && ['ob', pdfW('obs'), 'Observations'], ['sid', Math.round(Math.min(60, Math.max(32, longestId(b) * 4.1 + 6))), (b.samples || []).some(s => s.name) ? 'Sample' : 'No.'], ['sty', 14, ''], on('blows') && ['blows', pdfW('blows'), 'Blows/', S.units === 'ft' ? '6 in' : '150 mm'], on('n') && ['n', pdfW('n'), 'N'],
     on('nplot') && ['np', pdfW('nplot'), 'SPT N'], on('su') && ['sp', pdfW('su'), 'Su (kPa)'], on('w') && ['ap', pdfW('w'), 'w (%)'], on('cvc') && ['vp', pdfW('cvc'), 'Vapour (ppm)'], on('lab') && labGraphParam() && ['lp', pdfW('lab'), LAB_PARAMS[labGraphParam()].label.replace(/ \(.*\)$/, '').slice(0, 14), LAB_PARAMS[labGraphParam()].unit || ''], ...graphsOf().map((g, i) => ['gx' + i, lay('graph'), graphSeries()[g.series][0].replace(/ \(.*\)$/, '').slice(0, 14), graphSeries()[g.series][1]]), on('so4') && ['so4', pdfW('so4'), 'SO4', '%'], on('water') && ['gw', pdfW('water'), 'Level']].filter(Boolean);
   // soil column up to 52 px and standpipe a little narrower, never squeezing the description under 170 px
   const elevW = b.elevation != null && on('elev') ? 48 : 0, avail = X1 - M - 38 - elevW - RC.reduce((a, c) => a + c[1], 0);
@@ -7701,7 +7714,7 @@ function pageSVG(b, pi, pn) {
     const sEnd = smp[smp.length - 1].x + smp[smp.length - 1].w;
     if (yB - yA >= 3) o.push(line(C.sid.x, yA, sEnd, yA, 'var(--line)', .5), line(C.sid.x, yB, sEnd, yB, 'var(--line)', .5));
     o.push(sampleGlyph(C.sty.x, C.sty.w, yA, yB, s.type, .6));
-    o.push(T(C.sid.x + C.sid.w / 2, yy + 3.2, sampleId(s), { s: 6.8, w: 700, a: 'middle' }));
+    o.push(T(C.sid.x + C.sid.w / 2, yy + 3.2, sampleId(s), { s: idFont(sampleId(s), C.sid.w, 6.8 * F) / F, w: 700, a: 'middle' }));
     if (C.blows) o.push(T(C.blows.x + C.blows.w / 2, yy + 3.2, s.type === 'C' ? [s.rec != null ? s.rec + '%' : '', s.rqd != null ? 'R' + s.rqd : ''].filter(Boolean).join(' ') : blowStr(s), { s: 6.8, a: 'middle' }));
     if (N != null && C.n) o.push(T(C.n.x + C.n.w / 2, yy + 3.2, N, { s: 7.2, w: 700, a: 'middle' }));
     if (N != null && C.np) { pts.push({ v: N, y: yy }); if (N > P.n.max) o.push(T(NX(P.n.max) - 3, yy - 3, N + '→', { s: 5.8, c: 'var(--muted)', a: 'end' })); }

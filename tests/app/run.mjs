@@ -1847,6 +1847,31 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('samples: free-text names, purpose, only the columns that apply, the next sample filled in', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        want(nextSampleName('S3') === 'S4' && nextSampleName('BH1-SA09') === 'BH1-SA10' && nextSampleName('jar') === '' && nextSampleName('') === '', 'next names: ' + [nextSampleName('S3'), nextSampleName('BH1-SA09'), nextSampleName('jar')]);
+        want(sampleId({ type: 'SS', no: 2 }) === 'SS2' && sampleId({ type: 'SS', no: 2, name: 'BH1-S2' }) === 'BH1-S2', 'a name replaces type and number');
+        loadDlExample(); await w(300); const b = sortedList().find(x => x.status !== 'issued' && x.samples.some(s => s.type === 'SS')); S.sel = b.id; S.dtab = 'samples'; goTab('edit'); await w(400);
+        const heads = () => [...document.querySelectorAll('.ws .dgrid[data-sheet="samples"] thead th')].map(t => t.textContent.trim());
+        let h = heads(); want(h.includes('Name') && h.includes('Method') && h.includes('Purpose / analyses') && h.includes('Blows 1') && !h.includes('No.') && !h.includes('Rec. %'), 'split spoons, no core: ' + h.join('|'));
+        const keep = b.samples.map(s => s.type); b.samples.forEach(s => { s.type = 'G'; }); wsGrids(); h = heads(); want(!h.includes('Blows 1') && !h.includes('N'), 'grab samples only, no SPT columns: ' + h.join('|'));
+        b.samples.forEach((s, i) => { s.type = keep[i]; });
+        S.gridOne = 0; goTab('table'); S.tsheet = 'samples'; renderView(true); await w(250); h = [...document.querySelectorAll('#view .dgrid thead th')].map(t => t.textContent.trim()); want(h.includes('No.') && h.includes('Rec. %'), 'the project table keeps every column for pasting: ' + h.join('|'));
+        S.dtab = 'samples'; goTab('edit'); await w(300);
+        const last = [...b.samples].sort((x, y) => x.depth - y.depth).pop(); last.name = 'S09'; last.purpose = 'BTEX, PHC F1–F4'; const n0 = b.samples.length;
+        wsAddRow('samples'); await w(200); const nw = b.samples[b.samples.length - 1];
+        want(b.samples.length === n0 + 1 && nw.name === 'S10' && nw.purpose === 'BTEX, PHC F1–F4' && nw.type === last.type, 'the next sample: ' + JSON.stringify([nw.name, nw.purpose, nw.type]));
+        const fc = document.activeElement; want(fc?.closest('.dgrid') && heads()[+fc.dataset.c] === 'Depth (m)', 'the cursor waits in Depth: ' + heads()[+fc?.dataset.c]);
+        nw.depth = last.depth + .75; nw.name = 's09'; want(checkLog(b).some(m => /used twice/.test(m)) || Object.values(gridIssues([b], 'samples')).some(m => /used twice/.test(m)), 'a repeated name is flagged');
+        nw.name = 'BH26-LONG-NAME-01'; const svg = logSVG(b, 1100), pg = pageSVG(b, 0, 1);
+        want(svg.includes('BH26-LONG-NAME-01') && pg.includes('BH26-LONG-NAME-01') && pg.includes('>Sample<'), 'the log and PDF show the names under Sample');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('log: a layer marked part of the unit above is a change within it', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
