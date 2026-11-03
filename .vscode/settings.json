@@ -1,0 +1,6 @@
+{
+  // VS Code's own terminal sets ELECTRON_RUN_AS_NODE=1, which stops Electron opening a window; clear it so `npm run dev` works here
+  "terminal.integrated.env.osx": { "ELECTRON_RUN_AS_NODE": null },
+  "terminal.integrated.env.linux": { "ELECTRON_RUN_AS_NODE": null },
+  "terminal.integrated.env.windows": { "ELECTRON_RUN_AS_NODE": null }
+}

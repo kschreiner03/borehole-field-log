@@ -35,7 +35,7 @@ To update later: `git pull`, then build again.
 
 Smoke test: `BOREHOLE_SMOKE=shot.png npx electron .` opens the window, saves a screenshot and quits (`BOREHOLE_VIEW=preview` for the new interface; add a `.bhp` path to open it; `BOREHOLE_USER_DATA=<folder>` runs it in its own profile, beside a copy already open).
 
-Running from a VS Code terminal: VS Code sets `ELECTRON_RUN_AS_NODE=1`, which stops Electron opening a window. Use `env -u ELECTRON_RUN_AS_NODE npm run dev`.
+VS Code: open this folder (File › Open Folder… › `borehole-field-log`). Its `.vscode/settings.json` clears `ELECTRON_RUN_AS_NODE`, which VS Code's terminal otherwise sets and which stops Electron opening a window, so `npm run dev` works in the built-in terminal.
 
 ## Layout
 
@@ -48,7 +48,11 @@ Running from a VS Code terminal: VS Code sets `ELECTRON_RUN_AS_NODE=1`, which st
 
 Unsigned installers work, but Windows SmartScreen warns about them and macOS refuses to open them without a right-click. electron-builder signs automatically when these are set in the environment:
 
-- **macOS** (Apple Developer Program): a Developer ID Application certificate in the keychain (or `CSC_LINK` / `CSC_KEY_PASSWORD`), and for notarization `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`. Hardened runtime is on.
+- **macOS**: set up. `npm run dist:mac` signs with the Developer ID Application certificate for team UUUUG5QGQ9 (it must be in the login keychain) and notarizes with Apple, so the `.dmg` opens on any Mac without warnings. Notarization reads your Apple ID from a keychain profile named `borehole-notary`; create it once on each Mac you build on:
+  ```
+  xcrun notarytool store-credentials borehole-notary --apple-id <your Apple ID email> --team-id UUUUG5QGQ9
+  ```
+  It asks for an app-specific password (make one at account.apple.com › Sign-In and Security › App-Specific Passwords). The password stays in your keychain, never in the project. Without the profile the app is still signed but not notarized. Hardened runtime is on; builds are Apple Silicon (arm64), matching the MODFLOW 6 build.
 - **Windows**: a code-signing certificate as `CSC_LINK` (a .pfx path or base64) and `CSC_KEY_PASSWORD`, or Azure Trusted Signing.
 
 Raise `version` in `package.json` for each release. The app icon is `build/icon.png` (1024 px, made from `build/icon.svg`).
