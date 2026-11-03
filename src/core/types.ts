@@ -10,7 +10,7 @@ export interface Sample {
 }
 export interface WaterReading { kind?: string; depth: number | null; date?: string; ref?: string }
 export interface SlugTest { H0?: number; data?: [number, number][]; rc?: number; R?: number; Le?: number; date?: string; kind?: string }
-export interface Layer { id: string; top: number | null; bottom: number | null; uscs?: string; texture?: string; origin?: string }
+export interface Layer { id: string; top: number | null; bottom: number | null; uscs?: string; texture?: string; origin?: string; sub?: boolean }
 export interface Borehole {
   id: string; name: string; project?: string;
   easting?: number | null; northing?: number | null; elevation?: number | null; crs?: string;
