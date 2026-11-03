@@ -8211,11 +8211,12 @@ function imageryAct(t) {
 
 /* ---------- basemaps: online map tiles under the site plan and project maps. Tiles come from the provider chosen
    (which then sees the site's approximate location), are cached as pictures and placed through the UTM projection ---------- */
+/* Esri's blankTile=false: where a zoom level has no imagery the server answers 404 rather than sending a grey "no data" tile, so a coarser one is shown */
 const BASEMAPS = {
-  imagery: ['Satellite imagery (Esri)', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', 19, 'Imagery © Esri, Maxar, Earthstar Geographics'],
+  imagery: ['Satellite imagery (Esri)', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?blankTile=false', 19, 'Imagery © Esri, Maxar, Earthstar Geographics'],
   osm: ['Street map (OpenStreetMap)', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', 19, '© OpenStreetMap contributors'],
-  topo: ['Topographic (Esri)', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', 19, 'Basemap © Esri and contributors'],
-  grey: ['Light grey (Esri), for printing', 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', 16, 'Basemap © Esri and contributors'],
+  topo: ['Topographic (Esri)', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}?blankTile=false', 19, 'Basemap © Esri and contributors'],
+  grey: ['Light grey (Esri), for printing', 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}?blankTile=false', 16, 'Basemap © Esri and contributors'],
 };
 const basemapKey = () => BASEMAPS[siteOf()?.basemap] ? siteOf().basemap : 'imagery';
 const crsZone = () => { const m = /zone\s*(\d{1,2})/i.exec(projList().find(b => b.crs)?.crs || ''); return m ? +m[1] : siteOf()?.zone || 12; };
@@ -8233,7 +8234,7 @@ const lon2tx = (lon, z) => (lon + 180) / 360 * 2 ** z;
 const lat2ty = (lat, z) => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z; };
 const tx2lon = (x, z) => x / 2 ** z * 360 - 180;
 const ty2lat = (y, z) => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / 2 ** z))) * 180 / Math.PI;
-S.tiles = new Map(); S.tilePend = new Set(); S.tileN = 0;
+S.tiles = new Map(); S.tilePend = new Set(); S.tileBad = new Set(); S.tileN = 0;   // tileBad: tiles the server doesn't have, not asked for again
 const tileStore = {
   db: null,
   open() { return this.db ||= new Promise((res, rej) => { const r = indexedDB.open('bhlog-tiles', 1); r.onupgradeneeded = () => r.result.createObjectStore('t'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
@@ -8243,12 +8244,13 @@ const tileStore = {
 let tileT;
 function tileArrived() { clearTimeout(tileT); tileT = setTimeout(() => { if (S.tab === 'site') drawPlan(); else if (['home', 'gw', 'contam', 'compose'].includes(S.tab)) renderView(true); }, 250); }
 function fetchTile(u) {
-  if (S.tilePend.has(u) || S.tilePend.size > 40) return; S.tilePend.add(u);
+  if (S.tilePend.has(u) || S.tileBad.has(u) || S.tilePend.size > 40) return; S.tilePend.add(u);
   tileStore.get(u).catch(() => null).then(c => c || fetch(u, { mode: 'cors' }).then(r => r.ok ? r.blob() : Promise.reject(r.status))
     .then(bl => new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(bl); }))
     .then(d => { tileStore.put(u, d).catch(() => {}); return d; }))
     .then(d => { S.tiles.set(u, d); if (S.tiles.size > 500) S.tiles.delete(S.tiles.keys().next().value); S.tilePend.delete(u); tileArrived(); })
-    .catch(() => { S.tilePend.delete(u); if (!S.tileWarned) { S.tileWarned = true; toast('Basemap tiles could not be loaded. They need an internet connection, and some networks block them.'); } });
+    .catch(st => { S.tilePend.delete(u); if (st >= 400 && st < 500) { S.tileBad.add(u); tileArrived(); return; }   // none at this zoom: a coarser tile stands in
+      if (!S.tileWarned) { S.tileWarned = true; toast('Basemap tiles could not be loaded. They need an internet connection, and some networks block them.'); } });
 }
 const basemapIdle = () => new Promise(res => { const t0 = Date.now(), tick = () => (!S.tilePend.size || Date.now() - t0 > 10000) ? res() : setTimeout(tick, 120); tick(); });
 function basemapSVG(W, H, cx, cy, sc, op = 1) {
@@ -8258,8 +8260,15 @@ function basemapSVG(W, H, cx, cy, sc, op = 1) {
   let z = Math.max(1, Math.min(zmax, Math.round(Math.log2(156543.03392 * Math.cos(lat0 * Math.PI / 180) * sc)))), x0, x1, y0, y1;
   for (;; z--) { x0 = Math.floor(Math.min(...corners.map(c => lon2tx(c[1], z)))); x1 = Math.floor(Math.max(...corners.map(c => lon2tx(c[1], z)))); y0 = Math.floor(Math.min(...corners.map(c => lat2ty(c[0], z)))); y1 = Math.floor(Math.max(...corners.map(c => lat2ty(c[0], z)))); if ((x1 - x0 + 1) * (y1 - y0 + 1) <= 64 || z <= 1) break; }
   const X = e => W / 2 + (e - cx) * sc, Y = n => H / 2 - (n - cy) * sc, P = (tx, ty) => { const [e, n] = llToUtm(ty2lat(ty, z), tx2lon(tx, z), zone); return [X(e), Y(n)]; }, o = [];
+  const tileUrl = (z, x, y) => url.replace('{z}', z).replace('{x}', x).replace('{y}', y);
   for (let tx = x0; tx <= x1; tx++) for (let ty = y0; ty <= y1; ty++) {
-    const u = url.replace('{z}', z).replace('{x}', tx).replace('{y}', ty), d = S.tiles.get(u); if (!d) { fetchTile(u); continue; }
+    /* the tile itself, or while it loads (or where the server has none this close) the nearest coarser tile already here, enlarged */
+    let d = null, up = 0, asked = false;
+    for (; up <= Math.min(z - 1, 8); up++) {
+      const u = tileUrl(z - up, tx >> up, ty >> up); if ((d = S.tiles.get(u))) break;
+      if (!asked && !S.tileBad.has(u)) { fetchTile(u); asked = true; }   // fetch the closest one the server may have
+    }
+    if (!d) continue;
     /* each piece of the tile is placed by its corners through the projection (no shift or twist at the zone edges); a tile that
        bends across the projection, as when zoomed out to a province, is split until each piece is flat to under a pixel */
     const id = 'bt' + (++S.tileN), parts = [];
@@ -8274,7 +8283,9 @@ function basemapSVG(W, H, cx, cy, sc, op = 1) {
       parts.push(`<clipPath id="${cid}"><polygon points="${g(ax, ay)} ${g(bx, by)} ${g(dx, dy)} ${g(cx2, cy2)}"/></clipPath><g clip-path="url(#${cid})"><use href="#${id}" transform="${tr}"/></g>`);
     };
     piece(0, 0, 1, 0);
-    o.push(`<g opacity="${op}"><defs><image id="${id}" href="${d}" width="256.6" height="256.6" preserveAspectRatio="none"/></defs>${parts.join('')}</g>`);
+    const q = 2 ** up, img = up ? `<svg id="${id}" width="256.6" height="256.6" viewBox="0 0 256 256" preserveAspectRatio="none"><image href="${d}" x="${-256 * (tx % q)}" y="${-256 * (ty % q)}" width="${256 * q}" height="${256 * q}" preserveAspectRatio="none"/></svg>`
+      : `<image id="${id}" href="${d}" width="256.6" height="256.6" preserveAspectRatio="none"/>`;   // a coarser tile: the part of it this tile covers
+    o.push(`<g opacity="${op}"><defs>${img}</defs>${parts.join('')}</g>`);
   }
   o.push(`<text x="${W - 8}" y="${H - 4}" text-anchor="end" style="font:9px Arial,sans-serif;fill:#333;paint-order:stroke;stroke:#fff;stroke-width:3px">${esc(attr)}</text>`);
   return o.join('');

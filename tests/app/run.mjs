@@ -2222,6 +2222,26 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('basemap: zoomed in past the imagery, a coarser tile is enlarged instead of a blank map', async run => {
+    const r = await run(`(async () => {
+      const F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await new Promise(r => setTimeout(r, 300)); const b = projList().find(x => x.easting != null);
+        const asked = []; fetchTile = u => asked.push(u);   // no network: record what the map asks for
+        const zOf = u => +u.match(/tile\\/(\\d+)\\//)[1], png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        const draw = () => basemapSVG(800, 500, b.easting, b.northing, 40);   // 40 px a metre: past the closest imagery
+        draw(); const z = Math.max(...asked.map(zOf)), top = [...new Set(asked.filter(u => zOf(u) === z))];
+        want(top.length && top.every(u => /blankTile=false/.test(u)), 'Esri is asked for a 404 where it has no imagery: ' + top[0]);
+        for (const u of top) S.tiles.set(u.replace('/tile/' + z + '/', '/tile/' + (z - 2) + '/').replace(/\\/(\\d+)\\/(\\d+)\\?/, (m, y, x) => '/' + (y >> 2) + '/' + (x >> 2) + '?'), png);
+        let svg = draw(); want(/<svg id="bt\\d+"[^>]*viewBox="0 0 256 256"/.test(svg) && (svg.match(/<image /g) || []).length >= top.length, 'while the close tiles load, the coarser ones are shown enlarged');
+        asked.length = 0; for (const u of top) S.tileBad.add(u); draw();
+        want(asked.length && asked.every(u => zOf(u) === z - 1), 'where the server has none, the next coarser tile is asked for instead: ' + [...new Set(asked.map(zOf))]);
+        for (const u of top) S.tiles.set(u, png); svg = draw(); want(/<image id="bt\\d+"/.test(svg), 'the close tiles themselves once here');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('Dawn Lake example: 10 boreholes, 9 wells with bentonite over sand, about 5 m deep', async run => {
     const r = await run(`(() => { loadDlExample(); const l = sortedList().filter(b => b.project === DL_PROJ), w = l.filter(b => b.well.installed);
       return { n: l.length, wells: w.length, ann: w.every(b => b.well.annulus.map(a => a.mat).join() === 'bentonite,sand'), depth: w.every(b => b.well.depth >= 4.8 && b.well.depth <= 5.5), vapour: l.every(b => b.samples.some(s => s.cvc != null)) }; })()`);
