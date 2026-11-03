@@ -1856,19 +1856,25 @@ app.whenReady().then(async () => {
           { id: 'u2', top: 2, bottom: 4, uscs: 'SM', mods: 'trace gravel', consistency: 'Compact', moisture: 'Moist', colour: 'grey', other: '', origin: '', sub: true },
           { id: 'u3', top: 4, bottom: 5, uscs: 'SM', mods: 'some gravel', consistency: 'Compact', moisture: 'Wet', colour: 'grey', other: '', origin: '', sub: true },
           { id: 'u4', top: 5, bottom: 6, uscs: 'CL', mods: '', consistency: 'Stiff', moisture: 'Moist', colour: 'grey', other: '', origin: '' }];
-        want(changeNote(b.layers[1], b.layers[0]) === '– becoming grey', 'only the colour change: ' + changeNote(b.layers[1], b.layers[0]));
-        want(changeNote(b.layers[2], b.layers[1]) === '– becoming some gravel, wet', 'gravel and moisture: ' + changeNote(b.layers[2], b.layers[1]));
+        want(changeNote(b.layers[1], b.layers[0]) === '– grey', 'only the colour change: ' + changeNote(b.layers[1], b.layers[0]));
+        want(changeNote(b.layers[2], b.layers[1]) === '– some gravel, wet', 'gravel and moisture: ' + changeNote(b.layers[2], b.layers[1]));
         const txt = s => { const d = document.createElement('div'); d.innerHTML = s; d.querySelectorAll('title').forEach(e => e.remove()); return d.textContent; };   // hover titles keep the full description
         for (const [what, svg] of [['log', logSVG(b, 1100)], ['PDF page', pageSVG(b, 0, 1)]]) {
           const t = txt(svg);
-          want(t.includes('becoming grey') && t.includes('becoming some gravel, wet'), what + ': change notes shown');
+          want(t.includes('– grey') && t.includes('– some gravel, wet'), what + ': change notes shown');
           want((t.match(/SAND \\(SM\\)/g) || []).length === 1, what + ': the unit is described once: ' + (t.match(/SAND \\(SM\\)/g) || []).length);
           want((svg.match(/stroke-dasharray="4 3"/g) || []).length === 4, what + ': dashed boundaries inside the unit only: ' + (svg.match(/stroke-dasharray="4 3"/g) || []).length);
         }
         S.layer = 1; S.dtab = 'soil'; goTab('edit'); await w(250);
         const box = document.querySelector('#ld-sub'); want(box && box.checked, 'the editor shows the box ticked');
         if (box) { box.checked = false; box.dispatchEvent(new Event('change', { bubbles: true })); await w(150); want(cur().layers[1].sub === false, 'unticking it saves: ' + cur().layers[1].sub); }
-        want(!/becoming grey/.test(txt(logSVG(cur(), 1100))), 'unticked, the layer has its own description again');
+        want(!/– grey/.test(txt(logSVG(cur(), 1100))), 'unticked, the layer has its own description again');
+        cur().layers[2].note = 'becoming wet, sand lenses'; want(txt(logSVG(cur(), 1100)).includes('– becoming wet, sand lenses'), 'the logger\\'s own note replaces the automatic one');
+        cur().layers[3] = { id: 'u4', top: 5, bottom: 6, uscs: '', texture: '', mods: '', consistency: '', moisture: '', colour: 'olive brown', other: '', origin: '' }; S.layer = 3; goTab('edit'); await w(250);
+        const box2 = document.querySelector('#ld-sub'); box2.checked = true; box2.dispatchEvent(new Event('change', { bubbles: true })); await w(150);
+        const l4 = cur().layers[3]; want(l4.sub && l4.uscs === 'SM' && l4.mods === 'some gravel' && l4.moisture === 'Wet', 'ticking it carries the empty fields down: ' + JSON.stringify(l4));
+        want(l4.colour === 'olive brown', 'what was entered stays: ' + l4.colour);
+        want(document.querySelector('#ld-uscs')?.value === 'SM', 'the editor shows the carried-down soil');
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       return F;
     })()`);

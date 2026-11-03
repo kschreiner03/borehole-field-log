@@ -1746,7 +1746,8 @@ function composeDesc(l) {
   const body = parts.join(', ') + tag;
   return { name: head, body, text: head ? head + (parts.length ? ', ' + parts.join(', ') : '') + tag : body || 'Not described' };
 }
-/* a layer marked part of the unit above (l.sub) is logged as a change within that unit: a dashed boundary and a note naming only what changed */
+/* a layer marked part of the unit above (l.sub) is logged as a change within that unit: a dashed boundary and a note naming only what changed,
+   or the logger's own wording (l.note) */
 const subOf = (L, i) => i > 0 && !!L[i]?.sub;
 function changeNote(l, up) {
   const same = k => String(l[k] || '').trim().toLowerCase() === String(up[k] || '').trim().toLowerCase();
@@ -1754,10 +1755,11 @@ function changeNote(l, up) {
   const added = k => terms(l[k]).filter(t => !had(k).has(t.toLowerCase())).join(', ');   // list fields: only the terms that are new
   const parts = [!same('uscs') || !same('texture') ? composeDesc(l).name : '', added('mods'), ...['consistency', 'moisture'].map(k => same(k) ? '' : String(l[k] || '').toLowerCase()), same('colour') ? '' : l.colour, added('other'),
     !same('origin') && ORIGIN_TAG[l.origin] ? `(${ORIGIN_TAG[l.origin]})` : ''].filter(Boolean);
-  return parts.length ? '– becoming ' + parts.join(', ') : '– as above';
+  return parts.length ? '– ' + parts.join(', ') : '– as above';
 }
 /* the log's description for layer i of the depth-sorted list L: its change note when it is part of the unit above */
-const logDesc = (L, i) => subOf(L, i) ? { name: '', body: changeNote(L[i], L[i - 1]), text: changeNote(L[i], L[i - 1]) } : composeDesc(L[i]);
+const subNote = (L, i) => { const n = String(L[i].note || '').trim(); return n ? (/^[–-]/.test(n) ? n : '– ' + n) : changeNote(L[i], L[i - 1]); };
+const logDesc = (L, i) => subOf(L, i) ? { name: '', body: subNote(L, i), text: subNote(L, i) } : composeDesc(L[i]);
 /* CFEM classes: consistency from undrained shear strength (kPa), compactness from SPT N */
 function consistencyFromSu(su) { return su < 12 ? 'Very soft' : su < 25 ? 'Soft' : su < 50 ? 'Firm' : su < 100 ? 'Stiff' : su < 200 ? 'Very stiff' : 'Hard'; }
 function compactnessFromN(n) { return n < 4 ? 'Very loose' : n < 10 ? 'Loose' : n < 30 ? 'Compact' : n < 50 ? 'Dense' : 'Very dense'; }
@@ -3939,7 +3941,7 @@ function layerRows(b) {
   return `<thead><tr><th>#</th><th class="n">From (${L})</th><th class="n">To (${L})</th><th>Description</th></tr></thead><tbody>${(b.layers || []).map((l, i) => {
     const bad = l.top != null && l.bottom != null && l.bottom <= l.top;
     return `<tr data-layer="${i}" aria-selected="${i === S.layer}"><td class="muted">${i + 1}</td><td class="n ${bad ? 'bad' : ''}">${fx(l.top)}</td><td class="n ${bad ? 'bad' : ''}">${fx(l.bottom)}</td>
-      <td><span class="sw" style="background:var(--${soilOf(l.uscs)?.fill || 'panel-2'})"></span>${subOf(b.layers, i) ? `<span class="muted">${esc(changeNote(l, b.layers[i - 1]))}</span>` : esc(composeDesc(l).text)}</td></tr>`;
+      <td><span class="sw" style="background:var(--${soilOf(l.uscs)?.fill || 'panel-2'})"></span>${subOf(b.layers, i) ? `<span class="muted">${esc(subNote(b.layers, i))}</span>` : esc(composeDesc(l).text)}</td></tr>`;
   }).join('') || '<tr><td colspan="4" class="note">No layers. Use Add below.</td></tr>'}</tbody>`;
 }
 function layerDetail(b) {
@@ -3949,7 +3951,8 @@ function layerDetail(b) {
   const at = k => `id="ld-${k}" data-sec="layers" data-i="${i}" data-k="${k}"`;
   const ed = editable(b), qp = (k, list) => list.map(t => `<button type="button" class="chip" data-qpick="${k}" data-term="${esc(t)}" aria-pressed="${String(l[k] || '').toLowerCase() === t.toLowerCase()}" ${ed ? '' : 'disabled'}>${esc(t)}</button>`).join('');
   return `<div style="display:flex;align-items:center;gap:8px"><b>Layer ${i + 1}</b><span class="note">Edits apply immediately</span><span class="sp" style="flex:1"></span>${i > 0 && ed ? '<button class="btn link" data-act="same-above">Same as layer above</button>' : ''}</div>
-    ${i > 0 ? `<label class="inline" title="Logged as a change within the layer above: a dashed boundary and a note with only what changed, e.g. – becoming grey"><input type="checkbox" ${at('sub')} ${l.sub ? 'checked' : ''} ${ed ? '' : 'disabled'}> Part of the unit above <span class="note">(dashed boundary, “– becoming …” note)</span></label>` : ''}
+    ${i > 0 ? `<label style="display:flex;align-items:center;gap:6px;margin:8px 0 2px" title="Logged as a change within the layer above: a dashed boundary and a note with only what changed, e.g. – grey, wet"><input type="checkbox" ${at('sub')} ${l.sub ? 'checked' : ''} ${ed ? '' : 'disabled'}><span style="white-space:nowrap">Part of the unit above</span></label>` : ''}
+    ${i > 0 && l.sub ? `<div class="fields"><div class="fld wide"><label for="ld-note">Note on the log</label><input type="text" ${at('note')} value="${esc(l.note || '')}" placeholder="${esc(changeNote(l, b.layers[i - 1]))}  (blank: what changed)" ${ed ? '' : 'disabled'}></div></div>` : ''}
     <div class="fields qd-depth">
       ${fld(`From (${L})`, numIn('ld-top', at('top').replace('id="ld-top" ', ''), f(l.top, 3)))}
       ${fld(`To (${L})`, numIn('ld-bottom', at('bottom').replace('id="ld-bottom" ', ''), f(l.bottom, 3)))}
@@ -3979,6 +3982,7 @@ function layerDetail(b) {
     <div class="note">${(b.comments || []).filter(c => c.target === 'layer:' + l.id && !c.resolved).length ? `<b style="color:var(--warn)">${(b.comments || []).filter(c => c.target === 'layer:' + l.id && !c.resolved).length} open review comment(s) on this layer.</b> ` : ''}<button class="btn link" data-act="comments" data-target="layer:${l.id}">Comment on this layer</button></div>
     </details>`;
 }
+const LAYER_COPY = ['uscs', 'texture', 'mods', 'consistency', 'moisture', 'colour', 'origin', 'other', 'unit'];   // what a layer takes from the one above
 const QUICK_SOILS = ['TOP', 'FILL', 'CL', 'CI', 'CH', 'ML', 'MH', 'SM', 'SC', 'SP', 'SW', 'GP', 'GW', 'PT', 'CLST', 'SH', 'SDST'];
 const QUICK_COLOURS = ['brown', 'dark brown', 'grey', 'dark grey', 'grey-brown', 'olive brown', 'black', 'mottled'];
 /* modifiers in the standard order (-y words, then "some", then "trace"), one term per constituent */
@@ -4055,6 +4059,11 @@ function onField(e) {
       if (tx?.sys === 'astm' && !row.uscs) { const sym = astmSymbol(tx.name); if (SOILS[sym]) { row.uscs = sym; const us = $('#ld-uscs'); if (us) us.value = sym; } }
       if (tx && /TILL/.test(tx.name) && !row.origin) { row.origin = 'till'; const og = $('#ld-origin'); if (og) og.value = 'till'; }
       if (tx && /FILL|MADE GROUND/i.test(tx.name) && !row.uscs) { row.uscs = 'FILL'; const us = $('#ld-uscs'); if (us) us.value = 'FILL'; }
+    }
+    if (sec === 'layers' && k === 'sub') {   // part of the unit above: the empty fields carry down, what was already entered stays
+      const up = b.layers[+t.dataset.i - 1];
+      if (up && v) for (const f of LAYER_COPY) if (!row[f]) row[f] = up[f] ?? '';
+      const ld = $('#ldetail'); if (ld) ld.innerHTML = layerDetail(b); if (S.drawer?.kind === 'layer') renderDrawer();
     }
     if (sec === 'layers' && k === 'hz') { const o = $('#ld-hz-out'); if (o) o.textContent = hzMeaning(v) || '—'; }
     if (sec === 'layers' && k === 'uscs') {
@@ -7051,16 +7060,16 @@ function qlColSVG(b, W) {
   const st = niceStep(toD(maxD), 12);
   for (let v = 0; v <= toD(maxD) + 1e-9; v += st) { const yy = y(fromD(v)); o.push(`<line x1="${cx - 6}" x2="${cx}" y1="${yy}" y2="${yy}" style="stroke:var(--muted)"/><text class="dt tk" x="${cx - 9}" y="${yy + 4}" text-anchor="end">${+v.toFixed(2)}</text><line x1="${cx + cw}" x2="${W}" y1="${yy}" y2="${yy}" style="stroke:var(--grid)"/>`); }
   const editL = q.tab === 'layer' && q.i != null;
-  for (const { l, i } of ls) {
-    const live = editL && q.i === i ? { ...l, uscs: q.code, mods: q.mods, other: q.other, origin: q.origin, consistency: q.consistency, moisture: q.moisture, colour: q.colour, bottom: q.bottom > l.top ? q.bottom : l.bottom } : l;
-    const y0 = y(live.top), y1 = y(live.bottom), d = composeDesc(live);
+  const LL = ls.map(({ l, i }) => editL && q.i === i ? { ...l, uscs: q.code, mods: q.mods, other: q.other, origin: q.origin, consistency: q.consistency, moisture: q.moisture, colour: q.colour, bottom: q.bottom > l.top ? q.bottom : l.bottom } : l);
+  ls.forEach(({ i }, j) => {
+    const live = LL[j], y0 = y(live.top), y1 = y(live.bottom), d = logDesc(LL, j), nm = d.name || (d.body ? '' : 'Not described'), by = nm ? 34 : 17;
     o.push(`<g data-qli="${i}"><rect x="${cx - 2}" y="${y0}" width="${W - cx}" height="${y1 - y0}" style="fill:${editL && q.i === i ? 'var(--sel)' : 'transparent'}"/>${soilRects(cx, y0, cw, y1 - y0, live.uscs, live.origin, live.texture)}${hzTag(cx, y0, y1 - y0, live.hz)}`);
-    o.push(`<line x1="${cx}" x2="${W}" y1="${y1}" y2="${y1}" style="stroke:var(--muted)"/>`);
-    if (y1 - y0 >= 18) o.push(`<text class="lt" x="${tx}" y="${y0 + 17}">${esc(d.name || 'Not described')}</text>`);
+    o.push(`<line x1="${cx}" x2="${W}" y1="${y1}" y2="${y1}" style="stroke:var(--muted)"${subOf(LL, j + 1) ? ' stroke-dasharray="4 3"' : ''}/>`);
+    if (nm && y1 - y0 >= 18) o.push(`<text class="lt" x="${tx}" y="${y0 + 17}">${esc(nm)}</text>`);
     const body = wrap(d.body || '', Math.max(10, Math.floor((W - tx - lane) / 6.6)));
-    body.slice(0, Math.max(0, Math.floor((y1 - y0 - 24) / 15))).forEach((t, j) => o.push(`<text class="ls" x="${tx}" y="${y0 + 34 + j * 15}">${esc(t)}</text>`));
+    body.slice(0, Math.max(0, Math.floor((y1 - y0 - by + 10) / 15))).forEach((t, n) => o.push(`<text class="ls" x="${tx}" y="${y0 + by + n * 15}">${esc(t)}</text>`));
     o.push('</g>');
-  }
+  });
   if (pend) { const p = { top: pend.top, bottom: pend.bottom, uscs: q.code, mods: q.mods, other: q.other, origin: q.origin, consistency: q.consistency, moisture: q.moisture, colour: q.colour }, d = composeDesc(p), y0 = y(pend.top), y1 = y(pend.bottom);
     o.push(`<g opacity=".8">${soilRects(cx, y0, cw, y1 - y0, q.code, q.origin)}<rect x="${cx}" y="${y0}" width="${cw}" height="${y1 - y0}" fill="none" style="stroke:var(--accent)" stroke-width="2" stroke-dasharray="6 4"/>`);
     o.push(`<text class="lt" x="${tx}" y="${y0 + 17}" style="fill:var(--accent)">${esc(d.name)}</text>`);
@@ -10650,7 +10659,7 @@ document.addEventListener('click', e => {
     case 'backup': backup(); break;
     case 'restore': case 'open-file': openFile(); break;
     case 'save-proj': saveProject(); break;
-    case 'same-above': { const l = b?.layers[S.layer], up = b?.layers[S.layer - 1]; if (!l || !up || !editable(b)) break; for (const k of ['uscs', 'texture', 'mods', 'consistency', 'moisture', 'colour', 'origin', 'other', 'unit']) l[k] = up[k] ?? ''; logChange(b, 'Soil layers'); store.save(b); $('#ldetail').innerHTML = layerDetail(b); refreshLayerRow(b); break; }
+    case 'same-above': { const l = b?.layers[S.layer], up = b?.layers[S.layer - 1]; if (!l || !up || !editable(b)) break; for (const k of LAYER_COPY) l[k] = up[k] ?? ''; logChange(b, 'Soil layers'); store.save(b); $('#ldetail').innerHTML = layerDetail(b); refreshLayerRow(b); break; }
     case 'imp-lab': if (!S.readOnly) importLab(); break;
     case 'lab-imp-go': importLabGo(); break;
     case 'guide-save': { const st = siteOf() || {}; dialog('Save guideline', `<div class="fld"><label for="gs-name">Name</label><input id="gs-name" value="${esc(st.guideSrc || '')}" placeholder="e.g. Alberta Tier 1, fine, residential/parkland"></div><p class="note">Saves the ${Object.keys(projGuide()).length} values in the Guideline row with your company settings, to apply to other projects.</p>`, `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="guide-save-go">Save</button>`); $('#gs-name')?.focus(); break; }
