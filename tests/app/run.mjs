@@ -1847,6 +1847,33 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('log: a layer marked part of the unit above is a change within it', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); const b = cur();
+        b.layers = [{ id: 'u1', top: 0, bottom: 2, uscs: 'SM', mods: 'trace gravel', consistency: 'Compact', moisture: 'Moist', colour: 'brown', other: '', origin: '' },
+          { id: 'u2', top: 2, bottom: 4, uscs: 'SM', mods: 'trace gravel', consistency: 'Compact', moisture: 'Moist', colour: 'grey', other: '', origin: '', sub: true },
+          { id: 'u3', top: 4, bottom: 5, uscs: 'SM', mods: 'some gravel', consistency: 'Compact', moisture: 'Wet', colour: 'grey', other: '', origin: '', sub: true },
+          { id: 'u4', top: 5, bottom: 6, uscs: 'CL', mods: '', consistency: 'Stiff', moisture: 'Moist', colour: 'grey', other: '', origin: '' }];
+        want(changeNote(b.layers[1], b.layers[0]) === '– becoming grey', 'only the colour change: ' + changeNote(b.layers[1], b.layers[0]));
+        want(changeNote(b.layers[2], b.layers[1]) === '– becoming some gravel, wet', 'gravel and moisture: ' + changeNote(b.layers[2], b.layers[1]));
+        const txt = s => { const d = document.createElement('div'); d.innerHTML = s; d.querySelectorAll('title').forEach(e => e.remove()); return d.textContent; };   // hover titles keep the full description
+        for (const [what, svg] of [['log', logSVG(b, 1100)], ['PDF page', pageSVG(b, 0, 1)]]) {
+          const t = txt(svg);
+          want(t.includes('becoming grey') && t.includes('becoming some gravel, wet'), what + ': change notes shown');
+          want((t.match(/SAND \\(SM\\)/g) || []).length === 1, what + ': the unit is described once: ' + (t.match(/SAND \\(SM\\)/g) || []).length);
+          want((svg.match(/stroke-dasharray="4 3"/g) || []).length === 4, what + ': dashed boundaries inside the unit only: ' + (svg.match(/stroke-dasharray="4 3"/g) || []).length);
+        }
+        S.layer = 1; S.dtab = 'soil'; goTab('edit'); await w(250);
+        const box = document.querySelector('#ld-sub'); want(box && box.checked, 'the editor shows the box ticked');
+        if (box) { box.checked = false; box.dispatchEvent(new Event('change', { bubbles: true })); await w(150); want(cur().layers[1].sub === false, 'unticking it saves: ' + cur().layers[1].sub); }
+        want(!/becoming grey/.test(txt(logSVG(cur(), 1100))), 'unticked, the layer has its own description again');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('tables: soil type cell reads names like silty sand', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };

@@ -15,7 +15,7 @@
     "test": "vitest run",
     "test:app": "npm run sync-legacy && node scripts/test-app.mjs",
     "dist:win": "node scripts/fetch-mf6.mjs win32-x64 && npm test && npm run test:app && npm run build && electron-builder --win",
-    "dist:mac": "node scripts/fetch-mf6.mjs darwin-arm64 && npm test && npm run test:app && npm run build && electron-builder --mac"
+    "dist:mac": "node scripts/fetch-mf6.mjs darwin-arm64 && npm test && npm run test:app && npm run build && APPLE_KEYCHAIN_PROFILE=${APPLE_KEYCHAIN_PROFILE:-borehole-notary} electron-builder --mac"
   },
   "build": {
     "appId": "ca.boreholefieldlog.app",
@@ -60,12 +60,22 @@
       ]
     },
     "mac": {
-      "target": "dmg",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
       "category": "public.app-category.productivity",
       "hardenedRuntime": true,
       "files": [
         "resources/mf6/darwin-arm64/**"
-      ]
+      ],
+      "gatekeeperAssess": false,
+      "identity": "KOLE KRISTIAN SCHREINER (UUUUG5QGQ9)",
+      "notarize": true
     },
     "nsis": {
       "oneClick": false,

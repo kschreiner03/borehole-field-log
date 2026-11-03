@@ -1746,6 +1746,18 @@ function composeDesc(l) {
   const body = parts.join(', ') + tag;
   return { name: head, body, text: head ? head + (parts.length ? ', ' + parts.join(', ') : '') + tag : body || 'Not described' };
 }
+/* a layer marked part of the unit above (l.sub) is logged as a change within that unit: a dashed boundary and a note naming only what changed */
+const subOf = (L, i) => i > 0 && !!L[i]?.sub;
+function changeNote(l, up) {
+  const same = k => String(l[k] || '').trim().toLowerCase() === String(up[k] || '').trim().toLowerCase();
+  const terms = v => String(v || '').split(/\s*[,;]\s*/).filter(Boolean), had = k => new Set(terms(up[k]).map(t => t.toLowerCase()));
+  const added = k => terms(l[k]).filter(t => !had(k).has(t.toLowerCase())).join(', ');   // list fields: only the terms that are new
+  const parts = [!same('uscs') || !same('texture') ? composeDesc(l).name : '', added('mods'), ...['consistency', 'moisture'].map(k => same(k) ? '' : String(l[k] || '').toLowerCase()), same('colour') ? '' : l.colour, added('other'),
+    !same('origin') && ORIGIN_TAG[l.origin] ? `(${ORIGIN_TAG[l.origin]})` : ''].filter(Boolean);
+  return parts.length ? '– becoming ' + parts.join(', ') : '– as above';
+}
+/* the log's description for layer i of the depth-sorted list L: its change note when it is part of the unit above */
+const logDesc = (L, i) => subOf(L, i) ? { name: '', body: changeNote(L[i], L[i - 1]), text: changeNote(L[i], L[i - 1]) } : composeDesc(L[i]);
 /* CFEM classes: consistency from undrained shear strength (kPa), compactness from SPT N */
 function consistencyFromSu(su) { return su < 12 ? 'Very soft' : su < 25 ? 'Soft' : su < 50 ? 'Firm' : su < 100 ? 'Stiff' : su < 200 ? 'Very stiff' : 'Hard'; }
 function compactnessFromN(n) { return n < 4 ? 'Very loose' : n < 10 ? 'Loose' : n < 30 ? 'Compact' : n < 50 ? 'Dense' : 'Very dense'; }
@@ -3346,8 +3358,8 @@ function annRect(x, y, w, h, mat) {
   const bw = bwLogs(), fill = bw ? ({ grout: '#d4d4d4', concrete: '#e6e6e6' }[mat] || '#ffffff') : `var(--${a.fill})`;
   return `<rect x="${x}" y="${y}" width="${w}" height="${h}" style="fill:${fill}"/>${a.pat ? `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${bw ? 'k' : 'p'}-${a.pat})"/>` : ''}`;
 }
-function descLines(l, maxChars) {
-  const d = composeDesc(l), out = [];
+function descLines(d, maxChars) {
+  const out = [];
   if (d.name) wrap(d.name, maxChars).forEach(t => out.push(['dname', t]));
   if (d.body) wrap(d.body, maxChars).forEach(t => out.push(['desc', t]));
   if (!out.length) out.push(['sub', 'Not described']);
@@ -3585,7 +3597,7 @@ function logSVG(b, W) {
   const tEnd = GX.length ? GX[GX.length - 1].c.x + 150 : cLb.x + cLb.w;
   const cW = { x, w: on('water') ? 76 : 0 }; x += cW.w;
   const maxChars = Math.max(12, Math.floor(cDs.w / 6.6));
-  const blocks = layers.map(l => descLines(l, maxChars));
+  const blocks = layers.map((l, i) => descLines(logDesc(layers, i), maxChars));
   let k = Math.max(680 / endM, 70);
   layers.forEach((l, i) => { k = Math.max(k, (blocks[i].length * 14 + 12) / (l.bottom - l.top)); });
   k = Math.min(k, 420);
@@ -3642,7 +3654,8 @@ function logSVG(b, W) {
   layers.forEach((l, i) => {
     const y0 = y(l.top), y1 = y(l.bottom), h = y1 - y0;
     out.push(soilRects(cG.x, y0, cG.w, h, l.uscs, l.origin, l.texture), hzTag(cG.x, y0, h, l.hz));
-    out.push(`<line x1="${cG.x}" x2="${cG.x + cG.w}" y1="${y1}" y2="${y1}" style="stroke:var(--muted)" stroke-width=".8"/><line x1="${cWl.x + cWl.w}" x2="${cSm.x}" y1="${y1}" y2="${y1}" style="stroke:var(--muted)" stroke-width=".8"/>`);
+    const dash = subOf(layers, i + 1) ? ' stroke-dasharray="4 3"' : '';
+    out.push(`<line x1="${cG.x}" x2="${cG.x + cG.w}" y1="${y1}" y2="${y1}" style="stroke:var(--muted)" stroke-width=".8"${dash}/><line x1="${cWl.x + cWl.w}" x2="${cSm.x}" y1="${y1}" y2="${y1}" style="stroke:var(--muted)" stroke-width=".8"${dash}/>`);
     const lines = blocks[i], room = Math.floor((h - 6) / 14);
     if (room >= 1) {
       const shown = lines.slice(0, room);
@@ -3926,7 +3939,7 @@ function layerRows(b) {
   return `<thead><tr><th>#</th><th class="n">From (${L})</th><th class="n">To (${L})</th><th>Description</th></tr></thead><tbody>${(b.layers || []).map((l, i) => {
     const bad = l.top != null && l.bottom != null && l.bottom <= l.top;
     return `<tr data-layer="${i}" aria-selected="${i === S.layer}"><td class="muted">${i + 1}</td><td class="n ${bad ? 'bad' : ''}">${fx(l.top)}</td><td class="n ${bad ? 'bad' : ''}">${fx(l.bottom)}</td>
-      <td><span class="sw" style="background:var(--${soilOf(l.uscs)?.fill || 'panel-2'})"></span>${esc(composeDesc(l).text)}</td></tr>`;
+      <td><span class="sw" style="background:var(--${soilOf(l.uscs)?.fill || 'panel-2'})"></span>${subOf(b.layers, i) ? `<span class="muted">${esc(changeNote(l, b.layers[i - 1]))}</span>` : esc(composeDesc(l).text)}</td></tr>`;
   }).join('') || '<tr><td colspan="4" class="note">No layers. Use Add below.</td></tr>'}</tbody>`;
 }
 function layerDetail(b) {
@@ -3936,6 +3949,7 @@ function layerDetail(b) {
   const at = k => `id="ld-${k}" data-sec="layers" data-i="${i}" data-k="${k}"`;
   const ed = editable(b), qp = (k, list) => list.map(t => `<button type="button" class="chip" data-qpick="${k}" data-term="${esc(t)}" aria-pressed="${String(l[k] || '').toLowerCase() === t.toLowerCase()}" ${ed ? '' : 'disabled'}>${esc(t)}</button>`).join('');
   return `<div style="display:flex;align-items:center;gap:8px"><b>Layer ${i + 1}</b><span class="note">Edits apply immediately</span><span class="sp" style="flex:1"></span>${i > 0 && ed ? '<button class="btn link" data-act="same-above">Same as layer above</button>' : ''}</div>
+    ${i > 0 ? `<label class="inline" title="Logged as a change within the layer above: a dashed boundary and a note with only what changed, e.g. – becoming grey"><input type="checkbox" ${at('sub')} ${l.sub ? 'checked' : ''} ${ed ? '' : 'disabled'}> Part of the unit above <span class="note">(dashed boundary, “– becoming …” note)</span></label>` : ''}
     <div class="fields qd-depth">
       ${fld(`From (${L})`, numIn('ld-top', at('top').replace('id="ld-top" ', ''), f(l.top, 3)))}
       ${fld(`To (${L})`, numIn('ld-bottom', at('bottom').replace('id="ld-bottom" ', ''), f(l.bottom, 3)))}
@@ -4028,7 +4042,7 @@ function onField(e) {
     a[t.dataset.k] = t.dataset.k === 'mat' ? t.value : fromD(num(t.value));
   } else if (t.dataset.sec) {
     const sec = t.dataset.sec, row = b[sec][+t.dataset.i], k = t.dataset.k; if (!row) return;
-    let v = t.value;
+    let v = t.type === 'checkbox' ? t.checked : t.value;
     if (LEN_KEYS.has(k)) v = fromD(num(v));
     else if (['n', 'no', 'rec', 'rqd', 'b1', 'b2', 'b3', 'w', 'll', 'pl', 'pp', 'su', 'so4', 'cvc'].includes(k)) v = num(v);
     if (sec === 'layers' && k === 'bottom') {
@@ -6482,7 +6496,7 @@ async function xLogSheet(wb, b, paper) {
     spans.push({ l, r0, r1 }); prevEnd = r1;
   }
   for (const sp of spans) {
-    const need = lines(composeDesc(sp.l).text, 52) * 11 + 4, have = rowPt.slice(sp.r0, sp.r1 + 1).reduce((a, c) => a + c, 0);
+    const need = lines(logDesc(layers, layers.indexOf(sp.l)).text, 52) * 11 + 4, have = rowPt.slice(sp.r0, sp.r1 + 1).reduce((a, c) => a + c, 0);
     if (need > have) { const extra = (need - have) / (sp.r1 - sp.r0 + 1); for (let r = sp.r0; r <= sp.r1; r++) rowPt[r] += extra; }
   }
   for (let i = 0; i < R; i++) ws.getRow(R0 + i).height = +rowPt[i].toFixed(2);
@@ -6501,15 +6515,16 @@ async function xLogSheet(wb, b, paper) {
   }
   if (b.elevation != null) put(ws, R0, C.elev, +toD(b.elevation).toFixed(2), { fmt: '0.00', v: 'top', h: 'right', color: XC.muted });
   put(ws, R0, C.depth, 0, { bold: true, fmt: '0.0', v: 'top', h: 'right' });
-  for (const { l, r0, r1 } of spans) {
+  spans.forEach(({ l, r0, r1 }, si) => {
     const a = R0 + r0, z = R0 + r1;
     for (const c of [C.legend, C.desc]) if (z > a) ws.mergeCells(a, c, z, c);
-    const d = composeDesc(l);
+    const d = logDesc(layers, layers.indexOf(l));
     const cell = put(ws, a, C.desc, null, { v: 'top' });
     cell.value = d.name ? { richText: [{ text: d.name, font: { name: FONT, size: 8.5, bold: true } }, { text: d.body ? ', ' + d.body : '', font: { name: FONT, size: 8.5 } }] } : d.text;
     const fill = soilFill(l.uscs); if (fill) for (let r = a; r <= z; r++) ws.getCell(r, C.legend).fill = fill;
-    for (const c of [C.legend, C.desc]) setB(ws, z, c, 'bottom', T_(XC.black));
-  }
+    const next = spans[si + 1];
+    for (const c of [C.legend, C.desc]) setB(ws, z, c, 'bottom', T_(XC.black, next && subOf(layers, layers.indexOf(next.l)) ? 'dashed' : 'thin'));
+  });
   // standpipe drawn side by side: annulus | pipe | annulus. Solid riser is white, slotted section hatched, thick line = end cap
   if (well) {
     const wbot = Math.max(well.depth ?? well.screenBottom, well.screenBottom), lastPipe = rowOf(wbot - 1e-6);
@@ -7629,12 +7644,13 @@ function pageSVG(b, pi, pn) {
   }
   const layers = (b.layers || []).filter(l => l.top != null && l.bottom != null && l.bottom > l.top).sort((a, c) => a.top - c.top);
   const maxChars = Math.floor((C.desc.w - 8) / (5.3 * f)), LH = 12 * f;
-  for (const l of layers) {
-    const yA = Math.max(Y(l.top), by0), yB = Math.min(Y(l.bottom), by1); if (yB <= yA) continue;
+  layers.forEach((l, li) => {
+    const yA = Math.max(Y(l.top), by0), yB = Math.min(Y(l.bottom), by1); if (yB <= yA) return;
     o.push(soilRects(C.sym.x, yA, C.sym.w, yB - yA, l.uscs, l.origin, l.texture), hzTag(C.sym.x, yA, yB - yA, l.hz, 7));
-    o.push(line(C.sym.x, Y(l.bottom), C.sym.x + C.sym.w, Y(l.bottom), 'var(--ink)', .7), line(C.desc.x, Y(l.bottom), C.desc.x + C.desc.w, Y(l.bottom), 'var(--ink)', .7));
+    const dash = subOf(layers, li + 1) ? 'stroke-dasharray="4 3"' : '';
+    o.push(line(C.sym.x, Y(l.bottom), C.sym.x + C.sym.w, Y(l.bottom), 'var(--ink)', .7, dash), line(C.desc.x, Y(l.bottom), C.desc.x + C.desc.w, Y(l.bottom), 'var(--ink)', .7, dash));
     const cont = Y(l.top) < by0 - .5;
-    const d = composeDesc(l), lines2 = [];
+    const d = logDesc(layers, li), lines2 = [];
     if (cont) lines2.push(['sub', '(continued)']);
     if (d.name) wrap(d.name, maxChars).forEach(t => lines2.push(['b', t]));
     if (d.body) wrap(d.body, maxChars).forEach(t => lines2.push(['n', t]));
@@ -7653,7 +7669,7 @@ function pageSVG(b, pi, pn) {
       if (lines2.length > room && room) shown[room - 1] = [shown[room - 1][0], shown[room - 1][1] + ' …'];
       shown.forEach(([c, t], j) => o.push(T(C.desc.x + 4, yA + LH + j * LH, t, { s: 7.6, w: c === 'b' ? 700 : '', c: c === 'sub' ? 'var(--muted)' : 'var(--ink)' })));
     }
-  }
+  });
   if (layers.length) {
     const eoh = layers[layers.length - 1].bottom, ye = Y(eoh);
     if (ye >= by0 && ye <= by1) { o.push(line(C.sym.x, ye, X1, ye, 'var(--ink)', 1.4)); o.push(T(C.desc.x + 4, ye + 14, `END OF BOREHOLE AT ${fx(eoh)} ${U.toUpperCase()}${b.termination ? ' – ' + b.termination.toUpperCase() : ''}`, { s: 7.5, w: 700 })); }
