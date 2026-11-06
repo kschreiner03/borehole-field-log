@@ -86,7 +86,7 @@ function soilGridHTML() {
 function soilHTML() {
   const sv = surveyOf(), s = sv.survey || {}, ed = soilEd(), ro = S.readOnly;
   const f = (k, label, h) => `<div class="fld"><label for="sf-${k}">${label}</label>${h}</div>`, inp = (k, t = 'text') => `<input id="sf-${k}" type="${t}" data-soilf="${k}" value="${esc(s[k] || '')}" ${ed ? '' : 'readonly'}>`;
-  return `<div class="soil-page"><section class="sec"><header><h3>Soil survey</h3><div class="mini-tools">${ed ? `<button class="btn" data-act="soil-add">Add point</button><button class="btn" data-act="soil-imp-pts">Import locations</button><button class="btn" data-act="soil-imp-lab">Import lab results</button>` : ''}${sv.points.length ? '<button class="btn" data-act="soil-xlsx">Excel</button><button class="btn" data-act="soil-csv">Map grid CSV</button>' : ed ? '<button class="btn" data-act="soil-example">Load an example</button>' : ''}${ro ? '' : `<button class="btn" data-act="soil-issue">${s.issued ? 'Reopen' : 'Issue'}</button>`}</div></header>
+  return `<div class="soil-page"><section class="sec"><header><h3>Soil survey</h3><div class="mini-tools">${ed ? `<button class="btn" data-act="soil-add">Add point</button><button class="btn" data-act="soil-imp-pts">Import locations</button><button class="btn" data-act="soil-imp-lab">Import lab results</button>` : ''}${sv.points.length ? `<button class="btn" data-act="soil-xlsx">Excel</button><button class="btn" data-act="soil-csv">Map grid CSV</button>${ed && /fictional/i.test(s.name || '') ? '<button class="btn" data-act="soil-example">Reload example</button>' : ''}` : ed ? '<button class="btn" data-act="soil-example">Load an example</button>' : ''}${ro ? '' : `<button class="btn" data-act="soil-issue">${s.issued ? 'Reopen' : 'Issue'}</button>`}</div></header>
     <div class="body"><div class="fields">${f('name', 'Survey name', inp('name'))}${f('date', 'Date', inp('date', 'date'))}${f('strategy', 'Sampling strategy', `<select id="sf-strategy" data-soilf="strategy" ${ed ? '' : 'disabled'}>${Object.entries(SOIL_STRATEGIES).map(([k, v]) => `<option value="${k}" ${(s.strategy || '') === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}${f('notes', 'Notes', inp('notes'))}</div>
     <div id="plan" class="map-canvas" data-tool="pan"></div><div id="soil-graphs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;margin-top:16px"></div><h4 style="margin:14px 0 6px">Points and samples</h4><div id="soil-grid">${soilGridHTML()}</div><p class="note">Separate from boreholes. Depths with the same from and to values are mapped together. Type &lt; for results below detection, like &lt;0.5. Paste a block from Excel into any cell.</p></div></section></div>
     <input type="file" id="soil-file" hidden accept=".csv,.txt,.xlsx,.xls">`;
@@ -395,13 +395,24 @@ async function soilExportCSV() {
   for (let r = 0; r < g.ny; r++) for (let c = 0; c < g.nx; c++) { const i = r * g.nx + c; if (mask[i] > 0 || v.maskOff) out.push([(g.x0 + (c + .5) * g.cell).toFixed(2), (g.y0 + (r + .5) * g.cell).toFixed(2), +val[i].toPrecision(6), +unc[i].toPrecision(4)].join(',')); }
   return saveFile(`${fileSlug(`${surveyOf().survey?.name || 'Soil survey'} ${v.prop}`)}.csv`, out.join('\n') + '\n');
 }
+/* made up, shaped like a real shallow survey: about 25 hand samples at 15 and 30 cm, targeted rather than gridded, 75 to 100 m apart, on sandy
+   northern soils with a wetter low and one salt-affected spot. It sits beside the project's boreholes, or at the Dawn Lake example site. */
+const SOIL_EXAMPLE = [[0, 0], [85, 10], [170, -5], [250, 15], [335, 5], [30, 90], [115, 100], [200, 85], [285, 105], [60, 185], [145, 195], [230, 180], [-60, 70], [95, 280], [180, 275]];
 function loadSoilExample() {
-  if (!soilEd()) return; let seed = 4242; const nr = () => (seed = (seed * 16807) % 2147483647) / 2147483647, sv = soilBlank(); sv.survey = { ...sv.survey, name: 'Example soil survey (fictional)', date: '2026-07-22', strategy: 'targeted', notes: 'Made-up values to show the page. Not a real site.' };
-  const base = projList().find(b => b.easting != null), e0 = base?.easting ?? 561000, n0 = base?.northing ?? 6463000, lt = v => ({ v: +v.toFixed(2), lt: false });
-  for (let i = 0; i < 25; i++) { const cx = i % 5, cy = Math.floor(i / 5), gg = ['Eutric Brunisol', 'Dystric Brunisol', 'Gray Luvisol', 'Humic Gleysol'][Math.min(3, Math.floor((cx + cy + nr() * 1.5) / 2.2))], p = { id: soilId('sp'), name: `SP-${i + 1}`, e: +(e0 + cx * 90 + nr() * 25).toFixed(1), n: +(n0 + cy * 85 + nr() * 25).toFixed(1), z: null, notes: '', order: csscOrder(gg), gg, sub: '', samples: [] };
-    for (const [from, to, f] of [[0, .15, 1], [.15, .3, 1.5]]) { const sa = 62 - cx * 7 + nr() * 8 - to * 30, cl = 8 + cy * 3 + nr() * 5 + to * 18; p.samples.push({ id: soilId('ss'), name: `${p.name}-${Math.round(to * 100)}`, from, to, method: to < .2 ? 'Hand dig' : 'Hand auger', hz: to < .2 ? 'Ah' : 'Bm', texture: '', colour: '', notes: '', sand: +sa.toFixed(1), silt: +(100 - sa - cl).toFixed(1), clay: +cl.toFixed(1), gsd: [], lab: { ec: lt((.6 + cx * .5 + cy * .35 + nr() * .6) * f), sar: lt((.8 + cy * .7 + nr()) * f), ph: lt(6.2 + cx * .2 + nr() * .4), cl: nr() < .2 ? { v: 5, lt: true } : lt(20 + cx * cy * 9 + nr() * 15), om: lt(5 - to * 12 + nr() * 2) } }); }
-    sv.points.push(p); }
-  setSurvey(sv); S.soilView = null; S.soilCache = null; S.mv = null; renderView(true);
+  if (!soilEd()) return; let seed = 4242; const nr = () => (seed = (seed * 16807) % 2147483647) / 2147483647, sv = soilBlank(), base = projList().find(b => b.easting != null), e0 = base?.easting ?? 559400, n0 = base?.northing ?? 6418000, rd = (v, d = 2) => +v.toFixed(d), res = v => ({ v: rd(v), lt: false });
+  sv.survey = { ...sv.survey, name: 'Example soil survey (fictional)', date: '2026-07-22', strategy: 'targeted', notes: 'Made-up values, shaped like a shallow hand survey. Not a real site.' };
+  SOIL_EXAMPLE.forEach(([dx, dy], i) => {
+    const low = Math.hypot(dx - 40, dy - 250) < 150, salt = Math.exp(-(Math.hypot(dx - 235, dy - 95) ** 2) / 11000), gg = low ? 'Humic Gleysol' : dy > 120 ? 'Gray Luvisol' : dx < 150 ? 'Eutric Brunisol' : 'Dystric Brunisol';
+    const p = { id: soilId('sp'), name: `SP-${i + 1}`, e: rd(e0 + dx, 1), n: rd(n0 + dy, 1), z: null, notes: low ? 'Low wet area' : salt > .5 ? 'Targeted: bare patch, salt crust' : '', order: csscOrder(gg), gg, sub: '', samples: [] };
+    for (const [from, to, f] of (i < 10 ? [[0, .15, 1], [.15, .3, 1.3]] : i % 2 ? [[0, .15, 1]] : [[.15, .3, 1.3]])) {
+      const deep = to > .2, cl = rd((low ? 18 : dy > 120 ? 14 : 7) + nr() * 5 + (deep ? 5 : 0), 1), si = rd((low ? 38 : 20) + nr() * 9, 1), sa = rd(100 - cl - si, 1), fine = cl + si * .1;
+      const gsd = [[2, 100], [.425, sa * .55 + si + cl], [.075, sa * .08 + si + cl], [.05, si + cl], [.002, cl]].map(([size, passing]) => ({ size, passing: rd(passing, 1) })), hot = salt * (5.5 + nr()) * f;
+      p.samples.push({ id: soilId('ss'), name: `${p.name}-${Math.round(to * 100)}`, from, to, method: deep ? 'Hand auger' : 'Hand dig', hz: low ? (deep ? 'Bg' : 'Ah') : deep ? (dy > 120 ? 'Bt' : 'Bm') : (dy > 120 ? 'Ae' : 'Ah'), texture: '', colour: low ? 'dark grey' : deep ? 'yellowish brown' : 'dark brown', notes: '', sand: sa, silt: si, clay: cl, gsd,
+        lab: { ec: res(.25 + nr() * .4 + fine * .01 + hot), sar: res(.6 + nr() * .8 + hot * 1.5), ph: res(5.6 + salt * 2.2 + nr() * .5), cl: salt < .1 && nr() < .5 ? { v: 5, lt: true } : res(12 + nr() * 15 + hot * 90), om: res((low ? 9 : 3.5) * (deep ? .4 : 1) + nr()) } });
+    }
+    sv.points.push(p);
+  });
+  setSurvey(sv); S.soilView = null; S.soilCache = null; S.mv = null; S.soilSel = null; renderView(true);
 }
 function soilAct(act) {
   if (act === 'soil-xlsx') return soilExportXlsx(); if (act === 'soil-csv') return soilExportCSV(); if (act === 'soil-example') { loadSoilExample(); return; }
