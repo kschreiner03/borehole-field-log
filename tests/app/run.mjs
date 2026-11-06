@@ -2266,6 +2266,55 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('soil survey: points and samples, imports, saved with the project', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); const n0 = projList().length, b0 = JSON.stringify(projList().map(b => b.samples.length)); goTab('soil'); await w(200);
+        const p = soilAddPoint('SP-1'), a = soilAddSample(p, { from: 0, to: .15, name: 'SP-1-15', method: 'Hand dig' }), c = soilAddSample(p, { from: .15, to: .30, name: 'SP-1-30', method: 'Hand auger' });
+        const d = soilDepths(); want(d.length === 2 && d[0].label === '0–15 cm' && d[1].label === '15–30 cm' && d[0].n === 1, 'depth groups: ' + JSON.stringify(d));
+        want(document.querySelector('#view').innerText.includes('SP-1') || (renderView(true), document.querySelector('#view').innerText.length > 0), 'page draws');
+        renderView(true); await w(100); want([...document.querySelectorAll('.soil-grid input')].some(i => i.value === 'SP-1-15'), 'the sample shows in the grid');
+        /* typing in the grid */
+        const col = soilCols().findIndex(x => x[0] === 'lab:ec'), cell = document.querySelector('.soil-grid input[data-sr="0"][data-sc="' + col + '"]'); cell.value = '<0.5'; cell.dispatchEvent(new Event('change', { bubbles: true })); await w(100);
+        const v = soilValue(surveyOf().points[0].samples[0], 'ec'); want(v && v.nd && v.dl === .5 && v.v === .25, 'typed <0.5 is a non-detect at half the limit: ' + JSON.stringify(v));
+        const again = document.querySelector('.soil-grid input[data-sr="0"][data-sc="' + col + '"]'); want(again.value === '<0.5', 'the grid shows it as typed: ' + again.value); again.value = ''; again.dispatchEvent(new Event('change', { bubbles: true })); await w(100); want(!soilValue(surveyOf().points[0].samples[0], 'ec'), 'blank clears it');
+        /* pasting a block makes new points */
+        const before = surveyOf().points.length; soilPaste(['SP-2\\t561000\\t6463000', 'SP-3\\t561100\\t6463100'].join('\\n'), soilRows().length, 0); await w(100); want(surveyOf().points.length === before + 2 && surveyOf().points.at(-1).e === 561100, 'paste adds points: ' + surveyOf().points.length);
+        /* the survey CSV format */
+        const csv = 'point_name,latitude,longitude,north,east,elevation\\nSP-1,58.3,-103.95,6462600.1,561500.2,412\\nSP-9,58.3001,-103.9501,6462611.2,561494.3,413\\n';
+        await soilImportPoints(new File([csv], 'survey.csv')); await w(100); const pts = surveyOf().points; want(pts.find(x => x.name === 'SP-1').e === 561500.2 && pts.find(x => x.name === 'SP-9')?.z === 413, 'coordinates by name: ' + JSON.stringify(pts.map(x => [x.name, x.e])));
+        /* a lab file matched by sample name */
+        await soilImportLab(new File(['Sample ID,EC,SAR,pH,Sand,Silt,Clay,Organic matter\\nSP-1-15,1.8,<0.5,7.4,60,30,10,4.2\\nUNKNOWN,9,9,9,,,,\\n'], 'lab.csv')); await w(150);
+        want(document.querySelector('[data-soillab="0"]')?.value === surveyOf().points[0].samples[0].id, 'lab row matched to its sample'); want(document.querySelector('[data-soillab="1"]')?.value === '', 'an unknown sample is left for the user');
+        soilImportLabGo(); await w(150); const s0 = surveyOf().points[0].samples[0];
+        want(soilValue(s0, 'ec').v === 1.8 && soilValue(s0, 'sar').nd && soilValue(s0, 'om').v === 4.2, 'lab values stored: ' + JSON.stringify(s0.lab)); want(s0.sand === 60 && soilClass(s0, 'texture') === 'Sandy loam', 'fractions give the texture: ' + soilClass(s0, 'texture'));
+        /* boreholes untouched */
+        want(projList().length === n0 && JSON.stringify(projList().map(b => b.samples.length)) === b0, 'boreholes untouched');
+        /* saved with the project */
+        want(JSON.parse(JSON.stringify(siteOf())).soil.points.length === surveyOf().points.length, 'in the project record');
+        /* units */
+        S.units = 'ft'; want(soilDepths()[0].label === '0–0.49 ft' && surveyOf().points[0].samples[0].to === .15, 'imperial labels, metres stored: ' + soilDepths()[0].label); S.units = 'm';
+        /* issued */
+        surveyOf().survey.issued = true; setSurvey(surveyOf()); renderView(true); await w(100); want([...document.querySelectorAll('.soil-grid input')].every(i => i.readOnly), 'an issued survey is read only'); const n1 = surveyOf().points.length; soilAddPoint('NO'); want(surveyOf().points.length === n1, 'no adding when issued'); surveyOf().survey.issued = false;
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('soil survey: works with no boreholes at all', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        S.bh.clear(); S.sel = null; want(!projList().length, 'starts empty'); goTab('soil'); await w(200); want(!!document.querySelector('.soil-page'), 'the page opens without a borehole');
+        soilAddSample(soilAddPoint('SP-1'), { from: 0, to: .15 }); await w(50); want(surveyOf().points.length === 1, 'a point is added'); want(projList().length === 0, 'no borehole made');
+        const sent = []; const keep = saveTo; saveTo = async (p, name, ext, data) => sent.push(data); await saveProject(false, ''); saveTo = keep;
+        want(sent[0]?.site?.soil?.points?.length === 1 && sent[0].boreholes.length === 0, 'a soil-only project saves: ' + JSON.stringify(sent[0]?.site || null).slice(0, 80));
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('Dawn Lake example: 10 boreholes, 9 wells with bentonite over sand, about 5 m deep', async run => {
     const r = await run(`(() => { loadDlExample(); const l = sortedList().filter(b => b.project === DL_PROJ), w = l.filter(b => b.well.installed);
       return { n: l.length, wells: w.length, ann: w.every(b => b.well.annulus.map(a => a.mat).join() === 'bentonite,sand'), depth: w.every(b => b.well.depth >= 4.8 && b.well.depth <= 5.5), vapour: l.every(b => b.samples.some(s => s.cvc != null)) }; })()`);
