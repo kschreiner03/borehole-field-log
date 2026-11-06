@@ -214,7 +214,7 @@ app.whenReady().then(async () => {
       return { has, added, focusedCell: fresh?.dataset?.c, top, prevBottom, nl: { bottom: nl.bottom, uscs: nl.uscs }, logHasSand: /SAND/.test(logText), focusedRow, sheets, which: document.querySelector('[data-which="samples"]')?.textContent, sel: S.dsel.samples };
     })()`);
     expect(r.has.grid && r.has.log, 'workspace parts: ' + JSON.stringify(r.has));
-    expect(r.has.tree.join() === 'Overview,Borehole,Map,Tables,Water,Lab,Section,Model,3D,Reports' && r.has.cur === 'Borehole' && r.has.rows === r.has.want, 'rail and list: ' + JSON.stringify(r.has));
+    expect(r.has.tree.join() === 'Overview,Borehole,Map,Tables,Water,Lab,Soil,Section,Model,3D,Reports' && r.has.cur === 'Borehole' && r.has.rows === r.has.want, 'rail and list: ' + JSON.stringify(r.has));
     expect(r.added === 1 && r.top === r.prevBottom, 'Enter on the last row: ' + JSON.stringify(r));
     expect(r.nl.uscs === 'SP' && Math.abs(r.nl.bottom - (r.prevBottom + 1.2)) < 1e-6 && r.logHasSand, 'typed interval: ' + JSON.stringify(r.nl) + ' log has sand ' + r.logHasSand);
     expect(r.focusedRow === 0, 'log click focused row ' + r.focusedRow);
@@ -529,7 +529,7 @@ app.whenReady().then(async () => {
       goTab('site'); await w(200); const link = !!document.querySelector('#view [data-tab="xsec"]'), old = !!document.querySelector('#section');
       return { tabs, svg, chips, link, old };
     })()`);
-    expect(r.tabs.indexOf('xsec') === r.tabs.indexOf('contam') + 1 && r.tabs.indexOf('gwm') === r.tabs.indexOf('xsec') + 1 && r.tabs.indexOf('v3d') === r.tabs.indexOf('gwm') + 1 && r.tabs.indexOf('compose') === r.tabs.indexOf('v3d') + 1, 'rail order: ' + r.tabs);
+    expect(r.tabs.indexOf('soil') === r.tabs.indexOf('contam') + 1 && r.tabs.indexOf('xsec') === r.tabs.indexOf('soil') + 1 && r.tabs.indexOf('gwm') === r.tabs.indexOf('xsec') + 1 && r.tabs.indexOf('v3d') === r.tabs.indexOf('gwm') + 1 && r.tabs.indexOf('compose') === r.tabs.indexOf('v3d') + 1, 'rail order: ' + r.tabs);
     expect(r.svg && r.chips >= 2, 'section page draws: ' + JSON.stringify(r));
     expect(r.link && !r.old, 'map page links to the section page: ' + JSON.stringify(r));
   });
