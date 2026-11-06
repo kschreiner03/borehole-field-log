@@ -2302,6 +2302,37 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('soil survey: maps follow the data', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); goTab('soil'); await w(150); fetchTile = () => {};
+        const seed = (n, f = (i) => 1 + (i * 7 % 11) / 2, strategy = 'grid') => { const pts = Array.from({ length: n }, (_, i) => ({ id: 'p' + i, name: 'SP-' + i, e: 561000 + (i % 6) * 85 + (i * 13 % 7), n: 6463000 + Math.floor(i / 6) * 85 + (i * 5 % 9), z: null, order: i % 2 ? 'Brunisolic' : 'Luvisolic', gg: '', samples: [{ id: 's' + i, name: '', from: 0, to: .15, method: 'Hand dig', hz: 'Ah', sand: 50 + i % 20, silt: 30, clay: 20 - i % 20 + 0, lab: { ec: { v: f(i), lt: false } }, gsd: [] }] })); setSurvey({ survey: { name: 'T', date: '2026-07-22', strategy, notes: '' }, points: pts }); S.soilView = null; S.soilCache = null; };
+        const map = () => soilMapSVG(800, 560, soilCurrent(), false), label = t => t.replace(/<[^>]+>/g, ' ');
+        seed(4); let v = soilCurrent(); want(v.prop === 'ec', 'a lab value is the default: ' + v.prop);
+        let f = soilSurface(v.prop, v.depth, v); want(f.method === 'none', 'under 5: no surface: ' + f.method); want(!/soil-surface/.test(map()), 'only points are drawn'); want(/4 points/.test(f.why), 'says why: ' + f.why);
+        soilSet({ view: 'heat' }); f = soilSurface(v.prop, v.depth, soilCurrent()); want(/soil-surface/.test(map()) && f.warnings.some(x => x.id === 'forced-few'), 'asking for a heat map still works, with a warning');
+        seed(25); v = soilCurrent(); f = soilSurface(v.prop, v.depth, v); want(f.method === 'idw' && /25 points/.test(f.why), '25 points: ' + f.method);
+        let t = label(map()); want(t.includes('Interpolated, not measured') && t.includes('Inverse distance, 25 points'), 'label: ' + t.slice(0, 200)); want(/RMSE/.test(t), 'the check error shows'); want((map().match(/data-spt=/g) || []).length === 25, 'every measured point is drawn');
+        want(f.cell > 15 && f.cell < 30, 'cell from the spacing: ' + f.cell);
+        seed(40); v = soilCurrent(); f = soilSurface(v.prop, v.depth, v); want(f.method === 'krige', '40 points: ' + f.method);
+        seed(25, undefined, 'targeted'); t = label(map()); want(t.includes('Points were targeted, so this may not represent the whole site.'), 'targeted line');
+        seed(25); soilSet({ prop: 'order' }); v = soilCurrent(); f = soilSurface('order', v.depth, v); want(f.method === 'nearest' && /soil-surface/.test(map()), 'class zones: ' + f.method); want(/Brunisolic/.test(label(map())), 'the legend names the classes');
+        seed(25); soilSet({ prop: 'texture' }); f = soilSurface('texture', soilCurrent().depth, soilCurrent()); want(f.fromFractions && /soil-surface/.test(map()), 'texture comes from interpolating the fractions');
+        seed(25); soilSet({ view: 'pie' }); want((map().match(/soil-pie/g) || []).length >= 25, 'sand, silt and clay pies');
+        seed(25); soilSet({ view: 'graduated' }); want(new Set([...map().matchAll(/data-spt="[^"]+"[^>]*r="([\\d.]+)"/g)].map(m => m[1])).size > 3, 'circle size follows the value');
+        seed(25); soilSet({ view: 'uncertainty' }); want(/soil-surface/.test(map()), 'uncertainty map');
+        seed(10, () => 5); v = soilCurrent(); f = soilSurface('ec', v.depth, v); want(/same value/.test(f.note || '') && !/NaN|Infinity/.test(map()), 'identical values: ' + f.note);
+        seed(25); surveyOf().points[0].e = null; setSurvey(surveyOf()); S.soilCache = null; want(/1 point has no coordinates/.test(soilSurface('ec', soilCurrent().depth, soilCurrent()).unmappedNote || ''), 'unmapped points are listed');
+        seed(25); surveyOf().points[3].samples[0].lab.ec = { v: 1, lt: true }; surveyOf().points[8].e = surveyOf().points[9].e; surveyOf().points[8].n = surveyOf().points[9].n; setSurvey(surveyOf()); S.soilCache = null; f = soilSurface('ec', soilCurrent().depth, soilCurrent()); want(f.warnings.some(x => x.id === 'non-detects') && f.merged === 1 && /same spot/.test(f.notes.join(' ')), 'non-detects and duplicates are reported: ' + f.notes);
+        const a = soilSurface('ec', soilCurrent().depth, soilCurrent()); want(a === soilSurface('ec', soilCurrent().depth, soilCurrent()), 'surfaces are cached');
+        seed(25); const keep = S.co.logStyle; S.co.logStyle = 'bw'; S.soilCache = null; want(soilRamp(soilCurrent()) === 'grey', 'black and white uses a grey ramp'); S.co.logStyle = keep;
+        seed(25); renderView(true); await w(200); want(!!document.querySelector('#plan svg') && !!document.querySelector('[data-sv="prop"]'), 'the page draws the map and its settings'); want(S._plan && S._plan.sc > 0, 'pan and zoom know the map');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('soil survey: works with no boreholes at all', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };

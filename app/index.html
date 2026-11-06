@@ -2090,7 +2090,7 @@ function treeGroup(key, label, count, kids, extra = '') {
 }
 const BH_TABS = ['log', 'edit', 'report'];
 const NAV_LABEL = { v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
-const NAV_ICON = { v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
+const NAV_ICON = { soil: '<path d="M3 9l9-5 9 5-9 5z"/><path d="M3 14l9 5 9-5"/>', v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 /* ---------- the Settings panel: each page with view settings lists its groups in CTL; the shell draws them on the right.
    Open or collapsed, width and folded groups are one app-wide choice, kept between sessions. ---------- */
@@ -8252,7 +8252,7 @@ const tileStore = {
   async put(u, v) { const d = await this.open(); d.transaction('t', 'readwrite').objectStore('t').put(v, u); },
 };
 let tileT;
-function tileArrived() { clearTimeout(tileT); tileT = setTimeout(() => { if (S.tab === 'site') drawPlan(); else if (['home', 'gw', 'contam', 'compose'].includes(S.tab)) renderView(true); }, 250); }
+function tileArrived() { clearTimeout(tileT); tileT = setTimeout(() => { if (S.tab === 'site' || S.tab === 'soil') drawPlan(); else if (['home', 'gw', 'contam', 'compose'].includes(S.tab)) renderView(true); }, 250); }
 function fetchTile(u) {
   if (S.tilePend.has(u) || S.tileBad.has(u) || S.tilePend.size > 40) return; S.tilePend.add(u);
   tileStore.get(u).catch(() => null).then(c => c || fetch(u, { mode: 'cors' }).then(r => r.ok ? r.blob() : Promise.reject(r.status))
@@ -8393,6 +8393,7 @@ function xsecHTML() {
       <p class="note" id="xs-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
   </div>`;
 }
+CTL.soil = () => soilCtl();
 CTL.xsec = () => [
   { id: 'xs-plume', title: 'Plume and layers', icon: NAV_ICON.contam, html: xsPlumeCtl() },
   { id: 'xs-line', title: 'Section line and drawing', icon: NAV_ICON.xsec, html: secToolsHTML() },
@@ -8439,7 +8440,7 @@ document.addEventListener('input', e => { if (e.target.id === 'v3d-cutpos') { S.
 document.addEventListener('input', e => { if (e.target.id === 'xs-date') { const d = xsDates(sectionList())[+e.target.value]; if (d) xsSetDate(d); } });
 function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); const ms = $('#xs-model-sec'); if (ms) ms.outerHTML = xsModelHTML(); }   // the forecast panel reads the drawn section's geometry
 const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
-function drawPlan(el = $('#plan')) { if (!el) return; el.innerHTML = planSVG(Math.max(el.clientWidth, 420), S.mapEdit ? 620 : 460, true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); loadImagery(); }
+function drawPlan(el = $('#plan')) { if (!el) return; if (S.tab === 'soil') { drawSoil(); return; } el.innerHTML = planSVG(Math.max(el.clientWidth, 420), S.mapEdit ? 620 : 460, true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); loadImagery(); }
 /* Delaunay triangulation (Bowyer–Watson) for contouring between boreholes */
 function delaunay(P) {
   const n = P.length; if (n < 3) return [];
@@ -8473,6 +8474,7 @@ function planSVG(W, H, interactive) {
   let x0 = Math.min(...ex.map(p => p[0])), x1 = Math.max(...ex.map(p => p[0])), y0 = Math.min(...ex.map(p => p[1])), y1 = Math.max(...ex.map(p => p[1]));
   const span = Math.max(x1 - x0, y1 - y0, 20) * 1.1; let cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   let sc = RO.scale ? PX_PER_M / RO.scale : Math.min((W - 2 * pad) / span, (H - 2 * pad) / span);
+  if (interactive && S.mvTab === 'soil') { S.mv = null; S.mvTab = 'site'; }
   if (interactive && S.mv && S.mvProj !== projKey(projList()[0])) S.mv = null;
   const free = RO.scale || (interactive && S.mv); if (interactive && S.mv) ({ cx, cy, sc } = S.mv);
   const X = e => W / 2 + (e - cx) * sc, Y = n => H / 2 - (n - cy) * sc;
