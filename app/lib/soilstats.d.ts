@@ -1,3 +1,7 @@
+export type VgModel = 'spherical' | 'exponential';
+export interface Variogram { model: VgModel; nugget: number; sill: number; range: number; sse?: number; ok?: boolean }
+export interface EmpRow { h: number; g: number; n: number }
+export interface Surface { g: { x0: number; y0: number; nx: number; ny: number; cell: number }; val: Float32Array; unc: Float32Array; mask: Float32Array; classes?: string[] }
 export interface Pt<V = number> { x: number; y: number; v: V; w?: number }
 export interface LooRow<V> { i: number; actual: V; pred: V; err: number | null }
 export interface Loo<V> { rows: LooRow<V>[]; rmse: number | null; bias: number | null; range: number | null; pctCorrect?: number }
@@ -13,4 +17,10 @@ export const SoilStats: {
   loo<V>(pts: Pt<V>[], predict: (rest: Pt<V>[], p: Pt<V>) => V, classes?: boolean): Loo<V>;
   grid(pts: Pt<unknown>[], o: { cell: number; pad?: number }): { x0: number; y0: number; nx: number; ny: number; cell: number };
   mask(pts: Pt<unknown>[], spacing: number, x: number, y: number): number;
+  empirical(pts: Pt[], o?: { lags?: number; weights?: number[] }): EmpRow[];
+  fitVariogram(emp: EmpRow[], o?: { model?: VgModel }): Variogram;
+  krige(pts: Pt[], vg: Variogram, x: number, y: number, o?: { k?: number }): { v: number; var: number | null };
+  krigeWeights(pts: Pt[], vg: Variogram, x: number, y: number, k?: number): number[];
+  classField(pts: Pt<string>[], x: number, y: number, o?: { method?: 'nearest' | 'indicator'; vgs?: Record<string, Variogram> }): { cls: string; p: Record<string, number> };
+  surface<V>(pts: Pt<V>[], o: { method: 'idw' | 'krige' | 'nearest' | 'indicator'; cell: number; pad?: number; spacing?: number; power?: number; k?: number; log?: boolean; vg?: Variogram }): Surface;
 };

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import '../app/lib/soilstats.js';
+import ref from './fixtures/kriging-reference.json';
 
 const S = (globalThis as unknown as { SoilStats: typeof import('../app/lib/soilstats').SoilStats }).SoilStats;
 const gridPts = (n: number, step: number, f: (x: number, y: number) => number) => Array.from({ length: n * n }, (_, i) => { const x = (i % n) * step, y = Math.floor(i / n) * step; return { x, y, v: f(x, y) }; });
@@ -69,5 +70,83 @@ describe('soil survey statistics: basics', () => {
     expect(S.mask(pts, 100, 200 + 175, 100)).toBeCloseTo(.5, 6);
     expect(S.mask(pts, 100, 200 + 200, 100)).toBe(0);
     expect(S.mask(pts, 100, 900, 900)).toBe(0);
+  });
+});
+
+/* a repeatable correlated field: Cholesky of a spherical covariance over random points */
+function simulate(n: number, size: number, range: number, seed = 12345) {
+  for (let i = 0; i < 20; i++) seed = (seed * 1664525 + 1013904223) % 4294967296;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296, nrm = () => Math.sqrt(-2 * Math.log(rnd() || 1e-9)) * Math.cos(2 * Math.PI * rnd());
+  const xy = Array.from({ length: n }, () => [rnd() * size, rnd() * size] as const), C = (a: number, b: number) => { const h = Math.hypot(xy[a]![0] - xy[b]![0], xy[a]![1] - xy[b]![1]) / range; return (h >= 1 ? 0 : 1 - 1.5 * h + .5 * h ** 3) + (a === b ? 1e-6 : 0); };
+  const L = xy.map(() => new Float64Array(n));
+  for (let i = 0; i < n; i++) for (let j = 0; j <= i; j++) { let t = C(i, j); for (let k = 0; k < j; k++) t -= L[i]![k]! * L[j]![k]!; L[i]![j] = i === j ? Math.sqrt(Math.max(t, 1e-12)) : t / L[j]![j]!; }
+  const z = xy.map(() => nrm());
+  return xy.map(([x, y], i) => ({ x, y, v: z.reduce((t, zk, k) => t + L[i]![k]! * zk, 0) }));
+}
+
+describe('soil survey statistics: kriging', () => {
+  const vg = ref.vg as Parameters<typeof S.krige>[1];
+  it('matches the reference solve', () => {
+    for (const s of ref.spots) { const r = S.krige(ref.pts, vg, s.x, s.y); expect(r.v).toBeCloseTo(s.v, 4); expect(r.var!).toBeCloseTo(s.var, 4); }
+  });
+  it('honours the data at a sampled spot', () => {
+    const p = ref.pts[5]!, r = S.krige(ref.pts, { ...vg, nugget: 0 }, p.x, p.y);
+    expect(r.v).toBeCloseTo(p.v, 6); expect(r.var!).toBeCloseTo(0, 6);
+  });
+  it('kriging weights sum to one', () => {
+    expect(S.krigeWeights(ref.pts, vg, 100, 100).reduce((a, c) => a + c, 0)).toBeCloseTo(1, 9);
+  });
+  it('falls back without throwing when the equations cannot be solved', () => {
+    const r = S.krige([{ x: 0, y: 0, v: 1 }, { x: 0, y: 0, v: 3 }], { model: 'spherical', nugget: 0, sill: 1, range: 10 }, 5, 5);
+    expect(r.var).toBeNull(); expect(r.v).toBeCloseTo(2, 9);
+  });
+  it('recovers a known variogram on average over simulated fields', () => {
+    const fits = Array.from({ length: 16 }, (_, i) => S.fitVariogram(S.empirical(simulate(200, 1000, 200, (i + 1) * 7919)), { model: 'spherical' }));
+    const mean = (k: 'range' | 'sill' | 'nugget') => fits.reduce((a, f) => a + f[k], 0) / fits.length;
+    expect(fits.every(f => f.ok)).toBe(true);
+    expect(mean('range')).toBeGreaterThan(170); expect(mean('range')).toBeLessThan(230);
+    expect(mean('sill')).toBeGreaterThan(.85); expect(mean('sill')).toBeLessThan(1.15);
+    expect(mean('nugget')).toBeLessThan(.1);
+  });
+  it('picks the better model when none is named', () => {
+    expect(['spherical', 'exponential']).toContain(S.fitVariogram(S.empirical(simulate(150, 1000, 200))).model);
+  });
+  it('says so when no variogram can be fitted', () => {
+    const flat = gridPts(4, 50, () => 5);
+    expect(S.fitVariogram(S.empirical(flat)).ok).toBe(false);
+    expect(S.fitVariogram(S.empirical([{ x: 0, y: 0, v: 1 }, { x: 1, y: 0, v: 2 }])).ok).toBe(false);
+  });
+});
+
+describe('soil survey statistics: surfaces', () => {
+  const ab = [{ x: 0, y: 0, v: 'A' }, { x: 100, y: 0, v: 'A' }, { x: 0, y: 100, v: 'B' }, { x: 100, y: 100, v: 'B' }, { x: 50, y: 50, v: 'C' }];
+  it('nearest-point zones take the closest class', () => {
+    expect(S.classField(ab, 5, 5, { method: 'nearest' }).cls).toBe('A');
+  });
+  it('indicator chances sum to one and favour the local class', () => {
+    const r = S.classField(ab, 2, 98, { method: 'indicator' }), t = Object.values(r.p).reduce((a, c) => a + c, 0);
+    expect(t).toBeCloseTo(1, 9); expect(r.cls).toBe('B');
+  });
+  it('draws a flat surface for identical values', () => {
+    const f = S.surface(gridPts(4, 50, () => 5), { method: 'krige', cell: 25, vg: S.fitVariogram(S.empirical(gridPts(4, 50, () => 5))) });
+    expect([...f.val].every(v => v === 5)).toBe(true);
+  });
+  it('returns a value, an uncertainty and a mask for every cell', () => {
+    const pts = gridPts(5, 75, (x, y) => x / 10 + y / 20), f = S.surface(pts, { method: 'idw', cell: 20, spacing: 75 });
+    expect(f.val.length).toBe(f.g.nx * f.g.ny); expect(f.unc.length).toBe(f.val.length); expect(f.mask.length).toBe(f.val.length);
+    expect(f.val.every(Number.isFinite)).toBe(true);
+  });
+  it('keeps a log-transformed surface in the original units', () => {
+    const pts = gridPts(4, 50, (x, y) => 1 + (x + y) ** 2 / 1000), f = S.surface(pts, { method: 'idw', cell: 25, log: true, spacing: 50 }), vs = pts.map(p => p.v);
+    expect(Math.max(...f.val)).toBeLessThanOrEqual(Math.max(...vs) + 1e-3);
+  });
+  it('classes come back with their names', () => {
+    const f = S.surface(ab, { method: 'nearest', cell: 20, spacing: 50 });
+    expect(f.classes!.sort()).toEqual(['A', 'B', 'C']); expect(f.val.every(v => v >= 0 && v < 3)).toBe(true);
+  });
+  it('handles 2,000 points on a fine grid in reasonable time', () => {
+    const pts = Array.from({ length: 2000 }, (_, i) => ({ x: (i * 7919) % 2003, y: (i * 104729) % 1999, v: i % 17 })), t = Date.now();
+    S.surface(pts, { method: 'krige', cell: 10, spacing: 10, vg: { model: 'spherical', nugget: .1, sill: 1, range: 300, ok: true } });
+    expect(Date.now() - t).toBeLessThan(20000);
   });
 });
