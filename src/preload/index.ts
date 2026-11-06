@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-/* The only bridge between the window and the computer: native save/open dialogs and menu commands. */
+/* The only bridge between the window and the computer: native save/open dialogs, menu commands, MODFLOW and Apple Maps pictures. */
 export interface OpenedFile { path: string; name: string; text: string }
 const desktop = {
   platform: process.platform,
@@ -13,6 +13,12 @@ const desktop = {
   ready: () => ipcRenderer.send('renderer-ready'),
   // MODFLOW 6, run on this computer: model files in, listed outputs (bytes) back
   mf6Run: (o: { files: Record<string, string>; outputs?: string[] }): Promise<{ ok: boolean; error?: string; stdout?: string; seconds?: number; files?: Record<string, Uint8Array> }> => ipcRenderer.invoke('mf6:run', o),
+  // Apple Maps satellite pictures, signed by the shell with the user's Maps key (which never comes to the window)
+  appleMaps: {
+    status: (): Promise<{ teamId: string; keyId: string } | null> => ipcRenderer.invoke('apple:status'),
+    setup: (c: { teamId: string; keyId: string; key: string } | null): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('apple:setup', c),
+    snapshot: (q: { lat: number; lon: number; z: number; w: number; h: number; scale?: number }): Promise<{ ok: boolean; data?: string; status?: number; error?: string }> => ipcRenderer.invoke('apple:snapshot', q),
+  },
 };
 contextBridge.exposeInMainWorld('desktop', desktop);
 export type Desktop = typeof desktop;

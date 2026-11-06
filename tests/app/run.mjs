@@ -2242,6 +2242,30 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('basemap: Apple Maps pictures under the plan and in exports, Esri around them, set up with a key', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); const b = projList().find(x => x.easting != null);
+        const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', asked = []; let answer = { ok: true, data: png };
+        window.desktop = { appleMaps: { status: async () => ({ teamId: 'ABCDE12345', keyId: 'KEY1234567' }), setup: async () => ({ ok: true }), snapshot: async q => { asked.push(q); return answer; } } };
+        fetchTile = () => {}; setSite({ ...(siteOf() || {}), basemap: 'apple' });
+        goTab('site'); await w(300); want(/Set up Apple Maps/.test(document.body.innerText), 'without a key the panel offers to set it up');
+        S.apple.who = { teamId: 'ABCDE12345', keyId: 'KEY1234567' };
+        want(!/<image href="data:image\\/png/.test(basemapSVG(800, 500, b.easting, b.northing, 40)), 'nothing from Apple until its picture comes');
+        await basemapIdle(); const q = asked[0];
+        want(q && q.z >= 10 && q.z <= 20 && q.w <= 640 && q.h <= 640 && q.scale === 2, 'one picture of the area in view: ' + JSON.stringify(q));
+        const svg = basemapSVG(800, 500, b.easting, b.northing, 40), m = svg.match(/<image href="data:image\\/png[^"]*" width="(\\d+)" height="(\\d+)" preserveAspectRatio="none" transform="matrix\\(([^)]*)\\)"/);
+        want(m && /Imagery © Apple Maps/.test(svg), 'the picture is drawn, with Apple named');
+        if (m) { const [a, bb, c, d, e, f] = m[3].split(' ').map(Number), cxp = e + a * m[1] / 2 + c * m[2] / 2, cyp = f + bb * m[1] / 2 + d * m[2] / 2; want(Math.hypot(cxp - 400, cyp - 250) < 3, 'its centre on the centre of the view: ' + [cxp, cyp]); want(Math.abs(bb / a) < .05, 'turned only by the grid convergence: ' + (bb / a)); }
+        want(!basemapSVG(800, 500, b.easting, b.northing, .001).includes('Apple'), 'far out, Esri only');
+        answer = { ok: false, status: 401, error: 'Apple Maps refused the key.' }; asked.length = 0; basemapSVG(800, 500, b.easting + 500, b.northing, 40); await basemapIdle();
+        want(S.apple.off && asked.length === 1, 'a refused key turns Apple off and says so');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('Dawn Lake example: 10 boreholes, 9 wells with bentonite over sand, about 5 m deep', async run => {
     const r = await run(`(() => { loadDlExample(); const l = sortedList().filter(b => b.project === DL_PROJ), w = l.filter(b => b.well.installed);
       return { n: l.length, wells: w.length, ann: w.every(b => b.well.annulus.map(a => a.mat).join() === 'bentonite,sand'), depth: w.every(b => b.well.depth >= 4.8 && b.well.depth <= 5.5), vapour: l.every(b => b.samples.some(s => s.cvc != null)) }; })()`);

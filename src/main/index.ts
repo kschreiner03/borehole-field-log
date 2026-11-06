@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstruc
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { mf6Binary, runMf6 } from './mf6run.mjs';
+import { clearCreds, fetchSnapshot, loadCreds, saveCreds } from './applemaps.mjs';
 
 /* The desktop shell. The current interface ("classic") runs from resources/legacy; the React interface is being
    built alongside it and opens from View > New interface (preview). Project files are ordinary files on disk. */
@@ -84,6 +85,15 @@ ipcMain.handle('file:save', async (_e, o: { name: string; data: ArrayBuffer; pat
 ipcMain.handle('mf6:run', async (e, o: { files: Record<string, string>; outputs?: string[] }) => {
   if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' };
   return runMf6({ bin: mf6Binary(app.getAppPath()), files: o?.files, outputs: Array.isArray(o?.outputs) ? o.outputs : [] });
+});
+
+/* Apple Maps: the key is set up and kept here (the app's own folder); the page asks for pictures of areas and gets images back */
+const appleFile = () => join(app.getPath('userData'), 'apple-maps.json');
+ipcMain.handle('apple:status', async e => { if (e.sender !== win?.webContents) return null; const c = await loadCreds(appleFile()); return c ? { teamId: c.teamId, keyId: c.keyId } : null; });
+ipcMain.handle('apple:setup', async (e, c: unknown) => e.sender !== win?.webContents ? { ok: false, error: 'Not allowed.' } : c ? saveCreds(appleFile(), c) : (await clearCreds(appleFile()), { ok: true }));
+ipcMain.handle('apple:snapshot', async (e, q) => {
+  if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' };
+  try { return await fetchSnapshot(q, await loadCreds(appleFile())); } catch (err) { return { ok: false, error: (err as Error).message }; }
 });
 
 ipcMain.handle('file:open', async () => {

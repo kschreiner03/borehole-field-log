@@ -2229,7 +2229,12 @@ function layersPanelHTML() {
   const bh = ps.map(b => `<label class="lyr"><input type="checkbox" class="vis" data-vis="${esc(b.id)}" ${onMap(b) ? 'checked' : ''}>${bhGlyph(b.well?.installed)}<span>${esc(b.name || 'Untitled')}</span></label>`).join('');
   const z = crsZone(), zFixed = projList().some(b => /zone\s*\d/i.test(b.crs || ''));
   return `<h4>Basemap</h4><select id="basemap" ${S.readOnly ? 'disabled' : ''}>${Object.entries(BASEMAPS).map(([k, [t]]) => `<option value="${k}" ${basemapKey() === k ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>
-    <p class="note">Loaded from ${basemapKey() === 'osm' ? 'OpenStreetMap' : 'Esri'} over the internet and kept on this computer, so areas you have viewed still show offline. UTM Zone ${z}${zFixed ? ', from the boreholes’ coordinate system' : ''}.</p>
+    <p class="note">${basemapKey() !== 'apple' ? `Loaded from ${basemapKey() === 'osm' ? 'OpenStreetMap' : 'Esri'} over the internet and kept on this computer, so areas you have viewed still show offline.`
+      : !window.desktop?.appleMaps ? 'Apple Maps needs the desktop app; Esri imagery is shown.'
+      : !S.apple.who ? 'Apple Maps needs a MapKit key from your Apple Developer account. Esri imagery is shown until it is set up.'
+      : S.apple.off ? 'Apple Maps refused the key, so Esri imagery is shown. Check it below.'
+      : `A picture of the area in view from Apple Maps (key ${esc(S.apple.who.keyId)}), close in; not kept on this computer. Esri imagery fills in further out, around it and offline. Reports and PDFs use the same pictures.`}
+      UTM Zone ${z}${zFixed ? ', from the boreholes’ coordinate system' : ''}.</p>${basemapKey() === 'apple' && window.desktop?.appleMaps && !S.readOnly ? `<button class="btn" data-act="apple-setup">${S.apple.who ? 'Apple Maps key…' : 'Set up Apple Maps…'}</button>` : ''}
     <h4>Go to</h4>${goToHTML()}
     <h4>Layers</h4><ul class="lyr-list">${rows}</ul>
     <details ${S.offMap.size ? 'open' : ''}><summary>Boreholes on maps · ${ps.filter(onMap).length} of ${ps.length}</summary><div class="lyr-bhs">${bh}</div><p class="note">Unticked boreholes are left out of maps, sections and the flow calculation, never out of logs or tables.</p></details>`;
@@ -8216,6 +8221,7 @@ const BASEMAPS = {
   imagery: ['Satellite imagery (Esri)', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?blankTile=false', 19, 'Imagery © Esri, Maxar, Earthstar Geographics'],
   osm: ['Street map (OpenStreetMap)', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', 19, '© OpenStreetMap contributors'],
   topo: ['Topographic (Esri)', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}?blankTile=false', 19, 'Basemap © Esri and contributors'],
+  apple: ['Satellite (Apple Maps)', '', 20, 'Imagery © Apple Maps'],   // pictures from Apple's snapshot service, see appleSVG
   grey: ['Light grey (Esri), for printing', 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}?blankTile=false', 16, 'Basemap © Esri and contributors'],
 };
 const basemapKey = () => BASEMAPS[siteOf()?.basemap] ? siteOf().basemap : 'imagery';
@@ -8252,10 +8258,57 @@ function fetchTile(u) {
     .catch(st => { S.tilePend.delete(u); if (st >= 400 && st < 500) { S.tileBad.add(u); tileArrived(); return; }   // none at this zoom: a coarser tile stands in
       if (!S.tileWarned) { S.tileWarned = true; toast('Basemap tiles could not be loaded. They need an internet connection, and some networks block them.'); } });
 }
+/* Apple Maps: one signed snapshot of the area in view (Apple serves no tiles), placed by its corners through the projection like a tile.
+   Pictures are kept in memory only, never on disk; while a new one comes the last is shown where it belongs. Close views only (zoom 10+). */
+S.apple = { who: null, pics: new Map(), last: null, off: false };
+window.desktop?.appleMaps?.status().then(w => { S.apple.who = w; if (w && basemapKey() === 'apple') tileArrived(); }).catch(() => {});
+const appleOn = () => !!(window.desktop?.appleMaps && S.apple.who && !S.apple.off);
+function appleSVG(W, H, cx, cy, sc, op) {
+  if (!appleOn()) return '';
+  const zone = crsZone(), [lat, lon] = utmToLL(cx, cy, zone), C = 40075016.686 * Math.cos(lat * Math.PI / 180), k = Math.max(1, W / 640, H / 640);
+  const z = Math.min(20, Math.floor(Math.log2(sc / k * C / 256))); if (z < 10) return '';
+  const ppm = 2 ** z * 256 / C, q = { lat: +lat.toFixed(6), lon: +lon.toFixed(6), z, w: Math.min(640, Math.ceil(W / sc * ppm) + 2), h: Math.min(640, Math.ceil(H / sc * ppm) + 2), scale: 2 };
+  const key = JSON.stringify(q), pic = S.apple.pics.get(key) || (fetchApple(key, q), S.apple.last); if (!pic) return '';
+  const { q: p } = pic, X0 = lon2tx(p.lon, p.z) * 256 - p.w / 2, Y0 = lat2ty(p.lat, p.z) * 256 - p.h / 2;
+  const P = (i, j) => { const [e, n] = llToUtm(ty2lat((Y0 + j) / 256, p.z), tx2lon((X0 + i) / 256, p.z), zone); return [W / 2 + (e - cx) * sc, H / 2 - (n - cy) * sc]; };
+  const [ax, ay] = P(0, 0), [bx, by] = P(p.w, 0), [dx, dy] = P(0, p.h), m = [(bx - ax) / p.w, (by - ay) / p.w, (dx - ax) / p.h, (dy - ay) / p.h, ax, ay];
+  return `<g opacity="${op}"><image href="${pic.d}" width="${p.w}" height="${p.h}" preserveAspectRatio="none" transform="matrix(${m.map(v => +v.toFixed(6)).join(' ')})"/></g>`
+    + `<text x="${W - 8}" y="${H - 4}" text-anchor="end" style="font:9px Arial,sans-serif;fill:#333;paint-order:stroke;stroke:#fff;stroke-width:3px">${esc(BASEMAPS.apple[3])}</text>`;
+}
+function fetchApple(key, q) {
+  const id = 'apple:' + key; if (S.tilePend.has(id)) return; S.tilePend.add(id);   // reports wait for it like a tile
+  window.desktop.appleMaps.snapshot(q).catch(e => ({ ok: false, error: String(e) })).then(r => {
+    S.tilePend.delete(id);
+    if (r?.ok) { S.apple.pics.set(key, S.apple.last = { d: r.data, q }); if (S.apple.pics.size > 24) S.apple.pics.delete(S.apple.pics.keys().next().value); }
+    else if (r?.status === 401 || r?.status === 403) { S.apple.off = true; toast(`${r.error} Esri imagery is shown meanwhile.`); }
+    else if (!S.tileWarned) { S.tileWarned = true; toast(`Apple Maps could not be reached (${r?.error || 'no answer'}). Esri imagery is shown meanwhile.`); }
+    tileArrived();
+  });
+}
+function appleSetup() {
+  const w = S.apple.who;
+  dialog('Apple Maps', `<p class="note" style="margin:0">Satellite pictures from Apple Maps, requested with a MapKit key from your Apple Developer account (Certificates, Identifiers &amp; Profiles › Keys, with MapKit JS ticked). The key stays in this app on this computer and is never put in a project file.</p>
+    <div class="fields"><div class="fld"><label for="ap-team">Team ID</label><input id="ap-team" value="${esc(w?.teamId || '')}" placeholder="10 letters and digits" autocomplete="off" spellcheck="false"></div>
+    <div class="fld"><label for="ap-kid">Key ID</label><input id="ap-kid" value="${esc(w?.keyId || '')}" placeholder="10 letters and digits" autocomplete="off" spellcheck="false"></div>
+    <div class="fld wide"><label for="ap-key">Key file (.p8)</label><input id="ap-key" type="file" accept=".p8"></div></div>
+    <p class="note">Apple's terms govern how its pictures may be used, including in reports you send out; each picture keeps Apple's logo and notice.</p>`,
+    `${w ? '<button class="btn danger" data-act="apple-clear">Remove key</button>' : ''}<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="apple-save">Save</button>`);
+}
+async function appleSave() {
+  const f = $('#ap-key')?.files[0]; if (!f) { toast('Choose the key file (.p8) you downloaded from Apple.'); return; }
+  const c = { teamId: $('#ap-team').value.trim().toUpperCase(), keyId: $('#ap-kid').value.trim().toUpperCase(), key: await f.text() };
+  const r = await window.desktop.appleMaps.setup(c); if (!r?.ok) { toast(r?.error || 'The key could not be saved.'); return; }
+  S.apple = { who: { teamId: c.teamId, keyId: c.keyId }, pics: new Map(), last: null, off: false }; closeOverlay(); renderView(true); toast('Apple Maps is set up.');
+}
+async function appleClear() { await window.desktop.appleMaps.setup(null); S.apple = { who: null, pics: new Map(), last: null, off: false }; closeOverlay(); renderView(true); toast('Apple Maps key removed.'); }
 const basemapIdle = () => new Promise(res => { const t0 = Date.now(), tick = () => (!S.tilePend.size || Date.now() - t0 > 10000) ? res() : setTimeout(tick, 120); tick(); });
 function basemapSVG(W, H, cx, cy, sc, op = 1) {
-  const key = basemapKey(), zone = crsZone(); if (S.lyr.base === false) return '';
-  const [, url, zmax, attr] = BASEMAPS[key], [lat0] = utmToLL(cx, cy, zone);
+  if (S.lyr.base === false) return '';
+  const key = basemapKey(); if (key !== 'apple') return tilesSVG(key, W, H, cx, cy, sc, op);
+  return tilesSVG('imagery', W, H, cx, cy, sc, op) + (appleSVG(W, H, cx, cy, sc, op) || '');   // Esri imagery under Apple's picture fills its edges, and stands in while it loads or without a key
+}
+function tilesSVG(key, W, H, cx, cy, sc, op) {
+  const zone = crsZone(), [, url, zmax, attr] = BASEMAPS[key], [lat0] = utmToLL(cx, cy, zone);
   const corners = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([sx, sy]) => utmToLL(cx + sx * W / 2 / sc, cy + sy * H / 2 / sc, zone));
   let z = Math.max(1, Math.min(zmax, Math.round(Math.log2(156543.03392 * Math.cos(lat0 * Math.PI / 180) * sc)))), x0, x1, y0, y1;
   for (;; z--) { x0 = Math.floor(Math.min(...corners.map(c => lon2tx(c[1], z)))); x1 = Math.floor(Math.max(...corners.map(c => lon2tx(c[1], z)))); y0 = Math.floor(Math.min(...corners.map(c => lat2ty(c[0], z)))); y1 = Math.floor(Math.max(...corners.map(c => lat2ty(c[0], z)))); if ((x1 - x0 + 1) * (y1 - y0 + 1) <= 64 || z <= 1) break; }
@@ -10608,6 +10661,9 @@ document.addEventListener('click', e => {
     case 'bh-tpl': saveBhTemplate(); break;
     case 'map-edit': case 'imp-loc': case 'imp-shp': case 'imp-img': case 'img-add-go': case 'loc-imp-go': case 'shp-imp-go': case 'mf-del': case 'mf-done': case 'mf-clear': mapAct(act); break;
     case 'bt-save-go': saveBhTemplateGo(); break;
+    case 'apple-setup': appleSetup(); break;
+    case 'apple-save': appleSave(); break;
+    case 'apple-clear': appleClear(); break;
     case 'cols-auto': if (!S.readOnly) { S.co.cols = {}; store.saveCompany(); renderView(true); toast('Log columns are automatic again.'); } break;
     case 'drawer-close': closeDrawer(); break;
     case 'drawer-del': if (editable(b) && (S.drawer || t.dataset.idx != null)) { const what = t.dataset.what, idx = t.dataset.idx != null ? +t.dataset.idx : S.drawer.i; if (!t.classList.contains('armed')) { t.classList.add('armed'); t.textContent = 'Tap again to delete'; break; } b[what].splice(idx, 1); logChange(b, { layers: 'Soil layers', samples: 'Samples & SPT', water: 'Groundwater' }[what]); store.save(b); if (S.drawer) closeDrawer(); else renderView(true); renderFacts(b); renderList(sortedList()); toast('Deleted.'); } break;
