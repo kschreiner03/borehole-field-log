@@ -2327,6 +2327,7 @@ app.whenReady().then(async () => {
         seed(25); surveyOf().points[3].samples[0].lab.ec = { v: 1, lt: true }; surveyOf().points[8].e = surveyOf().points[9].e; surveyOf().points[8].n = surveyOf().points[9].n; setSurvey(surveyOf()); S.soilCache = null; f = soilSurface('ec', soilCurrent().depth, soilCurrent()); want(f.warnings.some(x => x.id === 'non-detects') && f.merged === 1 && /same spot/.test(f.notes.join(' ')), 'non-detects and duplicates are reported: ' + f.notes);
         const a = soilSurface('ec', soilCurrent().depth, soilCurrent()); want(a === soilSurface('ec', soilCurrent().depth, soilCurrent()), 'surfaces are cached');
         seed(25); const keep = S.co.logStyle; S.co.logStyle = 'bw'; S.soilCache = null; want(soilRamp(soilCurrent()) === 'grey', 'black and white uses a grey ramp'); S.co.logStyle = keep;
+        seed(25); S.units = 'ft'; want(/\\d ft<\\/text>/.test(map()) && !/\\d m<\\/text>/.test(map()), 'the scale bar follows the units'); S.units = 'm';
         seed(25); renderView(true); await w(200); want(!!document.querySelector('#plan svg') && !!document.querySelector('[data-sv="prop"]'), 'the page draws the map and its settings'); want(S._plan && S._plan.sc > 0, 'pan and zoom know the map');
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
       return F;
@@ -2358,14 +2359,58 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('soil survey: a point shows everything', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); goTab('soil'); await w(150); fetchTile = () => {}; loadSoilExample(); await w(200);
+        const p = surveyOf().points[2]; want(surveyOf().points.length === 25 && /fictional/i.test(surveyOf().survey.name), 'an example survey, clearly labelled: ' + surveyOf().survey.name);
+        document.querySelector('#plan [data-spt="' + p.id + '"]').dispatchEvent(new MouseEvent('click', { bubbles: true })); await w(200);
+        const card = document.querySelector('#drawer'); want(card && !card.hidden, 'the card opens');
+        const t = card.innerText; want(t.includes(p.name) && t.includes(p.gg) && t.includes(p.order), 'classification: ' + t.slice(0, 120));
+        want(t.includes('0–15 cm') && t.includes('15–30 cm') && t.includes('Hand dig'), 'each depth sample'); want(/EC/.test(t) && /SAR/.test(t) && /Sand/.test(t), 'lab values and fractions'); want(/Good|Fair|Poor|Unsuitable/.test(t) && /unverified/.test(t), 'lab values against limits, with their status');
+        want(S.soilSel === p.id, 'selected'); want(new RegExp('data-spt="' + p.id + '"[^>]*stroke-width="3"').test(document.querySelector('#plan').innerHTML), 'marked on the map');
+        want(new RegExp('data-spt="' + p.id + '"[^>]*stroke-width="2.5"').test(document.querySelector('#soil-graphs').innerHTML), 'marked on the graphs');
+        const other = surveyOf().points[7]; document.querySelector('#soil-graphs [data-spt="' + other.id + '"]').dispatchEvent(new MouseEvent('click', { bubbles: true })); await w(200);
+        want(S.soilSel === other.id && document.querySelector('#drawer').innerText.includes(other.name), 'clicking a graph mark selects that point');
+        closeDrawer(); await w(50); want(document.querySelector('#drawer').hidden, 'the card closes');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('soil survey: reports and exports', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); goTab('soil'); await w(150); fetchTile = () => {}; loadSoilExample(); await w(200); surveyOf().survey.strategy = 'targeted'; setSurvey(surveyOf());
+        want(['soilmap', 'soilgraph', 'soiltable'].every(k => RITEMS[k]), 'report items exist');
+        const view = { ...soilCurrent() }, map = itemInner({ t: 'soilmap', o: { view } }, 700, 520);
+        want(map.startsWith('<svg') && /Interpolated, not measured/.test(map) && /Points were targeted/.test(map) && /RMSE/.test(map), 'the map carries its method note and warnings');
+        want(/data-north/.test(map) && /m<\\/text>/.test(map), 'north arrow and scale bar');
+        for (const kind of ['texture', 'ecSar', 'ranked']) { const g = itemInner({ t: 'soilgraph', o: { kind, view } }, 640, 360); want(g.startsWith('<svg'), 'graph item ' + kind + ': ' + g.slice(0, 60)); }
+        const tb = itemInner({ t: 'soiltable', o: { view } }, 700, 400); want(tb.startsWith('<svg') && /SP-1/.test(tb) && /EC/.test(tb), 'table item');
+        goTab('compose'); await w(300); want(/Soil map/.test(document.body.innerHTML), 'the add menu lists them'); goTab('soil'); await w(150);
+        let saved = []; const keep = saveFile; saveFile = async (n, d) => { saved.push([n, d]); return true; };
+        await soilAct('soil-xlsx'); await w(50); const wb = XLSX.read(saved[0][1]); want(['Points', 'Samples', 'Lab'].every(n => wb.SheetNames.includes(n)), 'Excel sheets: ' + wb.SheetNames);
+        const samples = XLSX.utils.sheet_to_json(wb.Sheets.Samples); want(samples.length === 50 && samples[0].Point === 'SP-1', 'one row a sample: ' + samples.length);
+        saved = []; await soilAct('soil-csv'); await w(50); const csv = await new Blob([saved[0][1]]).text(), lines = csv.trim().split('\\n'); want(lines[0] === 'easting,northing,value,uncertainty' && lines.length > 50 && lines[1].split(',').every(x => Number.isFinite(+x)), 'surface grid CSV: ' + lines.slice(0, 2).join(' / '));
+        saveFile = keep;
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('soil survey: works with no boreholes at all', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
       try {
         S.bh.clear(); S.sel = null; want(!projList().length, 'starts empty'); goTab('soil'); await w(200); want(!!document.querySelector('.soil-page'), 'the page opens without a borehole');
         soilAddSample(soilAddPoint('SP-1'), { from: 0, to: .15 }); await w(50); want(surveyOf().points.length === 1, 'a point is added'); want(projList().length === 0, 'no borehole made');
+        const pt = surveyOf().points[0]; pt.e = 561000; pt.n = 6463000; const p2 = soilAddPoint('SP-2'); p2.e = 561090; p2.n = 6463040; soilAddSample(p2, { from: 0, to: .15 }); setSurvey(surveyOf()); renderView(true); await w(150);
+        zoomAt(200, 200, 1.6); await w(250); want(S.mv && S.mv.sc > 0, 'zooming works with no boreholes'); document.querySelector('#plan').dispatchEvent(new Event('x')); await w(50);
         const sent = []; const keep = saveTo; saveTo = async (p, name, ext, data) => sent.push(data); await saveProject(false, ''); saveTo = keep;
-        want(sent[0]?.site?.soil?.points?.length === 1 && sent[0].boreholes.length === 0, 'a soil-only project saves: ' + JSON.stringify(sent[0]?.site || null).slice(0, 80));
+        want(sent[0]?.site?.soil?.points?.length === 2 && sent[0].boreholes.length === 0, 'a soil-only project saves: ' + JSON.stringify(sent[0]?.site || null).slice(0, 80));
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       return F;
     })()`);

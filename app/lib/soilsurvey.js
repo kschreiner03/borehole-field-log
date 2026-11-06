@@ -86,7 +86,7 @@ function soilGridHTML() {
 function soilHTML() {
   const sv = surveyOf(), s = sv.survey || {}, ed = soilEd(), ro = S.readOnly;
   const f = (k, label, h) => `<div class="fld"><label for="sf-${k}">${label}</label>${h}</div>`, inp = (k, t = 'text') => `<input id="sf-${k}" type="${t}" data-soilf="${k}" value="${esc(s[k] || '')}" ${ed ? '' : 'readonly'}>`;
-  return `<div class="soil-page"><section class="sec"><header><h3>Soil survey</h3><div class="mini-tools">${ed ? `<button class="btn" data-act="soil-add">Add point</button><button class="btn" data-act="soil-imp-pts">Import locations</button><button class="btn" data-act="soil-imp-lab">Import lab results</button>` : ''}${ro ? '' : `<button class="btn" data-act="soil-issue">${s.issued ? 'Reopen' : 'Issue'}</button>`}</div></header>
+  return `<div class="soil-page"><section class="sec"><header><h3>Soil survey</h3><div class="mini-tools">${ed ? `<button class="btn" data-act="soil-add">Add point</button><button class="btn" data-act="soil-imp-pts">Import locations</button><button class="btn" data-act="soil-imp-lab">Import lab results</button>` : ''}${sv.points.length ? '<button class="btn" data-act="soil-xlsx">Excel</button><button class="btn" data-act="soil-csv">Map grid CSV</button>' : ed ? '<button class="btn" data-act="soil-example">Load an example</button>' : ''}${ro ? '' : `<button class="btn" data-act="soil-issue">${s.issued ? 'Reopen' : 'Issue'}</button>`}</div></header>
     <div class="body"><div class="fields">${f('name', 'Survey name', inp('name'))}${f('date', 'Date', inp('date', 'date'))}${f('strategy', 'Sampling strategy', `<select id="sf-strategy" data-soilf="strategy" ${ed ? '' : 'disabled'}>${Object.entries(SOIL_STRATEGIES).map(([k, v]) => `<option value="${k}" ${(s.strategy || '') === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}${f('notes', 'Notes', inp('notes'))}</div>
     <div id="plan" class="map-canvas" data-tool="pan"></div><div id="soil-graphs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;margin-top:16px"></div><h4 style="margin:14px 0 6px">Points and samples</h4><div id="soil-grid">${soilGridHTML()}</div><p class="note">Separate from boreholes. Depths with the same from and to values are mapped together. Type &lt; for results below detection, like &lt;0.5. Paste a block from Excel into any cell.</p></div></section></div>
     <input type="file" id="soil-file" hidden accept=".csv,.txt,.xlsx,.xls">`;
@@ -177,7 +177,7 @@ function soilMapSVG(W, H, v, interactive) {
   if (!located.length) return o.join('') + `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" class="sub">Add coordinates to map the points.</text></svg>`;
   const xs = located.map(p => p.e), ys = located.map(p => p.n), pad = 60, span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 40) * 1.15;
   let cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2, sc = Math.min((W - 2 * pad) / span, (H - 2 * pad) / span);
-  if (interactive) { if (S.mvTab !== 'soil') { S.mv = null; S.mvTab = 'soil'; } if (S.mv) ({ cx, cy, sc } = S.mv); S._plan = S._drawn = { W, H, cx, cy, sc }; }
+  if (interactive) { if (S.mvTab !== 'soil' || (S.mv && S.mvProj !== projKey(projList()[0]))) { S.mv = null; S.mvTab = 'soil'; } if (S.mv) ({ cx, cy, sc } = S.mv); S._plan = S._drawn = { W, H, cx, cy, sc }; }
   const X = e => W / 2 + (e - cx) * sc, Y = n => H / 2 - (n - cy) * sc; o.push(basemapSVG(W, H, cx, cy, sc));
   const f = soilSurface(v.prop, v.depth, v), kind = f.kind, ramp = soilRamp(v), vs = kind === 'num' ? f.pts.map(p => p.v) : [], lo = v.min ?? (vs.length ? Math.min(...vs) : 0), hi = v.max ?? (vs.length ? Math.max(...vs) : 1), span2 = hi - lo || 1;
   const stepT = t => v.steps > 1 ? Math.min(v.steps - 1, Math.floor(t * v.steps)) / (v.steps - 1) : t, tOf = x => stepT((x - lo) / span2), classes = f.field?.classes || [...new Set(f.pts.map(p => p.v))], bw = bwLogs();
@@ -206,7 +206,8 @@ function soilMapSVG(W, H, v, interactive) {
   if (view === 'pie') o.push(`<rect x="${lx - 4}" y="${ly - 40}" width="170" height="48" rx="3" fill="#fff" opacity=".9"/><text x="${lx}" y="${ly - 26}" style="font:700 10.5px Arial,sans-serif;fill:#111">${title}</text>${[['Sand', '#E69F00'], ['Silt', '#56B4E9'], ['Clay', '#D55E00']].map(([t, c], i) => `<rect x="${lx + i * 52}" y="${ly - 14}" width="10" height="10" fill="${c}"/><text x="${lx + 14 + i * 52}" y="${ly - 5}" style="font:10.5px Arial,sans-serif;fill:#111">${t}</text>`).join('')}`);
   else if (kind === 'class' && view !== 'uncertainty') { const n = Math.min(classes.length, 10), h = n * 15 + 24; o.push(`<rect x="${lx - 4}" y="${ly - h + 8}" width="190" height="${h}" rx="3" fill="#fff" opacity=".9"/><text x="${lx}" y="${ly - h + 22}" style="font:700 10.5px Arial,sans-serif;fill:#111">${esc(title)}</text>${classes.slice(0, n).map((c, i) => `${soilMark(i, lx + 6, ly - h + 36 + i * 15, 5, `style="fill:${soilClassCol(i, bw)};stroke:#111" stroke-width="1"`, '')}<text x="${lx + 18}" y="${ly - h + 40 + i * 15}" style="font:10.5px Arial,sans-serif;fill:#111">${esc(c)}</text>`).join('')}`); }
   else { const id = `sg${Math.random().toString(36).slice(2, 8)}`, rn = view === 'uncertainty' ? 'magma' : ramp, a = view === 'uncertainty' ? 0 : lo, b = view === 'uncertainty' ? Math.max(...(f.field?.unc || [1])) : hi; o.push(`<defs><linearGradient id="${id}">${[0, .25, .5, .75, 1].map(t => `<stop offset="${t}" stop-color="${soilHex(rampAt(rn, t))}"/>`).join('')}</linearGradient></defs><rect x="${lx - 4}" y="${ly - 38}" width="190" height="46" rx="3" fill="#fff" opacity=".9"/><text x="${lx}" y="${ly - 24}" style="font:700 10.5px Arial,sans-serif;fill:#111">${esc(title)}</text><rect x="${lx}" y="${ly - 18}" width="170" height="9" fill="url(#${id})"/><text x="${lx}" y="${ly + 4}" style="font:10px Arial,sans-serif;fill:#111">${soilFmt(a)}</text><text x="${lx + 170}" y="${ly + 4}" text-anchor="end" style="font:10px Arial,sans-serif;fill:#111">${soilFmt(b)}</text>`); }
-  const nice = niceStep(120 / sc, 1), bar = nice * sc; o.push(`<rect x="${W - bar - 34}" y="${H - 34}" width="${bar + 26}" height="20" rx="3" fill="#fff" opacity=".9"/><path d="M${W - bar - 22} ${H - 22}v4h${bar}v-4" fill="none" stroke="#111"/><text x="${W - 22 - bar / 2}" y="${H - 24}" text-anchor="middle" style="font:10px Arial,sans-serif;fill:#111">${+nice.toFixed(1)} m</text>`);
+  const ft = S.units === 'ft', nice = niceStep((ft ? 3.28084 : 1) * 120 / sc, 1), bar = nice / (ft ? 3.28084 : 1) * sc; o.push(`<rect x="${W - bar - 34}" y="${H - 34}" width="${bar + 26}" height="20" rx="3" fill="#fff" opacity=".9"/><path d="M${W - bar - 22} ${H - 22}v4h${bar}v-4" fill="none" stroke="#111"/><text x="${W - 22 - bar / 2}" y="${H - 24}" text-anchor="middle" style="font:10px Arial,sans-serif;fill:#111">${+nice.toFixed(1)} ${ft ? 'ft' : 'm'}</text>`);
+  o.push(`<g data-north="1" transform="translate(${W - 26} 44)"><path d="M0 -16L7 8L0 3L-7 8z" fill="#111" stroke="#fff"/><text y="-20" text-anchor="middle" style="font:700 11px Arial,sans-serif;fill:#111;paint-order:stroke;stroke:#fff;stroke-width:3px">N</text></g>`);
   return o.join('') + '</svg>';
 }
 function drawSoil() {
@@ -353,7 +354,57 @@ function soilImportLabGo() {
   });
   S._soilLab = null; setSurvey(surveyOf()); closeOverlay(); renderView(true); toast(`Imported results for ${n} sample${n === 1 ? '' : 's'}.`);
 }
+/* ---------- one point, everything recorded there ---------- */
+function soilRate(k, v) { const L = soilLimits(), lim = L[k]; if (!lim || v == null) return ''; return L.classes[lim.filter(q => v >= q).length]; }
+function soilCardHTML(id) {
+  const p = surveyOf().points.find(x => x.id === id); if (!p) return '';
+  const row = (a, b) => `<tr><td>${esc(a)}</td><td class="r">${b}</td></tr>`, keys = LAB_ORDER.filter(k => !SOIL_FR.includes(k));
+  return `<header><div><h3>${esc(p.name)}</h3><span class="note">${[p.gg, p.order && `${p.order} order`].filter(Boolean).map(esc).join(' · ') || 'Not classified'}</span></div><button class="btn" data-act="drawer-close" aria-label="Close">×</button></header>
+    <div class="dbody"><p class="note" style="margin-top:0">${p.e != null ? `${p.e} E, ${p.n} N${p.z != null ? `, elevation ${soilFmt(p.z)} m` : ''}` : 'No coordinates'}${p.notes ? `<br>${esc(p.notes)}` : ''}</p>
+    ${p.samples.map(s => { const t = csscOf(s), labs = keys.filter(k => labVal(s, k)); return `<h4 class="ff-h">${esc(soilDepthLabel(s))}${s.name ? ` · ${esc(s.name)}` : ''}</h4><p class="note" style="margin:0 0 4px">${[s.method, s.hz && `Horizon ${s.hz}`, soilClass(s, 'texture', p), s.colour, s.notes].filter(Boolean).map(esc).join(' · ') || 'No field notes'}</p>
+      <table class="sum" style="min-width:0"><tbody>${t ? row('Sand / silt / clay (%)', `${soilFmt(t.sand)} / ${soilFmt(t.silt)} / ${soilFmt(t.clay)}`) : ''}${labs.map(k => { const r = labVal(s, k), rate = r.lt ? '' : soilRate(k, r.v); return row(`${k === 'ec' ? 'EC' : k === 'sar' ? 'SAR' : LAB_PARAMS[k].label}${LAB_PARAMS[k].unit ? ` (${LAB_PARAMS[k].unit})` : ''}`, `${fmtLab(r)}${rate ? ` · ${esc(rate)}` : ''}`); }).join('')}</tbody></table>${s.gsd?.length > 1 ? `<p class="note">Grain size curve: ${s.gsd.length} points.</p>` : ''}`; }).join('') || '<p class="note">No samples yet.</p>'}
+    <p class="note">Ratings: ${esc(soilLimitName())}.</p></div>`;
+}
+function soilSelect(id) { S.soilSel = id; S.drawer = { kind: 'soilpt', id }; renderDrawer(); drawSoil(); soilGraphsDraw(); }
+document.addEventListener('click', e => { const m = e.target.closest?.('[data-spt]'); if (m && m.closest('#plan, #soil-graphs') && m.dataset.spt) soilSelect(m.dataset.spt); });
+/* ---------- output ---------- */
+function soilTableSVG(W, H, v) {
+  const rows = surveyOf().points.flatMap(p => soilSampleAt(p, v.depth).map(s => ({ p, s }))), lh = 15, cols = [['Point', 0], ['Depth', .14], ['Class', .28], ['Texture', .46], ['EC', .64], ['SAR', .73], ['pH', .82], ['Clay %', .91]], o = [soilOpen(W, H, 'Soil results')];
+  cols.forEach(([t, x]) => o.push(`<text x="${x * W + 2}" y="12" style="font:700 10px Arial,sans-serif;fill:var(--ink)">${t}</text>`)); o.push(`<line x1="0" x2="${W}" y1="17" y2="17" style="stroke:var(--ink)"/>`);
+  const fit = rows.slice(0, Math.floor((H - 34) / lh)); fit.forEach(({ p, s }, i) => { const y = 30 + i * lh, c = k => { const r = labVal(s, k); return r ? fmtLab(r) : '—'; }, t = csscOf(s), vals = [p.name, soilDepthLabel(s), p.order || '—', soilClass(s, 'texture', p) || '—', c('ec'), c('sar'), c('ph'), t ? soilFmt(t.clay) : '—']; vals.forEach((q, j) => o.push(`<text x="${cols[j][1] * W + 2}" y="${y}" style="font:10px Arial,sans-serif;fill:var(--ink)">${esc(q)}</text>`)); });
+  if (fit.length < rows.length) o.push(`<text x="2" y="${H - 4}" style="font:10px Arial,sans-serif;fill:var(--muted)">Showing ${fit.length} of ${rows.length}. Make the item taller to fit more.</text>`);
+  return o.join('') + '</svg>';
+}
+/* a report item keeps the view it was added with */
+function soilItem(t, o, w, h) {
+  const v = { ...soilCurrent(), ...(o.view || {}) }; if (!surveyOf().points.length) return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><text x="10" y="20" style="font:12px Arial,sans-serif">No soil survey in this project yet.</text></svg>`;
+  if (t === 'soilmap') return soilMapSVG(w, h, v, false); if (t === 'soiltable') return soilTableSVG(w, h, v);
+  const g = soilGraphSVG(o.kind || 'texture', w, h, v), svg = g.startsWith('<svg') ? g.replace(/<\/svg>[^]*$/, '</svg>') : `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><text x="10" y="20" style="font:12px Arial,sans-serif">${esc(g.replace(/<[^>]+>/g, ''))}</text></svg>`; return svg;
+}
+async function soilExportXlsx() {
+  const sv = surveyOf(), wb = XLSX.utils.book_new(), add = (name, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), name), ss = sv.points.flatMap(p => p.samples.map(s => ({ p, s })));
+  add('Points', sv.points.map(p => ({ Point: p.name, Easting: p.e, Northing: p.n, Elevation: p.z, Order: p.order, 'Great group': p.gg, Notes: p.notes })));
+  add('Samples', ss.map(({ p, s }) => { const t = csscOf(s); return { Point: p.name, Sample: s.name, 'From (m)': s.from, 'To (m)': s.to, Method: s.method, Horizon: s.hz, Texture: soilClass(s, 'texture', p), Colour: s.colour, 'Sand %': t?.sand, 'Silt %': t?.silt, 'Clay %': t?.clay, Notes: s.notes }; }));
+  add('Lab', ss.flatMap(({ p, s }) => Object.keys(s.lab || {}).map(k => ({ Point: p.name, Sample: s.name, 'From (m)': s.from, 'To (m)': s.to, Parameter: LAB_PARAMS[k]?.label || k, Unit: LAB_PARAMS[k]?.unit || '', Result: fmtLab(s.lab[k]) }))));
+  const v = soilCurrent(), f = v.prop ? soilSurface(v.prop, v.depth, v) : null; if (f?.loo?.rmse != null) add('Check', f.loo.rows.map(r => ({ Point: f.pts[r.i]?.pt.name, Measured: r.actual, Predicted: r.pred, Error: r.err })));
+  return saveFile(`${fileSlug(sv.survey?.name) || 'Soil survey'}.xlsx`, XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
+}
+async function soilExportCSV() {
+  const v = soilCurrent(), f = soilSurface(v.prop, v.depth, v); if (!f.field || f.kind !== 'num') { toast('Choose a measured property with a surface first.'); return; }
+  const { g, val, unc, mask } = f.field, out = ['easting,northing,value,uncertainty'];
+  for (let r = 0; r < g.ny; r++) for (let c = 0; c < g.nx; c++) { const i = r * g.nx + c; if (mask[i] > 0 || v.maskOff) out.push([(g.x0 + (c + .5) * g.cell).toFixed(2), (g.y0 + (r + .5) * g.cell).toFixed(2), +val[i].toPrecision(6), +unc[i].toPrecision(4)].join(',')); }
+  return saveFile(`${fileSlug(`${surveyOf().survey?.name || 'Soil survey'} ${v.prop}`)}.csv`, out.join('\n') + '\n');
+}
+function loadSoilExample() {
+  if (!soilEd()) return; let seed = 4242; const nr = () => (seed = (seed * 16807) % 2147483647) / 2147483647, sv = soilBlank(); sv.survey = { ...sv.survey, name: 'Example soil survey (fictional)', date: '2026-07-22', strategy: 'targeted', notes: 'Made-up values to show the page. Not a real site.' };
+  const base = projList().find(b => b.easting != null), e0 = base?.easting ?? 561000, n0 = base?.northing ?? 6463000, lt = v => ({ v: +v.toFixed(2), lt: false });
+  for (let i = 0; i < 25; i++) { const cx = i % 5, cy = Math.floor(i / 5), gg = ['Eutric Brunisol', 'Dystric Brunisol', 'Gray Luvisol', 'Humic Gleysol'][Math.min(3, Math.floor((cx + cy + nr() * 1.5) / 2.2))], p = { id: soilId('sp'), name: `SP-${i + 1}`, e: +(e0 + cx * 90 + nr() * 25).toFixed(1), n: +(n0 + cy * 85 + nr() * 25).toFixed(1), z: null, notes: '', order: csscOrder(gg), gg, sub: '', samples: [] };
+    for (const [from, to, f] of [[0, .15, 1], [.15, .3, 1.5]]) { const sa = 62 - cx * 7 + nr() * 8 - to * 30, cl = 8 + cy * 3 + nr() * 5 + to * 18; p.samples.push({ id: soilId('ss'), name: `${p.name}-${Math.round(to * 100)}`, from, to, method: to < .2 ? 'Hand dig' : 'Hand auger', hz: to < .2 ? 'Ah' : 'Bm', texture: '', colour: '', notes: '', sand: +sa.toFixed(1), silt: +(100 - sa - cl).toFixed(1), clay: +cl.toFixed(1), gsd: [], lab: { ec: lt((.6 + cx * .5 + cy * .35 + nr() * .6) * f), sar: lt((.8 + cy * .7 + nr()) * f), ph: lt(6.2 + cx * .2 + nr() * .4), cl: nr() < .2 ? { v: 5, lt: true } : lt(20 + cx * cy * 9 + nr() * 15), om: lt(5 - to * 12 + nr() * 2) } }); }
+    sv.points.push(p); }
+  setSurvey(sv); S.soilView = null; S.soilCache = null; S.mv = null; renderView(true);
+}
 function soilAct(act) {
+  if (act === 'soil-xlsx') return soilExportXlsx(); if (act === 'soil-csv') return soilExportCSV(); if (act === 'soil-example') { loadSoilExample(); return; }
   if (act === 'soil-add') { const p = soilAddPoint(); if (p) soilAddSample(p); renderView(true); }
   else if (act === 'soil-imp-pts' || act === 'soil-imp-lab') { const f = $('#soil-file'); f.dataset.mode = act; f.click(); }
   else if (act === 'soil-lab-go') soilImportLabGo();

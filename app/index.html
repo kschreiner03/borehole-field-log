@@ -2750,7 +2750,7 @@ function drawerHTML(b) {
 function openDrawer(kind, i) { const was = !!S.drawer; S.drawer = { kind, i }; if (kind === 'layer') S.layer = i; renderDrawer(); if (!was) redrawLog(); }
 function renderDrawer() {
   const el = $('#drawer'), b = cur(); if (!el) return;
-  const html = S.drawer && b && S.tab === 'log' ? drawerHTML(b) : '';
+  const html = S.drawer?.kind === 'soilpt' ? soilCardHTML(S.drawer.id) : S.drawer && b && S.tab === 'log' ? drawerHTML(b) : '';
   el.hidden = !html; el.innerHTML = html;
   document.body.classList.toggle('drawer-open', !!html);
   if (!html) S.drawer = null;
@@ -9013,7 +9013,7 @@ const bodyOf = pg => { const d = pgDims(pg); return { x: d.M, y: d.M + 80, w: d.
 const LB = bodyOf({ orient: 'land' });
 const xsecPage = () => newPage('free', { orient: 'land', title: 'CROSS-SECTION A–A′', items: [newItem('section', LB.x, LB.y, { w: LB.w, h: LB.h - 64 }), newItem('text', LB.x, LB.y + LB.h - 52, { w: LB.w, h: 52, o: { size: 9, text: 'Units between boreholes are an interpretation; conditions between boreholes are not known. The water table is interpolated between readings.' } })] });
 const RITEMS = {
-  plan: ['Site plan', BODY.w, 560], section: ['Cross-section', BODY.w, 440], wt: ['Water-table map', BODY.w, 520], vap: ['Vapour map', BODY.w, 520],
+  soilmap: ['Soil map', BODY.w, 560], soilgraph: ['Soil graph', BODY.w, 360], soiltable: ['Soil results table', BODY.w, 420], plan: ['Site plan', BODY.w, 560], section: ['Cross-section', BODY.w, 440], wt: ['Water-table map', BODY.w, 520], vap: ['Vapour map', BODY.w, 520],
   flow: ['Groundwater flow', BODY.w, 460], hydro: ['Hydrograph', BODY.w, 320], text: ['Text box', 360, 110], image: ['Picture', 360, 260],
   gwsum: ['Model summary', BODY.w, BODY.h], gwcal: ['Model calibration plot', BODY.w, 560], gwpar: ['Model parameters', BODY.w, 300], gwlim: ['Model limits', BODY.w, 300],
   scalebar: ['Scale bar', 300, 56], north: ['North arrow', 80, 96], legend: ['Legend', 220, 110], shape: ['Shape', 160, 100],
@@ -9144,6 +9144,7 @@ function itemInner(it, w, h) {
   if (it.t === 'shape') return shapeSVG(it, w, h);
   if (['gwsum', 'gwcal', 'gwpar', 'gwlim'].includes(it.t)) return gwReportSVG(it.t, w, h);
   const out = withRO(ro, () => {
+    if (it.t.startsWith('soil')) return soilItem(it.t, o, w, h);
     if (it.t === 'plan') { const r = planSVG(w, h, false); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'section') return fromEl(el => { RO.xs = { shape: 'guided', style: 'graded', ...(o.xs || S.xs) }; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
     if (it.t === 'wt') return wtMapSVG(w, h)?.svg || msg('Needs water levels in at least 3 wells with coordinates and ground elevations.');
@@ -9323,7 +9324,7 @@ function composeHTML() {
   if (pg.kind === 'free') {
     const d = pgDims(pg), bd = bodyOf(pg);
     stage = `<div class="cmp-tools">      <label class="cmp-zoom"><span class="note">Zoom</span><select id="cmp-zoom" aria-label="Zoom">${[['fit', 'Fit page'], ['width', 'Fit width'], ...[0.5, 0.75, 1, 1.5, 2, 4].map(v => [v, Math.round(v * 100) + ' %'])].map(([v, t]) => `<option value="${v}" ${String(S.czoom) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <span class="cmp-addwrap"><button class="btn primary" data-act="cmp-addmenu" aria-haspopup="true" ${S.readOnly ? 'disabled' : ''}>Add item ▾</button><div class="cmp-addmenu" role="menu" hidden>${(() => { const G = [['Maps and drawings', ['plan', 'section', 'wt', 'vap', 'flow', 'hydro']], ['Groundwater model', ['gwsum', 'gwcal', 'gwpar', 'gwlim']], ['Text and pictures', ['text', 'image']], ['Map parts', ['scalebar', 'north', 'legend', 'shape']]], seen = new Set(G.flatMap(g => g[1])), rest = Object.keys(RITEMS).filter(k => !seen.has(k)); return [...G, ...(rest.length ? [['Other', rest]] : [])].map(([t, ks]) => `<div class="cmp-addg"><b>${t}</b>${ks.filter(k => RITEMS[k]).map(k => `<button type="button" class="cmp-addi" role="menuitem" data-cadd="${k}">${esc(RITEMS[k][0])}</button>`).join('')}</div>`).join(''); })()}</div></span></div>
+      <span class="cmp-addwrap"><button class="btn primary" data-act="cmp-addmenu" aria-haspopup="true" ${S.readOnly ? 'disabled' : ''}>Add item ▾</button><div class="cmp-addmenu" role="menu" hidden>${(() => { const G = [['Maps and drawings', ['plan', 'section', 'wt', 'vap', 'flow', 'hydro']], ['Soil survey', ['soilmap', 'soilgraph', 'soiltable']], ['Groundwater model', ['gwsum', 'gwcal', 'gwpar', 'gwlim']], ['Text and pictures', ['text', 'image']], ['Map parts', ['scalebar', 'north', 'legend', 'shape']]], seen = new Set(G.flatMap(g => g[1])), rest = Object.keys(RITEMS).filter(k => !seen.has(k)); return [...G, ...(rest.length ? [['Other', rest]] : [])].map(([t, ks]) => `<div class="cmp-addg"><b>${t}</b>${ks.filter(k => RITEMS[k]).map(k => `<button type="button" class="cmp-addi" role="menuitem" data-cadd="${k}">${esc(RITEMS[k][0])}</button>`).join('')}</div>`).join(''); })()}</div></span></div>
       <div class="cmp-canvas"><span class="rl-c" aria-hidden="true"></span><svg class="rl-x" id="rl-x" aria-hidden="true"></svg><svg class="rl-y" id="rl-y" aria-hidden="true"></svg>
       <div class="cmp-stage cmp-scroll" id="cmp-stage"><div class="cmp-sizer" id="cmp-sizer"><div class="cmp-paper" id="cmp-paper" style="width:${d.W}px;height:${d.H}px">${pageFrame(pg.title || '', S.cpage + 1, n, pageItemsSVG(pg), d)}
         <div class="cmp-body" style="left:${bd.x}px;top:${bd.y}px;width:${bd.w}px;height:${bd.h}px" aria-hidden="true"></div>
@@ -9375,6 +9376,7 @@ function propsHTML() {
     ${(ROPTS[it.t] || []).map(([k, l, list]) => sel(k, l, list)).join('')}
     ${it.t === 'section' ? `<p class="note">Follows the section line chosen on the <button class="btn link" data-tab="xsec">Cross-section</button> page.${it.o?.xs ? ` Shows ${esc(it.o.xs.date ? 'the date ' + it.o.xs.date : 'the latest data')}${it.o.xs.plume !== false && (it.o.xs.param || it.o.xs.medium === 'vapour') ? ` with the ${esc(it.o.xs.medium === 'vapour' ? 'vapour' : (LAB_PARAMS[it.o.xs.param]?.label || '') + ' ' + it.o.xs.medium)} plume` : ''}.` : ' Shows that page\'s current view: date, plume and model results.'}</p><button class="btn" data-act="cmp-xs-use" ${S.readOnly ? 'disabled' : ''}>Use the Cross-section page's current view</button>` : ''}
     ${it.t === 'plan' || it.t === 'wt' || it.t === 'vap' ? '<p class="note">A fixed scale is true on the printed Letter page; resize the frame to show more or less of the site.</p>' : ''}
+    ${it.t === 'soilgraph' ? `<label class="cmp-lbl" for="co-kind">Graph</label><select id="co-kind" data-copt="kind">${SOIL_GRAPHS.map(g => `<option value="${g[0]}" ${(it.o?.kind || 'texture') === g[0] ? 'selected' : ''}>${esc(g[1])}</option>`).join('')}</select>` : ''}
     ${it.t === 'scalebar' ? (() => { const maps = pg.items.filter(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); return `<label class="cmp-lbl" for="co-link">Measures</label><select id="co-link" data-copt="link"><option value="">Choose a map…</option>${maps.map(m => `<option value="${m.id}" ${it.o?.link === m.id ? 'selected' : ''}>${esc(m.cap || RITEMS[m.t][0])}</option>`).join('')}</select>
       <label class="cmp-lbl" for="co-units">Units</label><select id="co-units" data-copt="units">${[['auto', 'As the project (m or ft)'], ['m', 'Metres'], ['ft', 'Feet']].map(([v, t]) => `<option value="${v}" ${(it.o?.units || 'auto') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <p class="note">The bar uses the scale the map is drawn at. It is true when the PDF is printed at 100 %.</p>`; })() : ''}
@@ -10623,6 +10625,7 @@ document.addEventListener('click', e => {
   }
   const cp = e.target.closest('[data-cpage]'); if (cp) { S.cpage = +cp.dataset.cpage; S.csel = null; S.cmulti = new Set(); rerenderCompose(); return; }
   const ca = e.target.closest('[data-cadd]'); if (ca) { const pg = curPage(), k = ca.dataset.cadd, bd = bodyOf(pg), low = Math.max(bd.y, ...pg.items.map(x => x.y + x.h + 12)), it = newItem(k, bd.x, low + RITEMS[k][2] <= bd.y + bd.h ? low : bd.y); if (RITEMS[k][1] === BODY.w) it.w = bd.w; if (k === 'section') it.o.xs = structuredClone(S.xs);
+    if (k.startsWith('soil')) it.o = { ...(it.o || {}), view: { ...soilCurrent() }, kind: 'texture' };
     if (k === 'scalebar') { const m = pg.items.find(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); it.frame = false; if (m) { it.o = { link: m.id }; it.x = m.x + 10; it.y = m.y + m.h - it.h - 10; } }   // inside its map's bottom-left corner
     clampIt(it); pg.items.push(it); S.csel = it.id; commit(); return; }
   const co = e.target.closest('[data-corient]'); if (co) { const pg = curPage(), was = bodyOf(pg); pg.orient = co.dataset.corient === 'land' ? 'land' : undefined; const now = bodyOf(pg); for (const it of pg.items) { if (Math.round(it.w) === Math.round(was.w)) it.w = now.w; clampIt(it, pg); } commit(); return; }
@@ -10674,7 +10677,7 @@ document.addEventListener('click', e => {
     case 'apple-setup': appleSetup(); break;
     case 'apple-save': appleSave(); break;
     case 'apple-clear': appleClear(); break;
-    case 'soil-add': case 'soil-imp-pts': case 'soil-imp-lab': case 'soil-lab-go': case 'soil-issue': soilAct(act); break;
+    case 'soil-add': case 'soil-imp-pts': case 'soil-imp-lab': case 'soil-lab-go': case 'soil-issue': case 'soil-xlsx': case 'soil-csv': case 'soil-example': soilAct(act); break;
     case 'cols-auto': if (!S.readOnly) { S.co.cols = {}; store.saveCompany(); renderView(true); toast('Log columns are automatic again.'); } break;
     case 'drawer-close': closeDrawer(); break;
     case 'drawer-del': if (editable(b) && (S.drawer || t.dataset.idx != null)) { const what = t.dataset.what, idx = t.dataset.idx != null ? +t.dataset.idx : S.drawer.i; if (!t.classList.contains('armed')) { t.classList.add('armed'); t.textContent = 'Tap again to delete'; break; } b[what].splice(idx, 1); logChange(b, { layers: 'Soil layers', samples: 'Samples & SPT', water: 'Groundwater' }[what]); store.save(b); if (S.drawer) closeDrawer(); else renderView(true); renderFacts(b); renderList(sortedList()); toast('Deleted.'); } break;

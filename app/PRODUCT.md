@@ -39,6 +39,7 @@ Compared with gINT, HoleBASE or paper field sheets, all four of these hold at on
 
 - Single self-contained HTML file; vanilla JS and SVG. Libraries from a CDN only: SheetJS, ExcelJS, jsPDF (bundled into `lib/` for the offline build).
 - Local build: `build-local.py` writes `Borehole Log.html` and `Quick Log.html` (opens straight into the guided logging flow). Local data lives in browser storage; the published version stores shared data server-side.
+- Soil surveys separate from boreholes: points and depth samples with CSSC classification, maps (heat maps, class zones, uncertainty) that state their method and accuracy, and texture, particle size and salinity graphs.
 - Metric and imperial units; depth per PDF page; colour or black and white logs; selectable soil symbol standards (FGDC, CFEM, USCS/gINT, BS 5930, CSSC texture).
 - Log columns are configurable (Auto / Always / Never); standard Canadian log layout with grouped headers, sample columns and SPT N, shear strength, water content / Atterberg and vapour plots.
 - Light theme only (a firm requirement).

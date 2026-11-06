@@ -57,6 +57,15 @@ Unsigned installers work, but Windows SmartScreen warns about them and macOS ref
 
 Raise `version` in `package.json` for each release. The app icon is `build/icon.png` (1024 px, made from `build/icon.svg`).
 
+## Soil survey
+
+The Soil page holds surface soil surveys, separate from boreholes: points with any number of depth samples, CSSC classification, particle size and lab results, entered in a grid, pasted from Excel, or imported (the survey CSV and lab files both work). A project can hold a survey with no boreholes at all.
+
+- Maps: symbols, graduated circles, sand/silt/clay pies, heat maps, class zones and uncertainty, one depth at a time. The default method follows the number of points (under 5 none, 5–29 inverse distance or nearest point, 30+ kriging), and every setting can be changed, with warnings.
+- Every surface is labelled "Interpolated, not measured" and shows a leave-one-out check. Colour stops where points are too far apart.
+- `app/lib/soilstats.js` holds the statistics and has its own tests; `app/lib/soilsurvey.js` holds the page.
+- Salinity limits in the app are marked unverified until each value has been checked against the published source and ticked in Settings › Limits.
+
 ## Saved data
 
 The classic interface keeps boreholes, company settings and site plans in IndexedDB (database `bhlog-data`) and photos and imagery in IndexedDB `bhlog`, inside the app's profile folder. Older versions used local storage; their data moves across on first start. Project files (`.bhp`, `.bhlog`) are the copy to back up and share.
