@@ -2333,6 +2333,31 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('soil survey: graphs', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); goTab('soil'); await w(150); fetchTile = () => {}; const legacyTri = textureTriSVG(), legacyGsd = gsdSVG();
+        for (const k of ['texture', 'psd', 'psdBars', 'ecSar', 'ranked', 'depthPairs', 'hist', 'classShare', 'predicted']) want(/class="note"/.test(soilGraphSVG(k, 560, 320, soilCurrent())), 'with no data, a plain message: ' + k);
+        const pts = Array.from({ length: 12 }, (_, i) => ({ id: 'p' + i, name: 'SP-' + i, e: 561000 + (i % 4) * 90, n: 6463000 + Math.floor(i / 4) * 90, z: null, order: i % 3 ? 'Brunisolic' : 'Luvisolic', gg: '', samples: [0, 1].map(d => ({ id: 's' + i + d, name: '', from: d * .15, to: (d + 1) * .15, method: 'Hand dig', hz: '', sand: 60 - i - d * 5, silt: 25 + d, clay: 15 + i + d * 4, lab: { ec: { v: 1 + i * .5 + d, lt: i === 2 }, sar: { v: 1 + i * .8 + d, lt: false } }, gsd: i < 4 ? [{ size: 2, passing: 100 }, { size: .05, passing: 50 + i }, { size: .002, passing: 15 + i }] : [] })) }));
+        setSurvey({ survey: { name: 'T', date: '2026-07-22', strategy: 'grid', notes: '' }, points: pts }); S.soilView = null; S.soilCache = null; const v = soilCurrent();
+        for (const k of ['texture', 'psd', 'psdBars', 'ecSar', 'ranked', 'depthPairs', 'hist', 'classShare', 'predicted']) { const g = soilGraphSVG(k, 560, 320, v); want(g.startsWith('<svg') && !/NaN|undefined|Infinity/.test(g), k + ' draws: ' + g.slice(0, 80)); }
+        const tri = soilGraphSVG('texture', 560, 320, v); want((tri.match(/data-spt=/g) || []).length === 24 && (tri.match(/class="soil-link"/g) || []).length === 12, 'the triangle shows each sample and joins a point\\'s depths: ' + (tri.match(/class="soil-link"/g) || []).length);
+        want((soilGraphSVG('psd', 560, 320, v).match(/class="soil-curve"/g) || []).length === 4, 'one curve per grain size test at this depth'); want(/soil-median/.test(soilGraphSVG('psd', 560, 320, v)), 'with a median');
+        const es = soilGraphSVG('ecSar', 560, 320, v); want(/Alberta/.test(es) && /unverified/.test(es), 'salinity bands name their source and say unverified: ' + es.replace(/<[^>]+>/g, ' ').slice(0, 200)); want(/Good/.test(es) && /Unsuitable/.test(es), 'bands are named');
+        const srcLine = (es.match(/<text[^>]*>([^<]*unverified[^<]*)<\\/text>/) || [])[1] || ''; want(srcLine && srcLine.length * 5.4 < 560 - 48, 'the source line fits, so unverified can be read: ' + srcLine.length);
+        for (const k of ['texture', 'ecSar']) { const g = soilGraphSVG(k, 560, 320, v); want(/0–15 cm/.test(g) && /15–30 cm/.test(g), k + ' has a depth legend'); }
+        want(/unverified/.test(soilGraphSVG('ranked', 560, 320, v)), 'limits show on the ranked bars');
+        S.co.soilLimits[0].verified = true; want(!/unverified/.test(soilGraphSVG('ecSar', 560, 320, v)), 'once checked, the label goes'); S.co.soilLimits[0].verified = false;
+        want((soilGraphSVG('depthPairs', 560, 320, v).match(/class="soil-pair"/g) || []).length === 12, 'a line per point between depths');
+        want(textureTriSVG() === legacyTri && gsdSVG() === legacyGsd, 'the lab page charts are unchanged');
+        renderView(true); await w(250); want(document.querySelectorAll('#soil-graphs svg').length >= 6, 'the page shows the graphs: ' + document.querySelectorAll('#soil-graphs svg').length);
+        surveyOf().points.forEach(p => p.samples.forEach(q => { q.gsd = []; })); setSurvey(surveyOf()); S.soilCache = null; renderView(true); await w(200); want(![...document.querySelectorAll('#soil-graphs section')].some(x => /Particle size curves/.test(x.textContent)) && /Particle size curves/.test(document.querySelector('#soil-graphs').textContent), 'a graph with nothing to show is one line, not an empty card');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('soil survey: works with no boreholes at all', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };

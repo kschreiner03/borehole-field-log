@@ -88,7 +88,7 @@ function soilHTML() {
   const f = (k, label, h) => `<div class="fld"><label for="sf-${k}">${label}</label>${h}</div>`, inp = (k, t = 'text') => `<input id="sf-${k}" type="${t}" data-soilf="${k}" value="${esc(s[k] || '')}" ${ed ? '' : 'readonly'}>`;
   return `<div class="soil-page"><section class="sec"><header><h3>Soil survey</h3><div class="mini-tools">${ed ? `<button class="btn" data-act="soil-add">Add point</button><button class="btn" data-act="soil-imp-pts">Import locations</button><button class="btn" data-act="soil-imp-lab">Import lab results</button>` : ''}${ro ? '' : `<button class="btn" data-act="soil-issue">${s.issued ? 'Reopen' : 'Issue'}</button>`}</div></header>
     <div class="body"><div class="fields">${f('name', 'Survey name', inp('name'))}${f('date', 'Date', inp('date', 'date'))}${f('strategy', 'Sampling strategy', `<select id="sf-strategy" data-soilf="strategy" ${ed ? '' : 'disabled'}>${Object.entries(SOIL_STRATEGIES).map(([k, v]) => `<option value="${k}" ${(s.strategy || '') === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}${f('notes', 'Notes', inp('notes'))}</div>
-    <div id="plan" class="map-canvas" data-tool="pan"></div><h4 style="margin:14px 0 6px">Points and samples</h4><div id="soil-grid">${soilGridHTML()}</div><p class="note">Separate from boreholes. Depths with the same from and to values are mapped together. Type &lt; for results below detection, like &lt;0.5. Paste a block from Excel into any cell.</p></div></section></div>
+    <div id="plan" class="map-canvas" data-tool="pan"></div><div id="soil-graphs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;margin-top:16px"></div><h4 style="margin:14px 0 6px">Points and samples</h4><div id="soil-grid">${soilGridHTML()}</div><p class="note">Separate from boreholes. Depths with the same from and to values are mapped together. Type &lt; for results below detection, like &lt;0.5. Paste a block from Excel into any cell.</p></div></section></div>
     <input type="file" id="soil-file" hidden accept=".csv,.txt,.xlsx,.xls">`;
 }
 /* ---------- maps ---------- */
@@ -159,11 +159,11 @@ function soilSurface(prop, depth, v) {
 }
 /* colour-blind safe: viridis for values, grey for black and white, Okabe-Ito with a shape for each class */
 const SOIL_RAMPS = { viridis: [[68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]], magma: [[252, 253, 191], [254, 159, 109], [222, 73, 104], [140, 41, 129], [59, 15, 112]], grey: [[240, 240, 240], [50, 50, 50]] };
-const SOIL_CLASS_COL = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999'];
+const SOIL_CLASS_COL = ['#0072B2', '#E69F00', '#009E73', '#D55E00', '#56B4E9', '#CC79A7'];
 const soilRamp = v => bwLogs() ? 'grey' : SOIL_RAMPS[v.ramp] ? v.ramp : 'viridis';
 function rampAt(name, t) { const r = SOIL_RAMPS[name], x = Math.max(0, Math.min(1, t)) * (r.length - 1), i = Math.min(r.length - 2, Math.floor(x)), f = x - i; return r[i].map((c, j) => Math.round(c + (r[i + 1][j] - c) * f)); }
 const soilHex = c => `rgb(${c.join(',')})`;
-const soilClassCol = (i, bw) => bw ? ['#111', '#555', '#888', '#bbb', '#333', '#777', '#aaa', '#ddd'][i % 8] : SOIL_CLASS_COL[i % 8];
+const soilClassCol = (i, bw) => bw ? ['#111', '#666', '#aaa', '#ddd', '#444', '#888'][i % 6] : SOIL_CLASS_COL[i % 6];
 const soilMark = (i, x, y, r, st, attr) => { const k = i % 5; return k === 0 ? `<circle cx="${x}" cy="${y}" r="${r}" ${st} ${attr}/>` : k === 1 ? `<rect x="${x - r}" y="${y - r}" width="${2 * r}" height="${2 * r}" ${st} ${attr}/>` : k === 2 ? `<path d="M${x} ${y - r * 1.2}L${x + r * 1.1} ${y + r}L${x - r * 1.1} ${y + r}z" ${st} ${attr}/>` : k === 3 ? `<path d="M${x} ${y - r * 1.3}L${x + r * 1.3} ${y}L${x} ${y + r * 1.3}L${x - r * 1.3} ${y}z" ${st} ${attr}/>` : `<path d="M${x - r} ${y - r}L${x + r} ${y + r}M${x + r} ${y - r}L${x - r} ${y + r}" ${st.replace(/fill:[^;]+;?/, 'fill:none;').replace('stroke-width="1"', 'stroke-width="2"')} ${attr}/>`; };
 /* a surface as a picture: one pixel a cell, faded by the mask */
 function soilFieldPNG(f, colour) {
@@ -211,9 +211,97 @@ function soilMapSVG(W, H, v, interactive) {
 }
 function drawSoil() {
   const el = $('#plan'); if (!el) return; const v = soilCurrent();
-  el.innerHTML = soilMapSVG(Math.max(el.clientWidth, 420), 560, v, true) + planCtlHTML();
+  el.innerHTML = soilMapSVG(Math.max(el.clientWidth, 420), 560, v, true) + planCtlHTML(); if (!$('#soil-graphs')?.firstChild) soilGraphsDraw();
 }
-function soilRefresh() { drawSoil(); ctlRender(); }
+function soilRefresh() { drawSoil(); ctlRender(); soilGraphsDraw(); }
+/* ---------- graphs ---------- */
+/* reference limits: a named set the user can edit. Unverified until someone has checked each value against the named source */
+const SOIL_LIMIT_SEED = [{ name: 'Alberta Soil Quality Criteria Relative to Disturbance and Reclamation (1987), topsoil', short: 'Alberta Soil Quality Criteria (1987), topsoil', verified: false, classes: ['Good', 'Fair', 'Poor', 'Unsuitable'], ec: [2, 4, 8], sar: [4, 8, 12] }];
+const soilLimits = () => (S.co.soilLimits ||= structuredClone(SOIL_LIMIT_SEED))[0];
+const soilLimitName = () => { const l = soilLimits(); return `${l.short || l.name}${l.verified ? '' : ' (unverified)'}`; };
+const SOIL_BAND = ['#e3efe3', '#f5efd8', '#f6e0cf', '#f1d2d2'];
+const soilNote = t => `<p class="note">${esc(t)}</p>`;
+const soilAxisX = (W, H, m, ticks, X, label) => ticks.map(t => `<line x1="${X(t)}" x2="${X(t)}" y1="${m.t}" y2="${H - m.b}" style="stroke:var(--grid)"/><text class="tick" x="${X(t)}" y="${H - m.b + 13}" text-anchor="middle">${t}</text>`).join('') + `<text class="lbl" x="${(m.l + W - m.r) / 2}" y="${H - 4}" text-anchor="middle">${esc(label)}</text>`;
+const soilAxisY = (W, H, m, ticks, Y, label) => ticks.map(t => `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(t)}" y2="${Y(t)}" style="stroke:var(--grid)"/><text class="tick" x="${m.l - 6}" y="${Y(t) + 4}" text-anchor="end">${t}</text>`).join('') + `<text class="lbl" transform="rotate(-90)" x="${-(m.t + H - m.b) / 2}" y="11" text-anchor="middle">${esc(label)}</text>`;
+const soilTicks = (lo, hi, n = 5) => { const st = niceStep(hi - lo || 1, n), out = []; for (let t = Math.ceil(lo / st) * st; t <= hi + 1e-9; t += st) out.push(+t.toFixed(6)); return out; };
+const soilOpen = (W, H, label) => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="max-width:100%;height:auto" role="img" aria-label="${esc(label)}">`;
+const soilProp = k => soilProps().find(p => p.k === k);
+const soilPropLabel = k => { const p = soilProp(k); return p ? `${p.label}${p.unit ? ` (${p.unit})` : ''}` : k; };
+const soilDepthLegend = (x, y, col) => soilDepths().slice(0, 6).map((d, i) => `<circle cx="${x + 5 + i * 84}" cy="${y - 4}" r="4.5" style="fill:${col(d.key)}"/><text class="tick" x="${x + 13 + i * 84}" y="${y}">${esc(d.label)}</text>`).join('');
+const soilDot = (x, y, r, fill, id, title, extra = '') => `<g><title>${esc(title)}</title><circle data-spt="${esc(id)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" style="fill:${fill};stroke:${S.soilSel === id ? 'var(--ink)' : 'var(--panel)'}" stroke-width="${S.soilSel === id ? 2.5 : 1}" ${extra}/></g>`;
+function soilGraphSVG(kind, W, H, v) {
+  const sv = surveyOf(), ds = soilDepths(), bw = bwLogs(), depthCol = key => soilClassCol(Math.max(0, ds.findIndex(d => d.key === key)), bw), m = { l: 48, r: 16, t: 14, b: 40 };
+  if (kind === 'texture') {
+    const ss = sv.points.flatMap(p => p.samples.map(s => ({ p, s, t: csscOf(s) })).filter(x => x.t)); if (!ss.length) return soilNote('Add sand, silt and clay, or a grain size curve, to plot samples.');
+    return textureTriSVG(W, P => { const out = []; for (const pt of sv.points) { const q = ss.filter(x => x.p === pt).sort((a, c) => (a.s.from ?? 0) - (c.s.from ?? 0)); for (let i = 1; i < q.length; i++) { const a = P(q[i - 1].t.sand, q[i - 1].t.silt, q[i - 1].t.clay), c = P(q[i].t.sand, q[i].t.silt, q[i].t.clay); out.push(`<line class="soil-link" x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${c[0].toFixed(1)}" y2="${c[1].toFixed(1)}" style="stroke:var(--ink)" stroke-opacity=".5"/>`); } }
+      for (const x of ss) { const [a, c] = P(x.t.sand, x.t.silt, x.t.clay); out.push(soilDot(a, c, 4.5, depthCol(soilDepthKey(x.s)), x.p.id, `${x.p.name} ${soilDepthLabel(x.s)}: ${x.t.name}, sand ${soilFmt(x.t.sand)}, silt ${soilFmt(x.t.silt)}, clay ${soilFmt(x.t.clay)}`)); } out.push(soilDepthLegend(8, 14, depthCol)); return out.join(''); });
+  }
+  if (kind === 'psd') {
+    const cs = sv.points.flatMap(p => soilSampleAt(p, v.depth).filter(s => s.gsd?.length > 1).map(s => ({ p, s }))); if (!cs.length) return soilNote('No particle size curves at this depth yet.');
+    return gsdSVG(W, H, (X, Y) => { const line = pts => pts.map((q, i) => `${i ? 'L' : 'M'}${X(q[0]).toFixed(1)} ${Y(q[1]).toFixed(1)}`).join(''), sizes = [...new Set(cs.flatMap(c => c.s.gsd.map(q => q.size)))].sort((a, c) => a - c), med = sizes.map(z => [z, (a => { const b = a.sort((p, q) => p - q), n = b.length; return n % 2 ? b[(n - 1) / 2] : (b[n / 2 - 1] + b[n / 2]) / 2; })(cs.map(c => passingAt(c.s.gsd, z)).filter(q => q != null))]).filter(q => Number.isFinite(q[1]));
+      return cs.map(c => `<g><title>${esc(`${c.p.name} ${soilDepthLabel(c.s)}`)}</title><path class="soil-curve" data-spt="${esc(c.p.id)}" d="${line(c.s.gsd.slice().sort((a, b) => a.size - b.size).map(q => [q.size, q.passing]))}" fill="none" style="stroke:var(--muted)" stroke-width="1.2"/></g>`).join('') + `<path class="soil-median" d="${line(med)}" fill="none" style="stroke:${soilClassCol(0, bw)}" stroke-width="2.5"/><text class="lbl2" x="${W - m.r}" y="${H - 44}" text-anchor="end">Thick line: median of ${cs.length}</text>`; });
+  }
+  if (kind === 'psdBars') {
+    const rows = sv.points.flatMap(p => soilSampleAt(p, v.depth).map(s => ({ p, s, t: csscOf(s) })).filter(x => x.t)).sort((a, c) => a.t.clay - c.t.clay).slice(0, 40); if (!rows.length) return soilNote('Add sand, silt and clay to compare points.');
+    const h = Math.max(H, rows.length * 13 + 56), o = [soilOpen(W, h, 'Sand, silt and clay by point')], bx = 60, X = q => bx + q / 100 * (W - bx - 16), parts = [['sand', 0], ['silt', 4], ['clay', 1]];
+    rows.forEach((r, i) => { const y = 8 + i * 13; let a = 0; o.push(`<text class="tick" x="${bx - 6}" y="${y + 9}" text-anchor="end">${esc(r.p.name)}</text>`); for (const [k, c] of parts) { o.push(`<g><title>${esc(`${r.p.name}: ${k} ${soilFmt(r.t[k])} %`)}</title><rect data-spt="${esc(r.p.id)}" x="${X(a).toFixed(1)}" y="${y}" width="${Math.max(0, X(a + r.t[k]) - X(a) - 2).toFixed(1)}" height="10" fill="${soilClassCol(c, bw)}"/></g>`); a += r.t[k]; } });
+    const ly = h - 14; parts.forEach(([k, c], i) => o.push(`<rect x="${bx + i * 70}" y="${ly - 9}" width="10" height="10" fill="${soilClassCol(c, bw)}"/><text class="tick" x="${bx + 14 + i * 70}" y="${ly}">${k[0].toUpperCase() + k.slice(1)}</text>`));
+    return o.join('') + '</svg>';
+  }
+  if (kind === 'ecSar') {
+    const rows = sv.points.flatMap(p => p.samples.map(s => ({ p, s, ec: soilValue(s, 'ec'), sar: soilValue(s, 'sar') })).filter(x => x.ec && x.sar)); if (!rows.length) return soilNote('Add EC and SAR results to see salinity and sodicity together.');
+    const L = soilLimits(), xMax = Math.max(...rows.map(r => r.ec.v), L.ec[2]) * 1.1, yMax = Math.max(...rows.map(r => r.sar.v), L.sar[2]) * 1.1, X = q => m.l + q / xMax * (W - m.l - m.r), Y = q => H - m.b - q / yMax * (H - m.t - m.b - 12), o = [soilOpen(W, H, 'EC against SAR')], e = [0, ...L.ec, xMax], a = [0, ...L.sar, yMax], top = Y(yMax);
+    for (let i = 3; i >= 0; i--) { o.push(`<rect x="${m.l}" y="${Y(a[i + 1]).toFixed(1)}" width="${(X(e[i + 1]) - m.l).toFixed(1)}" height="${(Y(0) - Y(a[i + 1])).toFixed(1)}" fill="${bw ? ['#f7f7f7', '#ececec', '#dedede', '#cfcfcf'][i] : SOIL_BAND[i]}"/>`); }
+    L.classes.forEach((c, i) => o.push(`<text class="lbl2" x="${X(e[i + 1]) - 4}" y="${Y(a[i + 1]) + 12}" text-anchor="end">${esc(c)}</text>`));
+    o.push(soilAxisX(W, H, m, soilTicks(0, xMax), X, 'EC (dS/m)'), soilAxisY(W, H, m, soilTicks(0, yMax), Y, 'SAR'), `<text class="lbl2" x="${m.l}" y="${top - 4}">${esc(soilLimitName())}</text>`, soilDepthLegend(m.l - 40, H - 4, depthCol));
+    for (const r of rows) o.push(soilDot(X(r.ec.v), Y(r.sar.v), 4.5, r.ec.nd || r.sar.nd ? 'var(--panel)' : depthCol(soilDepthKey(r.s)), r.p.id, `${r.p.name} ${soilDepthLabel(r.s)}: EC ${soilFmt(r.ec.v)}, SAR ${soilFmt(r.sar.v)}`, r.ec.nd || r.sar.nd ? `stroke="${depthCol(soilDepthKey(r.s))}"` : ''));
+    return o.join('') + '</svg>';
+  }
+  const kp = soilKind(v.prop), { pts } = soilPts(v.prop, v.depth), num = kp === 'num';
+  if (kind === 'ranked') {
+    if (!num || !pts.length) return soilNote('Choose a measured property to rank the points.');
+    const rows = pts.slice().sort((a, c) => c.v - a.v).slice(0, 40), h = Math.max(H, rows.length * 13 + 34), L = soilLimits()[v.prop], bx = 60, maxV = Math.max(...rows.map(r => r.v), L ? L[2] : 0) * 1.08 || 1, X = q => bx + Math.max(0, q) / maxV * (W - bx - 20), o = [soilOpen(W, h, `${soilPropLabel(v.prop)} by point`)];
+    rows.forEach((r, i) => { const y = 6 + i * 13; o.push(`<text class="tick" x="${bx - 6}" y="${y + 9}" text-anchor="end">${esc(r.pt.name)}</text><g><title>${esc(`${r.pt.name}: ${r.nd ? 'below detection' : soilFmt(r.v)}`)}</title><rect data-spt="${esc(r.pt.id)}" x="${bx}" y="${y}" width="${Math.max(1, X(r.v) - bx).toFixed(1)}" height="10" rx="2" fill="${r.nd ? 'var(--panel-2)' : soilHex(rampAt(soilRamp(v), .25))}" stroke="${soilHex(rampAt(soilRamp(v), .25))}" stroke-width=".6"/></g><text class="tick" x="${(X(r.v) + 4).toFixed(1)}" y="${y + 9}" style="paint-order:stroke;stroke:var(--panel);stroke-width:3px">${r.nd ? '&lt;' : ''}${soilFmt(r.nd ? r.v * 2 : r.v)}</text>`); });
+    if (L) { for (const q of L) o.push(`<line x1="${X(q)}" x2="${X(q)}" y1="2" y2="${h - 28}" style="stroke:var(--ink)" stroke-dasharray="3 3"/><text class="tick" x="${X(q)}" y="${h - 18}" text-anchor="middle">${q}</text>`); o.push(`<text class="lbl2" x="${bx}" y="${h - 5}">${esc(soilLimitName())}</text>`); }
+    return o.join('') + '</svg>';
+  }
+  if (kind === 'depthPairs') {
+    if (!num) return soilNote('Choose a measured property to compare depths.'); if (ds.length < 2) return soilNote('This needs samples at two or more depths.');
+    const [a, c] = ds, rows = sv.points.map(p => { const q = k => { const s = p.samples.find(x => soilDepthKey(x) === k); return s ? soilValue(s, v.prop) : null; }; return { p, a: q(a.key), c: q(c.key) }; }).filter(r => r.a && r.c); if (!rows.length) return soilNote('No point has this property at both depths.');
+    const vs = rows.flatMap(r => [r.a.v, r.c.v]), lo = Math.min(...vs), hi = Math.max(...vs), Y = q => H - m.b - (q - lo) / (hi - lo || 1) * (H - m.t - m.b), x0 = m.l + 60, x1 = W - m.r - 60, o = [soilOpen(W, H, 'Change with depth'), soilAxisY(W, H, m, soilTicks(lo, hi), Y, soilPropLabel(v.prop))], up = rows.filter(r => r.c.v > r.a.v).length;
+    for (const r of rows) { const rises = r.c.v > r.a.v; o.push(`<g><title>${esc(`${r.p.name}: ${soilFmt(r.a.v)} to ${soilFmt(r.c.v)}`)}</title><line class="soil-pair" data-spt="${esc(r.p.id)}" x1="${x0}" y1="${Y(r.a.v).toFixed(1)}" x2="${x1}" y2="${Y(r.c.v).toFixed(1)}" style="stroke:${soilClassCol(rises ? 3 : 0, bw)}" stroke-width="1.5" ${rises ? '' : 'stroke-dasharray="5 3"'}/></g>`); }
+    o.push(`<text class="lbl" x="${x0}" y="${H - 22}" text-anchor="middle">${esc(a.label)}</text><text class="lbl" x="${x1}" y="${H - 22}" text-anchor="middle">${esc(c.label)}</text><text class="lbl2" x="${(x0 + x1) / 2}" y="${H - 6}" text-anchor="middle">Rises at ${up} of ${rows.length} points (solid); falls or holds at the rest (dashed)</text>`);
+    return o.join('') + '</svg>';
+  }
+  if (kind === 'hist') {
+    if (!num || !pts.length) return soilNote('Choose a measured property to see its spread.');
+    const vs = pts.map(p => p.v), lo = Math.min(...vs), hi = Math.max(...vs), bins = Math.max(3, Math.min(12, Math.round(Math.sqrt(vs.length)) + 1)), w = (hi - lo) / bins || 1, n = Array(bins).fill(0); for (const q of vs) n[Math.min(bins - 1, Math.floor((q - lo) / w))]++;
+    const top = Math.max(...n), X = q => m.l + (q - lo) / ((hi - lo) || 1) * (W - m.l - m.r), Y = q => H - m.b - q / top * (H - m.t - m.b - 12), o = [soilOpen(W, H, `Spread of ${soilPropLabel(v.prop)}`), soilAxisX(W, H, m, soilTicks(lo, hi), X, soilPropLabel(v.prop)), soilAxisY(W, H, m, soilTicks(0, top).filter(Number.isInteger), Y, 'Points')];
+    n.forEach((c, i) => { if (c) o.push(`<g><title>${esc(`${soilFmt(lo + i * w)} to ${soilFmt(lo + (i + 1) * w)}: ${c}`)}</title><rect x="${(X(lo + i * w) + 1).toFixed(1)}" y="${Y(c).toFixed(1)}" width="${Math.max(1, X(lo + (i + 1) * w) - X(lo + i * w) - 2).toFixed(1)}" height="${(Y(0) - Y(c)).toFixed(1)}" rx="2" fill="${soilHex(rampAt(soilRamp(v), .25))}"/></g>`); });
+    return o.join('') + '</svg>';
+  }
+  if (kind === 'classShare') {
+    const key = kp === 'class' ? v.prop : soilProps().find(p => p.kind === 'class')?.k; if (!key) return soilNote('Add soil classes to see their shares.');
+    const q = soilPts(key, v.depth).pts, cnt = new Map(); for (const p of q) cnt.set(p.v, (cnt.get(p.v) || 0) + 1); const rows = [...cnt].sort((a, c) => c[1] - a[1]), n = q.length; if (!rows.length) return soilNote('No classes at this depth.');
+    const bx = 130, X = c => bx + c / rows[0][1] * (W - bx - 60), h = Math.max(H, rows.length * 24 + 20), o = [soilOpen(W, h, `Share of ${soilPropLabel(key)}`)];
+    rows.forEach(([c, k], i) => { const y = 10 + i * 24; o.push(`<text class="tick" x="${bx - 6}" y="${y + 13}" text-anchor="end">${esc(c)}</text><rect x="${bx}" y="${y}" width="${Math.max(1, X(k) - bx).toFixed(1)}" height="16" rx="3" fill="${soilClassCol(i, bw)}"/><text class="tick" x="${(X(k) + 5).toFixed(1)}" y="${y + 13}">${k} (${Math.round(k / n * 100)}%)</text>`); });
+    return o.join('') + '</svg>';
+  }
+  if (kind === 'predicted') {
+    const f = soilSurface(v.prop, v.depth, { ...v, method: v.method }), rows = f.loo?.rows || []; if (!rows.length || f.kind !== 'num') return soilNote('The check appears once a measured property has a surface, from 5 points.');
+    const vs = rows.flatMap(r => [r.actual, r.pred]), lo = Math.min(...vs), hi = Math.max(...vs), s = (hi - lo) || 1, X = q => m.l + (q - lo) / s * (W - m.l - m.r), Y = q => H - m.b - (q - lo) / s * (H - m.t - m.b), o = [soilOpen(W, H, 'Predicted against measured'), soilAxisX(W, H, m, soilTicks(lo, hi), X, 'Measured'), soilAxisY(W, H, m, soilTicks(lo, hi), Y, 'Predicted with the point hidden'), `<line x1="${X(lo)}" y1="${Y(lo)}" x2="${X(hi)}" y2="${Y(hi)}" style="stroke:var(--muted)" stroke-dasharray="4 3"/>`];
+    for (const r of rows) o.push(soilDot(X(r.actual), Y(r.pred), 4.5, soilClassCol(0, bw), f.pts[r.i]?.pt.id || '', `${f.pts[r.i]?.pt.name || ''}: measured ${soilFmt(r.actual)}, predicted ${soilFmt(r.pred)}`));
+    o.push(`<text class="lbl2" x="${m.l + 6}" y="${m.t + 10}" style="paint-order:stroke;stroke:var(--panel);stroke-width:3px">RMSE ${soilFmt(f.loo.rmse)}, bias ${soilFmt(f.loo.bias)}. On the dashed line is a perfect match.</text>`);
+    return o.join('') + '</svg>';
+  }
+  return '';
+}
+const SOIL_GRAPHS = [['texture', 'Soil texture triangle', 'Every sample, depth by colour; lines join one point’s depths'], ['psd', 'Particle size curves', 'CFEM size limits'], ['psdBars', 'Sand, silt and clay', 'By point, sorted by clay'], ['ecSar', 'Salinity and sodicity', 'EC against SAR, all depths'], ['ranked', 'Points ranked', 'The chosen property at this depth'], ['depthPairs', 'Change with depth', 'First two depths'], ['hist', 'Spread of values', 'The chosen property'], ['classShare', 'Share of classes', 'At this depth'], ['predicted', 'How well the map checks out', 'Predicted against measured']];
+function soilGraphsDraw() {
+  const el = $('#soil-graphs'); if (!el) return; const v = soilCurrent(), W = Math.max(360, Math.floor((el.clientWidth - 16) / 2) - 24);
+  const all = SOIL_GRAPHS.map(g => [...g, soilGraphSVG(g[0], W, 320, v)]), empty = all.filter(g => !g[3].startsWith('<svg'));
+  el.innerHTML = all.filter(g => g[3].startsWith('<svg')).map(([k, t, n, svg]) => `<section class="sec" data-graph="${k}"><header><h3>${esc(t)}</h3><span class="note">${esc(n)}</span></header><div class="body scroll-x">${svg}</div></section>`).join('') + (empty.length ? `<p class="note" style="grid-column:1/-1;margin:0">${empty.map(g => `${esc(g[1])}: ${esc(g[3].replace(/<[^>]+>/g, ''))}`).join(' ')}</p>` : '');
+}
 function soilCtl() {
   const v = soilCurrent(), props = soilProps(), ds = soilDepths(); if (!props.length || !ds.length) return [{ id: 'soil-none', title: 'Show', icon: NAV_ICON.soil, html: '<p class="note">Add points and results to choose what to show.</p>' }];
   const f = soilSurface(v.prop, v.depth, v), sel = (k, opts) => `<select data-sv="${k}" style="width:100%">${opts.map(([a, b]) => `<option value="${esc(a)}" ${String(v[k] ?? '') === String(a) ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>`, fld = (t, h) => `<div class="fld"><label>${t}</label>${h}</div>`, num = (k, ph = '') => `<input type="number" step="any" data-sv="${k}" value="${esc(v[k] ?? '')}" placeholder="${esc(ph)}">`, chk = (k, t) => `<label class="check"><input type="checkbox" data-sv="${k}" ${v[k] ? 'checked' : ''}> ${t}</label>`;
@@ -223,9 +311,15 @@ function soilCtl() {
     { id: 'soil-show', title: 'Show', icon: NAV_ICON.soil, html: `${fld('Property', sel('prop', props.map(p => [p.k, p.label])))}${fld('Depth', sel('depth', [...ds.map(d => [d.key, `${d.label} (${d.n})`]), ['*', 'All depths combined']]))}${fld('View', sel('view', views))}${chk('labels', 'Value labels')}${isNum ? chk('contours', 'Contour lines') : ''}${chk('pointsHidden', 'Hide measured points')}` },
     { id: 'soil-method', title: 'Method', icon: NAV_ICON.gwm, html: `<p class="note" style="margin-top:0">${esc(f.why)}</p>${fld('Method', sel('method', methods))}${isNum ? `${fld('Inverse distance power', num('power'))}${fld('Neighbours', num('k'))}${fld('Log transform', sel('log', [['auto', `Automatic (${f.log ? 'on' : 'off'})`], ['on', 'On'], ['off', 'Off']]))}${fld('Variogram model', sel('vgModel', [['auto', 'Best fit'], ['spherical', 'Spherical'], ['exponential', 'Exponential']]))}${fld('Variogram nugget, sill, range', `<div class="inline">${num('nugget', f.vg ? soilFmt(f.vg.nugget) : '')}${num('sill', f.vg ? soilFmt(f.vg.sill) : '')}${num('range', f.vg ? soilFmt(f.vg.range) : '')}</div>`)}` : `${v.prop === 'texture' ? fld('Texture map from', sel('texMode', [['auto', 'Sand, silt and clay'], ['classes', 'Texture classes']])) : ''}`}${fld('Cell size (m)', num('cell', soilFmt(f.cell)))}${chk('maskOff', 'Draw colour far from points')}` },
     { id: 'soil-style', title: 'Colours', icon: NAV_ICON.site, html: `${fld('Colour scale', sel('ramp', [['viridis', 'Blue to yellow'], ['magma', 'Pale to dark']]))}${isNum ? `${fld('Scale from, to', `<div class="inline">${num('min', 'auto')}${num('max', 'auto')}</div>`)}${fld('Colour steps', num('steps', 'smooth'))}` : ''}` },
+    { id: 'soil-limits', title: 'Limits', icon: NAV_ICON.contam, html: (L => `<p class="note" style="margin-top:0">${esc(L.name)}</p>${fld('EC limits (dS/m)', `<div class="inline">${L.ec.map((q, i) => `<input type="number" step="any" data-sl="ec.${i}" value="${q}">`).join('')}</div>`)}${fld('SAR limits', `<div class="inline">${L.sar.map((q, i) => `<input type="number" step="any" data-sl="sar.${i}" value="${q}">`).join('')}</div>`)}<label class="check"><input type="checkbox" data-sl="verified" ${L.verified ? 'checked' : ''}> Checked against the published source</label>`)(soilLimits()) },
     { id: 'soil-warn', title: `Warnings (${f.warnings.length})`, icon: NAV_ICON.gw, html: `${f.warnings.length ? `<ul class="soil-warn">${f.warnings.map(w => `<li data-warn="${w.id}">${esc(w.text)}</li>`).join('')}</ul>` : '<p class="note" style="margin:0">Nothing to flag on this map.</p>'}${[...f.notes, f.unmappedNote].filter(Boolean).map(n => `<p class="note">${esc(n)}</p>`).join('')}` },
   ];
 }
+document.addEventListener('change', e => {
+  const t = e.target, q = t.dataset?.sl; if (!q || S.readOnly) return; const L = soilLimits();
+  if (q === 'verified') L.verified = t.checked; else { const [a, i] = q.split('.'); const n = num(t.value); if (n != null) L[a][+i] = n; }
+  store.saveCompany(); soilGraphsDraw();
+});
 document.addEventListener('change', e => {
   const t = e.target, k = t.dataset?.sv; if (!k) return; const num = ['power', 'k', 'nugget', 'sill', 'range', 'min', 'max', 'steps', 'cell'].includes(k);
   soilSet({ [k]: t.type === 'checkbox' ? t.checked : num ? (t.value === '' ? null : +t.value) : t.value }); soilRefresh();

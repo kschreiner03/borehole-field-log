@@ -8610,8 +8610,8 @@ const TRI_CLASSES = [
   ['Silty clay loam', [[27, 20], [40, 20], [40, 0], [27, 0]], 'clay'], ['Sandy clay', [[35, 65], [55, 45], [35, 45]], 'clay'],
   ['Silty clay', [[40, 20], [40, 0], [60, 0]], 'clay'], ['Clay', [[40, 45], [55, 45], [60, 40], [60, 0], [40, 20]], 'clay'], ['Heavy clay', [[60, 40], [100, 0], [60, 0]], 'clay'],
 ];
-function textureTriSVG(W = 520) {
-  const pts = labRows().filter(r => r.tex);
+function textureTriSVG(W = 520, marks) {   // marks(P): another page's points, drawn in the triangle's projection (sand, silt, clay)
+  const pts = marks ? [] : labRows().filter(r => r.tex);
   const m = { l: 40, r: 40, t: 18, b: 46 }, side = W - m.l - m.r, h = side * Math.sqrt(3) / 2, H = Math.round(h + m.t + m.b), x0 = m.l, yb = m.t + h;
   const P = (sa, si, cl) => [x0 + (si + cl / 2) / 100 * side, yb - cl / 100 * h], Pc = (cl, sa) => P(sa, 100 - cl - sa, cl);
   const xy = p => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
@@ -8636,15 +8636,16 @@ function textureTriSVG(W = 520) {
     const [x, y] = P(r.tex.sand, r.tex.silt, r.tex.clay);
     o.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.4" style="fill:${r.tex.exact ? `var(--${colorOf(r.b.id)})` : 'var(--panel)'};stroke:var(--${colorOf(r.b.id)})" stroke-width="${r.tex.exact ? 1 : 2}"><title>${esc(`${r.b.name} ${sampleId(r.s)} at ${fu(r.s.depth)}: sand ${r0(r.tex.sand)} %, silt ${r0(r.tex.silt)} %, clay ${r0(r.tex.clay)} % – ${r.tex.label}${r.tex.exact ? '' : ' (estimated from CFEM fractions)'}`)}</title></circle>`);
   }
+  if (marks) return o.join('') + marks(P) + '</svg>';
   o.push('</svg>');
   const bh = [...new Set(pts.map(r => r.b))];
   return o.join('') + (pts.length ? `<div class="legend">${bh.map(b => `<span><span class="dot" style="background:var(--${colorOf(b.id)})"></span>${esc(b.name)}</span>`).join('')}<span><span class="dot" style="background:var(--panel);box-shadow:inset 0 0 0 2px var(--muted)"></span>Estimated from CFEM fractions</span></div>`
     : '<p class="note">Add a grain-size curve with hydrometer points (to 0.002 mm), or sand, silt and clay percentages, to plot samples.</p>') +
     '<p class="note" style="margin-top:6px">Fine earth (&lt; 2 mm): sand 2–0.05 mm, silt 0.05–0.002 mm, clay &lt; 0.002 mm. Heavy clay is the CSSC class above 60 % clay.</p>';
 }
-function gsdSVG(W = 640, H = 320) {
-  const curves = projList().flatMap(b => (b.samples || []).filter(s => s.gsd?.length > 1).map(s => ({ b, s })));
-  if (!curves.length) return '<p class="note">No grain-size curves yet. Use “Add curve” in Field &amp; lab tests.</p>';
+function gsdSVG(W = 640, H = 320, marks) {   // marks(X, Y): another page's curves on the same axes
+  const curves = marks ? [] : projList().flatMap(b => (b.samples || []).filter(s => s.gsd?.length > 1).map(s => ({ b, s })));
+  if (!curves.length && !marks) return '<p class="note">No grain-size curves yet. Use “Add curve” in Field &amp; lab tests.</p>';
   const m = { l: 44, r: 14, t: 26, b: 34 }, lo = Math.log10(.001), hi = Math.log10(100);
   const X = d => m.l + (Math.log10(d) - lo) / (hi - lo) * (W - m.l - m.r), Y = p => H - m.b - p / 100 * (H - m.t - m.b);
   const o = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Grain size distribution">`];
@@ -8654,6 +8655,7 @@ function gsdSVG(W = 640, H = 320) {
   for (const [a, c, t] of bands) { o.push(`<line x1="${X(c)}" x2="${X(c)}" y1="${m.t - 14}" y2="${H - m.b}" style="stroke:var(--muted)" stroke-dasharray="3 2"/><text class="lbl2" x="${(X(a) + X(Math.min(c, 100))) / 2}" y="${m.t - 4}" text-anchor="middle">${t}</text>`); }
   o.push(`<text class="lbl" x="${(X(.075) + X(4.75)) / 2}" y="12" text-anchor="middle">SAND</text><text class="lbl" x="${(X(4.75) + X(75)) / 2}" y="12" text-anchor="middle">GRAVEL</text>`);
   o.push(`<text class="lbl" x="${(m.l + W - m.r) / 2}" y="${H - 4}" text-anchor="middle">Particle size (mm)</text><text class="lbl" transform="rotate(-90)" x="${-(m.t + H - m.b) / 2}" y="11" text-anchor="middle">Percent passing</text>`);
+  if (marks) return o.join('') + marks(X, Y) + '</svg>';
   curves.forEach(({ b, s }) => { const pts = s.gsd.filter(p => p.size >= .001 && p.size <= 100).sort((a, c) => a.size - c.size); o.push(`<path d="${pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.size).toFixed(1)} ${Y(p.passing).toFixed(1)}`).join('')}" fill="none" style="stroke:var(--${colorOf(b.id)})" stroke-width="1.8"><title>${esc(`${b.name} ${sampleId(s)} at ${fu(s.depth)}`)}</title></path>`); });
   o.push('</svg>');
   return o.join('') + `<div class="legend">${curves.map(({ b, s }) => `<span><span class="dot" style="background:var(--${colorOf(b.id)})"></span>${esc(b.name)} ${esc(sampleId(s))} (${fx(s.depth)} ${LEN()})</span>`).join('')}</div>`;
