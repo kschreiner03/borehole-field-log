@@ -17,6 +17,9 @@ export const SoilStats: {
   loo<V>(pts: Pt<V>[], predict: (rest: Pt<V>[], p: Pt<V>) => V, classes?: boolean): Loo<V>;
   grid(pts: Pt<unknown>[], o: { cell: number; pad?: number }): { x0: number; y0: number; nx: number; ny: number; cell: number };
   mask(pts: Pt<unknown>[], spacing: number, x: number, y: number): number;
+  chooseMethod(n: number, kind: 'num' | 'class'): { method: 'none' | 'idw' | 'krige' | 'nearest' | 'indicator'; why: string };
+  warningsFor(c: { n: number; kind: string; method: string; vgOk?: boolean; cell: number; spacing: number; maskOff?: boolean; pointsHidden?: boolean; depthsCombined?: boolean; strategy: string; rmse?: number | null; range?: number | null; nonDetects?: number; mixedUnits?: boolean; forced?: boolean }): { id: string; text: string; figure: boolean }[];
+  surfaceLabel(c: { method: string; n: number; depth?: string; date?: string; strategy: string }): string[];
   empirical(pts: Pt[], o?: { lags?: number; weights?: number[] }): EmpRow[];
   fitVariogram(emp: EmpRow[], o?: { model?: VgModel }): Variogram;
   krige(pts: Pt[], vg: Variogram, x: number, y: number, o?: { k?: number }): { v: number; var: number | null };

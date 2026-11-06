@@ -150,3 +150,52 @@ describe('soil survey statistics: surfaces', () => {
     expect(Date.now() - t).toBeLessThan(20000);
   });
 });
+
+describe('soil survey: method defaults', () => {
+  it.each([[0, 'none', 'none'], [4, 'none', 'none'], [5, 'idw', 'nearest'], [29, 'idw', 'nearest'], [30, 'krige', 'indicator'], [500, 'krige', 'indicator']])('%i points', (n, num, cls) => {
+    expect(S.chooseMethod(n, 'num').method).toBe(num); expect(S.chooseMethod(n, 'class').method).toBe(cls);
+    expect(S.chooseMethod(n, 'num').why).toMatch(new RegExp(`${n} point`));
+  });
+});
+
+describe('soil survey: warnings', () => {
+  const good = { n: 40, kind: 'num', method: 'krige', vgOk: true, cell: 20, spacing: 80, maskOff: false, pointsHidden: false, depthsCombined: false, strategy: 'grid', rmse: 1, range: 10, nonDetects: 0, mixedUnits: false, forced: false } as const;
+  const ids = (c: Partial<Parameters<typeof S.warningsFor>[0]>) => S.warningsFor({ ...good, ...c }).map(w => w.id);
+  it('says nothing about a sound map', () => { expect(ids({})).toEqual([]); });
+  it.each<[string, Partial<Parameters<typeof S.warningsFor>[0]>]>([
+    ['krige-few', { n: 25 }], ['vg-fail', { vgOk: false }], ['cell-fine', { cell: 7 }], ['mask-off', { maskOff: true }], ['points-hidden', { pointsHidden: true }],
+    ['depths-combined', { depthsCombined: true }], ['targeted', { strategy: 'targeted' }], ['strategy-unstated', { strategy: '' }], ['rmse-large', { rmse: 3 }],
+    ['non-detects', { nonDetects: 2 }], ['mixed-units', { mixedUnits: true }], ['forced-few', { n: 4, forced: true }],
+  ])('%s', (id, c) => { expect(ids(c)).toContain(id); });
+  it('does not warn at the exact limits', () => {
+    expect(ids({ n: 30 })).toEqual([]); expect(ids({ cell: 8 })).toEqual([]); expect(ids({ rmse: 2.5 })).toEqual([]);
+  });
+  it('does not warn about kriging when another method is in use', () => { expect(ids({ n: 10, method: 'idw' })).toEqual([]); });
+  it('marks which warnings print on a figure', () => {
+    const w = S.warningsFor({ ...good, strategy: 'targeted', cell: 7 });
+    expect(w.find(x => x.id === 'targeted')!.figure).toBe(true); expect(w.find(x => x.id === 'cell-fine')!.figure).toBe(false);
+  });
+  it('names how many non-detects were replaced', () => {
+    expect(S.warningsFor({ ...good, nonDetects: 3 })[0]!.text).toMatch(/3 .*half the detection limit/);
+  });
+});
+
+describe('soil survey: map label', () => {
+  const c = { method: 'idw', n: 25, depth: '0–15 cm', date: '2026-07-22', strategy: 'grid' };
+  it('always says the map is interpolated, how, and from what', () => {
+    const l = S.surfaceLabel(c);
+    expect(l[0]).toBe('Interpolated, not measured');
+    expect(l[1]).toBe('Inverse distance, 25 points, 0–15 cm, 2026-07-22');
+  });
+  it('adds the targeted line', () => {
+    expect(S.surfaceLabel({ ...c, strategy: 'targeted' })).toContain('Points were targeted, so this may not represent the whole site.');
+  });
+  it('says when the strategy is not stated', () => {
+    expect(S.surfaceLabel({ ...c, strategy: '' })).toContain('Sampling strategy: not stated.');
+  });
+  it('names zones and kriging', () => {
+    expect(S.surfaceLabel({ ...c, method: 'krige' })[1]).toMatch(/^Ordinary kriging/);
+    expect(S.surfaceLabel({ ...c, method: 'nearest' })[0]).toBe('Interpolated, not measured');
+    expect(S.surfaceLabel({ ...c, method: 'nearest' })[1]).toMatch(/^Nearest point zones/);
+  });
+});

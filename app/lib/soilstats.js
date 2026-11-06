@@ -128,5 +128,32 @@
     }
     return { g, val, unc, mask: msk, ...(classes ? { classes } : {}) };
   }
-  globalThis.SoilStats = { merge, spacing, decluster, idw, nearest, logT, alr, alrInv, loo, grid, mask, empirical, fitVariogram, krige, krigeWeights, classField, surface };
+  /* the default method for a number of points, and why, in words for the panel */
+  function chooseMethod(n, kind) {
+    const pts = `${n} point${n === 1 ? '' : 's'}`;
+    if (n < 5) return { method: 'none', why: `${pts}: too few to draw between, so only the points are shown.` };
+    if (kind === 'class') return n < 30 ? { method: 'nearest', why: `${pts}: each area takes the class of its nearest point.` } : { method: 'indicator', why: `${pts}: enough to estimate the most likely class by kriging.` };
+    return n < 30 ? { method: 'idw', why: `${pts}: too few to fit a variogram reliably, so inverse distance is used. Treat this map as lower confidence.` } : { method: 'krige', why: `${pts}: enough to fit a variogram, so ordinary kriging is used.` };
+  }
+  /* what to tell the user about a map. figure: also printed in the note on a report figure */
+  function warningsFor(c) {
+    const w = [], add = (id, text, figure) => w.push({ id, text, figure });
+    if (['krige', 'indicator'].includes(c.method) && c.n < 30) add('krige-few', `Kriging with ${c.n} points: the variogram is poorly known below about 30.`, true);
+    if (['krige'].includes(c.method) && c.vgOk === false) add('vg-fail', 'No variogram could be fitted, so inverse distance is shown instead.', true);
+    if (c.spacing && c.cell < c.spacing / 10) add('cell-fine', 'Cells are under a tenth of the point spacing: the map looks more detailed than the sampling can show.', false);
+    if (c.maskOff) add('mask-off', 'Colour is being drawn far from any point, where there is no data behind it.', true);
+    if (c.pointsHidden) add('points-hidden', 'The measured points are hidden, so estimates can be mistaken for measurements.', false);
+    if (c.depthsCombined) add('depths-combined', 'Depths are combined on this map.', true);
+    if (c.strategy === 'targeted') add('targeted', 'Points were targeted, so this may not represent the whole site.', true);
+    if (!c.strategy) add('strategy-unstated', 'The sampling strategy is not stated. Set it in the survey details.', true);
+    if (c.range > 0 && c.rmse > c.range / 4) add('rmse-large', 'The check error is large compared with the range of the data, so this map is a weak guide between points.', true);
+    if (c.nonDetects) add('non-detects', `${c.nonDetects} result${c.nonDetects === 1 ? '' : 's'} below detection replaced by half the detection limit.`, true);
+    if (c.mixedUnits) add('mixed-units', 'Units or laboratory methods differ at this depth.', true);
+    if (c.forced && c.n < 5) add('forced-few', `A surface from ${c.n} point${c.n === 1 ? '' : 's'} shows almost nothing that the points themselves do not.`, true);
+    return w;
+  }
+  const METHOD_NAMES = { idw: 'Inverse distance', krige: 'Ordinary kriging', nearest: 'Nearest point zones', indicator: 'Indicator kriging' };
+  const surfaceLabel = c => ['Interpolated, not measured', [METHOD_NAMES[c.method] || c.method, `${c.n} points`, c.depth, c.date].filter(Boolean).join(', '),
+    ...(c.strategy === 'targeted' ? ['Points were targeted, so this may not represent the whole site.'] : !c.strategy ? ['Sampling strategy: not stated.'] : [])];
+  globalThis.SoilStats = { chooseMethod, warningsFor, surfaceLabel, merge, spacing, decluster, idw, nearest, logT, alr, alrInv, loo, grid, mask, empirical, fitVariogram, krige, krigeWeights, classField, surface };
 })();
