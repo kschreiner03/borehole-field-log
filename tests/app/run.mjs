@@ -2286,6 +2286,34 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('layer editor: one pass in classification order', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); const b = sortedList().find(x => x.status !== 'issued' && x.layers.length > 2); S.sel = b.id; S.dtab = 'soil'; S.layer = 1; goTab('edit'); await w(400);
+        const d = () => document.querySelector('#ldetail'), labels = () => [...d().querySelectorAll('.lstep .qd-l')].map(x => x.textContent.trim().replace(/^\\d+/, ''));
+        const want8 = ['Soil', 'Modifiers', 'Plasticity or gradation', null, 'Moisture', 'Colour', 'Other features', 'Origin']; const got = labels();
+        want(got.length === 8 && want8.every((x, i) => x === null ? /Consistency|Compactness|consistency|compactness|Weathering|State/.test(got[i]) : got[i] === x), 'steps in order: ' + got.join(' | '));
+        const ks = [...d().querySelectorAll('[data-k]')].map(x => x.dataset.k), dup = ks.filter((k, i) => ks.indexOf(k) !== i); want(!dup.length, 'each field once: ' + dup);
+        want(!/All fields/.test(d().textContent), 'no All fields fold'); const fold = [...d().querySelectorAll('details')].find(x => /Soil science names/.test(x.querySelector('summary')?.textContent || '')); want(fold && fold.querySelector('#ld-hz') && fold.querySelector('#ld-texture'), 'horizon and texture in Soil science names');
+        const tools = [...document.querySelectorAll('#sec-layers > header [data-act]')].filter(x => x.offsetParent).map(x => x.dataset.act); want(tools.join() === 'l-add', 'the toolbar has only Add layer: ' + tools);
+        const menu = d().querySelector('details.lmenu'), acts = [...(menu?.querySelectorAll('[data-act]') || [])].map(x => x.dataset.act); want(acts.join() === 'l-insert,l-dup,l-split,l-up,l-down,l-del', 'the layer menu: ' + acts);
+        const n = b.layers.length; menu.querySelector('[data-act="l-dup"]').click(); await w(200); want(b.layers.length === n + 1, 'menu actions work');
+        document.querySelector('#ldetail details.lmenu [data-act="l-del"]').click(); await w(200); want(b.layers.length === n, 'delete from the menu');
+        want(!document.querySelector('.ws .dgrid[data-sheet="layerList"] [data-tdel]'), 'no × on layer rows');
+        const id = b.layers[1].id; S.layer = 1; d().querySelector('[data-qpick="moisture"][data-term="Wet"]').click(); await w(200); want(b.layers.find(l => l.id === id).moisture === 'Wet', 'a step button sets the field');
+        d().querySelector('[data-qpick="origin"][data-term="till"]').click(); await w(200); want(b.layers.find(l => l.id === id).origin === 'till', 'origin from its step');
+        d().querySelector('[data-qpick="pg"][data-term]')?.click(); await w(200); want(!!b.layers.find(l => l.id === id).pg, 'plasticity override from its step');
+        const us = document.querySelector('#ld-uscs'); us.value = 'SW'; us.dispatchEvent(new Event('input', { bubbles: true })); await w(250); want(/Compactness|compactness/.test(labels()[3]) && !!d().querySelector('[data-qpick="consistency"][data-term="Dense"]'), 'changing the soil changes the state buttons: ' + labels()[3]);
+        goTab('log'); await w(300); openDrawer('layer', 1); await w(200); want(!!document.querySelector('#drawer .lstep') && !!document.querySelector('#drawer #lt-type'), 'the Full log panel uses the same editor');
+        document.querySelector('#drawer [data-qpick="moisture"][data-term="Dry"]').click(); await w(250); want(b.layers[1].moisture === 'Dry' && /dry/.test(document.querySelector('#log').textContent.toLowerCase()), 'and redraws the log');
+        const iss = sortedList().find(x => x.status === 'issued' && x.layers.length); S.sel = iss.id; S.layer = 0; S.drawer = null; goTab('edit'); await w(300);
+        want([...document.querySelectorAll('#ldetail .lstep button')].every(x => x.disabled) && !document.querySelector('#ldetail details.lmenu'), 'issued: read only, no layer menu');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('soil survey: points and samples, imports, saved with the project', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
