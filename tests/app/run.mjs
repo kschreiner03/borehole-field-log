@@ -2392,6 +2392,23 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('layer editor: type the whole layer in every view', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); const b = sortedList().find(x => x.status !== 'issued' && x.layers.length > 2); S.sel = b.id;
+        S.tsheet = 'layers'; S.gridOne = true; goTab('table'); await w(300); const heads = [...document.querySelectorAll('#view .dgrid thead th')].map(t => t.textContent.trim()), j = heads.indexOf('Description') - 0;
+        const cell = [...document.querySelectorAll('#view .dgrid tbody tr')][1]?.querySelectorAll('td')[j]?.querySelector('input'); want(!!cell, 'the Description cell can be typed in: ' + heads.join('|'));
+        if (cell) { cell.value = 'SP sand, fine grained, loose, wet, grey'; cell.dispatchEvent(new Event('change', { bubbles: true })); await w(250); const l = b.layers[1]; want(l.uscs === 'SP' && l.moisture === 'Wet' && l.colour === 'grey', 'Data tables reads it: ' + JSON.stringify([l.uscs, l.moisture, l.colour])); }
+        goTab('log'); await w(200); openQL('layer'); await w(300); const t = document.querySelector('#ql-type'); want(!!t, 'the guided flow has the typing line');
+        if (t) { t.value = 'SM silty sand, compact, moist, brown, trace rootlets'; t.dispatchEvent(new Event('input', { bubbles: true })); await w(100); want(/Reads as/.test(document.querySelector('#ql-type-read')?.textContent || ''), 'reads as you type');
+          t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(250); const q = S.ql; want(q.code === 'SM' && q.consistency === 'Compact' && q.moisture === 'Moist' && q.colour === 'brown' && /rootlets/.test(q.other), 'the buttons follow: ' + JSON.stringify([q.code, q.consistency, q.moisture, q.colour, q.other])); }
+        closeQL();
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('soil survey: points and samples, imports, saved with the project', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };

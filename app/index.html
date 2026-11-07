@@ -2903,7 +2903,7 @@ const SHEETS = {
     ['mods', 'Modifiers', 'text', () => MOD_CHIPS], ['consistency', 'Consistency / compactness', 'pick', () => [...COHESIVE, ...GRANULAR, ...WEATHERING].filter(Boolean)],
     ['moisture', 'Moisture', 'pick', () => MOISTURE.filter(Boolean)], ['colour', 'Colour', 'text', () => [...document.querySelectorAll('#colours option')].map(o => o.value)],
     ['origin', 'Origin', 'pick', () => Object.values(ORIGINS).filter(Boolean), ORIGINS], ['other', 'Other features', 'text', () => OTHER_CHIPS], ['hz', 'Horizon', 'text', () => Object.keys(HORIZONS)],
-    ['desc', 'Description', 'calc', (r, b) => plainDesc(r)]],
+    ['desc', 'Description', 'ltdesc']],
     blank: (b, prev) => newLayer(prev?.bottom ?? Math.max(0, ...b.layers.map(l => l.bottom ?? 0))) },
   samples: { name: 'Samples & SPT', key: 'samples', by: 'depth', cols: [
     ['depth', 'Depth', 'depth'], ['name', 'Name', 'text', null, null, r => sampleId({ ...r, name: '' })], ['type', 'Method', 'code', () => Object.keys(SAMPLE_TYPES)], ['purpose', 'Purpose / analyses', 'text', () => SAMPLE_PURPOSES], ['no', 'No.', 'int'],
@@ -7285,6 +7285,7 @@ function qlPane(b) {
   if (q.tab === 'layer') {
     const editing = q.i != null;
     return `<div class="ql-h"><b>${editing ? `Editing layer ${q.i + 1}` : `Layer ${qlLayers(b).length + 1}`}</b><span>from ${fu(q.top)}</span>${editing ? '<button class="btn link" data-ql="new-layer">Start a new layer instead</button>' : ''}</div>
+      <div class="ql-sec"><label class="ql-lab" for="ql-type">Type the layer</label><input id="ql-type" autocomplete="off" spellcheck="false" placeholder="e.g. 1.2-3.5 SP fine to medium grained, trace silt, compact, moist, brown" style="width:100%"><p class="note" id="ql-type-read" style="margin:4px 0 0">Or use the buttons below. Enter fills them in.</p></div>
       ${qlDepthCtl('bottom', 'Bottom of layer')}
       <div class="ql-sec"><span class="ql-lab">Soil type</span><div class="ql-tiles">${QL_TILES.map((t, i) => `<button type="button" class="ql-tile" data-qltile="${i}" aria-pressed="${q.tile === i}"><svg viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true">${soilRects(0, 0, 100, 34, t.code, t.origin)}</svg>${t.label}</button>`).join('')}</div></div>
       ${tile?.alts.length ? `<div class="ql-sec"><span class="ql-lab">Symbol</span>${qlChips('code', tile.alts, q.code)}</div>` : ''}
@@ -7333,6 +7334,16 @@ function qlPane(b) {
     <div class="ql-go"><button class="btn primary" data-ql="sample-save">Add sample</button></div>
     ${ss.length ? `<div class="ql-sec"><span class="ql-lab">Samples</span><div class="ql-list">${ss.map(s => `<div class="row"><b>${fu(s.depth)}</b><span>${esc(sampleId(s))}${sptN(s) != null ? ' · N = ' + sptN(s) : ''}${blowStr(s) ? ' · ' + blowStr(s) : ''}${s.cvc != null ? ' · ' + s.cvc + ' ppm' : ''}</span></div>`).join('')}</div></div>` : ''}`;
 }
+/* the guided flow's typing line: the same reading as everywhere else; Enter sets the buttons and, when given, the depths */
+document.addEventListener('input', e => { if (e.target.id === 'ql-type') $('#ql-type-read').textContent = e.target.value.trim() ? 'Reads as: ' + ltRead(e.target.value) : 'Or use the buttons below. Enter fills them in.'; });
+document.addEventListener('keydown', e => {
+  const t = e.target; if (t.id !== 'ql-type' || e.key !== 'Enter' || e.isComposing) return; e.preventDefault(); const q = S.ql, r = parseLayerText(t.value);
+  if (r.error) { $('#ql-type-read').textContent = r.error; return; }
+  Object.assign(q, { code: r.uscs || q.code, mods: r.mods || '', other: r.other || '', origin: r.origin || '', consistency: r.consistency || '', moisture: r.moisture || q.moisture, colour: r.colour || '' });
+  const ti = QL_TILES.findIndex(x => x.code === q.code || x.alts?.includes(q.code)); if (ti >= 0) q.tile = ti;
+  if (r.top != null && q.i == null) q.top = r.top; if (r.bottom != null) q.bottom = r.bottom;
+  renderQL();
+});
 function renderQL() {
   const b = cur(), el = $('#qlog'); if (!b || !el || !S.ql) return;
   const q = S.ql, ed = editable(b), keepScroll = el.querySelector('.ql-pane')?.scrollTop || 0;
