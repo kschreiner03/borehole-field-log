@@ -201,7 +201,7 @@ app.whenReady().then(async () => {
       const set = (c, v) => { const el = document.querySelector('.ws .dgrid[data-sheet="layerList"] tbody tr:last-child input[data-c="' + c + '"]'); el.focus(); el.dispatchEvent(new FocusEvent('focusin', { bubbles: true })); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
       set(1, (prevBottom + 1.2).toFixed(2)); await w(50);
       // the pick panel edits the selected (new) layer
-      document.querySelector('.ws #ldetail [data-qpick="uscs"][data-term="SP"]').click(); await w(300);
+      { const us = document.querySelector('.ws #ldetail #ld-uscs'); us.value = 'SP'; us.dispatchEvent(new Event('input', { bubbles: true })); } await w(300);
       const nl = b.layers.at(-1), logText = document.querySelector('#ws-col').textContent;
       // clicking a layer on the log puts the cursor in its row
       document.querySelector('#ws-col [data-qli="0"] rect').dispatchEvent(new MouseEvent('click', { bubbles: true })); await w(100);
@@ -2304,7 +2304,7 @@ app.whenReady().then(async () => {
         const os = async (k, sel = '#ldetail') => { const el = document.querySelector(sel + ' [data-lstep="' + k + '"]'); if (el) { el.click(); await w(150); } }; const id = b.layers[1].id; S.layer = 1; renderView(true); await w(200); await os('moisture'); d().querySelector('[data-qpick="moisture"][data-term="Wet"]').click(); await w(200); want(b.layers.find(l => l.id === id).moisture === 'Wet', 'a step button sets the field');
         await os('origin'); d().querySelector('[data-qpick="origin"][data-term="till"]').click(); await w(200); want(b.layers.find(l => l.id === id).origin === 'till', 'origin from its step');
         await os('pg'); d().querySelector('[data-qpick="pg"][data-term]')?.click(); await w(200); want(!!b.layers.find(l => l.id === id).pg, 'plasticity override from its step');
-        await os('uscs'); d().querySelector('[data-qpick="uscs"][data-term="SW"]').click(); await w(250); await os('consistency'); want(/Compactness|compactness/.test(labels()[3]) && !!d().querySelector('[data-qpick="consistency"][data-term="Dense"]'), 'changing the soil changes the state buttons: ' + labels()[3]);
+        await os('uscs'); { const us = d().querySelector('#ld-uscs'); us.value = 'SW'; us.dispatchEvent(new Event('input', { bubbles: true })); } await w(250); await os('consistency'); want(/Compactness|compactness/.test(labels()[3]) && !!d().querySelector('[data-qpick="consistency"][data-term="Dense"]'), 'changing the soil changes the state buttons: ' + labels()[3]);
         goTab('log'); await w(300); openDrawer('layer', 1); await w(200); want(!!document.querySelector('#drawer .lstep') && !!document.querySelector('#drawer #lt-type'), 'the Full log panel uses the same editor');
         await os('moisture', '#drawer'); document.querySelector('#drawer [data-qpick="moisture"][data-term="Dry"]').click(); await w(250); want(b.layers[1].moisture === 'Dry' && /dry/.test(document.querySelector('#log').textContent.toLowerCase()), 'and redraws the log');
         const iss = sortedList().find(x => x.status === 'issued' && x.layers.length); S.sel = iss.id; S.layer = 0; S.drawer = null; goTab('edit'); await w(300);
@@ -2352,7 +2352,7 @@ app.whenReady().then(async () => {
         want(ta('mods').value.split('\\n').includes('trace mica'), 'the dialog lists it');
         ta('moisture').value = 'Wet\\nDry'; ta('uscs').value = 'SM\\nXX\\nCL'; ta('type').value = 'J\\nSS'; document.querySelector('[data-act="btns-save"]').click(); await w(250);
         want(/XX/.test(document.querySelector('#toast').textContent), 'an unknown soil symbol is refused: ' + document.querySelector('#toast').textContent);
-        renderView(true); await w(200); await os('moisture'); want(terms('moisture').join() === 'Wet,Dry', 'reordered and hidden: ' + terms('moisture')); await os('uscs'); want(terms('uscs').join() === 'SM,CL', 'soil buttons are symbols: ' + terms('uscs'));
+        renderView(true); await w(200); await os('moisture'); want(terms('moisture').join() === 'Wet,Dry', 'reordered and hidden: ' + terms('moisture')); await os('uscs'); const mineU = [...d().querySelectorAll('#ld-uscs optgroup[data-mine] option')].map(o => o.value); want(mineU.join() === 'SM,CL', 'your soil list comes first in the dropdown: ' + mineU);
         const tsel = d().querySelector('.lsamp select[data-k="type"]'); want(!tsel || [...tsel.options].map(o => o.value).slice(0, 2).join() === 'J,SS', 'sample types follow the list');
         openButtons(); await w(150); ta('moisture').value = ''; document.querySelector('[data-act="btns-save"]').click(); await w(200); renderView(true); await w(150); await os('moisture'); want(terms('moisture').slice().sort().join() === ['Dry', 'Damp', 'Moist', 'Wet', 'Saturated'].sort().join(), 'an empty list falls back to the built-in buttons: ' + terms('moisture'));
         openButtons(); await w(150); document.querySelector('[data-act="btns-reset"]').click(); await w(200); renderView(true); await w(150); await os('mods'); d().querySelector('[data-lstepmore="mods"]')?.click(); await w(150); want(!terms('mods').includes('trace mica') && !lsGet('bhlog.buttons'), 'reset restores everything');
@@ -2367,10 +2367,11 @@ app.whenReady().then(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
       try {
         loadDlExample(); await w(300); const b = sortedList().find(x => x.status !== 'issued' && x.layers.length > 2); S.sel = b.id; S.dtab = 'soil'; S.layer = 1; goTab('edit'); await w(400);
+        const os = async (k, sel = '#ldetail') => { const el = document.querySelector(sel + ' [data-lstep="' + k + '"]'); if (el) { el.click(); await w(150); } };
         const d = () => document.querySelector('#ldetail'), open = () => [...d().querySelectorAll('.lstep:not(.lfold)')].map(x => x.dataset.step), folded = () => [...d().querySelectorAll('.lstep.lfold')].map(x => x.dataset.step);
         const first = d().querySelector('input, select, textarea'); want(first?.id === 'lt-type', 'the typing line is first: ' + first?.id); want(!d().querySelector('#ld-preview'), 'no separate preview line');
         const nl = newLayer(b.layers.at(-1).bottom); b.layers.push(nl); S.layer = b.layers.length - 1; renderView(true); await w(200);
-        want(open().join() === 'uscs' && folded().length === 7, 'a new layer opens Soil only: ' + open() + ' / ' + folded().length);
+        want(open().join() === 'uscs' && folded().length === 7 && !!d().querySelector('[data-step="uscs"] select#ld-uscs'), 'a new layer opens Soil only, as a dropdown: ' + open() + ' / ' + folded().length);
         b.layers.pop(); S.layer = 1; renderView(true); await w(200); const L0 = b.layers[1];
         const t = d().querySelector('#lt-type'); t.value = (L0.top + '-' + L0.bottom) + ' SM silty sand, compact, moist, brown, trace mica'; t.dispatchEvent(new Event('input', { bubbles: true })); await w(100);
         want(/Reads as/.test(d().querySelector('#lt-read').textContent), 'reads as you type'); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(250);
@@ -2385,7 +2386,7 @@ app.whenReady().then(async () => {
         box.value = 'silty, trace mica, trace shell'; box.dispatchEvent(new Event('input', { bubbles: true })); await w(600); want(!!d().querySelector('[data-act="btn-save"][data-for="mods"]'), 'Save as a button once something new is typed');
         lsDel('bhlog.btnUse'); for (let i = 0; i < 4; i++) btnUsed('moisture', 'Wet'); L.moisture = ''; renderView(true); await w(200);
         const mo = [...d().querySelectorAll('[data-step="moisture"] [data-qpick]')].map(x => x.dataset.term); want(mo[0] === 'Wet' || mo.indexOf('Wet') < 2, 'most used come first: ' + mo);
-        want(!d().querySelector('#ld-uscs') || d().querySelector('[data-step="uscs"]:not(.lfold)'), 'no second soil dropdown');
+        await os('uscs'); want(d().querySelector('[data-step="uscs"] select#ld-uscs') && !d().querySelector('[data-step="uscs"] [data-qpick]'), 'soil is a dropdown, not buttons');
         goTab('log'); await w(300); openDrawer('layer', 1); await w(200); want(document.querySelectorAll('#drawer #lt-type').length === 1, 'the side panel has one typing line');
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
       return F;

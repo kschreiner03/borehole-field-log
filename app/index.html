@@ -3991,7 +3991,7 @@ const PG_FINE = ['non-plastic', 'low plastic', 'medium plastic', 'high plastic']
 const pgDefault = l => { const s = soilOf(l.uscs); return s ? s.grad || (s.plast && s.p !== 'PEAT' ? `${s.plast} plastic` : '') : ''; };
 /* your own buttons: per person, on this computer (never in a project or the company settings). A step with no list of its own
    uses the built-in buttons. Soil, origin and sample type keep to the codes the log understands. */
-const BTN_STEPS = [['uscs', 'Soil (symbols)'], ['mods', 'Modifiers'], ['pg', 'Plasticity or gradation'], ['consistency', 'Consistency / compactness'], ['moisture', 'Moisture'], ['colour', 'Colour'], ['other', 'Other features'], ['origin', 'Origin'], ['type', 'Sample type']];
+const BTN_STEPS = [['uscs', 'Soil types listed first'], ['mods', 'Modifiers'], ['pg', 'Plasticity or gradation'], ['consistency', 'Consistency / compactness'], ['moisture', 'Moisture'], ['colour', 'Colour'], ['other', 'Other features'], ['origin', 'Origin'], ['type', 'Sample type']];
 const BTN_BUILTIN = () => ({ uscs: QUICK_SOILS.filter(k => SOILS[k]), mods: MOD_CHIPS, pg: [...PG_FINE, ...PG_COARSE], consistency: [...COHESIVE, ...GRANULAR].filter(Boolean), moisture: MOISTURE.filter(Boolean), colour: QUICK_COLOURS, other: OTHER_CHIPS, origin: Object.keys(ORIGINS).filter(Boolean), type: Object.keys(SAMPLE_TYPES) });
 const btnUse = () => { try { return JSON.parse(lsGet('bhlog.btnUse') || '{}') || {}; } catch { return {}; } };
 const btnUsed = (k, t) => { const u = btnUse(); u[k] = { ...(u[k] || {}), [t]: (u[k]?.[t] || 0) + 1 }; lsSet('bhlog.btnUse', JSON.stringify(u)); };
@@ -4093,6 +4093,11 @@ function layerDetail(b) {
     const extra = (!more && (full || all).length > list.length ? [`<button type="button" class="chip soft" data-lstepmore="${k}" ${dis}>More…</button>`] : []).concat(typed && ed ? [`<button type="button" class="chip soft" data-lsteptype="${k}">+ other…</button>`] : []).join('');
     const custom = typed && splitTerms(l[k] || '').some(t => !(full || all).some(x => x.toLowerCase() === t.toLowerCase())), showBox = typed && (S.lstepType?.has(k) || custom);
     const fresh = showBox && splitTerms(l[k] || '').some(t => !myButtons(k, BTN_BUILTIN()[k]).some(x => x.toLowerCase() === t.toLowerCase()));
+    if (k === 'uscs') {   // a dropdown of every symbol; the person's own list, or the ones they use most, first
+      const mine = myBtnAll().uscs?.length ? myBtnAll().uscs.filter(c => SOILS[c]) : Object.entries(use.uscs || {}).sort((a, c) => c[1] - a[1]).map(x => x[0]).filter(c => SOILS[c]).slice(0, 6);
+      const top = mine.length ? `<optgroup label="${myBtnAll().uscs?.length ? 'Your list' : 'Most used'}" data-mine="1">${mine.map(c => `<option value="${c}">${esc(symLabel(c, SOILS[c]))}</option>`).join('')}</optgroup>` : '';
+      return `<div class="qd-row lstep" data-step="uscs">${head}<div class="lstep-b"><select ${at('uscs')} ${dis} aria-label="Soil type" style="max-width:420px">${soilOpts(l.uscs).replace('<option value="">—</option>', `<option value="">Choose the soil type…</option>${top}`)}</select></div></div>`;
+    }
     const btns = k === 'consistency' && !states.length ? '<span class="note">Pick a soil first.</span>' : (single ? qp(k, list, k === 'origin' ? ORIGINS : null) : multi(k, list)) + extra;
     const tail = [showBox ? box(k, k === 'pg' && pgDefault(l) ? `from the symbol: ${pgDefault(l)}` : 'type, e.g. ' + ({ mods: 'trace mica', pg: 'well graded', colour: 'mottled orange-brown', other: 'trace coal' }[k] || '')) + (fresh ? save(k) : '') : '', k === 'consistency' && ed ? '<button class="btn link" data-act="suggest" title="Use the SPT N, pocket penetrometer or vane results inside this layer">Suggest from tests</button>' : '', k === 'origin' && ed ? '<button class="btn link" data-act="buttons">Your buttons…</button>' : ''].filter(Boolean).join('');
     return `<div class="qd-row lstep" data-step="${k}">${head}<div class="lstep-b"><div class="chips">${btns}</div>${tail ? `<div class="lstep-in">${tail}</div>` : ''}</div></div>`;
@@ -4207,6 +4212,7 @@ function onField(e) {
       if (!stateList(v).includes(row.consistency)) row.consistency = '';
       const cs = $('#ld-consistency'); if (cs) { cs.innerHTML = opt(stateList(v), row.consistency); cs.closest('.fld').querySelector('label').textContent = stateLabel(v); }
       const mods = $('#ld-mods'); if (mods) mods.placeholder = soilOf(v)?.imp || 'e.g. silty, some sand, trace gravel';
+      if (v) btnUsed('uscs', v); if (t.closest('#ldetail, #drawer')) S.lstep = null;   // chosen: the next step opens
       setTimeout(() => refreshLayerEditor(b), 0);   // the state, plasticity and modifier buttons follow the soil
     }
     if (sec === 'samples' && /^b[123]$/.test(k)) {
