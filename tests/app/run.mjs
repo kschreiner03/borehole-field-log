@@ -2314,6 +2314,31 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('layer editor: samples with VOC and LEL in the layer', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); const b = sortedList().find(x => x.status !== 'issued' && x.layers.length > 2 && x.samples.length); S.sel = b.id; S.dtab = 'soil'; S.layer = 1; goTab('edit'); await w(400);
+        const l = b.layers[1], inL = s => s.depth != null && s.depth >= l.top && s.depth < l.bottom, rows = () => [...document.querySelectorAll('#ldetail .lsamp tbody tr[data-sid]')].map(t => t.dataset.sid);
+        want(JSON.stringify(rows()) === JSON.stringify(b.samples.filter(inL).sort((a, c) => a.depth - c.depth).map(s => s.id)), 'lists exactly the samples in the layer: ' + rows().length);
+        const n0 = b.samples.length, last = b.samples.filter(inL).at(-1) || b.samples.at(-1); last.name = 'SS7'; document.querySelector('#ldetail [data-act="ls-add"]').click(); await w(250);
+        const s = b.samples.at(-1); want(b.samples.length === n0 + 1 && s.name === 'SS8' && s.type === last.type, 'the next sample: ' + JSON.stringify([s.name, s.type]));
+        want(document.activeElement?.id === 'ls-' + s.id + '-depth' && rows().includes(s.id), 'shown here, cursor in Depth');
+        const put = (k, v, ev = 'input') => { const el = document.querySelector('#ls-' + s.id + '-' + k); el.value = v; el.dispatchEvent(new Event(ev, { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+        put('depth', String(+(l.top + .1).toFixed(2))); await w(200); put('cvc', '340'); await w(150); put('lel', '2'); await w(150); put('type', 'J'); await w(200);
+        want(Math.abs(s.depth - (l.top + .1)) < 1e-6 && s.cvc === 340 && s.lel === 2 && s.type === 'J', 'readings stored: ' + JSON.stringify([s.depth, s.cvc, s.lel, s.type]));
+        want(!!document.querySelector('#ldetail .lstep'), 'changing the type keeps the layer editor');
+        want(LOG_COLS.cvc[1](b) && /vapour 340 ppm/.test(logSVG(b, 1100)), 'the vapour graph and log have it');
+        S.dtab = 'samples'; S.dsel = { samples: b.samples.indexOf(s) }; renderView(true); await w(250); want(document.querySelector('#s-' + s.id + '-lel')?.value === '2', 'the same sample on Samples & lab'); S.dtab = 'soil'; S.layer = 1; renderView(true); await w(250);
+        const below = b.layers[2]; put('depth', String(+(below.top + .2).toFixed(2))); await w(250);
+        want(!rows().includes(s.id) && /layer 3/i.test(document.querySelector('#toast')?.textContent || document.body.innerText), 'a depth in another layer moves it, with a note');
+        const nl = newLayer(null); b.layers.push(nl); S.layer = b.layers.length - 1; renderView(true); await w(200); want(/Enter the layer.s depths/.test(document.querySelector('#ldetail .lsamp')?.textContent || ''), 'no depths yet: says so');
+        const iss = sortedList().find(x => x.status === 'issued' && x.samples.length); S.sel = iss.id; S.layer = 0; renderView(true); await w(200); want([...document.querySelectorAll('#ldetail .lsamp input, #ldetail .lsamp select')].every(x => x.disabled) && !document.querySelector('#ldetail [data-act="ls-add"]'), 'issued: read only');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('soil survey: points and samples, imports, saved with the project', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };

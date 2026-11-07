@@ -596,6 +596,7 @@ table.sum th, table.hist th { background: var(--panel-2); }
 .lstep-n { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 6px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font: 600 10.5px var(--f-body); vertical-align: 1px; }
 .lstep-b { display: grid; gap: 6px; min-width: 0; flex: 1; }
 .lstep-in input, .lstep-in select { max-width: 360px; }
+table.lsamp-t { min-width: 0; } table.lsamp-t td { padding: 3px 4px; } table.lsamp-t input, table.lsamp-t select { width: 100%; min-width: 64px; }
 details.lmenu { position: relative; }
 details.lmenu > summary { list-style: none; cursor: pointer; padding: 2px 10px; }
 details.lmenu > summary::-webkit-details-marker { display: none; }
@@ -3977,6 +3978,38 @@ function layerRows(b) {
 /* the steps of a description, in the order it is written (CFEM / Modified USCS) */
 const PG_FINE = ['non-plastic', 'low plastic', 'medium plastic', 'high plastic'], PG_COARSE = ['well graded', 'poorly graded', 'uniformly graded', 'gap graded'];
 const pgDefault = l => { const s = soilOf(l.uscs); return s ? s.grad || (s.plast && s.p !== 'PEAT' ? `${s.plast} plastic` : '') : ''; };
+/* the samples taken in a layer: depth from its top up to its bottom (the last layer keeps its bottom), plus any just added here */
+S.lsNew = new Set();
+function layerSamples(b, l) {
+  const last = l === [...b.layers].filter(x => x.bottom != null).sort((a, c) => a.bottom - c.bottom).pop();
+  return (b.samples || []).map((s, i) => ({ s, i })).filter(({ s }) => S.lsNew.has(s.id) || (s.depth != null && s.depth >= l.top - 1e-9 && (s.depth < l.bottom - 1e-9 || (last && Math.abs(s.depth - l.bottom) < 1e-9))))
+    .sort((a, c) => (a.s.depth ?? Infinity) - (c.s.depth ?? Infinity));
+}
+function layerSamplesHTML(b, l, ed) {
+  const dis = ed ? '' : 'disabled', head = `<h4 class="ff-h" style="margin-top:12px">Samples in this layer</h4>`;
+  if (l.top == null || l.bottom == null) return `<div class="lsamp">${head}<p class="note">Enter the layer's depths to list its samples.</p></div>`;
+  const rows = layerSamples(b, l), inp = (s, i, k, v, t = 'text', extra = '') => `<input id="ls-${s.id}-${k}" type="${t}" ${t === 'number' ? 'step="any" inputmode="decimal"' : ''} data-sec="samples" data-i="${i}" data-k="${k}" value="${esc(v ?? '')}" ${dis} ${extra}>`;
+  return `<div class="lsamp">${head}<div class="scroll-x"><table class="sum lsamp-t"><thead><tr><th>Name</th><th class="r">Depth (${LEN()})</th><th>Type</th><th class="r">VOC (ppm)</th><th class="r">LEL (%)</th><th></th></tr></thead><tbody>${rows.map(({ s, i }) => `<tr data-sid="${esc(s.id)}">
+    <td>${inp(s, i, 'name', s.name, 'text', `placeholder="${esc(sampleId({ ...s, name: '' }))}" aria-label="Sample name"`)}</td><td>${inp(s, i, 'depth', f(s.depth, 3), 'number', 'aria-label="Depth"')}</td>
+    <td><select id="ls-${s.id}-type" data-sec="samples" data-i="${i}" data-k="type" ${dis} aria-label="Type">${opt(withCur(Object.keys(SAMPLE_TYPES), s.type), s.type, SAMPLE_TYPES)}</select></td>
+    <td>${inp(s, i, 'cvc', s.cvc, 'number', 'min="0" aria-label="VOC in ppm"')}</td><td>${inp(s, i, 'lel', s.lel, 'number', 'min="0" max="100" aria-label="LEL in percent"')}</td>
+    <td class="del">${ed ? `<button class="x" data-act="ls-del" data-idx="${i}" aria-label="Delete sample">×</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="6" class="note">No samples in this layer yet.</td></tr>`}</tbody></table></div>
+    ${ed ? '<button class="btn" data-act="ls-add" style="margin-top:6px">+ Add sample</button>' : ''}<p class="note" style="margin:4px 0 0">Blow counts, lab results and grain size are on Samples &amp; lab.</p></div>`;
+}
+function layerSampleAct(act, el) {
+  const b = cur(), l = b?.layers[S.layer]; if (!l || !editable(b)) return;
+  if (act === 'ls-add') {
+    const here = layerSamples(b, l).map(x => x.s), prev = here.at(-1) || [...b.samples].sort((a, c) => (a.depth ?? 0) - (c.depth ?? 0)).pop(), s = SHEETS.samples.blank(b, prev);
+    b.samples.push(s); S.lsNew.add(s.id); logChange(b, 'Samples & SPT'); store.save(b); refreshLayerEditor(b); document.getElementById(`ls-${s.id}-depth`)?.focus();
+  } else if (act === 'ls-del') { const s = b.samples[+el.dataset.idx]; if (!s) return; b.samples.splice(+el.dataset.idx, 1); logChange(b, 'Samples & SPT'); store.save(b); refreshLayerEditor(b); toast(`Deleted ${sampleId(s)}. ${MOD}Z undoes it.`); }
+}
+/* a depth typed in the layer's sample list: once it is finished, the sample shows in the layer it belongs to */
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.closest?.('.lsamp') || t.dataset.k !== 'depth') return;
+  const b = cur(), s = b?.samples[+t.dataset.i], l = b?.layers[S.layer]; if (!s || !l) return; S.lsNew.delete(s.id);
+  if (s.depth != null && !layerSamples(b, l).some(x => x.s === s)) { const j = b.layers.findIndex(x => layerSamples(b, x).some(y => y.s === s)); toast(`${sampleId(s)} is at ${fu(s.depth)}, so it moved to ${j >= 0 ? `layer ${j + 1} (${fx(b.layers[j].top)}–${fu(b.layers[j].bottom)})` : 'no layer yet'}.`); }
+  setTimeout(() => refreshLayerEditor(b), 0);
+});
 /* redraw the layer editor where it is open: the Log & data page, or the Full log side panel (which also redraws the log) */
 function refreshLayerEditor(b) { const d = $('#ldetail'); if (d) d.innerHTML = layerDetail(b); if (S.drawer?.kind === 'layer') { renderDrawer(); redrawLog(); } refreshLayerRow(b); }
 function layerDetail(b) {
@@ -4008,6 +4041,7 @@ function layerDetail(b) {
       <div class="preview" id="ld-preview">${descHTML(l)}</div>
       ${steps.map(([label, btns, extra], n) => `<div class="qd-row lstep"><span class="qd-l"><span class="lstep-n">${n + 1}</span>${esc(label)}</span><div class="lstep-b"><div class="chips">${btns}</div>${extra ? `<div class="lstep-in">${extra}</div>` : ''}</div></div>`).join('')}
     </div>
+    ${layerSamplesHTML(b, l, ed)}
     <details class="qd-more" ${S.ldMore ? 'open' : ''}><summary>Soil science names, unit and log note</summary>
     <div class="fields">
       ${fld('Horizon (CSSC)', `<input type="text" list="hz-list" ${at('hz')} value="${esc(l.hz || '')}" placeholder="e.g. Ah, Bm, Ck" ${dis}><datalist id="hz-list">${Object.entries(HORIZONS).map(([k, v]) => `<option value="${k}" label="${esc(v)}">`).join('')}</datalist>`)}
@@ -4114,7 +4148,7 @@ function onField(e) {
       const ni = document.getElementById(`s-${row.id}-n`);
       if (row.b2 != null && row.b3 != null) { row.n = row.b2 + row.b3; if (ni) { ni.value = row.n; ni.readOnly = true; } } else if (ni) ni.readOnly = false;
     }
-    if (sec === 'samples' && k === 'type') { const fm = t.closest('.lf-form, .dbody'); if (fm) { const si = +t.dataset.i; fm.innerHTML = sampleFormHTML(b, si, fm.classList.contains('lf-form')); fm.querySelector(`#s-${row.id}-type`)?.focus(); } }   // the SPT and core fields follow the method
+    if (sec === 'samples' && k === 'type' && !t.closest('.lsamp')) { const fm = t.closest('.lf-form, .dbody'); if (fm) { const si = +t.dataset.i; fm.innerHTML = sampleFormHTML(b, si, fm.classList.contains('lf-form')); fm.querySelector(`#s-${row.id}-type`)?.focus(); } }   // the SPT and core fields follow the method
     if (sec === 'water') { recomputeWater(row, b); refreshWaterOut(b); }
     if (sec === 'layers') { refreshLayerRow(b); checkLayers(b); }
   } else return;
@@ -10696,6 +10730,7 @@ document.addEventListener('click', e => {
     case 'apple-save': appleSave(); break;
     case 'apple-clear': appleClear(); break;
     case 'soil-add': case 'soil-imp-pts': case 'soil-imp-lab': case 'soil-lab-go': case 'soil-issue': case 'soil-xlsx': case 'soil-csv': case 'soil-example': soilAct(act); break;
+    case 'ls-add': case 'ls-del': layerSampleAct(act, e.target.closest('[data-act]')); break;
     case 'cols-auto': if (!S.readOnly) { S.co.cols = {}; store.saveCompany(); renderView(true); toast('Log columns are automatic again.'); } break;
     case 'drawer-close': closeDrawer(); break;
     case 'drawer-del': if (editable(b) && (S.drawer || t.dataset.idx != null)) { const what = t.dataset.what, idx = t.dataset.idx != null ? +t.dataset.idx : S.drawer.i; if (!t.classList.contains('armed')) { t.classList.add('armed'); t.textContent = 'Tap again to delete'; break; } b[what].splice(idx, 1); logChange(b, { layers: 'Soil layers', samples: 'Samples & SPT', water: 'Groundwater' }[what]); store.save(b); if (S.drawer) closeDrawer(); else renderView(true); renderFacts(b); renderList(sortedList()); toast('Deleted.'); } break;
