@@ -2339,6 +2339,29 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('layer editor: your own buttons', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); const b = sortedList().find(x => x.status !== 'issued' && x.layers.length > 2 && x.samples.length); S.sel = b.id; S.dtab = 'soil'; S.layer = 1; goTab('edit'); await w(400);
+        const d = () => document.querySelector('#ldetail'), terms = k => [...d().querySelectorAll('[data-chip="' + k + '"], [data-qpick="' + k + '"]')].map(x => x.dataset.term);
+        const m = document.querySelector('#ld-mods'); m.value = 'silty, trace mica'; m.dispatchEvent(new Event('input', { bubbles: true })); await w(150); want(/trace mica/.test(b.layers[1].mods), 'typed into the layer');
+        d().querySelector('[data-act="btn-save"][data-for="mods"]').click(); await w(200); want(terms('mods').includes('trace mica'), 'saved as a button: ' + terms('mods').slice(-3));
+        want(/trace mica/.test(lsGet('bhlog.buttons') || '') && !JSON.stringify(S.co).includes('trace mica') && !JSON.stringify(siteOf() || {}).includes('trace mica'), 'kept for this person only');
+        openButtons(); await w(150); const ta = k => document.querySelector('[data-btns="' + k + '"]');
+        want(ta('mods').value.split('\\n').includes('trace mica'), 'the dialog lists it');
+        ta('moisture').value = 'Wet\\nDry'; ta('uscs').value = 'SM\\nXX\\nCL'; ta('type').value = 'J\\nSS'; document.querySelector('[data-act="btns-save"]').click(); await w(250);
+        want(/XX/.test(document.querySelector('#toast').textContent), 'an unknown soil symbol is refused: ' + document.querySelector('#toast').textContent);
+        renderView(true); await w(200); want(terms('moisture').join() === 'Wet,Dry', 'reordered and hidden: ' + terms('moisture')); want(terms('uscs').join() === 'SM,CL', 'soil buttons are symbols: ' + terms('uscs'));
+        const tsel = d().querySelector('.lsamp select[data-k="type"]'); want(!tsel || [...tsel.options].map(o => o.value).slice(0, 2).join() === 'J,SS', 'sample types follow the list');
+        openButtons(); await w(150); ta('moisture').value = ''; document.querySelector('[data-act="btns-save"]').click(); await w(200); renderView(true); await w(150); want(terms('moisture').join() === 'Dry,Damp,Moist,Wet,Saturated', 'an empty list falls back to the built-in buttons: ' + terms('moisture'));
+        openButtons(); await w(150); document.querySelector('[data-act="btns-reset"]').click(); await w(200); renderView(true); await w(150); want(!terms('mods').includes('trace mica') && !lsGet('bhlog.buttons'), 'reset restores everything');
+        const s0 = layerSamples(b, b.layers[1])[0]; if (s0) { const n = b.samples.length; d().querySelector('[data-act="ls-del"][data-idx="' + s0.i + '"]').click(); await w(200); want(b.samples.length === n - 1, 'a sample can be deleted from the layer'); }
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('soil survey: points and samples, imports, saved with the project', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };

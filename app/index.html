@@ -1412,6 +1412,7 @@ const num = v => { if (v === '' || v == null) return null; if (typeof v === 'num
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };   // local date: toISOString is UTC, a day ahead on prairie evenings
 const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch { return false; } };
+const lsDel = k => { try { localStorage.removeItem(k); } catch {} };
 /* saved data (boreholes, company, site) lives in IndexedDB, which has room for years of logs and site images. Local storage
    (about 5 MB) is where older versions kept it, and the fallback when IndexedDB fails: a key found there is newer than
    IndexedDB's copy, because a successful IndexedDB write removes it. A failed write must never look saved. */
@@ -2404,7 +2405,7 @@ function openPrefs() {
       <div class="fld"><label>Depth per PDF page</label>${mirror('page-depth')}</div>
       <div class="fld"><label>Soil symbols</label>${mirror('symset')}</div>
       <div class="fld"><label>Log graphics</label>${mirror('logstyle')}</div></div>
-    <div class="actions" style="margin-top:6px"><button class="btn" data-act="settings">Company, logo &amp; initials…</button><button class="btn" data-act="log-cols">Log columns…</button><button class="btn" data-act="field">${document.body.classList.contains('field') ? 'Turn off' : 'Turn on'} large controls</button></div>`,
+    <div class="actions" style="margin-top:6px"><button class="btn" data-act="settings">Company, logo &amp; initials…</button><button class="btn" data-act="buttons">Your buttons…</button><button class="btn" data-act="log-cols">Log columns…</button><button class="btn" data-act="field">${document.body.classList.contains('field') ? 'Turn off' : 'Turn on'} large controls</button></div>`,
     `<button class="btn primary" data-act="close">Done</button>`);
   document.querySelectorAll('[data-mirror]').forEach(sel => { sel.value = $('#' + sel.dataset.mirror).value; });
 }
@@ -3978,6 +3979,37 @@ function layerRows(b) {
 /* the steps of a description, in the order it is written (CFEM / Modified USCS) */
 const PG_FINE = ['non-plastic', 'low plastic', 'medium plastic', 'high plastic'], PG_COARSE = ['well graded', 'poorly graded', 'uniformly graded', 'gap graded'];
 const pgDefault = l => { const s = soilOf(l.uscs); return s ? s.grad || (s.plast && s.p !== 'PEAT' ? `${s.plast} plastic` : '') : ''; };
+/* your own buttons: per person, on this computer (never in a project or the company settings). A step with no list of its own
+   uses the built-in buttons. Soil, origin and sample type keep to the codes the log understands. */
+const BTN_STEPS = [['uscs', 'Soil (symbols)'], ['mods', 'Modifiers'], ['pg', 'Plasticity or gradation'], ['consistency', 'Consistency / compactness'], ['moisture', 'Moisture'], ['colour', 'Colour'], ['other', 'Other features'], ['origin', 'Origin'], ['type', 'Sample type']];
+const BTN_BUILTIN = () => ({ uscs: QUICK_SOILS.filter(k => SOILS[k]), mods: MOD_CHIPS, pg: [...PG_FINE, ...PG_COARSE], consistency: [...COHESIVE, ...GRANULAR].filter(Boolean), moisture: MOISTURE.filter(Boolean), colour: QUICK_COLOURS, other: OTHER_CHIPS, origin: Object.keys(ORIGINS).filter(Boolean), type: Object.keys(SAMPLE_TYPES) });
+const myBtnAll = () => { try { return JSON.parse(lsGet('bhlog.buttons') || '{}') || {}; } catch { return {}; } };
+const myButtons = (k, builtIn) => { const v = myBtnAll()[k]; return Array.isArray(v) && v.length ? v : builtIn; };
+function saveMyButtons(k, list) { const all = myBtnAll(); if (list?.length) all[k] = list; else delete all[k]; Object.keys(all).length ? lsSet('bhlog.buttons', JSON.stringify(all)) : lsDel('bhlog.buttons'); }
+/* a codes step accepts the code or its name; anything else is refused */
+const BTN_CODES = { uscs: () => Object.fromEntries(Object.keys(SOILS).map(k => [k.toLowerCase(), k])), origin: () => Object.fromEntries(Object.entries(ORIGINS).filter(([k]) => k).flatMap(([k, v]) => [[k, k], [v.toLowerCase(), k]])), type: () => Object.fromEntries(Object.entries(SAMPLE_TYPES).flatMap(([k, v]) => [[k.toLowerCase(), k], [v.toLowerCase(), k], [v.replace(/^\S+ – /, '').toLowerCase(), k]])) };
+function openButtons() {
+  const B = BTN_BUILTIN();
+  dialog('Your buttons', `<p class="note" style="margin:0">One button per line, in the order you want them. Leave a box empty to use the built-in buttons. These are yours, on this computer; they are not saved in projects.</p>
+    <div class="fields" style="grid-template-columns:1fr 1fr">${BTN_STEPS.map(([k, t]) => `<div class="fld"><label for="btns-${k}">${esc(t)}</label><textarea id="btns-${k}" data-btns="${k}" rows="6" spellcheck="false">${esc((myBtnAll()[k] || B[k]).join('\n'))}</textarea></div>`).join('')}</div>`,
+    `<button class="btn" data-act="btns-reset">Reset all</button><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="btns-save">Save</button>`);
+}
+function buttonsSave() {
+  const B = BTN_BUILTIN(), bad = [];
+  for (const [k] of BTN_STEPS) {
+    const el = document.querySelector(`[data-btns="${k}"]`); if (!el) continue;
+    let list = [...new Set(el.value.split('\n').map(x => x.trim()).filter(Boolean))];
+    if (BTN_CODES[k]) { const m = BTN_CODES[k](); list.filter(x => !m[x.toLowerCase()]).forEach(x => bad.push(x)); list = [...new Set(list.map(x => m[x.toLowerCase()]).filter(Boolean))]; }
+    saveMyButtons(k, JSON.stringify(list) === JSON.stringify(B[k]) ? null : list);
+  }
+  closeOverlay(); renderView(true); toast(bad.length ? `Saved. Not used, because the log can't read them: ${bad.join(', ')}. Use a soil symbol, origin or sample type from the lists.` : 'Your buttons are saved.');
+}
+function buttonSaveFromBox(k) {
+  const b = cur(), l = b?.layers[S.layer], v = String(l?.[k] || '').trim(); if (!v) { toast('Type a value in the box first.'); return; }
+  const terms = ['mods', 'other'].includes(k) ? splitTerms(v) : [v], cur0 = myButtons(k, BTN_BUILTIN()[k]), add = terms.filter(t => !cur0.some(x => x.toLowerCase() === t.toLowerCase()));
+  if (!add.length) { toast('Already a button.'); return; }
+  saveMyButtons(k, [...cur0, ...add]); refreshLayerEditor(b); toast(`Saved as a button: ${add.join(', ')}. Change your buttons in Settings › Your buttons.`);
+}
 /* the samples taken in a layer: depth from its top up to its bottom (the last layer keeps its bottom), plus any just added here */
 S.lsNew = new Set();
 function layerSamples(b, l) {
@@ -3991,7 +4023,7 @@ function layerSamplesHTML(b, l, ed) {
   const rows = layerSamples(b, l), inp = (s, i, k, v, t = 'text', extra = '') => `<input id="ls-${s.id}-${k}" type="${t}" ${t === 'number' ? 'step="any" inputmode="decimal"' : ''} data-sec="samples" data-i="${i}" data-k="${k}" value="${esc(v ?? '')}" ${dis} ${extra}>`;
   return `<div class="lsamp">${head}<div class="scroll-x"><table class="sum lsamp-t"><thead><tr><th>Name</th><th class="r">Depth (${LEN()})</th><th>Type</th><th class="r">VOC (ppm)</th><th class="r">LEL (%)</th><th></th></tr></thead><tbody>${rows.map(({ s, i }) => `<tr data-sid="${esc(s.id)}">
     <td>${inp(s, i, 'name', s.name, 'text', `placeholder="${esc(sampleId({ ...s, name: '' }))}" aria-label="Sample name"`)}</td><td>${inp(s, i, 'depth', f(s.depth, 3), 'number', 'aria-label="Depth"')}</td>
-    <td><select id="ls-${s.id}-type" data-sec="samples" data-i="${i}" data-k="type" ${dis} aria-label="Type">${opt(withCur(Object.keys(SAMPLE_TYPES), s.type), s.type, SAMPLE_TYPES)}</select></td>
+    <td><select id="ls-${s.id}-type" data-sec="samples" data-i="${i}" data-k="type" ${dis} aria-label="Type">${opt(withCur(myButtons('type', Object.keys(SAMPLE_TYPES)).filter(k => SAMPLE_TYPES[k]), s.type), s.type, SAMPLE_TYPES)}</select></td>
     <td>${inp(s, i, 'cvc', s.cvc, 'number', 'min="0" aria-label="VOC in ppm"')}</td><td>${inp(s, i, 'lel', s.lel, 'number', 'min="0" max="100" aria-label="LEL in percent"')}</td>
     <td class="del">${ed ? `<button class="x" data-act="ls-del" data-idx="${i}" aria-label="Delete sample">×</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="6" class="note">No samples in this layer yet.</td></tr>`}</tbody></table></div>
     ${ed ? '<button class="btn" data-act="ls-add" style="margin-top:6px">+ Add sample</button>' : ''}<p class="note" style="margin:4px 0 0">Blow counts, lab results and grain size are on Samples &amp; lab.</p></div>`;
@@ -4020,16 +4052,16 @@ function layerDetail(b) {
   const qp = (k, list, labels) => list.map(t => `<button type="button" class="chip" data-qpick="${k}" data-term="${esc(t)}" aria-pressed="${String(l[k] || '').toLowerCase() === t.toLowerCase()}" ${dis}>${esc(labels?.[t] ?? t)}</button>`).join('');
   const multi = (k, list) => chips(k, l[k], list).replace(/^<div class="chips">|<\/div>$/g, '').replace(/<button /g, `<button ${dis} `);
   const box = (k, ph, list) => `<input type="text" ${list ? `list="${list}"` : ''} ${at(k)} value="${esc(l[k] || '')}" placeholder="${esc(ph)}" ${dis}>`;
-  const grp = soilOf(l.uscs)?.group, states = stateList(l.uscs).filter(Boolean), oKeys = Object.keys(ORIGINS).filter(Boolean);
+  const grp = soilOf(l.uscs)?.group, states = stateList(l.uscs).filter(Boolean), oKeys = Object.keys(ORIGINS).filter(Boolean), save = k => ed ? `<button class="btn link" data-act="btn-save" data-for="${k}">Save as a button</button>` : '';
   const steps = [
-    ['Soil', qp('uscs', QUICK_SOILS.filter(k => SOILS[k])), `<select ${at('uscs')} ${dis} aria-label="Any soil type">${soilOpts(l.uscs)}</select>`],
-    ['Modifiers', multi('mods', MOD_CHIPS), box('mods', soilOf(l.uscs)?.imp || 'or type, e.g. trace mica', 'mods')],
-    ['Plasticity or gradation', qp('pg', grp === 'coarse' ? PG_COARSE : grp === 'fine' ? PG_FINE : [...PG_FINE, ...PG_COARSE]), box('pg', pgDefault(l) ? `from the symbol: ${pgDefault(l)}` : 'from the symbol')],
-    [stateLabel(l.uscs), states.length ? qp('consistency', states) : '<span class="note">Pick a soil first.</span>', ed ? '<button class="btn link" data-act="suggest" title="Use the SPT N, pocket penetrometer or vane results inside this layer">Suggest from tests</button>' : ''],
-    ['Moisture', qp('moisture', MOISTURE.filter(Boolean)), ''],
-    ['Colour', qp('colour', QUICK_COLOURS), box('colour', 'or type, e.g. mottled orange-brown', 'colours')],
-    ['Other features', multi('other', OTHER_CHIPS), box('other', 'or type, e.g. trace coal', 'others')],
-    ['Origin', qp('origin', oKeys, ORIGINS), ''],
+    ['Soil', qp('uscs', myButtons('uscs', QUICK_SOILS).filter(k => SOILS[k])), `<select ${at('uscs')} ${dis} aria-label="Any soil type">${soilOpts(l.uscs)}</select>`],
+    ['Modifiers', multi('mods', myButtons('mods', MOD_CHIPS)), box('mods', soilOf(l.uscs)?.imp || 'or type, e.g. trace mica', 'mods') + save('mods')],
+    ['Plasticity or gradation', qp('pg', myButtons('pg', [...PG_FINE, ...PG_COARSE]).filter(t => grp === 'coarse' ? !PG_FINE.includes(t) : grp === 'fine' ? !PG_COARSE.includes(t) : true)), box('pg', pgDefault(l) ? `from the symbol: ${pgDefault(l)}` : 'from the symbol') + save('pg')],
+    [stateLabel(l.uscs), states.length ? qp('consistency', myButtons('consistency', states).filter(t => states.includes(t) || ![...COHESIVE, ...GRANULAR, ...WEATHERING].includes(t))) : '<span class="note">Pick a soil first.</span>', ed ? '<button class="btn link" data-act="suggest" title="Use the SPT N, pocket penetrometer or vane results inside this layer">Suggest from tests</button>' : ''],
+    ['Moisture', qp('moisture', myButtons('moisture', MOISTURE.filter(Boolean))), ''],
+    ['Colour', qp('colour', myButtons('colour', QUICK_COLOURS)), box('colour', 'or type, e.g. mottled orange-brown', 'colours') + save('colour')],
+    ['Other features', multi('other', myButtons('other', OTHER_CHIPS)), box('other', 'or type, e.g. trace coal', 'others') + save('other')],
+    ['Origin', qp('origin', myButtons('origin', oKeys).filter(k => ORIGINS[k]), ORIGINS), ed ? '<button class="btn link" data-act="buttons">Your buttons…</button>' : ''],
   ];
   const menu = ed ? `<details class="lmenu"><summary class="btn" aria-label="More layer actions" title="More layer actions">⋯</summary><span class="lmenu-pop">${[['l-insert', 'Insert a layer above'], ['l-dup', 'Duplicate'], ['l-split', 'Split in two'], ['l-up', 'Move up'], ['l-down', 'Move down'], ['l-del', 'Delete layer']].map(([a, t]) => `<button type="button" class="btn link${a === 'l-del' ? ' danger' : ''}" data-act="${a}">${t}</button>`).join('')}</span></details>` : '';
   return `<div style="display:flex;align-items:center;gap:8px"><b>Layer ${i + 1}</b><span class="note">${l.top != null || l.bottom != null ? `${fx(l.top)}–${fx(l.bottom)} ${L}` : 'Edits apply immediately'}</span><span class="sp" style="flex:1"></span>${i > 0 && ed ? '<button class="btn link" data-act="same-above">Same as layer above</button>' : ''}${menu}</div>
@@ -10730,6 +10762,10 @@ document.addEventListener('click', e => {
     case 'apple-save': appleSave(); break;
     case 'apple-clear': appleClear(); break;
     case 'soil-add': case 'soil-imp-pts': case 'soil-imp-lab': case 'soil-lab-go': case 'soil-issue': case 'soil-xlsx': case 'soil-csv': case 'soil-example': soilAct(act); break;
+    case 'buttons': openButtons(); break;
+    case 'btns-save': buttonsSave(); break;
+    case 'btns-reset': lsDel('bhlog.buttons'); closeOverlay(); renderView(true); toast('Back to the built-in buttons.'); break;
+    case 'btn-save': buttonSaveFromBox(e.target.closest('[data-act]').dataset.for); break;
     case 'ls-add': case 'ls-del': layerSampleAct(act, e.target.closest('[data-act]')); break;
     case 'cols-auto': if (!S.readOnly) { S.co.cols = {}; store.saveCompany(); renderView(true); toast('Log columns are automatic again.'); } break;
     case 'drawer-close': closeDrawer(); break;
