@@ -592,6 +592,18 @@ table.sum th, table.hist th { background: var(--panel-2); }
 .lf-item:hover { background: var(--hover); }
 .lf-item[aria-current="true"] { background: var(--sel); } .lf-item[aria-current="true"] b { color: var(--accent-2); }
 .lf-form { min-width: 0; display: grid; gap: 12px; }
+.qd-row.lstep { align-items: start; }
+.lstep-n { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 6px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font: 600 10.5px var(--f-body); vertical-align: 1px; }
+.lstep-b { display: grid; gap: 6px; min-width: 0; flex: 1; }
+.lstep-in { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.lstep-in input { max-width: 360px; flex: 1 1 220px; } .lstep-in select { max-width: 260px; }
+.lmenu-pop .btn { text-decoration: none; padding: 6px 10px; } .lmenu-pop .btn:hover { background: var(--hover); }
+table.lsamp-t { min-width: 0; } table.lsamp-t td { padding: 3px 4px; } table.lsamp-t input, table.lsamp-t select { width: 100%; min-width: 64px; }
+details.lmenu { position: relative; }
+details.lmenu > summary { list-style: none; cursor: pointer; padding: 2px 10px; }
+details.lmenu > summary::-webkit-details-marker { display: none; }
+.lmenu-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; display: grid; min-width: 190px; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-sm); box-shadow: 0 6px 18px rgba(0,0,0,.14); }
+.lmenu-pop .btn { justify-content: flex-start; text-align: left; }
 .ff { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
 .ff .fld.wide { grid-column: 1 / -1; }
 .ff-h { margin: 4px 0 -2px; font: 600 13px var(--f-body); color: var(--ink); }
@@ -1402,6 +1414,7 @@ const num = v => { if (v === '' || v == null) return null; if (typeof v === 'num
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };   // local date: toISOString is UTC, a day ahead on prairie evenings
 const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch { return false; } };
+const lsDel = k => { try { localStorage.removeItem(k); } catch {} };
 /* saved data (boreholes, company, site) lives in IndexedDB, which has room for years of logs and site images. Local storage
    (about 5 MB) is where older versions kept it, and the fallback when IndexedDB fails: a key found there is newer than
    IndexedDB's copy, because a successful IndexedDB write removes it. A failed write must never look saved. */
@@ -1481,8 +1494,8 @@ const stateList = code => { const g = soilOf(code)?.group; return g === 'coarse'
 const stateLabel = code => { const g = soilOf(code)?.group; return g === 'coarse' ? 'Compactness' : g === 'fine' ? 'Consistency' : g === 'rock' ? 'Weathering' : 'Consistency / compactness'; };
 const ORIGINS = { '': '', topsoil: 'Topsoil', fill: 'Fill', lacustrine: 'Lacustrine', alluvium: 'Alluvium', till: 'Glacial till', glaciofluvial: 'Glaciofluvial', aeolian: 'Aeolian', bedrock: 'Bedrock' };
 const ORIGIN_TAG = { fill: 'FILL', lacustrine: 'LACUSTRINE', alluvium: 'ALLUVIUM', till: 'TILL', glaciofluvial: 'GLACIOFLUVIAL', aeolian: 'AEOLIAN' };
-const SAMPLE_TYPES = { SS: 'SS – split spoon (SPT)', ST: 'ST – Shelby tube', G: 'G – grab', A: 'A – auger cuttings', B: 'B – bulk', C: 'C – rock core' };
-const SAMPLE_ALIAS = { SPT: 'SS', SHELBY: 'ST', TUBE: 'ST', U100: 'ST', BULK: 'B', BAG: 'B', JAR: 'G', J: 'G', GRAB: 'G', AUGER: 'A', CORE: 'C', 'SPLIT SPOON': 'SS' };
+const SAMPLE_TYPES = { SS: 'SS – split spoon (SPT)', ST: 'ST – Shelby tube', G: 'G – grab', J: 'J – jar', A: 'A – auger cuttings', B: 'B – bulk', C: 'C – rock core' };
+const SAMPLE_ALIAS = { SPT: 'SS', SHELBY: 'ST', TUBE: 'ST', U100: 'ST', BULK: 'B', BAG: 'B', JAR: 'J', GRAB: 'G', AUGER: 'A', CORE: 'C', 'SPLIT SPOON': 'SS' };
 const WATER_KINDS = { strike: 'Seepage while drilling', completion: 'Upon completion', static: 'Standpipe reading', seepage: 'Seepage' };
 const METHODS = ['', 'Solid-stem auger', 'Hollow-stem auger', 'Mud rotary', 'Air rotary', 'Sonic', 'Diamond core', 'Direct push', 'Hydrovac', 'Hand auger', 'Test pit'];
 const TERMINATION = ['', 'Target depth reached', 'Auger refusal', 'SPT refusal', 'Hole collapse', 'Obstruction', 'Other'];
@@ -1732,7 +1745,7 @@ function normalize(b) {
     const t = String(s.type || '').toUpperCase();
     s.type = SAMPLE_TYPES[t] ? t : SAMPLE_ALIAS[t] || 'SS';
     s.no ??= i + 1;
-    for (const k of ['pp', 'su', 'so4', 'cvc']) s[k] ??= null;
+    for (const k of ['pp', 'su', 'so4', 'cvc', 'lel']) s[k] ??= null;
   });
   b.well = { ...blankWell(), ...(b.well || {}) };
   b.well.annulus ||= [];
@@ -1749,7 +1762,7 @@ function composeDesc(l) {
   const tx = texOf(l), tl = textureLabel(tx);
   const head0 = tl ? (s && !s.nonUscs ? `${tl} (${code})` : tl) : s ? (s.nonUscs ? s.p : `${s.p} (${code})`) : '';
   const head = l.hz ? `${l.hz.trim()} horizon${head0 ? ': ' + head0 : ''}` : head0;
-  const parts = [l.mods || (tx ? '' : s?.imp), tx ? '' : s?.grad, s?.plast && s.p !== 'PEAT' ? `${s.plast} plastic` : '', (l.consistency || '').toLowerCase(), (l.moisture || '').toLowerCase(), l.colour, l.other].filter(Boolean);
+  const parts = [l.mods || (tx ? '' : s?.imp), ...(l.pg ? [l.pg] : [tx ? '' : s?.grad, s?.plast && s.p !== 'PEAT' ? `${s.plast} plastic` : '']), (l.consistency || '').toLowerCase(), (l.moisture || '').toLowerCase(), l.colour, l.other].filter(Boolean);
   const tag = ORIGIN_TAG[l.origin] && !(l.origin === 'fill' && code === 'FILL') ? ` (${ORIGIN_TAG[l.origin]})` : '';
   const body = parts.join(', ') + tag;
   return { name: head, body, text: head ? head + (parts.length ? ', ' + parts.join(', ') : '') + tag : body || 'Not described' };
@@ -2394,7 +2407,7 @@ function openPrefs() {
       <div class="fld"><label>Depth per PDF page</label>${mirror('page-depth')}</div>
       <div class="fld"><label>Soil symbols</label>${mirror('symset')}</div>
       <div class="fld"><label>Log graphics</label>${mirror('logstyle')}</div></div>
-    <div class="actions" style="margin-top:6px"><button class="btn" data-act="settings">Company, logo &amp; initials…</button><button class="btn" data-act="log-cols">Log columns…</button><button class="btn" data-act="field">${document.body.classList.contains('field') ? 'Turn off' : 'Turn on'} large controls</button></div>`,
+    <div class="actions" style="margin-top:6px"><button class="btn" data-act="settings">Company, logo &amp; initials…</button><button class="btn" data-act="buttons">Your buttons…</button><button class="btn" data-act="log-cols">Log columns…</button><button class="btn" data-act="field">${document.body.classList.contains('field') ? 'Turn off' : 'Turn on'} large controls</button></div>`,
     `<button class="btn primary" data-act="close">Done</button>`);
   document.querySelectorAll('[data-mirror]').forEach(sel => { sel.value = $('#' + sel.dataset.mirror).value; });
 }
@@ -2566,7 +2579,7 @@ function sampleFormHTML(b, i, full) {
     <h4 class="ff-h">Field and lab tests</h4><div class="fields ff">
       ${n2('w', sm.w, 'Water content w (%)')}${n2('pl', sm.pl, 'Plastic limit (%)')}${n2('ll', sm.ll, 'Liquid limit (%)')}
       ${full ? out('pi', 'Plasticity index') + out('cls', 'Lab class') : ''}
-      ${n2('pp', sm.pp, 'Pocket pen. (kPa)')}${n2('su', sm.su, 'Field vane Su (kPa)')}${n2('cvc', sm.cvc, 'Vapour (ppm)')}
+      ${n2('pp', sm.pp, 'Pocket pen. (kPa)')}${n2('su', sm.su, 'Field vane Su (kPa)')}${n2('cvc', sm.cvc, 'Vapour (ppm)')}${n2('lel', sm.lel, 'LEL (%)')}
       ${n2('so4', sm.so4, 'Sulphate SO4 (%)')}${full ? out('so4c', 'CSA A23.1 class') + out('sw', 'Swell (indicative)') : ''}
       ${full ? `<div class="fld wide"><label>Grain size</label><div class="inline"><button class="btn" data-gsd="${i}">${sm.gsd?.length ? 'Edit curve' : 'Add curve'}</button><span class="out" data-calc="gsd-${i}"></span></div></div>` : ''}
       <div class="fld wide"><label for="s-${sm.id}-note">Remarks</label><input id="s-${sm.id}-note" type="text" data-sec="samples" data-i="${i}" data-k="note" value="${esc(sm.note || '')}" placeholder="e.g. 50/75 mm, wet at tip"></div>
@@ -2892,7 +2905,7 @@ const SHEETS = {
     blank: (b, prev) => ({ id: uid('s'), no: Math.max(0, ...b.samples.map(x => x.no || 0)) + 1, name: nextSampleName(prev?.name), purpose: prev?.purpose || '', depth: null, type: prev?.type || 'SS', b1: null, b2: null, b3: null, n: null, rec: null, rqd: null, w: null, pl: null, ll: null, pp: null, su: null, so4: null, note: '', lab: {}, labMeta: { lab: '', report: '', date: '' } }) },
   tests: { name: 'Field & lab tests', key: 'samples', by: 'depth', cols: [
     ['depth', 'Depth', 'depth'], ['id', 'Sample', 'calc', r => sampleId(r)], ['w', 'w (%)', 'num'], ['pl', 'PL (%)', 'num'], ['ll', 'LL (%)', 'num'], ['pi', 'PI', 'calc', r => r.ll != null && r.pl != null ? +(r.ll - r.pl).toFixed(1) : ''],
-    ['pp', 'PP (kPa)', 'num'], ['su', 'Su vane (kPa)', 'num'], ['so4', 'SO₄ (%)', 'num'], ['cvc', 'Vapour (ppm)', 'num']],
+    ['pp', 'PP (kPa)', 'num'], ['su', 'Su vane (kPa)', 'num'], ['so4', 'SO₄ (%)', 'num'], ['cvc', 'Vapour (ppm)', 'num'], ['lel', 'LEL (%)', 'num']],
     blank: (b, prev) => SHEETS.samples.blank(b, prev) },
   water: { name: 'Water levels', key: 'water', by: 'date', cols: [
     ['date', 'Date', 'date'], ['kind', 'Reading', 'pick', () => Object.values(WATER_KINDS), WATER_KINDS], ['measured', 'Depth to water', 'depth'], ['ref', 'Measured from', 'pick', () => ['Ground surface', 'Top of standpipe'], { gs: 'Ground surface', toc: 'Top of standpipe' }],
@@ -2900,7 +2913,7 @@ const SHEETS = {
     blank: (b, prev) => ({ id: uid('w'), date: prev?.date || today(), measured: null, depth: null, kind: prev?.kind || 'static', ref: prev?.ref || 'gs' }) },
 };
 /* the workspace's layer list: depths typed in place, the description built from the pick panel below it */
-const WS_SHEETS = { layerList: { name: 'Soil layers', key: 'layers', by: 'top', cols: [['top', 'From', 'depth'], ['bottom', 'To', 'depth'], ['desc', 'Description', 'ltdesc']], blank: (b, prev) => SHEETS.layers.blank(b, prev) } };
+const WS_SHEETS = { layerList: { name: 'Soil layers', key: 'layers', by: 'top', noDel: true, cols: [['top', 'From', 'depth'], ['bottom', 'To', 'depth'], ['desc', 'Description', 'ltdesc']], blank: (b, prev) => SHEETS.layers.blank(b, prev) } };
 const sheetOf = k => SHEETS[k] || WS_SHEETS[k];
 S.tsheet = lsGet('bhlog.tsheet') || 'layers'; if (!SHEETS[S.tsheet]) S.tsheet = 'layers';
 /* problems in a borehole's data, found as it is typed: [{sec, id, k, msg}] */
@@ -2983,7 +2996,7 @@ function gridBlockHTML(key, scope) {
     const calc = isCalc(c[2]), msg = iss[`${b.id}:${r.id}:${c[0]}`], cls = [num(c) ? 'r' : ['text', 'pick'].includes(c[2]) ? 'wide' : '', msg ? 'bad' : '', calc ? 'out' : ''].filter(Boolean).join(' ');
     return calc ? `<td class="${cls}"${msg ? ` title="${esc(msg)}"` : ''}>${esc(cellText(c, r, b))}</td>`
       : `<td class="${cls}"${msg ? ` title="${esc(msg)}"` : ''}><input data-r="${i}" data-c="${j}" value="${esc(cellText(c, r, b))}" title="${esc(msg || cellText(c, r, b))}" ${c[3] ? `list="dl-${key}-${c[0]}"` : ''} ${c[5] ? `placeholder="${esc(c[5](r))}"` : ''} ${editable(b) ? '' : 'readonly'} aria-label="${esc(`${b.name} ${c[1]}`)}" autocomplete="off"></td>`;
-  }).join('')}<td class="del">${editable(b) ? `<button class="x" data-tdel="${i}" aria-label="Delete row">${svgI('<path d="M6 6l12 12M18 6 6 18"/>')}</button>` : ''}</td></tr>`).join('');
+  }).join('')}<td class="del">${editable(b) && !sh.noDel ? `<button class="x" data-tdel="${i}" aria-label="Delete row">${svgI('<path d="M6 6l12 12M18 6 6 18"/>')}</button>` : ''}</td></tr>`).join('');
   const msgs = Object.values(iss), cols = cols0.length + (one ? 1 : 2);
   return `${bad ? `<div class="dg-issues" role="status"><b>${bad} problem${bad === 1 ? '' : 's'} to check</b> <span>${esc([...new Set(msgs)].map(m => one ? m.replace(/^[^:]*: /, '') : m).slice(0, 3).join(' · '))}${msgs.length > 3 ? ' …' : ''}</span></div>` : ''}
     <div class="dgrid-wrap"><table class="dgrid" data-sheet="${key}" data-scope="${one ? 'one' : 'all'}"><thead><tr>${one ? '' : '<th class="bh">Borehole</th>'}${head}<th></th></tr></thead><tbody>${body || `<tr><td colspan="${cols}" class="note">No rows yet.${list.some(editable) ? ' Add one, or paste from Excel into the first cell.' : ''}</td></tr>`}</tbody></table></div>
@@ -3514,7 +3527,7 @@ const GRAPH_TYPES = { line: 'Line', points: 'Points', bars: 'Bars', lollipop: 'L
 function graphSeries() {
   const fr = s => s.gsd?.length > 1 ? gsdFractions(s.gsd) : null;
   const S0 = {
-    cvc: ['Vapour, headspace', 'ppm', 'log', s => s.cvc], n: ['SPT N', NUNIT(), 'lin', s => sptN(s)], n60: ['SPT N60', 'blows/0.3 m', 'lin', (s, b) => sptCorr(b, s)?.N60], n160: ['SPT (N1)60', 'blows/0.3 m', 'lin', (s, b) => sptCorr(b, s)?.N160],
+    cvc: ['Vapour, headspace', 'ppm', 'log', s => s.cvc], lel: ['LEL (combustible gas)', '% LEL', 'lin', s => s.lel], n: ['SPT N', NUNIT(), 'lin', s => sptN(s)], n60: ['SPT N60', 'blows/0.3 m', 'lin', (s, b) => sptCorr(b, s)?.N60], n160: ['SPT (N1)60', 'blows/0.3 m', 'lin', (s, b) => sptCorr(b, s)?.N160],
     pp: ['Pocket penetrometer', 'kPa', 'lin', s => s.pp], su: ['Field vane Su', 'kPa', 'lin', s => s.su], w: ['Water content', '%', 'lin', s => s.w], ll: ['Liquid limit', '%', 'lin', s => s.ll], pl: ['Plastic limit', '%', 'lin', s => s.pl],
     pi: ['Plasticity index', '%', 'lin', s => s.ll != null && s.pl != null ? s.ll - s.pl : null], fines: ['Fines (< 0.075 mm)', '%', 'lin', s => fr(s)?.fines], gravel: ['Gravel', '%', 'lin', s => fr(s)?.gravel], sand: ['Sand', '%', 'lin', s => fr(s)?.sand], clay: ['Clay (< 0.002 mm)', '%', 'lin', s => fr(s)?.clay],
     so4: ['Sulphate SO4', '%', 'lin', s => s.so4], rec: ['Core recovery', '%', 'lin', s => s.rec], rqd: ['RQD', '%', 'lin', s => s.rqd],
@@ -3710,7 +3723,7 @@ function logSVG(b, W) {
   const npts = [], vpts = [], vType = lay('vplot');
   for (const it of sm) {
     const s = it.s, ly = it.ly, N = sptN(s), y0 = y(it.t), y1 = y(it.bt);
-    out.push(`<g><title>${esc(`${sampleId(s)} ${SAMPLE_TYPES[s.type] || s.type} at ${fu(s.depth)}${blowStr(s) ? ' · blows ' + blowStr(s) : ''}${N != null ? ' · N = ' + N : ''}${s.pp != null ? ' · PP ' + s.pp + ' kPa' : ''}${s.su != null ? ' · Su ' + s.su + ' kPa' : ''}${s.so4 != null ? ' · SO4 ' + s.so4 + '%' : ''}`)}</title>`);
+    out.push(`<g><title>${esc(`${sampleId(s)} ${SAMPLE_TYPES[s.type] || s.type} at ${fu(s.depth)}${blowStr(s) ? ' · blows ' + blowStr(s) : ''}${N != null ? ' · N = ' + N : ''}${s.pp != null ? ' · PP ' + s.pp + ' kPa' : ''}${s.su != null ? ' · Su ' + s.su + ' kPa' : ''}${s.so4 != null ? ' · SO4 ' + s.so4 + '%' : ''}${s.cvc != null ? ' · vapour ' + s.cvc + ' ppm' : ''}${s.lel != null ? ' · LEL ' + s.lel + '%' : ''}`)}</title>`);
     if (y1 - y0 >= 4) out.push(`<path d="M${cSm.x} ${y0}H${cN.x + cN.w}M${cSm.x} ${y1}H${cN.x + cN.w}" style="stroke:var(--line)"/>`);
     out.push(sampleGlyph(cTy.x, cTy.w, y0, y1, s.type));
     if (Math.abs(ly - it.y) > .5) out.push(`<path d="M${cSm.x + cSm.w - 2} ${ly}L${cTy.x} ${it.y}" style="stroke:var(--muted)" fill="none"/>`);
@@ -3850,7 +3863,7 @@ function editHTML(b) {
     </section>
     <section class="sec" id="sec-layers">
       <header><h3>Soil layers <span class="issues" id="issues"></span></h3>
-        <div class="mini-tools">${tbtn('l-add', 'add', 'Add layer', 'Add a layer below the selected one')}${tbtn('l-insert', 'add', 'Insert above')}${tbtn('l-dup', 'add', 'Duplicate', 'Copy the selected layer below it; enter the new bottom depth')}${tbtn('l-split', 'split', 'Split', 'Split the selected layer at its mid-depth')}${tbtn('l-up', 'up', '', 'Move up')}${tbtn('l-down', 'down', '', 'Move down')}${tbtn('l-del', 'del', 'Delete')}<span class="tb-sep" aria-hidden="true"></span><button class="tb" data-act="grid-bh" title="Type this borehole's layers in a spreadsheet grid: Tab and Enter move between cells, paste from Excel">${ICON.num}Edit as grid</button></div></header>
+        <div class="mini-tools">${tbtn('l-add', 'add', 'Add layer', 'Add a layer below the selected one')}<span class="tb-sep" aria-hidden="true"></span><button class="tb" data-act="grid-bh" title="Type this borehole's layers in a spreadsheet grid: Tab and Enter move between cells, paste from Excel">${ICON.num}Edit as grid</button></div></header>
       <div class="body layers-split">
         <div class="scroll-x" style="max-height:520px;overflow:auto"><table class="lgrid" id="lgrid">${layerRows(b)}</table></div>
         <div class="detail" id="ldetail">${layerDetail(b)}</div>
@@ -3965,45 +3978,117 @@ function layerRows(b) {
       <td><span class="sw" style="background:var(--${soilOf(l.uscs)?.fill || 'panel-2'})"></span>${subOf(b.layers, i) ? `<span class="muted">${esc(subNote(b.layers, i))}</span>` : esc(composeDesc(l).text)}</td></tr>`;
   }).join('') || '<tr><td colspan="4" class="note">No layers. Use Add below.</td></tr>'}</tbody>`;
 }
+/* the steps of a description, in the order it is written (CFEM / Modified USCS) */
+const PG_FINE = ['non-plastic', 'low plastic', 'medium plastic', 'high plastic'], PG_COARSE = ['well graded', 'poorly graded', 'uniformly graded', 'gap graded'];
+const pgDefault = l => { const s = soilOf(l.uscs); return s ? s.grad || (s.plast && s.p !== 'PEAT' ? `${s.plast} plastic` : '') : ''; };
+/* your own buttons: per person, on this computer (never in a project or the company settings). A step with no list of its own
+   uses the built-in buttons. Soil, origin and sample type keep to the codes the log understands. */
+const BTN_STEPS = [['uscs', 'Soil (symbols)'], ['mods', 'Modifiers'], ['pg', 'Plasticity or gradation'], ['consistency', 'Consistency / compactness'], ['moisture', 'Moisture'], ['colour', 'Colour'], ['other', 'Other features'], ['origin', 'Origin'], ['type', 'Sample type']];
+const BTN_BUILTIN = () => ({ uscs: QUICK_SOILS.filter(k => SOILS[k]), mods: MOD_CHIPS, pg: [...PG_FINE, ...PG_COARSE], consistency: [...COHESIVE, ...GRANULAR].filter(Boolean), moisture: MOISTURE.filter(Boolean), colour: QUICK_COLOURS, other: OTHER_CHIPS, origin: Object.keys(ORIGINS).filter(Boolean), type: Object.keys(SAMPLE_TYPES) });
+const myBtnAll = () => { try { return JSON.parse(lsGet('bhlog.buttons') || '{}') || {}; } catch { return {}; } };
+const myButtons = (k, builtIn) => { const v = myBtnAll()[k]; return Array.isArray(v) && v.length ? v : builtIn; };
+function saveMyButtons(k, list) { const all = myBtnAll(); if (list?.length) all[k] = list; else delete all[k]; Object.keys(all).length ? lsSet('bhlog.buttons', JSON.stringify(all)) : lsDel('bhlog.buttons'); }
+/* a codes step accepts the code or its name; anything else is refused */
+const BTN_CODES = { uscs: () => Object.fromEntries(Object.keys(SOILS).map(k => [k.toLowerCase(), k])), origin: () => Object.fromEntries(Object.entries(ORIGINS).filter(([k]) => k).flatMap(([k, v]) => [[k, k], [v.toLowerCase(), k]])), type: () => Object.fromEntries(Object.entries(SAMPLE_TYPES).flatMap(([k, v]) => [[k.toLowerCase(), k], [v.toLowerCase(), k], [v.replace(/^\S+ – /, '').toLowerCase(), k]])) };
+function openButtons() {
+  const B = BTN_BUILTIN();
+  dialog('Your buttons', `<p class="note" style="margin:0">One button per line, in the order you want them. Leave a box empty to use the built-in buttons. These are yours, on this computer; they are not saved in projects.</p>
+    <div class="fields" style="grid-template-columns:1fr 1fr">${BTN_STEPS.map(([k, t]) => `<div class="fld"><label for="btns-${k}">${esc(t)}</label><textarea id="btns-${k}" data-btns="${k}" rows="6" spellcheck="false">${esc((myBtnAll()[k] || B[k]).join('\n'))}</textarea></div>`).join('')}</div>`,
+    `<button class="btn" data-act="btns-reset">Reset all</button><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="btns-save">Save</button>`);
+}
+function buttonsSave() {
+  const B = BTN_BUILTIN(), bad = [];
+  for (const [k] of BTN_STEPS) {
+    const el = document.querySelector(`[data-btns="${k}"]`); if (!el) continue;
+    let list = [...new Set(el.value.split('\n').map(x => x.trim()).filter(Boolean))];
+    if (BTN_CODES[k]) { const m = BTN_CODES[k](); list.filter(x => !m[x.toLowerCase()]).forEach(x => bad.push(x)); list = [...new Set(list.map(x => m[x.toLowerCase()]).filter(Boolean))]; }
+    saveMyButtons(k, JSON.stringify(list) === JSON.stringify(B[k]) ? null : list);
+  }
+  closeOverlay(); renderView(true); toast(bad.length ? `Saved. Not used, because the log can't read them: ${bad.join(', ')}. Use a soil symbol, origin or sample type from the lists.` : 'Your buttons are saved.');
+}
+function buttonSaveFromBox(k) {
+  const b = cur(), l = b?.layers[S.layer], v = String(l?.[k] || '').trim(); if (!v) { toast('Type a value in the box first.'); return; }
+  const terms = ['mods', 'other'].includes(k) ? splitTerms(v) : [v], cur0 = myButtons(k, BTN_BUILTIN()[k]), add = terms.filter(t => !cur0.some(x => x.toLowerCase() === t.toLowerCase()));
+  if (!add.length) { toast('Already a button.'); return; }
+  saveMyButtons(k, [...cur0, ...add]); refreshLayerEditor(b); toast(`Saved as a button: ${add.join(', ')}. Change your buttons in Settings › Your buttons.`);
+}
+/* the samples taken in a layer: depth from its top up to its bottom (the last layer keeps its bottom), plus any just added here */
+S.lsNew = new Set();
+function layerSamples(b, l) {
+  const last = l === [...b.layers].filter(x => x.bottom != null).sort((a, c) => a.bottom - c.bottom).pop();
+  return (b.samples || []).map((s, i) => ({ s, i })).filter(({ s }) => S.lsNew.has(s.id) || (s.depth != null && s.depth >= l.top - 1e-9 && (s.depth < l.bottom - 1e-9 || (last && Math.abs(s.depth - l.bottom) < 1e-9))))
+    .sort((a, c) => (a.s.depth ?? Infinity) - (c.s.depth ?? Infinity));
+}
+function layerSamplesHTML(b, l, ed) {
+  const dis = ed ? '' : 'disabled', head = `<h4 class="ff-h" style="margin-top:12px">Samples in this layer</h4>`;
+  if (l.top == null || l.bottom == null) return `<div class="lsamp">${head}<p class="note">Enter the layer's depths to list its samples.</p></div>`;
+  const rows = layerSamples(b, l), inp = (s, i, k, v, t = 'text', extra = '') => `<input id="ls-${s.id}-${k}" type="${t}" ${t === 'number' ? 'step="any" inputmode="decimal"' : ''} data-sec="samples" data-i="${i}" data-k="${k}" value="${esc(v ?? '')}" ${dis} ${extra}>`;
+  return `<div class="lsamp">${head}<div class="scroll-x"><table class="sum lsamp-t"><thead><tr><th>Name</th><th class="r">Depth (${LEN()})</th><th>Type</th><th class="r">VOC (ppm)</th><th class="r">LEL (%)</th><th></th></tr></thead><tbody>${rows.map(({ s, i }) => `<tr data-sid="${esc(s.id)}">
+    <td>${inp(s, i, 'name', s.name, 'text', `placeholder="${esc(sampleId({ ...s, name: '' }))}" aria-label="Sample name"`)}</td><td>${inp(s, i, 'depth', f(s.depth, 3), 'number', 'aria-label="Depth"')}</td>
+    <td><select id="ls-${s.id}-type" data-sec="samples" data-i="${i}" data-k="type" ${dis} aria-label="Type">${opt(withCur(myButtons('type', Object.keys(SAMPLE_TYPES)).filter(k => SAMPLE_TYPES[k]), s.type), s.type, Object.fromEntries(Object.entries(SAMPLE_TYPES).map(([k, v]) => [k, v.replace(/ \(.*\)$/, '')])))}</select></td>
+    <td>${inp(s, i, 'cvc', s.cvc, 'number', 'min="0" aria-label="VOC in ppm"')}</td><td>${inp(s, i, 'lel', s.lel, 'number', 'min="0" max="100" aria-label="LEL in percent"')}</td>
+    <td class="del">${ed ? `<button class="x" data-act="ls-del" data-idx="${i}" aria-label="Delete sample">×</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="6" class="note">No samples in this layer yet.</td></tr>`}</tbody></table></div>
+    ${ed ? '<button class="btn" data-act="ls-add" style="margin-top:6px">+ Add sample</button>' : ''}<p class="note" style="margin:4px 0 0">Blow counts, lab results and grain size are on Samples &amp; lab.</p></div>`;
+}
+function layerSampleAct(act, el) {
+  const b = cur(), l = b?.layers[S.layer]; if (!l || !editable(b)) return;
+  if (act === 'ls-add') {
+    const here = layerSamples(b, l).map(x => x.s), prev = here.at(-1) || [...b.samples].sort((a, c) => (a.depth ?? 0) - (c.depth ?? 0)).pop(), s = SHEETS.samples.blank(b, prev);
+    b.samples.push(s); S.lsNew.add(s.id); logChange(b, 'Samples & SPT'); store.save(b); refreshLayerEditor(b); document.getElementById(`ls-${s.id}-depth`)?.focus();
+  } else if (act === 'ls-del') { const s = b.samples[+el.dataset.idx]; if (!s) return; b.samples.splice(+el.dataset.idx, 1); logChange(b, 'Samples & SPT'); store.save(b); refreshLayerEditor(b); toast(`Deleted ${sampleId(s)}. ${MOD}Z undoes it.`); }
+}
+/* a depth typed in the layer's sample list: once it is finished, the sample shows in the layer it belongs to */
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.closest?.('.lsamp') || t.dataset.k !== 'depth') return;
+  const b = cur(), s = b?.samples[+t.dataset.i], l = b?.layers[S.layer]; if (!s || !l) return; S.lsNew.delete(s.id);
+  if (s.depth != null && !layerSamples(b, l).some(x => x.s === s)) { const j = b.layers.findIndex(x => layerSamples(b, x).some(y => y.s === s)); toast(`${sampleId(s)} is at ${fu(s.depth)}, so it moved to ${j >= 0 ? `layer ${j + 1} (${fx(b.layers[j].top)}–${fu(b.layers[j].bottom)})` : 'no layer yet'}.`); }
+  setTimeout(() => refreshLayerEditor(b), 0);
+});
+/* redraw the layer editor where it is open: the Log & data page, or the Full log side panel (which also redraws the log) */
+function refreshLayerEditor(b) { const d = $('#ldetail'); if (d) d.innerHTML = layerDetail(b); if (S.drawer?.kind === 'layer') { renderDrawer(); redrawLog(); } refreshLayerRow(b); }
 function layerDetail(b) {
   const L = LEN(), i = Math.min(S.layer, (b.layers || []).length - 1), l = b.layers[i];
   if (!l) return '<p class="note">Select a layer.</p>';
   const fld = (label, html, cls = '') => `<div class="fld ${cls}"><label>${label}</label>${html}</div>`;
-  const at = k => `id="ld-${k}" data-sec="layers" data-i="${i}" data-k="${k}"`;
-  const ed = editable(b), qp = (k, list) => list.map(t => `<button type="button" class="chip" data-qpick="${k}" data-term="${esc(t)}" aria-pressed="${String(l[k] || '').toLowerCase() === t.toLowerCase()}" ${ed ? '' : 'disabled'}>${esc(t)}</button>`).join('');
-  return `<div style="display:flex;align-items:center;gap:8px"><b>Layer ${i + 1}</b><span class="note">Edits apply immediately</span><span class="sp" style="flex:1"></span>${i > 0 && ed ? '<button class="btn link" data-act="same-above">Same as layer above</button>' : ''}</div>
-    ${i > 0 ? `<label style="display:flex;align-items:center;gap:6px;margin:8px 0 2px" title="Logged as a change within the layer above: a dashed boundary and a note with only what changed, e.g. – grey, wet"><input type="checkbox" ${at('sub')} ${l.sub ? 'checked' : ''} ${ed ? '' : 'disabled'}><span style="white-space:nowrap">Part of the unit above</span></label>` : ''}
-    ${i > 0 && l.sub ? `<div class="fields"><div class="fld wide"><label for="ld-note">Note on the log</label><input type="text" ${at('note')} value="${esc(l.note || '')}" placeholder="${esc(changeNote(l, b.layers[i - 1]))}  (blank: what changed)" ${ed ? '' : 'disabled'}></div></div>` : ''}
+  const at = k => `id="ld-${k}" data-sec="layers" data-i="${i}" data-k="${k}"`, ed = editable(b), dis = ed ? '' : 'disabled';
+  const qp = (k, list, labels) => list.map(t => `<button type="button" class="chip" data-qpick="${k}" data-term="${esc(t)}" aria-pressed="${String(l[k] || '').toLowerCase() === t.toLowerCase()}" ${dis}>${esc(labels?.[t] ?? t)}</button>`).join('');
+  const multi = (k, list) => chips(k, l[k], list).replace(/^<div class="chips">|<\/div>$/g, '').replace(/<button /g, `<button ${dis} `);
+  const box = (k, ph, list) => `<input type="text" ${list ? `list="${list}"` : ''} ${at(k)} value="${esc(l[k] || '')}" placeholder="${esc(ph)}" ${dis}>`;
+  const grp = soilOf(l.uscs)?.group, states = stateList(l.uscs).filter(Boolean), oKeys = Object.keys(ORIGINS).filter(Boolean), save = k => ed ? `<button class="btn link" data-act="btn-save" data-for="${k}">Save as a button</button>` : '';
+  const steps = [
+    ['Soil', qp('uscs', myButtons('uscs', QUICK_SOILS).filter(k => SOILS[k])), `<select ${at('uscs')} ${dis} aria-label="Any soil type">${soilOpts(l.uscs)}</select>`],
+    ['Modifiers', multi('mods', myButtons('mods', MOD_CHIPS)), box('mods', soilOf(l.uscs)?.imp || 'or type, e.g. trace mica', 'mods') + save('mods')],
+    ['Plasticity or gradation', qp('pg', myButtons('pg', [...PG_FINE, ...PG_COARSE]).filter(t => grp === 'coarse' ? !PG_FINE.includes(t) : grp === 'fine' ? !PG_COARSE.includes(t) : true)), box('pg', pgDefault(l) ? `from the symbol: ${pgDefault(l)}` : 'from the symbol') + save('pg')],
+    [stateLabel(l.uscs), states.length ? qp('consistency', myButtons('consistency', states).filter(t => states.includes(t) || ![...COHESIVE, ...GRANULAR, ...WEATHERING].includes(t))) : '<span class="note">Pick a soil first.</span>', ed ? '<button class="btn link" data-act="suggest" title="Use the SPT N, pocket penetrometer or vane results inside this layer">Suggest from tests</button>' : ''],
+    ['Moisture', qp('moisture', myButtons('moisture', MOISTURE.filter(Boolean))), ''],
+    ['Colour', qp('colour', myButtons('colour', QUICK_COLOURS)), box('colour', 'or type, e.g. mottled orange-brown', 'colours') + save('colour')],
+    ['Other features', multi('other', myButtons('other', OTHER_CHIPS)), box('other', 'or type, e.g. trace coal', 'others') + save('other')],
+    ['Origin', qp('origin', myButtons('origin', oKeys).filter(k => ORIGINS[k]), ORIGINS), ed ? '<button class="btn link" data-act="buttons">Your buttons…</button>' : ''],
+  ];
+  const menu = ed ? `<details class="lmenu"><summary class="btn" aria-label="More layer actions" title="More layer actions">⋯</summary><span class="lmenu-pop">${[['l-insert', 'Insert a layer above'], ['l-dup', 'Duplicate'], ['l-split', 'Split in two'], ['l-up', 'Move up'], ['l-down', 'Move down'], ['l-del', 'Delete layer']].map(([a, t]) => `<button type="button" class="btn link${a === 'l-del' ? ' danger' : ''}" data-act="${a}">${t}</button>`).join('')}</span></details>` : '';
+  return `<div style="display:flex;align-items:center;gap:8px"><b>Layer ${i + 1}</b><span class="note">${l.top != null || l.bottom != null ? `${fx(l.top)}–${fx(l.bottom)} ${L}` : 'Edits apply immediately'}</span><span class="sp" style="flex:1"></span>${i > 0 && ed ? '<button class="btn link" data-act="same-above">Same as layer above</button>' : ''}${menu}</div>
     <div class="fields qd-depth">
       ${fld(`From (${L})`, numIn('ld-top', at('top').replace('id="ld-top" ', ''), f(l.top, 3)))}
       ${fld(`To (${L})`, numIn('ld-bottom', at('bottom').replace('id="ld-bottom" ', ''), f(l.bottom, 3)))}
     </div>
-    <div class="qd" aria-label="Quick description">
+    <div class="qd" aria-label="Description, in the order it is written">
       <div class="preview" id="ld-preview">${descHTML(l)}</div>
-      <div class="qd-row"><span class="qd-l">Soil</span><div class="chips">${qp('uscs', QUICK_SOILS.filter(k => SOILS[k]))}</div></div>
-      <div class="qd-row"><span class="qd-l">Modifiers</span><div class="chips">${chips('mods', l.mods, MOD_CHIPS.slice(0, 12)).replace(/^<div class="chips">|<\/div>$/g, '')}</div></div>
-      ${stateList(l.uscs).filter(Boolean).length ? `<div class="qd-row"><span class="qd-l">${esc(stateLabel(l.uscs))}</span><div class="chips">${qp('consistency', stateList(l.uscs).filter(Boolean))}</div></div>` : ''}
-      <div class="qd-row"><span class="qd-l">Moisture</span><div class="chips">${qp('moisture', MOISTURE.filter(Boolean))}</div></div>
-      <div class="qd-row"><span class="qd-l">Colour</span><div class="chips">${qp('colour', QUICK_COLOURS)}</div></div>
+      ${steps.map(([label, btns, extra], n) => `<div class="qd-row lstep"><span class="qd-l"><span class="lstep-n">${n + 1}</span>${esc(label)}</span><div class="lstep-b"><div class="chips">${btns}</div>${extra ? `<div class="lstep-in">${extra}</div>` : ''}</div></div>`).join('')}
     </div>
-    <details class="qd-more" ${S.ldMore ? 'open' : ''}><summary>All fields</summary>
+    ${layerSamplesHTML(b, l, ed)}
+    <details class="qd-more" ${S.ldMore ? 'open' : ''}><summary>Soil science names, unit and log note</summary>
     <div class="fields">
-      ${fld('Horizon (CSSC)', `<input type="text" list="hz-list" ${at('hz')} value="${esc(l.hz || '')}" placeholder="e.g. Ah, Bm, Ck"><datalist id="hz-list">${Object.entries(HORIZONS).map(([k, v]) => `<option value="${k}" label="${esc(v)}">`).join('')}</datalist>`)}
+      ${fld('Horizon (CSSC)', `<input type="text" list="hz-list" ${at('hz')} value="${esc(l.hz || '')}" placeholder="e.g. Ah, Bm, Ck" ${dis}><datalist id="hz-list">${Object.entries(HORIZONS).map(([k, v]) => `<option value="${k}" label="${esc(v)}">`).join('')}</datalist>`)}
       ${fld('Horizon meaning', `<div class="out" id="ld-hz-out" style="padding-top:6px">${esc(hzMeaning(l.hz) || '—')}</div>`)}
-      ${fld('Texture / soil name', `<select ${at('texture')}><option value="">—</option>${Object.entries(TEXTURES).map(([k, v]) => `<optgroup label="${esc(v.name)}">${v.list.map(n => `<option value="${k}|${esc(n)}" ${l.texture === k + '|' + n ? 'selected' : ''}>${esc(k === 'aashto' ? `${n} – ${v.desc[n]}` : n)}</option>`).join('')}</optgroup>`).join('')}</select>`, 'wide')}
-      ${fld('Soil type (symbol)', `<select ${at('uscs')}>${soilOpts(l.uscs)}</select>`, 'wide')}
-      ${fld('Modifiers', `<input type="text" list="mods" ${at('mods')} value="${esc(l.mods || '')}" placeholder="${esc(soilOf(l.uscs)?.imp || 'e.g. silty, some sand, trace gravel')}">${chips('mods', l.mods, MOD_CHIPS)}`, 'wide')}
-      ${fld(stateLabel(l.uscs), `<div class="inline"><select ${at('consistency')}>${opt(withCur(stateList(l.uscs), l.consistency), l.consistency)}</select><button class="btn" data-act="suggest" title="Use the SPT N, pocket penetrometer or vane results inside this layer">Suggest</button></div>`)}
-      ${fld('Moisture', `<select ${at('moisture')}>${opt(withCur(MOISTURE, l.moisture), l.moisture)}</select>`)}
-      ${fld('Colour', `<input type="text" list="colours" ${at('colour')} value="${esc(l.colour || '')}">`)}
-      ${fld('Origin', `<select ${at('origin')}>${opt(Object.keys(ORIGINS), l.origin, Object.fromEntries(Object.entries(ORIGINS).map(([k, v]) => [k, v || '—'])))}</select>`)}
-      ${fld('Other features', `<input type="text" list="others" ${at('other')} value="${esc(l.other || '')}" placeholder="e.g. trace coal, oxide staining">${chips('other', l.other, OTHER_CHIPS)}`, 'wide')}
-      ${fld('Cross-section unit', `<input type="text" list="units-list" ${at('unit')} value="${esc(l.unit || '')}" placeholder="${esc(defaultUnit(l))}"><datalist id="units-list">${[...new Set(sortedList().flatMap(x => x.layers.map(defaultUnit)))].map(u => `<option value="${esc(u)}">`).join('')}</datalist>`, 'wide')}
+      ${fld('Texture / soil name', `<select ${at('texture')} ${dis}><option value="">—</option>${Object.entries(TEXTURES).map(([k, v]) => `<optgroup label="${esc(v.name)}">${v.list.map(n => `<option value="${k}|${esc(n)}" ${l.texture === k + '|' + n ? 'selected' : ''}>${esc(k === 'aashto' ? `${n} – ${v.desc[n]}` : n)}</option>`).join('')}</optgroup>`).join('')}</select>`, 'wide')}
+      ${fld('Cross-section unit', `<input type="text" list="units-list" ${at('unit')} value="${esc(l.unit || '')}" placeholder="${esc(defaultUnit(l))}" ${dis}><datalist id="units-list">${[...new Set(sortedList().flatMap(x => x.layers.map(defaultUnit)))].map(u => `<option value="${esc(u)}">`).join('')}</datalist>`, 'wide')}
+      ${i > 0 ? `<div class="fld wide"><label style="display:flex;align-items:center;gap:6px" title="Logged as a change within the layer above: a dashed boundary and a note with only what changed, e.g. – grey, wet"><input type="checkbox" ${at('sub')} ${l.sub ? 'checked' : ''} ${dis}><span style="white-space:nowrap">Part of the unit above</span></label></div>` : ''}
+      ${i > 0 && l.sub ? `<div class="fld wide"><label for="ld-note">Note on the log</label><input type="text" ${at('note')} value="${esc(l.note || '')}" placeholder="${esc(changeNote(l, b.layers[i - 1]))}  (blank: what changed)" ${dis}></div>` : ''}
     </div>
     <div class="note">${(b.comments || []).filter(c => c.target === 'layer:' + l.id && !c.resolved).length ? `<b style="color:var(--warn)">${(b.comments || []).filter(c => c.target === 'layer:' + l.id && !c.resolved).length} open review comment(s) on this layer.</b> ` : ''}<button class="btn link" data-act="comments" data-target="layer:${l.id}">Comment on this layer</button></div>
     </details>`;
 }
-const LAYER_COPY = ['uscs', 'texture', 'mods', 'consistency', 'moisture', 'colour', 'origin', 'other', 'unit'];   // what a layer takes from the one above
+const LAYER_COPY = ['uscs', 'texture', 'mods', 'pg', 'consistency', 'moisture', 'colour', 'origin', 'other', 'unit'];   // what a layer takes from the one above
 const QUICK_SOILS = ['TOP', 'FILL', 'CL', 'CI', 'CH', 'ML', 'MH', 'SM', 'SC', 'SP', 'SW', 'GP', 'GW', 'PT', 'CLST', 'SH', 'SDST'];
 const QUICK_COLOURS = ['brown', 'dark brown', 'grey', 'dark grey', 'grey-brown', 'olive brown', 'black', 'mottled'];
 /* modifiers in the standard order (-y words, then "some", then "trace"), one term per constituent */
@@ -4069,7 +4154,7 @@ function onField(e) {
     const sec = t.dataset.sec, row = b[sec][+t.dataset.i], k = t.dataset.k; if (!row) return;
     let v = t.type === 'checkbox' ? t.checked : t.value;
     if (LEN_KEYS.has(k)) v = fromD(num(v));
-    else if (['n', 'no', 'rec', 'rqd', 'b1', 'b2', 'b3', 'w', 'll', 'pl', 'pp', 'su', 'so4', 'cvc'].includes(k)) v = num(v);
+    else if (['n', 'no', 'rec', 'rqd', 'b1', 'b2', 'b3', 'w', 'll', 'pl', 'pp', 'su', 'so4', 'cvc', 'lel'].includes(k)) v = num(v);
     if (sec === 'layers' && k === 'bottom') {
       const next = b.layers[+t.dataset.i + 1], old = row.bottom;
       if (next && (next.top == null || Math.abs(next.top - (old ?? -1)) < 1e-6)) next.top = v;
@@ -4091,12 +4176,13 @@ function onField(e) {
       if (!stateList(v).includes(row.consistency)) row.consistency = '';
       const cs = $('#ld-consistency'); if (cs) { cs.innerHTML = opt(stateList(v), row.consistency); cs.closest('.fld').querySelector('label').textContent = stateLabel(v); }
       const mods = $('#ld-mods'); if (mods) mods.placeholder = soilOf(v)?.imp || 'e.g. silty, some sand, trace gravel';
+      setTimeout(() => refreshLayerEditor(b), 0);   // the state, plasticity and modifier buttons follow the soil
     }
     if (sec === 'samples' && /^b[123]$/.test(k)) {
       const ni = document.getElementById(`s-${row.id}-n`);
       if (row.b2 != null && row.b3 != null) { row.n = row.b2 + row.b3; if (ni) { ni.value = row.n; ni.readOnly = true; } } else if (ni) ni.readOnly = false;
     }
-    if (sec === 'samples' && k === 'type') { const fm = t.closest('.lf-form, .dbody'); if (fm) { const si = +t.dataset.i; fm.innerHTML = sampleFormHTML(b, si, fm.classList.contains('lf-form')); fm.querySelector(`#s-${row.id}-type`)?.focus(); } }   // the SPT and core fields follow the method
+    if (sec === 'samples' && k === 'type' && !t.closest('.lsamp')) { const fm = t.closest('.lf-form, .dbody'); if (fm) { const si = +t.dataset.i; fm.innerHTML = sampleFormHTML(b, si, fm.classList.contains('lf-form')); fm.querySelector(`#s-${row.id}-type`)?.focus(); } }   // the SPT and core fields follow the method
     if (sec === 'water') { recomputeWater(row, b); refreshWaterOut(b); }
     if (sec === 'layers') { refreshLayerRow(b); checkLayers(b); }
   } else return;
@@ -6142,7 +6228,7 @@ function dataRows(bhs, unit) {
       [`Elevation ${u}`]: c(b.elevation), Datum: b.datum || '', 'Start date': b.date || '', 'End date': b.dateEnd || '', Contractor: b.contractor || '', Rig: b.rig || '', Method: b.method || '', 'Diameter (mm)': b.diameter ?? '',
       'Logged by': b.logger || '', 'Reviewed by': b.reviewer || '', Weather: b.weather || '', Termination: b.termination || '', [`Slough ${u}`]: c(b.slough), 'CSSC classification': [b.csscSub, b.csscGG].filter(Boolean).join(' '), Notes: b.notes || '' })),
     Layers: bhs.flatMap(b => (b.layers || []).map(l => ({ Borehole: b.name, [`From ${u}`]: c(l.top), [`To ${u}`]: c(l.bottom), Horizon: l.hz || '', Texture: texOf(l)?.name || '', Symbol: l.uscs || '', Modifiers: l.mods || '', Consistency: l.consistency || '', Moisture: l.moisture || '', Colour: l.colour || '', Other: l.other || '', Origin: ORIGINS[l.origin] || '', Description: composeDesc(l).text }))),
-    Samples: bhs.flatMap(b => (b.samples || []).map(s => ({ Borehole: b.name, [`Depth ${u}`]: c(s.depth), Name: sampleId(s), Type: s.type || '', No: s.no ?? '', 'Purpose / analyses': s.purpose || '', Blows: blowStr(s), 'SPT N': sptN(s) ?? '', 'Recovery %': s.rec ?? '', RQD: s.rqd ?? '', w: s.w ?? '', PL: s.pl ?? '', LL: s.ll ?? '', PP: s.pp ?? '', Su: s.su ?? '', SO4: s.so4 ?? '', 'Vapour (ppm)': s.cvc ?? '', Remarks: s.note || '' }))),
+    Samples: bhs.flatMap(b => (b.samples || []).map(s => ({ Borehole: b.name, [`Depth ${u}`]: c(s.depth), Name: sampleId(s), Type: s.type || '', No: s.no ?? '', 'Purpose / analyses': s.purpose || '', Blows: blowStr(s), 'SPT N': sptN(s) ?? '', 'Recovery %': s.rec ?? '', RQD: s.rqd ?? '', w: s.w ?? '', PL: s.pl ?? '', LL: s.ll ?? '', PP: s.pp ?? '', Su: s.su ?? '', SO4: s.so4 ?? '', 'Vapour (ppm)': s.cvc ?? '', 'LEL (%)': s.lel ?? '', Remarks: s.note || '' }))),
     Water: bhs.flatMap(b => (b.water || []).filter(w => w.depth != null).map(w => ({ Borehole: b.name, Date: w.date || '', [`Depth to water ${u}`]: c(w.depth), Type: WATER_KINDS[w.kind] || '' }))),
   };
 }
@@ -10602,7 +10688,7 @@ document.addEventListener('click', e => {
   if (tr) { S.layer = +tr.dataset.layer; const b = cur(); $('#lgrid').innerHTML = layerRows(b); $('#ldetail').innerHTML = layerDetail(b); return; }
   const rt = e.target.closest('[data-rtab]'); if (rt) { setRibbonTab(rt.dataset.rtab); return; }
   const ch = e.target.closest('[data-chip]'); if (ch) { toggleChip(ch); return; }
-  const qpk = e.target.closest('[data-qpick]'); if (qpk) { const b = cur(), l = b?.layers[S.layer]; if (l && editable(b)) { const k = qpk.dataset.qpick, t = qpk.dataset.term; l[k] = String(l[k] || '').toLowerCase() === t.toLowerCase() ? '' : t; if (k === 'uscs' && l.consistency && !stateList(l.uscs).includes(l.consistency)) l.consistency = ''; logChange(b, 'Soil layers'); store.save(b); $('#ldetail').innerHTML = layerDetail(b); refreshLayerRow(b); if (S.drawer) redrawLog(); } return; }
+  const qpk = e.target.closest('[data-qpick]'); if (qpk) { const b = cur(), l = b?.layers[S.layer]; if (l && editable(b)) { const k = qpk.dataset.qpick, t = qpk.dataset.term; l[k] = String(l[k] || '').toLowerCase() === t.toLowerCase() ? '' : t; if (k === 'uscs' && l.consistency && !stateList(l.uscs).includes(l.consistency)) l.consistency = ''; logChange(b, 'Soil layers'); store.save(b); refreshLayerEditor(b); } return; }
   const gs = e.target.closest('[data-gsd]'); if (gs) { openGsd(+gs.dataset.gsd); return; }
   const gd = e.target.closest('[data-gsdel]'); if (gd) { gd.closest('tr').remove(); return; }
   const pd = e.target.closest('[data-phdel]'); if (pd) { if (!editable(cur())) return; photoStore.remove(pd.dataset.phdel).then(() => loadPhotos(cur())); return; }
@@ -10678,6 +10764,11 @@ document.addEventListener('click', e => {
     case 'apple-save': appleSave(); break;
     case 'apple-clear': appleClear(); break;
     case 'soil-add': case 'soil-imp-pts': case 'soil-imp-lab': case 'soil-lab-go': case 'soil-issue': case 'soil-xlsx': case 'soil-csv': case 'soil-example': soilAct(act); break;
+    case 'buttons': openButtons(); break;
+    case 'btns-save': buttonsSave(); break;
+    case 'btns-reset': lsDel('bhlog.buttons'); closeOverlay(); renderView(true); toast('Back to the built-in buttons.'); break;
+    case 'btn-save': buttonSaveFromBox(e.target.closest('[data-act]').dataset.for); break;
+    case 'ls-add': case 'ls-del': layerSampleAct(act, e.target.closest('[data-act]')); break;
     case 'cols-auto': if (!S.readOnly) { S.co.cols = {}; store.saveCompany(); renderView(true); toast('Log columns are automatic again.'); } break;
     case 'drawer-close': closeDrawer(); break;
     case 'drawer-del': if (editable(b) && (S.drawer || t.dataset.idx != null)) { const what = t.dataset.what, idx = t.dataset.idx != null ? +t.dataset.idx : S.drawer.i; if (!t.classList.contains('armed')) { t.classList.add('armed'); t.textContent = 'Tap again to delete'; break; } b[what].splice(idx, 1); logChange(b, { layers: 'Soil layers', samples: 'Samples & SPT', water: 'Groundwater' }[what]); store.save(b); if (S.drawer) closeDrawer(); else renderView(true); renderFacts(b); renderList(sortedList()); toast('Deleted.'); } break;
@@ -10761,7 +10852,7 @@ document.addEventListener('click', e => {
     case 'backup': backup(); break;
     case 'restore': case 'open-file': openFile(); break;
     case 'save-proj': saveProject(); break;
-    case 'same-above': { const l = b?.layers[S.layer], up = b?.layers[S.layer - 1]; if (!l || !up || !editable(b)) break; for (const k of LAYER_COPY) l[k] = up[k] ?? ''; logChange(b, 'Soil layers'); store.save(b); $('#ldetail').innerHTML = layerDetail(b); refreshLayerRow(b); break; }
+    case 'same-above': { const l = b?.layers[S.layer], up = b?.layers[S.layer - 1]; if (!l || !up || !editable(b)) break; for (const k of LAYER_COPY) l[k] = up[k] ?? ''; logChange(b, 'Soil layers'); store.save(b); refreshLayerEditor(b); break; }
     case 'imp-lab': if (!S.readOnly) importLab(); break;
     case 'lab-imp-go': importLabGo(); break;
     case 'guide-save': { const st = siteOf() || {}; dialog('Save guideline', `<div class="fld"><label for="gs-name">Name</label><input id="gs-name" value="${esc(st.guideSrc || '')}" placeholder="e.g. Alberta Tier 1, fine, residential/parkland"></div><p class="note">Saves the ${Object.keys(projGuide()).length} values in the Guideline row with your company settings, to apply to other projects.</p>`, `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="guide-save-go">Save</button>`); $('#gs-name')?.focus(); break; }
