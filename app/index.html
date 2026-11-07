@@ -1481,8 +1481,8 @@ const stateList = code => { const g = soilOf(code)?.group; return g === 'coarse'
 const stateLabel = code => { const g = soilOf(code)?.group; return g === 'coarse' ? 'Compactness' : g === 'fine' ? 'Consistency' : g === 'rock' ? 'Weathering' : 'Consistency / compactness'; };
 const ORIGINS = { '': '', topsoil: 'Topsoil', fill: 'Fill', lacustrine: 'Lacustrine', alluvium: 'Alluvium', till: 'Glacial till', glaciofluvial: 'Glaciofluvial', aeolian: 'Aeolian', bedrock: 'Bedrock' };
 const ORIGIN_TAG = { fill: 'FILL', lacustrine: 'LACUSTRINE', alluvium: 'ALLUVIUM', till: 'TILL', glaciofluvial: 'GLACIOFLUVIAL', aeolian: 'AEOLIAN' };
-const SAMPLE_TYPES = { SS: 'SS – split spoon (SPT)', ST: 'ST – Shelby tube', G: 'G – grab', A: 'A – auger cuttings', B: 'B – bulk', C: 'C – rock core' };
-const SAMPLE_ALIAS = { SPT: 'SS', SHELBY: 'ST', TUBE: 'ST', U100: 'ST', BULK: 'B', BAG: 'B', JAR: 'G', J: 'G', GRAB: 'G', AUGER: 'A', CORE: 'C', 'SPLIT SPOON': 'SS' };
+const SAMPLE_TYPES = { SS: 'SS – split spoon (SPT)', ST: 'ST – Shelby tube', G: 'G – grab', J: 'J – jar', A: 'A – auger cuttings', B: 'B – bulk', C: 'C – rock core' };
+const SAMPLE_ALIAS = { SPT: 'SS', SHELBY: 'ST', TUBE: 'ST', U100: 'ST', BULK: 'B', BAG: 'B', JAR: 'J', GRAB: 'G', AUGER: 'A', CORE: 'C', 'SPLIT SPOON': 'SS' };
 const WATER_KINDS = { strike: 'Seepage while drilling', completion: 'Upon completion', static: 'Standpipe reading', seepage: 'Seepage' };
 const METHODS = ['', 'Solid-stem auger', 'Hollow-stem auger', 'Mud rotary', 'Air rotary', 'Sonic', 'Diamond core', 'Direct push', 'Hydrovac', 'Hand auger', 'Test pit'];
 const TERMINATION = ['', 'Target depth reached', 'Auger refusal', 'SPT refusal', 'Hole collapse', 'Obstruction', 'Other'];
@@ -1732,7 +1732,7 @@ function normalize(b) {
     const t = String(s.type || '').toUpperCase();
     s.type = SAMPLE_TYPES[t] ? t : SAMPLE_ALIAS[t] || 'SS';
     s.no ??= i + 1;
-    for (const k of ['pp', 'su', 'so4', 'cvc']) s[k] ??= null;
+    for (const k of ['pp', 'su', 'so4', 'cvc', 'lel']) s[k] ??= null;
   });
   b.well = { ...blankWell(), ...(b.well || {}) };
   b.well.annulus ||= [];
@@ -1749,7 +1749,7 @@ function composeDesc(l) {
   const tx = texOf(l), tl = textureLabel(tx);
   const head0 = tl ? (s && !s.nonUscs ? `${tl} (${code})` : tl) : s ? (s.nonUscs ? s.p : `${s.p} (${code})`) : '';
   const head = l.hz ? `${l.hz.trim()} horizon${head0 ? ': ' + head0 : ''}` : head0;
-  const parts = [l.mods || (tx ? '' : s?.imp), tx ? '' : s?.grad, s?.plast && s.p !== 'PEAT' ? `${s.plast} plastic` : '', (l.consistency || '').toLowerCase(), (l.moisture || '').toLowerCase(), l.colour, l.other].filter(Boolean);
+  const parts = [l.mods || (tx ? '' : s?.imp), ...(l.pg ? [l.pg] : [tx ? '' : s?.grad, s?.plast && s.p !== 'PEAT' ? `${s.plast} plastic` : '']), (l.consistency || '').toLowerCase(), (l.moisture || '').toLowerCase(), l.colour, l.other].filter(Boolean);
   const tag = ORIGIN_TAG[l.origin] && !(l.origin === 'fill' && code === 'FILL') ? ` (${ORIGIN_TAG[l.origin]})` : '';
   const body = parts.join(', ') + tag;
   return { name: head, body, text: head ? head + (parts.length ? ', ' + parts.join(', ') : '') + tag : body || 'Not described' };
@@ -2566,7 +2566,7 @@ function sampleFormHTML(b, i, full) {
     <h4 class="ff-h">Field and lab tests</h4><div class="fields ff">
       ${n2('w', sm.w, 'Water content w (%)')}${n2('pl', sm.pl, 'Plastic limit (%)')}${n2('ll', sm.ll, 'Liquid limit (%)')}
       ${full ? out('pi', 'Plasticity index') + out('cls', 'Lab class') : ''}
-      ${n2('pp', sm.pp, 'Pocket pen. (kPa)')}${n2('su', sm.su, 'Field vane Su (kPa)')}${n2('cvc', sm.cvc, 'Vapour (ppm)')}
+      ${n2('pp', sm.pp, 'Pocket pen. (kPa)')}${n2('su', sm.su, 'Field vane Su (kPa)')}${n2('cvc', sm.cvc, 'Vapour (ppm)')}${n2('lel', sm.lel, 'LEL (%)')}
       ${n2('so4', sm.so4, 'Sulphate SO4 (%)')}${full ? out('so4c', 'CSA A23.1 class') + out('sw', 'Swell (indicative)') : ''}
       ${full ? `<div class="fld wide"><label>Grain size</label><div class="inline"><button class="btn" data-gsd="${i}">${sm.gsd?.length ? 'Edit curve' : 'Add curve'}</button><span class="out" data-calc="gsd-${i}"></span></div></div>` : ''}
       <div class="fld wide"><label for="s-${sm.id}-note">Remarks</label><input id="s-${sm.id}-note" type="text" data-sec="samples" data-i="${i}" data-k="note" value="${esc(sm.note || '')}" placeholder="e.g. 50/75 mm, wet at tip"></div>
@@ -2892,7 +2892,7 @@ const SHEETS = {
     blank: (b, prev) => ({ id: uid('s'), no: Math.max(0, ...b.samples.map(x => x.no || 0)) + 1, name: nextSampleName(prev?.name), purpose: prev?.purpose || '', depth: null, type: prev?.type || 'SS', b1: null, b2: null, b3: null, n: null, rec: null, rqd: null, w: null, pl: null, ll: null, pp: null, su: null, so4: null, note: '', lab: {}, labMeta: { lab: '', report: '', date: '' } }) },
   tests: { name: 'Field & lab tests', key: 'samples', by: 'depth', cols: [
     ['depth', 'Depth', 'depth'], ['id', 'Sample', 'calc', r => sampleId(r)], ['w', 'w (%)', 'num'], ['pl', 'PL (%)', 'num'], ['ll', 'LL (%)', 'num'], ['pi', 'PI', 'calc', r => r.ll != null && r.pl != null ? +(r.ll - r.pl).toFixed(1) : ''],
-    ['pp', 'PP (kPa)', 'num'], ['su', 'Su vane (kPa)', 'num'], ['so4', 'SO₄ (%)', 'num'], ['cvc', 'Vapour (ppm)', 'num']],
+    ['pp', 'PP (kPa)', 'num'], ['su', 'Su vane (kPa)', 'num'], ['so4', 'SO₄ (%)', 'num'], ['cvc', 'Vapour (ppm)', 'num'], ['lel', 'LEL (%)', 'num']],
     blank: (b, prev) => SHEETS.samples.blank(b, prev) },
   water: { name: 'Water levels', key: 'water', by: 'date', cols: [
     ['date', 'Date', 'date'], ['kind', 'Reading', 'pick', () => Object.values(WATER_KINDS), WATER_KINDS], ['measured', 'Depth to water', 'depth'], ['ref', 'Measured from', 'pick', () => ['Ground surface', 'Top of standpipe'], { gs: 'Ground surface', toc: 'Top of standpipe' }],
@@ -3514,7 +3514,7 @@ const GRAPH_TYPES = { line: 'Line', points: 'Points', bars: 'Bars', lollipop: 'L
 function graphSeries() {
   const fr = s => s.gsd?.length > 1 ? gsdFractions(s.gsd) : null;
   const S0 = {
-    cvc: ['Vapour, headspace', 'ppm', 'log', s => s.cvc], n: ['SPT N', NUNIT(), 'lin', s => sptN(s)], n60: ['SPT N60', 'blows/0.3 m', 'lin', (s, b) => sptCorr(b, s)?.N60], n160: ['SPT (N1)60', 'blows/0.3 m', 'lin', (s, b) => sptCorr(b, s)?.N160],
+    cvc: ['Vapour, headspace', 'ppm', 'log', s => s.cvc], lel: ['LEL (combustible gas)', '% LEL', 'lin', s => s.lel], n: ['SPT N', NUNIT(), 'lin', s => sptN(s)], n60: ['SPT N60', 'blows/0.3 m', 'lin', (s, b) => sptCorr(b, s)?.N60], n160: ['SPT (N1)60', 'blows/0.3 m', 'lin', (s, b) => sptCorr(b, s)?.N160],
     pp: ['Pocket penetrometer', 'kPa', 'lin', s => s.pp], su: ['Field vane Su', 'kPa', 'lin', s => s.su], w: ['Water content', '%', 'lin', s => s.w], ll: ['Liquid limit', '%', 'lin', s => s.ll], pl: ['Plastic limit', '%', 'lin', s => s.pl],
     pi: ['Plasticity index', '%', 'lin', s => s.ll != null && s.pl != null ? s.ll - s.pl : null], fines: ['Fines (< 0.075 mm)', '%', 'lin', s => fr(s)?.fines], gravel: ['Gravel', '%', 'lin', s => fr(s)?.gravel], sand: ['Sand', '%', 'lin', s => fr(s)?.sand], clay: ['Clay (< 0.002 mm)', '%', 'lin', s => fr(s)?.clay],
     so4: ['Sulphate SO4', '%', 'lin', s => s.so4], rec: ['Core recovery', '%', 'lin', s => s.rec], rqd: ['RQD', '%', 'lin', s => s.rqd],
@@ -3710,7 +3710,7 @@ function logSVG(b, W) {
   const npts = [], vpts = [], vType = lay('vplot');
   for (const it of sm) {
     const s = it.s, ly = it.ly, N = sptN(s), y0 = y(it.t), y1 = y(it.bt);
-    out.push(`<g><title>${esc(`${sampleId(s)} ${SAMPLE_TYPES[s.type] || s.type} at ${fu(s.depth)}${blowStr(s) ? ' · blows ' + blowStr(s) : ''}${N != null ? ' · N = ' + N : ''}${s.pp != null ? ' · PP ' + s.pp + ' kPa' : ''}${s.su != null ? ' · Su ' + s.su + ' kPa' : ''}${s.so4 != null ? ' · SO4 ' + s.so4 + '%' : ''}`)}</title>`);
+    out.push(`<g><title>${esc(`${sampleId(s)} ${SAMPLE_TYPES[s.type] || s.type} at ${fu(s.depth)}${blowStr(s) ? ' · blows ' + blowStr(s) : ''}${N != null ? ' · N = ' + N : ''}${s.pp != null ? ' · PP ' + s.pp + ' kPa' : ''}${s.su != null ? ' · Su ' + s.su + ' kPa' : ''}${s.so4 != null ? ' · SO4 ' + s.so4 + '%' : ''}${s.cvc != null ? ' · vapour ' + s.cvc + ' ppm' : ''}${s.lel != null ? ' · LEL ' + s.lel + '%' : ''}`)}</title>`);
     if (y1 - y0 >= 4) out.push(`<path d="M${cSm.x} ${y0}H${cN.x + cN.w}M${cSm.x} ${y1}H${cN.x + cN.w}" style="stroke:var(--line)"/>`);
     out.push(sampleGlyph(cTy.x, cTy.w, y0, y1, s.type));
     if (Math.abs(ly - it.y) > .5) out.push(`<path d="M${cSm.x + cSm.w - 2} ${ly}L${cTy.x} ${it.y}" style="stroke:var(--muted)" fill="none"/>`);
@@ -4069,7 +4069,7 @@ function onField(e) {
     const sec = t.dataset.sec, row = b[sec][+t.dataset.i], k = t.dataset.k; if (!row) return;
     let v = t.type === 'checkbox' ? t.checked : t.value;
     if (LEN_KEYS.has(k)) v = fromD(num(v));
-    else if (['n', 'no', 'rec', 'rqd', 'b1', 'b2', 'b3', 'w', 'll', 'pl', 'pp', 'su', 'so4', 'cvc'].includes(k)) v = num(v);
+    else if (['n', 'no', 'rec', 'rqd', 'b1', 'b2', 'b3', 'w', 'll', 'pl', 'pp', 'su', 'so4', 'cvc', 'lel'].includes(k)) v = num(v);
     if (sec === 'layers' && k === 'bottom') {
       const next = b.layers[+t.dataset.i + 1], old = row.bottom;
       if (next && (next.top == null || Math.abs(next.top - (old ?? -1)) < 1e-6)) next.top = v;
@@ -6142,7 +6142,7 @@ function dataRows(bhs, unit) {
       [`Elevation ${u}`]: c(b.elevation), Datum: b.datum || '', 'Start date': b.date || '', 'End date': b.dateEnd || '', Contractor: b.contractor || '', Rig: b.rig || '', Method: b.method || '', 'Diameter (mm)': b.diameter ?? '',
       'Logged by': b.logger || '', 'Reviewed by': b.reviewer || '', Weather: b.weather || '', Termination: b.termination || '', [`Slough ${u}`]: c(b.slough), 'CSSC classification': [b.csscSub, b.csscGG].filter(Boolean).join(' '), Notes: b.notes || '' })),
     Layers: bhs.flatMap(b => (b.layers || []).map(l => ({ Borehole: b.name, [`From ${u}`]: c(l.top), [`To ${u}`]: c(l.bottom), Horizon: l.hz || '', Texture: texOf(l)?.name || '', Symbol: l.uscs || '', Modifiers: l.mods || '', Consistency: l.consistency || '', Moisture: l.moisture || '', Colour: l.colour || '', Other: l.other || '', Origin: ORIGINS[l.origin] || '', Description: composeDesc(l).text }))),
-    Samples: bhs.flatMap(b => (b.samples || []).map(s => ({ Borehole: b.name, [`Depth ${u}`]: c(s.depth), Name: sampleId(s), Type: s.type || '', No: s.no ?? '', 'Purpose / analyses': s.purpose || '', Blows: blowStr(s), 'SPT N': sptN(s) ?? '', 'Recovery %': s.rec ?? '', RQD: s.rqd ?? '', w: s.w ?? '', PL: s.pl ?? '', LL: s.ll ?? '', PP: s.pp ?? '', Su: s.su ?? '', SO4: s.so4 ?? '', 'Vapour (ppm)': s.cvc ?? '', Remarks: s.note || '' }))),
+    Samples: bhs.flatMap(b => (b.samples || []).map(s => ({ Borehole: b.name, [`Depth ${u}`]: c(s.depth), Name: sampleId(s), Type: s.type || '', No: s.no ?? '', 'Purpose / analyses': s.purpose || '', Blows: blowStr(s), 'SPT N': sptN(s) ?? '', 'Recovery %': s.rec ?? '', RQD: s.rqd ?? '', w: s.w ?? '', PL: s.pl ?? '', LL: s.ll ?? '', PP: s.pp ?? '', Su: s.su ?? '', SO4: s.so4 ?? '', 'Vapour (ppm)': s.cvc ?? '', 'LEL (%)': s.lel ?? '', Remarks: s.note || '' }))),
     Water: bhs.flatMap(b => (b.water || []).filter(w => w.depth != null).map(w => ({ Borehole: b.name, Date: w.date || '', [`Depth to water ${u}`]: c(w.depth), Type: WATER_KINDS[w.kind] || '' }))),
   };
 }

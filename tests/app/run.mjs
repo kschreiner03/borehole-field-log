@@ -2266,6 +2266,26 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('layer editor: LEL, jar and plasticity', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); const b = sortedList().find(x => x.status !== 'issued' && x.samples.length && x.layers.length > 1); S.sel = b.id;
+        const before = projList().flatMap(x => x.layers.map(l => composeDesc(l).text));
+        want(SAMPLE_TYPES.J === 'J – jar' && SAMPLE_ALIAS.JAR === 'J', 'jar type: ' + SAMPLE_TYPES.J);
+        const s = b.samples[0]; s.type = 'J'; s.lel = 4; s.cvc = 120; s.name = 'J1';
+        const log = logSVG(b, 1100); want(/J1 J – jar/.test(log) && /LEL 4%/.test(log), 'the log names the jar and the LEL reading');
+        want(Object.keys(graphSeries()).includes('lel'), 'LEL can be graphed on the log');
+        want(SHEETS.tests.cols.some(c => c[0] === 'lel' && /LEL/.test(c[1])), 'LEL in the data tables');
+        S.dtab = 'samples'; S.dsel = { samples: 0 }; goTab('edit'); await w(300); want(!!document.querySelector('#s-' + s.id + '-lel'), 'LEL in the sample form');
+        want(composeDesc({ uscs: 'CH', pg: 'medium plastic', mods: '', consistency: 'Stiff', moisture: 'Moist', colour: 'grey', other: '', origin: '' }).text === 'CLAY (CH), medium plastic, stiff, moist, grey', 'the override replaces the plasticity: ' + composeDesc({ uscs: 'CH', pg: 'medium plastic' }).text);
+        want(JSON.stringify(projList().flatMap(x => x.layers.map(l => composeDesc(l).text))) === JSON.stringify(before), 'existing descriptions unchanged');
+        normalize(s); want(s.lel === 4, 'normalize keeps LEL'); const t = structuredClone(b.samples[1]); delete t.lel; normalize({ ...b, samples: [t] }); want(t.lel === null, 'older samples get an empty LEL');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('soil survey: points and samples, imports, saved with the project', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
