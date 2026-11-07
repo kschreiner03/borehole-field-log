@@ -5,6 +5,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js" integrity="sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI" crossorigin="anonymous"></script>
+<script src="lib/soilstats.js"></script>
+<script src="lib/soilsurvey.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <style>
 /* Layout: desktop engineering tool — app bar + toolbar, borehole list on the left, borehole workspace (Log / Edit / Groundwater) on the right. Light theme only. */
@@ -2087,8 +2089,8 @@ function treeGroup(key, label, count, kids, extra = '') {
   return `<li class="tg${open ? ' open' : ''}"><div class="tr">${extra}<button class="tw" data-fold="${key}" aria-expanded="${open}" title="${open ? 'Collapse' : 'Expand'} ${esc(label)}">${TW}<span>${esc(label)}</span></button>${count != null ? `<span class="tc">${count}</span>` : ''}</div>${open ? `<ul class="tk">${kids}</ul>` : ''}</li>`;
 }
 const BH_TABS = ['log', 'edit', 'report'];
-const NAV_LABEL = { v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
-const NAV_ICON = { v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
+const NAV_LABEL = { v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
+const NAV_ICON = { soil: '<path d="M3 9l9-5 9 5-9 5z"/><path d="M3 14l9 5 9-5"/>', v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 /* ---------- the Settings panel: each page with view settings lists its groups in CTL; the shell draws them on the right.
    Open or collapsed, width and folded groups are one app-wide choice, kept between sessions. ---------- */
@@ -2100,7 +2102,7 @@ function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen ==
 /* the panel's column is set before a page draws, so drawings measure the work area they will really have */
 function ctlLayout() {
   const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
-  const has = !!CTL[S.tab] && !!cur() && (S.tab !== 'gwm' || !gwModel().error), open = S.ui.ctlOpen !== false;
+  const has = !!CTL[S.tab] && (!!cur() || S.tab === 'soil') && (S.tab !== 'gwm' || !gwModel().error), open = S.ui.ctlOpen !== false;
   if (el.dataset.tab !== S.tab) { el.scrollTop = 0; el.dataset.tab = S.tab; }
   el.hidden = !has; el.classList.toggle('min', has && !open);
   sh.style.setProperty('--ctl-w', !has ? '0px' : open ? ctlClamp(S.ui.ctlW) + 'px' : '40px');
@@ -2132,7 +2134,7 @@ document.addEventListener('pointerdown', e => {
 const bhGlyph = well => `<svg class="bhg" viewBox="0 0 16 16" aria-hidden="true">${well ? '<circle cx="8" cy="8" r="4.6" fill="#fff" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/>' : '<circle cx="8" cy="8" r="4.6" fill="currentColor"/>'}</svg>`;
 /* the sidebar is the project as a tree: project pages, and each borehole with its own pages nested under it when chosen */
 /* the left side: a rail of project pages, then the project's boreholes as a list with a filter, status chips and a sort */
-const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['compose', 'Reports']];
+const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['soil', 'Soil'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['compose', 'Reports']];
 const BH_ICON = '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M8 9h8M8 14h8"/>';
 S.bl = { q: '', st: lsGet('bhlog.blSt') || 'all', sort: lsGet('bhlog.blSort') || 'name' };
 const blMeta = b => { const w = latestWater(b), v = vapourMax(b, null, null); return { d: depthOf(b), w: w ? w.depth : null, v: v ? v.cvc : null }; };
@@ -2280,7 +2282,7 @@ function openActMenu(anchor, items) {
 function goTab(k) { S.tab = k; lsSet('bhlog.tab', k); S.formStale = true; S.drawer = null; renderDrawer(); render(); }
 function findItems() {
   const items = [], b = cur(), seen = new Set(), seenT = new Set(), home = {};
-  for (const k of ['home', 'site', 'table', 'gw', 'contam', 'compose']) items.push({ t: NAV_LABEL[k], where: 'Project page', kind: 'Page', run: () => goTab(k) });
+  for (const k of ['home', 'site', 'table', 'gw', 'contam', 'soil', 'compose']) items.push({ t: NAV_LABEL[k], where: 'Project page', kind: 'Page', run: () => goTab(k) });
   if (b) for (const k of BH_TABS) items.push({ t: `${NAV_LABEL[k]}: ${b.name}`, where: 'Borehole page', kind: 'Page', run: () => goTab(k) });
   if (b) for (const [k, t] of [['soil', 'Soil layers and observations'], ['samples', 'Samples and lab results'], ['ww', 'Water readings and well'], ['details', 'Borehole details and photos']]) items.push({ t, where: `${b.name} › Data`, kind: 'Section', run: () => { S.dtab = k; lsSet('bhlog.dtab', k); goTab('edit'); } });
   for (const x of sortedList()) items.push({ t: x.name || 'Untitled', where: x.project || 'No project', kind: x.well?.installed ? 'Well' : 'Borehole', run: () => { S.sel = x.id; S.layer = 0; goTab(BH_TABS.includes(S.tab) ? S.tab : 'edit'); } });
@@ -2338,7 +2340,7 @@ const RAIL = [
   ['log', 'Log', '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="1.5"/><path d="M7 8h10M7 13h10M7 17h10"/></svg>'],
   ['edit', 'Data', '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16M9 6v12"/></svg>'],
   ['report', 'PDF preview', '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 13h6M9 17h6"/></svg>']];
-const PROJECT_TABS = ['home', 'site', 'table', 'gw', 'contam', 'reports', 'compose'];
+const PROJECT_TABS = ['home', 'site', 'table', 'gw', 'contam', 'soil', 'reports', 'compose'];
 function renderRail() {
   const el = $('#rail'); if (!el) return; el.hidden = true; return; const b = cur();
   el.innerHTML = RAIL.map(x => typeof x === 'string' ? `<span class="rl">${x === 'Borehole' && b ? esc(b.name) : x}</span>` : `<button data-tab="${x[0]}" aria-current="${S.tab === x[0] ? 'page' : 'false'}" ${b ? '' : 'disabled'}>${x[2]}<span>${x[1]}</span></button>`).join('')
@@ -2748,7 +2750,7 @@ function drawerHTML(b) {
 function openDrawer(kind, i) { const was = !!S.drawer; S.drawer = { kind, i }; if (kind === 'layer') S.layer = i; renderDrawer(); if (!was) redrawLog(); }
 function renderDrawer() {
   const el = $('#drawer'), b = cur(); if (!el) return;
-  const html = S.drawer && b && S.tab === 'log' ? drawerHTML(b) : '';
+  const html = S.drawer?.kind === 'soilpt' ? soilCardHTML(S.drawer.id) : S.drawer && b && S.tab === 'log' ? drawerHTML(b) : '';
   el.hidden = !html; el.innerHTML = html;
   document.body.classList.toggle('drawer-open', !!html);
   if (!html) S.drawer = null;
@@ -2797,6 +2799,7 @@ function renderMain() {
   const main = $('#main');
   if (!S.loaded) return;
   const b = cur();
+  if (!b && S.tab === 'soil') { renderRail(); ctlLayout(); main.dataset.bh = ''; main.innerHTML = '<div id="view"></div>'; renderView(true); return; }   // a soil survey needs no borehole
   if (!b) {
     renderRail(); ctlLayout();
     main.dataset.bh = '';
@@ -2858,6 +2861,7 @@ function renderView(full) {
   else if (S.tab === 'v3d') { v.innerHTML = v3dHTML(); v3dBuild(); gwAutoEnsure(); }
   else if (S.tab === 'home') { v.innerHTML = homeHTML(); }
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
+  else if (S.tab === 'soil') { v.innerHTML = soilHTML(); drawSoil(); }
   else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); }
   else if (S.tab === 'reports') { v.innerHTML = reportsHubHTML(b); }
   else if (S.tab === 'compose') { v.innerHTML = composeHTML(); requestAnimationFrame(() => { drawCompose(); fillThumbs(); gwComposeEnsure(); }); }
@@ -6231,13 +6235,13 @@ const canPick = () => 'showSaveFilePicker' in window && window.self === window.t
 const projDirty = (p = projKey(projList()[0])) => { const at = S.fileAt.get(p); return !!at && sortedList().some(b => projKey(b) === p && (b.updated || '') > at); };
 async function photosFor(ids) { try { const all = await photoStore.all(); return ids ? all.filter(ph => ids.has(ph.bhId)) : all; } catch { return []; } }
 async function saveProject(as, proj, quiet) {
-  const list = proj == null ? projList() : sortedList().filter(b => projKey(b) === proj); if (!list.length) { if (!quiet) toast('There are no boreholes in this project to save.'); return; }
-  const p = projKey(list[0]), no = list.find(b => b.projNo)?.projNo || '';
+  const list = proj == null ? projList() : sortedList().filter(b => projKey(b) === proj); if (!list.length && !surveyOf().points.length) { if (!quiet) toast('There are no boreholes in this project to save.'); return; }
+  const p = list.length ? projKey(list[0]) : proj ?? '', no = list.find(b => b.projNo)?.projNo || '';
   const st = S.site?.projects ? (S.site.projects[p] || S.site.projects['*'] || null) : (S.site?.img ? S.site : null);
   const used = new Set(((S.site?.projects?.[p] || (S.site?.projects ? null : S.site))?.report?.pages || []).filter(pg => pg.kind === 'pdf').map(pg => pg.file));   // imports the report still uses; deleted ones stay behind
   const photos = (await photosFor(new Set([...list.map(b => b.id), 'imagery:' + p, REPORT_FILE_KEY(p)]))).filter(ph => ph.bhId !== REPORT_FILE_KEY(p) || used.has(ph.id));
   const data = { app: 'borehole-field-log', kind: 'project', version: 4, saved: new Date().toISOString(), project: p, projNo: no, company: S.co, site: st, boreholes: list, photos };
-  await saveTo(p, `${fileSlug([no, p].filter(Boolean).join(' ')) || 'Borehole project'}.bhp`, 'bhp', data, as, quiet);
+  await saveTo(p, `${fileSlug([no, p].filter(Boolean).join(' ')) || surveyOf().survey?.name || 'Borehole project'}.bhp`, 'bhp', data, as, quiet);
 }
 async function backup(as, quiet) {
   const data = { app: 'borehole-field-log', kind: 'workspace', version: 4, saved: new Date().toISOString(), company: S.co, site: S.site || null, boreholes: sortedList(), photos: await photosFor() };
@@ -8248,7 +8252,7 @@ const tileStore = {
   async put(u, v) { const d = await this.open(); d.transaction('t', 'readwrite').objectStore('t').put(v, u); },
 };
 let tileT;
-function tileArrived() { clearTimeout(tileT); tileT = setTimeout(() => { if (S.tab === 'site') drawPlan(); else if (['home', 'gw', 'contam', 'compose'].includes(S.tab)) renderView(true); }, 250); }
+function tileArrived() { clearTimeout(tileT); tileT = setTimeout(() => { if (S.tab === 'site' || S.tab === 'soil') drawPlan(); else if (['home', 'gw', 'contam', 'compose'].includes(S.tab)) renderView(true); }, 250); }
 function fetchTile(u) {
   if (S.tilePend.has(u) || S.tileBad.has(u) || S.tilePend.size > 40) return; S.tilePend.add(u);
   tileStore.get(u).catch(() => null).then(c => c || fetch(u, { mode: 'cors' }).then(r => r.ok ? r.blob() : Promise.reject(r.status))
@@ -8389,6 +8393,7 @@ function xsecHTML() {
       <p class="note" id="xs-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
   </div>`;
 }
+CTL.soil = () => soilCtl();
 CTL.xsec = () => [
   { id: 'xs-plume', title: 'Plume and layers', icon: NAV_ICON.contam, html: xsPlumeCtl() },
   { id: 'xs-line', title: 'Section line and drawing', icon: NAV_ICON.xsec, html: secToolsHTML() },
@@ -8435,7 +8440,7 @@ document.addEventListener('input', e => { if (e.target.id === 'v3d-cutpos') { S.
 document.addEventListener('input', e => { if (e.target.id === 'xs-date') { const d = xsDates(sectionList())[+e.target.value]; if (d) xsSetDate(d); } });
 function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); const ms = $('#xs-model-sec'); if (ms) ms.outerHTML = xsModelHTML(); }   // the forecast panel reads the drawn section's geometry
 const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
-function drawPlan(el = $('#plan')) { if (!el) return; el.innerHTML = planSVG(Math.max(el.clientWidth, 420), S.mapEdit ? 620 : 460, true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); loadImagery(); }
+function drawPlan(el = $('#plan')) { if (!el) return; if (S.tab === 'soil') { drawSoil(); return; } el.innerHTML = planSVG(Math.max(el.clientWidth, 420), S.mapEdit ? 620 : 460, true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); loadImagery(); }
 /* Delaunay triangulation (Bowyer–Watson) for contouring between boreholes */
 function delaunay(P) {
   const n = P.length; if (n < 3) return [];
@@ -8469,6 +8474,7 @@ function planSVG(W, H, interactive) {
   let x0 = Math.min(...ex.map(p => p[0])), x1 = Math.max(...ex.map(p => p[0])), y0 = Math.min(...ex.map(p => p[1])), y1 = Math.max(...ex.map(p => p[1]));
   const span = Math.max(x1 - x0, y1 - y0, 20) * 1.1; let cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   let sc = RO.scale ? PX_PER_M / RO.scale : Math.min((W - 2 * pad) / span, (H - 2 * pad) / span);
+  if (interactive && S.mvTab === 'soil') { S.mv = null; S.mvTab = 'site'; }
   if (interactive && S.mv && S.mvProj !== projKey(projList()[0])) S.mv = null;
   const free = RO.scale || (interactive && S.mv); if (interactive && S.mv) ({ cx, cy, sc } = S.mv);
   const X = e => W / 2 + (e - cx) * sc, Y = n => H / 2 - (n - cy) * sc;
@@ -8604,8 +8610,8 @@ const TRI_CLASSES = [
   ['Silty clay loam', [[27, 20], [40, 20], [40, 0], [27, 0]], 'clay'], ['Sandy clay', [[35, 65], [55, 45], [35, 45]], 'clay'],
   ['Silty clay', [[40, 20], [40, 0], [60, 0]], 'clay'], ['Clay', [[40, 45], [55, 45], [60, 40], [60, 0], [40, 20]], 'clay'], ['Heavy clay', [[60, 40], [100, 0], [60, 0]], 'clay'],
 ];
-function textureTriSVG(W = 520) {
-  const pts = labRows().filter(r => r.tex);
+function textureTriSVG(W = 520, marks) {   // marks(P): another page's points, drawn in the triangle's projection (sand, silt, clay)
+  const pts = marks ? [] : labRows().filter(r => r.tex);
   const m = { l: 40, r: 40, t: 18, b: 46 }, side = W - m.l - m.r, h = side * Math.sqrt(3) / 2, H = Math.round(h + m.t + m.b), x0 = m.l, yb = m.t + h;
   const P = (sa, si, cl) => [x0 + (si + cl / 2) / 100 * side, yb - cl / 100 * h], Pc = (cl, sa) => P(sa, 100 - cl - sa, cl);
   const xy = p => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
@@ -8630,15 +8636,16 @@ function textureTriSVG(W = 520) {
     const [x, y] = P(r.tex.sand, r.tex.silt, r.tex.clay);
     o.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.4" style="fill:${r.tex.exact ? `var(--${colorOf(r.b.id)})` : 'var(--panel)'};stroke:var(--${colorOf(r.b.id)})" stroke-width="${r.tex.exact ? 1 : 2}"><title>${esc(`${r.b.name} ${sampleId(r.s)} at ${fu(r.s.depth)}: sand ${r0(r.tex.sand)} %, silt ${r0(r.tex.silt)} %, clay ${r0(r.tex.clay)} % – ${r.tex.label}${r.tex.exact ? '' : ' (estimated from CFEM fractions)'}`)}</title></circle>`);
   }
+  if (marks) return o.join('') + marks(P) + '</svg>';
   o.push('</svg>');
   const bh = [...new Set(pts.map(r => r.b))];
   return o.join('') + (pts.length ? `<div class="legend">${bh.map(b => `<span><span class="dot" style="background:var(--${colorOf(b.id)})"></span>${esc(b.name)}</span>`).join('')}<span><span class="dot" style="background:var(--panel);box-shadow:inset 0 0 0 2px var(--muted)"></span>Estimated from CFEM fractions</span></div>`
     : '<p class="note">Add a grain-size curve with hydrometer points (to 0.002 mm), or sand, silt and clay percentages, to plot samples.</p>') +
     '<p class="note" style="margin-top:6px">Fine earth (&lt; 2 mm): sand 2–0.05 mm, silt 0.05–0.002 mm, clay &lt; 0.002 mm. Heavy clay is the CSSC class above 60 % clay.</p>';
 }
-function gsdSVG(W = 640, H = 320) {
-  const curves = projList().flatMap(b => (b.samples || []).filter(s => s.gsd?.length > 1).map(s => ({ b, s })));
-  if (!curves.length) return '<p class="note">No grain-size curves yet. Use “Add curve” in Field &amp; lab tests.</p>';
+function gsdSVG(W = 640, H = 320, marks) {   // marks(X, Y): another page's curves on the same axes
+  const curves = marks ? [] : projList().flatMap(b => (b.samples || []).filter(s => s.gsd?.length > 1).map(s => ({ b, s })));
+  if (!curves.length && !marks) return '<p class="note">No grain-size curves yet. Use “Add curve” in Field &amp; lab tests.</p>';
   const m = { l: 44, r: 14, t: 26, b: 34 }, lo = Math.log10(.001), hi = Math.log10(100);
   const X = d => m.l + (Math.log10(d) - lo) / (hi - lo) * (W - m.l - m.r), Y = p => H - m.b - p / 100 * (H - m.t - m.b);
   const o = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Grain size distribution">`];
@@ -8648,6 +8655,7 @@ function gsdSVG(W = 640, H = 320) {
   for (const [a, c, t] of bands) { o.push(`<line x1="${X(c)}" x2="${X(c)}" y1="${m.t - 14}" y2="${H - m.b}" style="stroke:var(--muted)" stroke-dasharray="3 2"/><text class="lbl2" x="${(X(a) + X(Math.min(c, 100))) / 2}" y="${m.t - 4}" text-anchor="middle">${t}</text>`); }
   o.push(`<text class="lbl" x="${(X(.075) + X(4.75)) / 2}" y="12" text-anchor="middle">SAND</text><text class="lbl" x="${(X(4.75) + X(75)) / 2}" y="12" text-anchor="middle">GRAVEL</text>`);
   o.push(`<text class="lbl" x="${(m.l + W - m.r) / 2}" y="${H - 4}" text-anchor="middle">Particle size (mm)</text><text class="lbl" transform="rotate(-90)" x="${-(m.t + H - m.b) / 2}" y="11" text-anchor="middle">Percent passing</text>`);
+  if (marks) return o.join('') + marks(X, Y) + '</svg>';
   curves.forEach(({ b, s }) => { const pts = s.gsd.filter(p => p.size >= .001 && p.size <= 100).sort((a, c) => a.size - c.size); o.push(`<path d="${pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.size).toFixed(1)} ${Y(p.passing).toFixed(1)}`).join('')}" fill="none" style="stroke:var(--${colorOf(b.id)})" stroke-width="1.8"><title>${esc(`${b.name} ${sampleId(s)} at ${fu(s.depth)}`)}</title></path>`); });
   o.push('</svg>');
   return o.join('') + `<div class="legend">${curves.map(({ b, s }) => `<span><span class="dot" style="background:var(--${colorOf(b.id)})"></span>${esc(b.name)} ${esc(sampleId(s))} (${fx(s.depth)} ${LEN()})</span>`).join('')}</div>`;
@@ -9005,7 +9013,7 @@ const bodyOf = pg => { const d = pgDims(pg); return { x: d.M, y: d.M + 80, w: d.
 const LB = bodyOf({ orient: 'land' });
 const xsecPage = () => newPage('free', { orient: 'land', title: 'CROSS-SECTION A–A′', items: [newItem('section', LB.x, LB.y, { w: LB.w, h: LB.h - 64 }), newItem('text', LB.x, LB.y + LB.h - 52, { w: LB.w, h: 52, o: { size: 9, text: 'Units between boreholes are an interpretation; conditions between boreholes are not known. The water table is interpolated between readings.' } })] });
 const RITEMS = {
-  plan: ['Site plan', BODY.w, 560], section: ['Cross-section', BODY.w, 440], wt: ['Water-table map', BODY.w, 520], vap: ['Vapour map', BODY.w, 520],
+  soilmap: ['Soil map', BODY.w, 560], soilgraph: ['Soil graph', BODY.w, 360], soiltable: ['Soil results table', BODY.w, 420], plan: ['Site plan', BODY.w, 560], section: ['Cross-section', BODY.w, 440], wt: ['Water-table map', BODY.w, 520], vap: ['Vapour map', BODY.w, 520],
   flow: ['Groundwater flow', BODY.w, 460], hydro: ['Hydrograph', BODY.w, 320], text: ['Text box', 360, 110], image: ['Picture', 360, 260],
   gwsum: ['Model summary', BODY.w, BODY.h], gwcal: ['Model calibration plot', BODY.w, 560], gwpar: ['Model parameters', BODY.w, 300], gwlim: ['Model limits', BODY.w, 300],
   scalebar: ['Scale bar', 300, 56], north: ['North arrow', 80, 96], legend: ['Legend', 220, 110], shape: ['Shape', 160, 100],
@@ -9136,6 +9144,7 @@ function itemInner(it, w, h) {
   if (it.t === 'shape') return shapeSVG(it, w, h);
   if (['gwsum', 'gwcal', 'gwpar', 'gwlim'].includes(it.t)) return gwReportSVG(it.t, w, h);
   const out = withRO(ro, () => {
+    if (it.t.startsWith('soil')) return soilItem(it.t, o, w, h);
     if (it.t === 'plan') { const r = planSVG(w, h, false); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'section') return fromEl(el => { RO.xs = { shape: 'guided', style: 'graded', ...(o.xs || S.xs) }; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
     if (it.t === 'wt') return wtMapSVG(w, h)?.svg || msg('Needs water levels in at least 3 wells with coordinates and ground elevations.');
@@ -9315,7 +9324,7 @@ function composeHTML() {
   if (pg.kind === 'free') {
     const d = pgDims(pg), bd = bodyOf(pg);
     stage = `<div class="cmp-tools">      <label class="cmp-zoom"><span class="note">Zoom</span><select id="cmp-zoom" aria-label="Zoom">${[['fit', 'Fit page'], ['width', 'Fit width'], ...[0.5, 0.75, 1, 1.5, 2, 4].map(v => [v, Math.round(v * 100) + ' %'])].map(([v, t]) => `<option value="${v}" ${String(S.czoom) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <span class="cmp-addwrap"><button class="btn primary" data-act="cmp-addmenu" aria-haspopup="true" ${S.readOnly ? 'disabled' : ''}>Add item ▾</button><div class="cmp-addmenu" role="menu" hidden>${(() => { const G = [['Maps and drawings', ['plan', 'section', 'wt', 'vap', 'flow', 'hydro']], ['Groundwater model', ['gwsum', 'gwcal', 'gwpar', 'gwlim']], ['Text and pictures', ['text', 'image']], ['Map parts', ['scalebar', 'north', 'legend', 'shape']]], seen = new Set(G.flatMap(g => g[1])), rest = Object.keys(RITEMS).filter(k => !seen.has(k)); return [...G, ...(rest.length ? [['Other', rest]] : [])].map(([t, ks]) => `<div class="cmp-addg"><b>${t}</b>${ks.filter(k => RITEMS[k]).map(k => `<button type="button" class="cmp-addi" role="menuitem" data-cadd="${k}">${esc(RITEMS[k][0])}</button>`).join('')}</div>`).join(''); })()}</div></span></div>
+      <span class="cmp-addwrap"><button class="btn primary" data-act="cmp-addmenu" aria-haspopup="true" ${S.readOnly ? 'disabled' : ''}>Add item ▾</button><div class="cmp-addmenu" role="menu" hidden>${(() => { const G = [['Maps and drawings', ['plan', 'section', 'wt', 'vap', 'flow', 'hydro']], ['Soil survey', ['soilmap', 'soilgraph', 'soiltable']], ['Groundwater model', ['gwsum', 'gwcal', 'gwpar', 'gwlim']], ['Text and pictures', ['text', 'image']], ['Map parts', ['scalebar', 'north', 'legend', 'shape']]], seen = new Set(G.flatMap(g => g[1])), rest = Object.keys(RITEMS).filter(k => !seen.has(k)); return [...G, ...(rest.length ? [['Other', rest]] : [])].map(([t, ks]) => `<div class="cmp-addg"><b>${t}</b>${ks.filter(k => RITEMS[k]).map(k => `<button type="button" class="cmp-addi" role="menuitem" data-cadd="${k}">${esc(RITEMS[k][0])}</button>`).join('')}</div>`).join(''); })()}</div></span></div>
       <div class="cmp-canvas"><span class="rl-c" aria-hidden="true"></span><svg class="rl-x" id="rl-x" aria-hidden="true"></svg><svg class="rl-y" id="rl-y" aria-hidden="true"></svg>
       <div class="cmp-stage cmp-scroll" id="cmp-stage"><div class="cmp-sizer" id="cmp-sizer"><div class="cmp-paper" id="cmp-paper" style="width:${d.W}px;height:${d.H}px">${pageFrame(pg.title || '', S.cpage + 1, n, pageItemsSVG(pg), d)}
         <div class="cmp-body" style="left:${bd.x}px;top:${bd.y}px;width:${bd.w}px;height:${bd.h}px" aria-hidden="true"></div>
@@ -9367,6 +9376,7 @@ function propsHTML() {
     ${(ROPTS[it.t] || []).map(([k, l, list]) => sel(k, l, list)).join('')}
     ${it.t === 'section' ? `<p class="note">Follows the section line chosen on the <button class="btn link" data-tab="xsec">Cross-section</button> page.${it.o?.xs ? ` Shows ${esc(it.o.xs.date ? 'the date ' + it.o.xs.date : 'the latest data')}${it.o.xs.plume !== false && (it.o.xs.param || it.o.xs.medium === 'vapour') ? ` with the ${esc(it.o.xs.medium === 'vapour' ? 'vapour' : (LAB_PARAMS[it.o.xs.param]?.label || '') + ' ' + it.o.xs.medium)} plume` : ''}.` : ' Shows that page\'s current view: date, plume and model results.'}</p><button class="btn" data-act="cmp-xs-use" ${S.readOnly ? 'disabled' : ''}>Use the Cross-section page's current view</button>` : ''}
     ${it.t === 'plan' || it.t === 'wt' || it.t === 'vap' ? '<p class="note">A fixed scale is true on the printed Letter page; resize the frame to show more or less of the site.</p>' : ''}
+    ${it.t === 'soilgraph' ? `<label class="cmp-lbl" for="co-kind">Graph</label><select id="co-kind" data-copt="kind">${SOIL_GRAPHS.map(g => `<option value="${g[0]}" ${(it.o?.kind || 'texture') === g[0] ? 'selected' : ''}>${esc(g[1])}</option>`).join('')}</select>` : ''}
     ${it.t === 'scalebar' ? (() => { const maps = pg.items.filter(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); return `<label class="cmp-lbl" for="co-link">Measures</label><select id="co-link" data-copt="link"><option value="">Choose a map…</option>${maps.map(m => `<option value="${m.id}" ${it.o?.link === m.id ? 'selected' : ''}>${esc(m.cap || RITEMS[m.t][0])}</option>`).join('')}</select>
       <label class="cmp-lbl" for="co-units">Units</label><select id="co-units" data-copt="units">${[['auto', 'As the project (m or ft)'], ['m', 'Metres'], ['ft', 'Feet']].map(([v, t]) => `<option value="${v}" ${(it.o?.units || 'auto') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <p class="note">The bar uses the scale the map is drawn at. It is true when the PDF is printed at 100 %.</p>`; })() : ''}
@@ -9640,11 +9650,12 @@ const LAB_SUITES = {
   btex: { name: 'BTEX', params: [['benzene', 'Benzene', 'mg/kg'], ['toluene', 'Toluene', 'mg/kg'], ['ethylbenzene', 'Ethylbenzene', 'mg/kg'], ['xylenes', 'Xylenes (total)', 'mg/kg']] },
   phc: { name: 'PHC F1–F4', params: [['f1', 'F1 (C6–C10)', 'mg/kg'], ['f2', 'F2 (>C10–C16)', 'mg/kg'], ['f3', 'F3 (>C16–C34)', 'mg/kg'], ['f4', 'F4 (>C34–C50)', 'mg/kg']] },
   salinity: { name: 'Salinity', params: [['ec', 'EC (sat. paste)', 'dS/m'], ['sar', 'SAR', ''], ['cl', 'Chloride (sat. paste)', 'mg/L'], ['ph', 'pH', '']] },
+  soil: { name: 'Soil properties', params: [['sand', 'Sand', '%'], ['silt', 'Silt', '%'], ['clay', 'Clay', '%'], ['om', 'Organic matter', '%']] },
   metals: { name: 'Metals', params: [['as', 'Arsenic', 'mg/kg'], ['ba', 'Barium', 'mg/kg'], ['cd', 'Cadmium', 'mg/kg'], ['cr', 'Chromium', 'mg/kg'], ['cu', 'Copper', 'mg/kg'], ['pb', 'Lead', 'mg/kg'], ['ni', 'Nickel', 'mg/kg'], ['zn', 'Zinc', 'mg/kg'], ['hg', 'Mercury', 'mg/kg']] },
 };
 const LAB_PARAMS = Object.fromEntries(Object.entries(LAB_SUITES).flatMap(([k, su]) => su.params.map(([p, label, unit]) => [p, { label, unit, suite: k }])));
 LAB_PARAMS.f1b = { label: 'F1 − BTEX', unit: 'mg/kg', suite: 'phc', computed: true };
-const LAB_ORDER = ['benzene', 'toluene', 'ethylbenzene', 'xylenes', 'f1', 'f1b', 'f2', 'f3', 'f4', 'ec', 'sar', 'cl', 'ph', 'as', 'ba', 'cd', 'cr', 'cu', 'pb', 'ni', 'zn', 'hg'];
+const LAB_ORDER = ['benzene', 'toluene', 'ethylbenzene', 'xylenes', 'f1', 'f1b', 'f2', 'f3', 'f4', 'ec', 'sar', 'cl', 'ph', 'sand', 'silt', 'clay', 'om', 'as', 'ba', 'cd', 'cr', 'cu', 'pb', 'ni', 'zn', 'hg'];
 /* one result: {v, lt}; lt means below the detection limit v */
 function labVal(sm, p) {
   const L = sm.lab || {};
@@ -9749,6 +9760,7 @@ const LAB_MATCH = [   // first match wins; null = recognised but not stored (cal
   [/f1\b.*btex|btex.*excluded/, null], [/m\s*[+&]\s*p|o-xylene|\bo xylene|m,p/, null], [/f4g|gravimetric/, null],
   [/^(phc\s*)?f1\b|c6\s*-\s*c10/, 'f1'], [/^(phc\s*)?f2\b|c10\s*-\s*c16/, 'f2'], [/^(phc\s*)?f3\b|c16\s*-\s*c34/, 'f3'], [/^(phc\s*)?f4\b|c34\s*-\s*c50/, 'f4'],
   [/^benzene\b/, 'benzene'], [/^toluene\b/, 'toluene'], [/^ethyl\s*-?\s*benzene/, 'ethylbenzene'], [/xylenes?\b.*total|total\s+xylenes?|^xylenes?$/, 'xylenes'],
+  [/^(%\s*)?sand\b/, 'sand'], [/^(%\s*)?silt\b/, 'silt'], [/^(%\s*)?clay\b/, 'clay'], [/organic matter|^om\b/, 'om'],
   [/sodium adsorption|^sar\b/, 'sar'], [/conductivity|^ec\b/, 'ec'], [/^chloride|^cl\b/, 'cl'], [/^ph\b/, 'ph'],
   [/^arsenic|^as$/, 'as'], [/^barium|^ba$/, 'ba'], [/^cadmium|^cd$/, 'cd'], [/^chromium(?!.*(vi|hex))|^cr$/, 'cr'], [/^copper|^cu$/, 'cu'], [/^lead|^pb$/, 'pb'], [/^nickel|^ni$/, 'ni'], [/^zinc|^zn$/, 'zn'], [/^mercury|^hg$/, 'hg'],
 ];
@@ -10613,6 +10625,7 @@ document.addEventListener('click', e => {
   }
   const cp = e.target.closest('[data-cpage]'); if (cp) { S.cpage = +cp.dataset.cpage; S.csel = null; S.cmulti = new Set(); rerenderCompose(); return; }
   const ca = e.target.closest('[data-cadd]'); if (ca) { const pg = curPage(), k = ca.dataset.cadd, bd = bodyOf(pg), low = Math.max(bd.y, ...pg.items.map(x => x.y + x.h + 12)), it = newItem(k, bd.x, low + RITEMS[k][2] <= bd.y + bd.h ? low : bd.y); if (RITEMS[k][1] === BODY.w) it.w = bd.w; if (k === 'section') it.o.xs = structuredClone(S.xs);
+    if (k.startsWith('soil')) it.o = { ...(it.o || {}), view: { ...soilCurrent() }, kind: 'texture' };
     if (k === 'scalebar') { const m = pg.items.find(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); it.frame = false; if (m) { it.o = { link: m.id }; it.x = m.x + 10; it.y = m.y + m.h - it.h - 10; } }   // inside its map's bottom-left corner
     clampIt(it); pg.items.push(it); S.csel = it.id; commit(); return; }
   const co = e.target.closest('[data-corient]'); if (co) { const pg = curPage(), was = bodyOf(pg); pg.orient = co.dataset.corient === 'land' ? 'land' : undefined; const now = bodyOf(pg); for (const it of pg.items) { if (Math.round(it.w) === Math.round(was.w)) it.w = now.w; clampIt(it, pg); } commit(); return; }
@@ -10664,6 +10677,7 @@ document.addEventListener('click', e => {
     case 'apple-setup': appleSetup(); break;
     case 'apple-save': appleSave(); break;
     case 'apple-clear': appleClear(); break;
+    case 'soil-add': case 'soil-imp-pts': case 'soil-imp-lab': case 'soil-lab-go': case 'soil-issue': case 'soil-xlsx': case 'soil-csv': case 'soil-example': soilAct(act); break;
     case 'cols-auto': if (!S.readOnly) { S.co.cols = {}; store.saveCompany(); renderView(true); toast('Log columns are automatic again.'); } break;
     case 'drawer-close': closeDrawer(); break;
     case 'drawer-del': if (editable(b) && (S.drawer || t.dataset.idx != null)) { const what = t.dataset.what, idx = t.dataset.idx != null ? +t.dataset.idx : S.drawer.i; if (!t.classList.contains('armed')) { t.classList.add('armed'); t.textContent = 'Tap again to delete'; break; } b[what].splice(idx, 1); logChange(b, { layers: 'Soil layers', samples: 'Samples & SPT', water: 'Groundwater' }[what]); store.save(b); if (S.drawer) closeDrawer(); else renderView(true); renderFacts(b); renderList(sortedList()); toast('Deleted.'); } break;

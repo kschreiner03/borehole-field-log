@@ -214,7 +214,7 @@ app.whenReady().then(async () => {
       return { has, added, focusedCell: fresh?.dataset?.c, top, prevBottom, nl: { bottom: nl.bottom, uscs: nl.uscs }, logHasSand: /SAND/.test(logText), focusedRow, sheets, which: document.querySelector('[data-which="samples"]')?.textContent, sel: S.dsel.samples };
     })()`);
     expect(r.has.grid && r.has.log, 'workspace parts: ' + JSON.stringify(r.has));
-    expect(r.has.tree.join() === 'Overview,Borehole,Map,Tables,Water,Lab,Section,Model,3D,Reports' && r.has.cur === 'Borehole' && r.has.rows === r.has.want, 'rail and list: ' + JSON.stringify(r.has));
+    expect(r.has.tree.join() === 'Overview,Borehole,Map,Tables,Water,Lab,Soil,Section,Model,3D,Reports' && r.has.cur === 'Borehole' && r.has.rows === r.has.want, 'rail and list: ' + JSON.stringify(r.has));
     expect(r.added === 1 && r.top === r.prevBottom, 'Enter on the last row: ' + JSON.stringify(r));
     expect(r.nl.uscs === 'SP' && Math.abs(r.nl.bottom - (r.prevBottom + 1.2)) < 1e-6 && r.logHasSand, 'typed interval: ' + JSON.stringify(r.nl) + ' log has sand ' + r.logHasSand);
     expect(r.focusedRow === 0, 'log click focused row ' + r.focusedRow);
@@ -529,7 +529,7 @@ app.whenReady().then(async () => {
       goTab('site'); await w(200); const link = !!document.querySelector('#view [data-tab="xsec"]'), old = !!document.querySelector('#section');
       return { tabs, svg, chips, link, old };
     })()`);
-    expect(r.tabs.indexOf('xsec') === r.tabs.indexOf('contam') + 1 && r.tabs.indexOf('gwm') === r.tabs.indexOf('xsec') + 1 && r.tabs.indexOf('v3d') === r.tabs.indexOf('gwm') + 1 && r.tabs.indexOf('compose') === r.tabs.indexOf('v3d') + 1, 'rail order: ' + r.tabs);
+    expect(r.tabs.indexOf('soil') === r.tabs.indexOf('contam') + 1 && r.tabs.indexOf('xsec') === r.tabs.indexOf('soil') + 1 && r.tabs.indexOf('gwm') === r.tabs.indexOf('xsec') + 1 && r.tabs.indexOf('v3d') === r.tabs.indexOf('gwm') + 1 && r.tabs.indexOf('compose') === r.tabs.indexOf('v3d') + 1, 'rail order: ' + r.tabs);
     expect(r.svg && r.chips >= 2, 'section page draws: ' + JSON.stringify(r));
     expect(r.link && !r.old, 'map page links to the section page: ' + JSON.stringify(r));
   });
@@ -2261,6 +2261,162 @@ app.whenReady().then(async () => {
         want(!basemapSVG(800, 500, b.easting, b.northing, .001).includes('Apple'), 'far out, Esri only');
         answer = { ok: false, status: 401, error: 'Apple Maps refused the key.' }; asked.length = 0; basemapSVG(800, 500, b.easting + 500, b.northing, 40); await basemapIdle();
         want(S.apple.off && asked.length === 1, 'a refused key turns Apple off and says so');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('soil survey: points and samples, imports, saved with the project', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); const n0 = projList().length, b0 = JSON.stringify(projList().map(b => b.samples.length)); goTab('soil'); await w(200);
+        const p = soilAddPoint('SP-1'), a = soilAddSample(p, { from: 0, to: .15, name: 'SP-1-15', method: 'Hand dig' }), c = soilAddSample(p, { from: .15, to: .30, name: 'SP-1-30', method: 'Hand auger' });
+        const d = soilDepths(); want(d.length === 2 && d[0].label === '0–15 cm' && d[1].label === '15–30 cm' && d[0].n === 1, 'depth groups: ' + JSON.stringify(d));
+        want(document.querySelector('#view').innerText.includes('SP-1') || (renderView(true), document.querySelector('#view').innerText.length > 0), 'page draws');
+        renderView(true); await w(100); want([...document.querySelectorAll('.soil-grid input')].some(i => i.value === 'SP-1-15'), 'the sample shows in the grid');
+        /* typing in the grid */
+        const col = soilCols().findIndex(x => x[0] === 'lab:ec'), cell = document.querySelector('.soil-grid input[data-sr="0"][data-sc="' + col + '"]'); cell.value = '<0.5'; cell.dispatchEvent(new Event('change', { bubbles: true })); await w(100);
+        const v = soilValue(surveyOf().points[0].samples[0], 'ec'); want(v && v.nd && v.dl === .5 && v.v === .25, 'typed <0.5 is a non-detect at half the limit: ' + JSON.stringify(v));
+        const again = document.querySelector('.soil-grid input[data-sr="0"][data-sc="' + col + '"]'); want(again.value === '<0.5', 'the grid shows it as typed: ' + again.value); again.value = ''; again.dispatchEvent(new Event('change', { bubbles: true })); await w(100); want(!soilValue(surveyOf().points[0].samples[0], 'ec'), 'blank clears it');
+        /* pasting a block makes new points */
+        const before = surveyOf().points.length; soilPaste(['SP-2\\t561000\\t6463000', 'SP-3\\t561100\\t6463100'].join('\\n'), soilRows().length, 0); await w(100); want(surveyOf().points.length === before + 2 && surveyOf().points.at(-1).e === 561100, 'paste adds points: ' + surveyOf().points.length);
+        /* the survey CSV format */
+        const csv = 'point_name,latitude,longitude,north,east,elevation\\nSP-1,58.3,-103.95,6462600.1,561500.2,412\\nSP-9,58.3001,-103.9501,6462611.2,561494.3,413\\n';
+        await soilImportPoints(new File([csv], 'survey.csv')); await w(100); const pts = surveyOf().points; want(pts.find(x => x.name === 'SP-1').e === 561500.2 && pts.find(x => x.name === 'SP-9')?.z === 413, 'coordinates by name: ' + JSON.stringify(pts.map(x => [x.name, x.e])));
+        /* a lab file matched by sample name */
+        await soilImportLab(new File(['Sample ID,EC,SAR,pH,Sand,Silt,Clay,Organic matter\\nSP-1-15,1.8,<0.5,7.4,60,30,10,4.2\\nUNKNOWN,9,9,9,,,,\\n'], 'lab.csv')); await w(150);
+        want(document.querySelector('[data-soillab="0"]')?.value === surveyOf().points[0].samples[0].id, 'lab row matched to its sample'); want(document.querySelector('[data-soillab="1"]')?.value === '', 'an unknown sample is left for the user');
+        soilImportLabGo(); await w(150); const s0 = surveyOf().points[0].samples[0];
+        want(soilValue(s0, 'ec').v === 1.8 && soilValue(s0, 'sar').nd && soilValue(s0, 'om').v === 4.2, 'lab values stored: ' + JSON.stringify(s0.lab)); want(s0.sand === 60 && soilClass(s0, 'texture') === 'Sandy loam', 'fractions give the texture: ' + soilClass(s0, 'texture'));
+        /* boreholes untouched */
+        want(projList().length === n0 && JSON.stringify(projList().map(b => b.samples.length)) === b0, 'boreholes untouched');
+        /* saved with the project */
+        want(JSON.parse(JSON.stringify(siteOf())).soil.points.length === surveyOf().points.length, 'in the project record');
+        /* units */
+        S.units = 'ft'; want(soilDepths()[0].label === '0–0.49 ft' && surveyOf().points[0].samples[0].to === .15, 'imperial labels, metres stored: ' + soilDepths()[0].label); S.units = 'm';
+        /* issued */
+        surveyOf().survey.issued = true; setSurvey(surveyOf()); renderView(true); await w(100); want([...document.querySelectorAll('.soil-grid input')].every(i => i.readOnly), 'an issued survey is read only'); const n1 = surveyOf().points.length; soilAddPoint('NO'); want(surveyOf().points.length === n1, 'no adding when issued'); surveyOf().survey.issued = false;
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('soil survey: maps follow the data', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); goTab('soil'); await w(150); fetchTile = () => {};
+        const seed = (n, f = (i) => 1 + (i * 7 % 11) / 2, strategy = 'grid') => { const pts = Array.from({ length: n }, (_, i) => ({ id: 'p' + i, name: 'SP-' + i, e: 561000 + (i % 6) * 85 + (i * 13 % 7), n: 6463000 + Math.floor(i / 6) * 85 + (i * 5 % 9), z: null, order: i % 2 ? 'Brunisolic' : 'Luvisolic', gg: '', samples: [{ id: 's' + i, name: '', from: 0, to: .15, method: 'Hand dig', hz: 'Ah', sand: 50 + i % 20, silt: 30, clay: 20 - i % 20 + 0, lab: { ec: { v: f(i), lt: false } }, gsd: [] }] })); setSurvey({ survey: { name: 'T', date: '2026-07-22', strategy, notes: '' }, points: pts }); S.soilView = null; S.soilCache = null; };
+        const map = () => soilMapSVG(800, 560, soilCurrent(), false), label = t => t.replace(/<[^>]+>/g, ' ');
+        seed(4); let v = soilCurrent(); want(v.prop === 'ec', 'a lab value is the default: ' + v.prop);
+        let f = soilSurface(v.prop, v.depth, v); want(f.method === 'none', 'under 5: no surface: ' + f.method); want(!/soil-surface/.test(map()), 'only points are drawn'); want(/4 points/.test(f.why), 'says why: ' + f.why);
+        soilSet({ view: 'heat' }); f = soilSurface(v.prop, v.depth, soilCurrent()); want(/soil-surface/.test(map()) && f.warnings.some(x => x.id === 'forced-few'), 'asking for a heat map still works, with a warning');
+        seed(25); v = soilCurrent(); f = soilSurface(v.prop, v.depth, v); want(f.method === 'idw' && /25 points/.test(f.why), '25 points: ' + f.method);
+        let t = label(map()); want(t.includes('Interpolated, not measured') && t.includes('Inverse distance, 25 points'), 'label: ' + t.slice(0, 200)); want(/RMSE/.test(t), 'the check error shows'); want((map().match(/data-spt=/g) || []).length === 25, 'every measured point is drawn');
+        want(f.cell > 15 && f.cell < 30, 'cell from the spacing: ' + f.cell);
+        seed(40); v = soilCurrent(); f = soilSurface(v.prop, v.depth, v); want(f.method === 'krige', '40 points: ' + f.method);
+        seed(25, undefined, 'targeted'); t = label(map()); want(t.includes('Points were targeted, so this may not represent the whole site.'), 'targeted line');
+        seed(25); soilSet({ prop: 'order' }); v = soilCurrent(); f = soilSurface('order', v.depth, v); want(f.method === 'nearest' && /soil-surface/.test(map()), 'class zones: ' + f.method); want(/Brunisolic/.test(label(map())), 'the legend names the classes');
+        seed(25); soilSet({ prop: 'texture' }); f = soilSurface('texture', soilCurrent().depth, soilCurrent()); want(f.fromFractions && /soil-surface/.test(map()), 'texture comes from interpolating the fractions');
+        seed(25); soilSet({ view: 'pie' }); want((map().match(/soil-pie/g) || []).length >= 25, 'sand, silt and clay pies');
+        seed(25); soilSet({ view: 'graduated' }); want(new Set([...map().matchAll(/data-spt="[^"]+"[^>]*r="([\\d.]+)"/g)].map(m => m[1])).size > 3, 'circle size follows the value');
+        seed(25); soilSet({ view: 'uncertainty' }); want(/soil-surface/.test(map()), 'uncertainty map');
+        seed(10, () => 5); v = soilCurrent(); f = soilSurface('ec', v.depth, v); want(/same value/.test(f.note || '') && !/NaN|Infinity/.test(map()), 'identical values: ' + f.note);
+        seed(25); surveyOf().points[0].e = null; setSurvey(surveyOf()); S.soilCache = null; want(/1 point has no coordinates/.test(soilSurface('ec', soilCurrent().depth, soilCurrent()).unmappedNote || ''), 'unmapped points are listed');
+        seed(25); surveyOf().points[3].samples[0].lab.ec = { v: 1, lt: true }; surveyOf().points[8].e = surveyOf().points[9].e; surveyOf().points[8].n = surveyOf().points[9].n; setSurvey(surveyOf()); S.soilCache = null; f = soilSurface('ec', soilCurrent().depth, soilCurrent()); want(f.warnings.some(x => x.id === 'non-detects') && f.merged === 1 && /same spot/.test(f.notes.join(' ')), 'non-detects and duplicates are reported: ' + f.notes);
+        const a = soilSurface('ec', soilCurrent().depth, soilCurrent()); want(a === soilSurface('ec', soilCurrent().depth, soilCurrent()), 'surfaces are cached');
+        seed(25); const keep = S.co.logStyle; S.co.logStyle = 'bw'; S.soilCache = null; want(soilRamp(soilCurrent()) === 'grey', 'black and white uses a grey ramp'); S.co.logStyle = keep;
+        seed(25); S.units = 'ft'; want(/\\d ft<\\/text>/.test(map()) && !/\\d m<\\/text>/.test(map()), 'the scale bar follows the units'); S.units = 'm';
+        seed(25); renderView(true); await w(200); want(!!document.querySelector('#plan svg') && !!document.querySelector('[data-sv="prop"]'), 'the page draws the map and its settings'); want(S._plan && S._plan.sc > 0, 'pan and zoom know the map');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('soil survey: graphs', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); goTab('soil'); await w(150); fetchTile = () => {}; const legacyTri = textureTriSVG(), legacyGsd = gsdSVG();
+        for (const k of ['texture', 'psd', 'psdBars', 'ecSar', 'ranked', 'depthPairs', 'hist', 'classShare', 'predicted']) want(/class="note"/.test(soilGraphSVG(k, 560, 320, soilCurrent())), 'with no data, a plain message: ' + k);
+        const pts = Array.from({ length: 12 }, (_, i) => ({ id: 'p' + i, name: 'SP-' + i, e: 561000 + (i % 4) * 90, n: 6463000 + Math.floor(i / 4) * 90, z: null, order: i % 3 ? 'Brunisolic' : 'Luvisolic', gg: '', samples: [0, 1].map(d => ({ id: 's' + i + d, name: '', from: d * .15, to: (d + 1) * .15, method: 'Hand dig', hz: '', sand: 60 - i - d * 5, silt: 25 + d, clay: 15 + i + d * 4, lab: { ec: { v: 1 + i * .5 + d, lt: i === 2 }, sar: { v: 1 + i * .8 + d, lt: false } }, gsd: i < 4 ? [{ size: 2, passing: 100 }, { size: .05, passing: 50 + i }, { size: .002, passing: 15 + i }] : [] })) }));
+        setSurvey({ survey: { name: 'T', date: '2026-07-22', strategy: 'grid', notes: '' }, points: pts }); S.soilView = null; S.soilCache = null; const v = soilCurrent();
+        for (const k of ['texture', 'psd', 'psdBars', 'ecSar', 'ranked', 'depthPairs', 'hist', 'classShare', 'predicted']) { const g = soilGraphSVG(k, 560, 320, v); want(g.startsWith('<svg') && !/NaN|undefined|Infinity/.test(g), k + ' draws: ' + g.slice(0, 80)); }
+        const tri = soilGraphSVG('texture', 560, 320, v); want((tri.match(/data-spt=/g) || []).length === 24 && (tri.match(/class="soil-link"/g) || []).length === 12, 'the triangle shows each sample and joins a point\\'s depths: ' + (tri.match(/class="soil-link"/g) || []).length);
+        want((soilGraphSVG('psd', 560, 320, v).match(/class="soil-curve"/g) || []).length === 4, 'one curve per grain size test at this depth'); want(/soil-median/.test(soilGraphSVG('psd', 560, 320, v)), 'with a median');
+        const es = soilGraphSVG('ecSar', 560, 320, v); want(/Alberta/.test(es) && /unverified/.test(es), 'salinity bands name their source and say unverified: ' + es.replace(/<[^>]+>/g, ' ').slice(0, 200)); want(/Good/.test(es) && /Unsuitable/.test(es), 'bands are named');
+        const srcLine = (es.match(/<text[^>]*>([^<]*unverified[^<]*)<\\/text>/) || [])[1] || ''; want(srcLine && srcLine.length * 5.4 < 560 - 48, 'the source line fits, so unverified can be read: ' + srcLine.length);
+        for (const k of ['texture', 'ecSar']) { const g = soilGraphSVG(k, 560, 320, v); want(/0–15 cm/.test(g) && /15–30 cm/.test(g), k + ' has a depth legend'); }
+        want(/unverified/.test(soilGraphSVG('ranked', 560, 320, v)), 'limits show on the ranked bars');
+        S.co.soilLimits[0].verified = true; want(!/unverified/.test(soilGraphSVG('ecSar', 560, 320, v)), 'once checked, the label goes'); S.co.soilLimits[0].verified = false;
+        want((soilGraphSVG('depthPairs', 560, 320, v).match(/class="soil-pair"/g) || []).length === 12, 'a line per point between depths');
+        want(textureTriSVG() === legacyTri && gsdSVG() === legacyGsd, 'the lab page charts are unchanged');
+        renderView(true); await w(250); want(document.querySelectorAll('#soil-graphs svg').length >= 6, 'the page shows the graphs: ' + document.querySelectorAll('#soil-graphs svg').length);
+        surveyOf().points.forEach(p => p.samples.forEach(q => { q.gsd = []; })); setSurvey(surveyOf()); S.soilCache = null; renderView(true); await w(200); want(![...document.querySelectorAll('#soil-graphs section')].some(x => /Particle size curves/.test(x.textContent)) && /Particle size curves/.test(document.querySelector('#soil-graphs').textContent), 'a graph with nothing to show is one line, not an empty card');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('soil survey: a point shows everything', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); goTab('soil'); await w(150); fetchTile = () => {}; loadSoilExample(); await w(200);
+        const ex = surveyOf(), all = ex.points.flatMap(q => q.samples), sp = SoilStats.spacing(ex.points.map(q => ({ x: q.e, y: q.n, v: 1 })));
+        want(all.length === 25 && /fictional/i.test(ex.survey.name) && ex.survey.strategy === 'targeted', 'the example matches the field work: 25 samples, targeted: ' + all.length + ' ' + ex.survey.name);
+        want(sp.min >= 70 && sp.max <= 105, 'points 75 to 100 m apart: ' + [sp.min, sp.max]); want(soilDepths().map(d => d.label).join() === '0–15 cm,15–30 cm', 'two depths: ' + soilDepths().map(d => d.label));
+        want(new Set(all.map(q => q.method)).size === 2 && all.some(q => q.method === 'Hand dig') && all.some(q => q.method === 'Hand auger'), 'hand dig and hand auger');
+        want(ex.points.every(q => q.order && q.gg) && all.every(q => q.hz && csscOf(q) && csscOf(q).exact && q.gsd.length >= 4 && labVal(q, 'ec') && labVal(q, 'sar') && labVal(q, 'ph')), 'full classification, particle size and salinity on every sample');
+        want(Math.max(...all.map(q => labVal(q, 'ec').v)) > 4 && Math.min(...all.map(q => labVal(q, 'ec').v)) < 1, 'a salinity pattern worth mapping');
+        const p = ex.points.find(q => q.samples.length === 2);
+        document.querySelector('#plan [data-spt="' + p.id + '"]').dispatchEvent(new MouseEvent('click', { bubbles: true })); await w(200);
+        const card = document.querySelector('#drawer'); want(card && !card.hidden, 'the card opens');
+        const t = card.innerText; want(t.includes(p.name) && t.includes(p.gg) && t.includes(p.order), 'classification: ' + t.slice(0, 120));
+        want(t.includes('0–15 cm') && t.includes('15–30 cm') && t.includes('Hand dig'), 'each depth sample'); want(/EC/.test(t) && /SAR/.test(t) && /Sand/.test(t), 'lab values and fractions'); want(/Good|Fair|Poor|Unsuitable/.test(t) && /unverified/.test(t), 'lab values against limits, with their status');
+        want(S.soilSel === p.id, 'selected'); want(new RegExp('data-spt="' + p.id + '"[^>]*stroke-width="3"').test(document.querySelector('#plan').innerHTML), 'marked on the map');
+        want(new RegExp('data-spt="' + p.id + '"[^>]*stroke-width="2.5"').test(document.querySelector('#soil-graphs').innerHTML), 'marked on the graphs');
+        const other = surveyOf().points.find(q => q !== p && document.querySelector('#soil-graphs [data-spt="' + q.id + '"]')); document.querySelector('#soil-graphs [data-spt="' + other.id + '"]').dispatchEvent(new MouseEvent('click', { bubbles: true })); await w(200);
+        want(S.soilSel === other.id && document.querySelector('#drawer').innerText.includes(other.name), 'clicking a graph mark selects that point');
+        closeDrawer(); await w(50); want(document.querySelector('#drawer').hidden, 'the card closes');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('soil survey: reports and exports', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); goTab('soil'); await w(150); fetchTile = () => {}; loadSoilExample(); await w(200); surveyOf().survey.strategy = 'targeted'; setSurvey(surveyOf());
+        want(['soilmap', 'soilgraph', 'soiltable'].every(k => RITEMS[k]), 'report items exist');
+        const view = { ...soilCurrent() }, map = itemInner({ t: 'soilmap', o: { view } }, 700, 520);
+        want(map.startsWith('<svg') && /Interpolated, not measured/.test(map) && /Points were targeted/.test(map) && /RMSE/.test(map), 'the map carries its method note and warnings');
+        want(/data-north/.test(map) && /m<\\/text>/.test(map), 'north arrow and scale bar');
+        for (const kind of ['texture', 'ecSar', 'ranked']) { const g = itemInner({ t: 'soilgraph', o: { kind, view } }, 640, 360); want(g.startsWith('<svg'), 'graph item ' + kind + ': ' + g.slice(0, 60)); }
+        const tb = itemInner({ t: 'soiltable', o: { view } }, 700, 400); want(tb.startsWith('<svg') && /SP-1/.test(tb) && /EC/.test(tb), 'table item');
+        goTab('compose'); await w(300); want(/Soil map/.test(document.body.innerHTML), 'the add menu lists them'); goTab('soil'); await w(150);
+        let saved = []; const keep = saveFile; saveFile = async (n, d) => { saved.push([n, d]); return true; };
+        await soilAct('soil-xlsx'); await w(50); const wb = XLSX.read(saved[0][1]); want(['Points', 'Samples', 'Lab'].every(n => wb.SheetNames.includes(n)), 'Excel sheets: ' + wb.SheetNames);
+        const samples = XLSX.utils.sheet_to_json(wb.Sheets.Samples); want(samples.length === 25 && samples[0].Point === 'SP-1', 'one row a sample: ' + samples.length);
+        saved = []; await soilAct('soil-csv'); await w(50); const csv = await new Blob([saved[0][1]]).text(), lines = csv.trim().split('\\n'); want(lines[0] === 'easting,northing,value,uncertainty' && lines.length > 50 && lines[1].split(',').every(x => Number.isFinite(+x)), 'surface grid CSV: ' + lines.slice(0, 2).join(' / '));
+        saveFile = keep;
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('soil survey: works with no boreholes at all', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        S.bh.clear(); S.sel = null; want(!projList().length, 'starts empty'); goTab('soil'); await w(200); want(!!document.querySelector('.soil-page'), 'the page opens without a borehole');
+        soilAddSample(soilAddPoint('SP-1'), { from: 0, to: .15 }); await w(50); want(surveyOf().points.length === 1, 'a point is added'); want(projList().length === 0, 'no borehole made');
+        const pt = surveyOf().points[0]; pt.e = 561000; pt.n = 6463000; const p2 = soilAddPoint('SP-2'); p2.e = 561090; p2.n = 6463040; soilAddSample(p2, { from: 0, to: .15 }); setSurvey(surveyOf()); renderView(true); await w(150);
+        zoomAt(200, 200, 1.6); await w(250); want(S.mv && S.mv.sc > 0, 'zooming works with no boreholes'); document.querySelector('#plan').dispatchEvent(new Event('x')); await w(50);
+        const sent = []; const keep = saveTo; saveTo = async (p, name, ext, data) => sent.push(data); await saveProject(false, ''); saveTo = keep;
+        want(sent[0]?.site?.soil?.points?.length === 2 && sent[0].boreholes.length === 0, 'a soil-only project saves: ' + JSON.stringify(sent[0]?.site || null).slice(0, 80));
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       return F;
     })()`);
