@@ -1719,7 +1719,7 @@ app.whenReady().then(async () => {
         const tl = document.querySelector('#drawer #lt-type'); want(tl, 'layer panel has a type line');
         tl.value = 'SM silty sand, some gravel, dense, wet, grey'; tl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(250);
         const l1 = cur().layers[1]; want(l1.uscs === 'SM' && l1.consistency === 'Dense' && l1.moisture === 'Wet' && /some gravel/.test(l1.mods), 'type line sets the layer: ' + JSON.stringify(l1));
-        want(document.querySelector('#drawer [aria-pressed="true"]') && /SM/.test(document.querySelector('#drawer').textContent), 'buttons in the panel show what was typed');
+        want(/SM/.test(document.querySelector('#drawer [data-step="uscs"]')?.textContent || '') && /Dense/.test(document.querySelector('#drawer [data-step="consistency"]')?.textContent || '') && /Wet/.test(document.querySelector('#drawer [data-step="moisture"]')?.textContent || ''), 'the steps in the panel show what was typed');
         closeDrawer(); await w(150);
         /* add a layer by typing, under the log */
         const n0 = cur().layers.length, bot = Math.max(...cur().layers.map(l => l.bottom || 0)), nb = document.querySelector('#lt-new'); want(nb, 'add-by-typing box under the log');
@@ -1924,13 +1924,13 @@ app.whenReady().then(async () => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
       try {
-        loadDlExample(); await w(300); cur().layers[1].texture = ''; goTab('edit'); await w(500);
+        loadDlExample(); await w(300); cur().layers[1].texture = ''; S.dtab = 'soil'; goTab('edit'); await w(500);
         const inp = () => document.querySelector('.ws .dgrid[data-sheet="layerList"] tbody tr:nth-child(2) input[data-c="2"]');
         want(inp() && !inp().readOnly, 'the Description cell can be typed in');
-        if (inp()) { inp().focus(); inp().value = 'silty sand, compact, moist, brown'; inp().dispatchEvent(new Event('input', { bubbles: true })); inp().dispatchEvent(new Event('change', { bubbles: true })); inp().blur(); await w(400); }
+        if (inp()) { inp().focus(); inp().dispatchEvent(new FocusEvent('focusin', { bubbles: true })); await w(100); inp().value = 'silty sand, compact, moist, brown'; inp().dispatchEvent(new Event('input', { bubbles: true })); inp().dispatchEvent(new Event('change', { bubbles: true })); inp().blur(); await w(400); }
         const l = cur().layers[1]; want(l.uscs === 'SM' && l.texture === 'cfem|silty SAND' && l.consistency === 'Compact', 'typed description sets the soil, texture and fields: ' + JSON.stringify([l.uscs, l.texture, l.consistency]));
         want(/silty SAND \\(SM\\)/.test(inp()?.value || ''), 'the cell then shows the description: ' + inp()?.value);
-        want(document.querySelector('#ldetail [aria-pressed="true"]') && /SM/.test(document.querySelector('#ldetail')?.textContent || ''), 'the pick buttons below follow');
+        want(/SM/.test(document.querySelector('#ldetail [data-step="uscs"]')?.textContent || '') && /Compact/.test(document.querySelector('#ldetail [data-step="consistency"]')?.textContent || ''), 'the steps below follow');
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       return F;
     })()`);
