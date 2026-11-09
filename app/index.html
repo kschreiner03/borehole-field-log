@@ -593,6 +593,14 @@ table.sum th, table.hist th { background: var(--panel-2); }
 .lf-item[aria-current="true"] { background: var(--sel); } .lf-item[aria-current="true"] b { color: var(--accent-2); }
 .lf-form { min-width: 0; display: grid; gap: 12px; }
 .qd-row.lstep { align-items: start; }
+.lstep.lfold { align-items: center; padding: 2px 0; border-bottom: 1px solid var(--grid); }
+.lfold-v { display: flex; gap: 12px; align-items: center; justify-content: space-between; width: 100%; border: 0; background: none; padding: 5px 4px; text-align: left; cursor: pointer; font: inherit; color: var(--ink); border-radius: var(--r-sm); }
+.lfold-v:hover:not(:disabled) { background: var(--hover); } .lfold-v:disabled { cursor: default; }
+.lfold-v .val { font-weight: 600; } .lfold-v .edit { color: var(--accent); font-size: 12.5px; flex: none; }
+.lstep-n.ok { background: #3c8c5a; }
+.lstep:not(.lfold) { background: var(--panel-2); border-radius: var(--r-sm); padding: 8px 6px; margin: 4px 0; }
+.chip.soft { border-style: dashed; color: var(--accent); }
+.lstep .chip:not([aria-pressed="true"]):not(.soft) { border-color: transparent; background: var(--panel); }
 .lstep-n { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 6px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font: 600 10.5px var(--f-body); vertical-align: 1px; }
 .lstep-b { display: grid; gap: 6px; min-width: 0; flex: 1; }
 .lstep-in { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
@@ -1682,7 +1690,7 @@ function layerApplyText(b, l, text, o = {}) {
 const ltApply = layerApplyText;
 function ltRead(text, l) { const q = parseLayerText(text, l); if (q.error) return q.error; return [q.top != null ? `${fx(q.top)}–${fu(q.bottom)}` : '', q.depthOnly ? 'depths only; the description stays' : '', q.uscs && q.uscs + (q.inferred ? ' (from the words)' : ''), q.mods, q.consistency, q.moisture, q.colour, q.origin && ORIGINS[q.origin], q.other && `other: ${q.other}`].filter(Boolean).join(' · ') || 'Nothing recognised yet'; }
 /* the panel stays on the layer it edited, wherever the layer sorted to */
-function ltShow(b, l) { if (S.drawer?.kind === 'layer') { S.drawer.i = S.layer = b.layers.indexOf(l); renderDrawer(); } redrawLog(); }
+function ltShow(b, l) { S.lstep = null; if (S.drawer?.kind === 'layer') { S.drawer.i = S.layer = b.layers.indexOf(l); renderDrawer(); } else if ($('#ldetail')) { S.layer = b.layers.indexOf(l); refreshLayerEditor(b); } redrawLog(); }
 /* typing straight onto the log: a text box over the layer's description; Enter applies, Escape leaves it */
 function ltInline(i) {
   $('#lt-inline')?.remove(); const b = cur(), l = b?.layers[i], z = document.querySelector(`#log [data-desc][data-i="${i}"]`); if (!l || !z) return;
@@ -2742,7 +2750,7 @@ function drawerHTML(b) {
   const head = (t, sub = '') => `<header><div><h3>${t}</h3>${sub ? `<span class="note">${sub}</span>` : ''}</div><button class="btn" data-act="drawer-close" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></header>`;
   if (d.kind === 'layer') {
     const lt = b.layers[i];
-    return head(`Layer ${i + 1}`, 'Edits show on the log as you type') + `<div class="dbody"><div class="lt-box"><label for="lt-type">Type the layer</label><input id="lt-type" data-ltl="${i}" value="${esc(lt ? layerText(lt) : '')}" autocomplete="off" spellcheck="false" placeholder="1.2-3.5 SP fine to medium grained, trace silt, compact, moist, brown"><p class="note" id="lt-read">Press Enter to apply; the buttons below follow. Words it doesn't know go to other features.</p></div>${layerDetail(b).replace(/^<div style="display:flex[^]*?<\/div>/, '')}
+    return head(`Layer ${i + 1}`, 'Edits show on the log as you type') + `<div class="dbody">${layerDetail(b).replace(/^<div style="display:flex[^]*?<\/div>/, '')}
       <div class="actions"><button class="btn" data-act="drawer-layer-below">Add layer below</button><button class="btn danger" data-act="drawer-del" data-what="layers">Delete layer</button></div></div>`;
   }
   if (d.kind === 'sample') { const sm = b.samples[i]; if (!sm) return ''; return head(`Sample ${esc(sampleId(sm))}`, `at ${fu(sm.depth)}`) + `<div class="dbody">${sampleFormHTML(b, i, false)}</div>`; }
@@ -2895,7 +2903,7 @@ const SHEETS = {
     ['mods', 'Modifiers', 'text', () => MOD_CHIPS], ['consistency', 'Consistency / compactness', 'pick', () => [...COHESIVE, ...GRANULAR, ...WEATHERING].filter(Boolean)],
     ['moisture', 'Moisture', 'pick', () => MOISTURE.filter(Boolean)], ['colour', 'Colour', 'text', () => [...document.querySelectorAll('#colours option')].map(o => o.value)],
     ['origin', 'Origin', 'pick', () => Object.values(ORIGINS).filter(Boolean), ORIGINS], ['other', 'Other features', 'text', () => OTHER_CHIPS], ['hz', 'Horizon', 'text', () => Object.keys(HORIZONS)],
-    ['desc', 'Description', 'calc', (r, b) => plainDesc(r)]],
+    ['desc', 'Description', 'ltdesc']],
     blank: (b, prev) => newLayer(prev?.bottom ?? Math.max(0, ...b.layers.map(l => l.bottom ?? 0))) },
   samples: { name: 'Samples & SPT', key: 'samples', by: 'depth', cols: [
     ['depth', 'Depth', 'depth'], ['name', 'Name', 'text', null, null, r => sampleId({ ...r, name: '' })], ['type', 'Method', 'code', () => Object.keys(SAMPLE_TYPES)], ['purpose', 'Purpose / analyses', 'text', () => SAMPLE_PURPOSES], ['no', 'No.', 'int'],
@@ -3983,8 +3991,17 @@ const PG_FINE = ['non-plastic', 'low plastic', 'medium plastic', 'high plastic']
 const pgDefault = l => { const s = soilOf(l.uscs); return s ? s.grad || (s.plast && s.p !== 'PEAT' ? `${s.plast} plastic` : '') : ''; };
 /* your own buttons: per person, on this computer (never in a project or the company settings). A step with no list of its own
    uses the built-in buttons. Soil, origin and sample type keep to the codes the log understands. */
-const BTN_STEPS = [['uscs', 'Soil (symbols)'], ['mods', 'Modifiers'], ['pg', 'Plasticity or gradation'], ['consistency', 'Consistency / compactness'], ['moisture', 'Moisture'], ['colour', 'Colour'], ['other', 'Other features'], ['origin', 'Origin'], ['type', 'Sample type']];
+const BTN_STEPS = [['uscs', 'Soil types listed first'], ['mods', 'Modifiers'], ['pg', 'Plasticity or gradation'], ['consistency', 'Consistency / compactness'], ['moisture', 'Moisture'], ['colour', 'Colour'], ['other', 'Other features'], ['origin', 'Origin'], ['type', 'Sample type']];
 const BTN_BUILTIN = () => ({ uscs: QUICK_SOILS.filter(k => SOILS[k]), mods: MOD_CHIPS, pg: [...PG_FINE, ...PG_COARSE], consistency: [...COHESIVE, ...GRANULAR].filter(Boolean), moisture: MOISTURE.filter(Boolean), colour: QUICK_COLOURS, other: OTHER_CHIPS, origin: Object.keys(ORIGINS).filter(Boolean), type: Object.keys(SAMPLE_TYPES) });
+const btnUse = () => { try { return JSON.parse(lsGet('bhlog.btnUse') || '{}') || {}; } catch { return {}; } };
+const btnUsed = (k, t) => { const u = btnUse(); u[k] = { ...(u[k] || {}), [t]: (u[k]?.[t] || 0) + 1 }; lsSet('bhlog.btnUse', JSON.stringify(u)); };
+S.lstep = null; S.lstepMore = new Set(); S.lstepType = new Set();
+document.addEventListener('click', e => {
+  const st = e.target.closest?.('[data-lstep]'), mo = e.target.closest?.('[data-lstepmore]'), ty = e.target.closest?.('[data-lsteptype]'), b = cur(), l = b?.layers[S.layer]; if (!l || !(st || mo || ty)) return;
+  if (st) { S.lstep = S.lstep?.id === l.id && S.lstep.k === st.dataset.lstep ? null : { id: l.id, k: st.dataset.lstep }; S.lstepMore.clear(); S.lstepType.clear(); }
+  if (mo) S.lstepMore.add(mo.dataset.lstepmore); if (ty) S.lstepType.add(ty.dataset.lsteptype);
+  refreshLayerEditor(b); if (ty) setTimeout(() => $(`#ld-${ty.dataset.lsteptype}`)?.focus(), 0);
+});
 const myBtnAll = () => { try { return JSON.parse(lsGet('bhlog.buttons') || '{}') || {}; } catch { return {}; } };
 const myButtons = (k, builtIn) => { const v = myBtnAll()[k]; return Array.isArray(v) && v.length ? v : builtIn; };
 function saveMyButtons(k, list) { const all = myBtnAll(); if (list?.length) all[k] = list; else delete all[k]; Object.keys(all).length ? lsSet('bhlog.buttons', JSON.stringify(all)) : lsDel('bhlog.buttons'); }
@@ -4055,26 +4072,44 @@ function layerDetail(b) {
   const multi = (k, list) => chips(k, l[k], list).replace(/^<div class="chips">|<\/div>$/g, '').replace(/<button /g, `<button ${dis} `);
   const box = (k, ph, list) => `<input type="text" ${list ? `list="${list}"` : ''} ${at(k)} value="${esc(l[k] || '')}" placeholder="${esc(ph)}" ${dis}>`;
   const grp = soilOf(l.uscs)?.group, states = stateList(l.uscs).filter(Boolean), oKeys = Object.keys(ORIGINS).filter(Boolean), save = k => ed ? `<button class="btn link" data-act="btn-save" data-for="${k}">Save as a button</button>` : '';
-  const steps = [
-    ['Soil', qp('uscs', myButtons('uscs', QUICK_SOILS).filter(k => SOILS[k])), `<select ${at('uscs')} ${dis} aria-label="Any soil type">${soilOpts(l.uscs)}</select>`],
-    ['Modifiers', multi('mods', myButtons('mods', MOD_CHIPS)), box('mods', soilOf(l.uscs)?.imp || 'or type, e.g. trace mica', 'mods') + save('mods')],
-    ['Plasticity or gradation', qp('pg', myButtons('pg', [...PG_FINE, ...PG_COARSE]).filter(t => grp === 'coarse' ? !PG_FINE.includes(t) : grp === 'fine' ? !PG_COARSE.includes(t) : true)), box('pg', pgDefault(l) ? `from the symbol: ${pgDefault(l)}` : 'from the symbol') + save('pg')],
-    [stateLabel(l.uscs), states.length ? qp('consistency', myButtons('consistency', states).filter(t => states.includes(t) || ![...COHESIVE, ...GRANULAR, ...WEATHERING].includes(t))) : '<span class="note">Pick a soil first.</span>', ed ? '<button class="btn link" data-act="suggest" title="Use the SPT N, pocket penetrometer or vane results inside this layer">Suggest from tests</button>' : ''],
-    ['Moisture', qp('moisture', myButtons('moisture', MOISTURE.filter(Boolean))), ''],
-    ['Colour', qp('colour', myButtons('colour', QUICK_COLOURS)), box('colour', 'or type, e.g. mottled orange-brown', 'colours') + save('colour')],
-    ['Other features', multi('other', myButtons('other', OTHER_CHIPS)), box('other', 'or type, e.g. trace coal', 'others') + save('other')],
-    ['Origin', qp('origin', myButtons('origin', oKeys).filter(k => ORIGINS[k]), ORIGINS), ed ? '<button class="btn link" data-act="buttons">Your buttons…</button>' : ''],
+  /* each step: [key, label, buttons, single?, typing box?, value when folded, full list for More…] */
+  const STEPS = [
+    ['uscs', 'Soil', myButtons('uscs', QUICK_SOILS).filter(k => SOILS[k]), true, false, () => composeDesc({ ...l, mods: '', consistency: '', moisture: '', colour: '', other: '', origin: '', hz: '' }).name || l.uscs, Object.keys(SOILS)],
+    ['mods', 'Modifiers', myButtons('mods', MOD_CHIPS), false, true, () => l.mods],
+    ['pg', 'Plasticity or gradation', myButtons('pg', [...PG_FINE, ...PG_COARSE]).filter(t => grp === 'coarse' ? !PG_FINE.includes(t) : grp === 'fine' ? !PG_COARSE.includes(t) : true), true, true, () => l.pg || (pgDefault(l) ? `${pgDefault(l)} (from the symbol)` : '')],
+    ['consistency', stateLabel(l.uscs), myButtons('consistency', states).filter(t => states.includes(t) || ![...COHESIVE, ...GRANULAR, ...WEATHERING].includes(t)), true, false, () => l.consistency],
+    ['moisture', 'Moisture', myButtons('moisture', MOISTURE.filter(Boolean)), true, false, () => l.moisture],
+    ['colour', 'Colour', myButtons('colour', QUICK_COLOURS), true, true, () => l.colour],
+    ['other', 'Other features', myButtons('other', OTHER_CHIPS), false, true, () => l.other],
+    ['origin', 'Origin', myButtons('origin', oKeys).filter(k => ORIGINS[k]), true, false, () => ORIGINS[l.origin] || ''],
   ];
+  const need = ['uscs', ...(states.length ? ['consistency'] : []), 'moisture', 'colour'], filled = k => k === 'pg' ? !!(l.pg || l.uscs) : !!String(l[k] || '').trim();
+  const pin = S.lstep?.id === l.id ? S.lstep.k : null, openK = pin ?? need.find(k => !filled(k)) ?? null, use = btnUse();
+  const short = (k, all, terms) => { const on = all.filter(t => terms.includes(t.toLowerCase())), rank = all.filter(t => !on.includes(t)).map((t, n) => [t, -(use[k]?.[t] || 0), n]).sort((a, c) => a[1] - c[1] || a[2] - c[2]).map(x => x[0]); return [...on, ...rank].slice(0, Math.max(k === 'uscs' ? 12 : 8, on.length)); };
+  const stepHTML = ([k, label, all, single, typed, val, full], n) => {
+    const head = `<span class="qd-l"><span class="lstep-n${filled(k) ? ' ok' : ''}">${n + 1}</span>${esc(label)}</span>`;
+    if (k !== openK) return `<div class="qd-row lstep lfold" data-step="${k}">${head}<button type="button" class="lfold-v" data-lstep="${k}" ${dis}><span class="${val() ? 'val' : 'note'}">${esc(val() || '—')}</span><span class="edit">${ed ? (val() ? 'change' : 'add') : ''}</span></button></div>`;
+    const terms = single ? [String(l[k] || '').toLowerCase()] : splitTerms(l[k]).map(t => t.toLowerCase()), more = S.lstepMore?.has(k), list = more ? (full || all) : short(k, all, terms);
+    const extra = (!more && (full || all).length > list.length ? [`<button type="button" class="chip soft" data-lstepmore="${k}" ${dis}>More…</button>`] : []).concat(typed && ed ? [`<button type="button" class="chip soft" data-lsteptype="${k}">+ other…</button>`] : []).join('');
+    const custom = typed && splitTerms(l[k] || '').some(t => !(full || all).some(x => x.toLowerCase() === t.toLowerCase())), showBox = typed && (S.lstepType?.has(k) || custom);
+    const fresh = showBox && splitTerms(l[k] || '').some(t => !myButtons(k, BTN_BUILTIN()[k]).some(x => x.toLowerCase() === t.toLowerCase()));
+    if (k === 'uscs') {   // a dropdown of every symbol; the person's own list, or the ones they use most, first
+      const mine = myBtnAll().uscs?.length ? myBtnAll().uscs.filter(c => SOILS[c]) : Object.entries(use.uscs || {}).sort((a, c) => c[1] - a[1]).map(x => x[0]).filter(c => SOILS[c]).slice(0, 6);
+      const top = mine.length ? `<optgroup label="${myBtnAll().uscs?.length ? 'Your list' : 'Most used'}" data-mine="1">${mine.map(c => `<option value="${c}">${esc(symLabel(c, SOILS[c]))}</option>`).join('')}</optgroup>` : '';
+      return `<div class="qd-row lstep" data-step="uscs">${head}<div class="lstep-b"><select ${at('uscs')} ${dis} aria-label="Soil type" style="max-width:420px">${soilOpts(l.uscs).replace('<option value="">—</option>', `<option value="">Choose the soil type…</option>${top}`)}</select></div></div>`;
+    }
+    const btns = k === 'consistency' && !states.length ? '<span class="note">Pick a soil first.</span>' : (single ? qp(k, list, k === 'origin' ? ORIGINS : null) : multi(k, list)) + extra;
+    const tail = [showBox ? box(k, k === 'pg' && pgDefault(l) ? `from the symbol: ${pgDefault(l)}` : 'type, e.g. ' + ({ mods: 'trace mica', pg: 'well graded', colour: 'mottled orange-brown', other: 'trace coal' }[k] || '')) + (fresh ? save(k) : '') : '', k === 'consistency' && ed ? '<button class="btn link" data-act="suggest" title="Use the SPT N, pocket penetrometer or vane results inside this layer">Suggest from tests</button>' : '', k === 'origin' && ed ? '<button class="btn link" data-act="buttons">Your buttons…</button>' : ''].filter(Boolean).join('');
+    return `<div class="qd-row lstep" data-step="${k}">${head}<div class="lstep-b"><div class="chips">${btns}</div>${tail ? `<div class="lstep-in">${tail}</div>` : ''}</div></div>`;
+  };
   const menu = ed ? `<details class="lmenu"><summary class="btn" aria-label="More layer actions" title="More layer actions">⋯</summary><span class="lmenu-pop">${[['l-insert', 'Insert a layer above'], ['l-dup', 'Duplicate'], ['l-split', 'Split in two'], ['l-up', 'Move up'], ['l-down', 'Move down'], ['l-del', 'Delete layer']].map(([a, t]) => `<button type="button" class="btn link${a === 'l-del' ? ' danger' : ''}" data-act="${a}">${t}</button>`).join('')}</span></details>` : '';
   return `<div style="display:flex;align-items:center;gap:8px"><b>Layer ${i + 1}</b><span class="note">${l.top != null || l.bottom != null ? `${fx(l.top)}–${fx(l.bottom)} ${L}` : 'Edits apply immediately'}</span><span class="sp" style="flex:1"></span>${i > 0 && ed ? '<button class="btn link" data-act="same-above">Same as layer above</button>' : ''}${menu}</div>
+    <div class="lt-box"><label for="lt-type">Type the layer</label><input id="lt-type" data-ltl="${i}" value="${esc(layerText(l))}" autocomplete="off" spellcheck="false" placeholder="1.2-3.5 SP fine to medium grained, trace silt, compact, moist, brown" ${dis}><p class="note" id="lt-read">${ed ? 'Type the whole layer and press Enter, or use the steps below. Words it doesn\'t know go to other features.' : ''}</p></div>
     <div class="fields qd-depth">
       ${fld(`From (${L})`, numIn('ld-top', at('top').replace('id="ld-top" ', ''), f(l.top, 3)))}
       ${fld(`To (${L})`, numIn('ld-bottom', at('bottom').replace('id="ld-bottom" ', ''), f(l.bottom, 3)))}
     </div>
-    <div class="qd" aria-label="Description, in the order it is written">
-      <div class="preview" id="ld-preview">${descHTML(l)}</div>
-      ${steps.map(([label, btns, extra], n) => `<div class="qd-row lstep"><span class="qd-l"><span class="lstep-n">${n + 1}</span>${esc(label)}</span><div class="lstep-b"><div class="chips">${btns}</div>${extra ? `<div class="lstep-in">${extra}</div>` : ''}</div></div>`).join('')}
-    </div>
+    <div class="qd" aria-label="Description, in the order it is written">${STEPS.map(stepHTML).join('')}</div>
     ${layerSamplesHTML(b, l, ed)}
     <details class="qd-more" ${S.ldMore ? 'open' : ''}><summary>Soil science names, unit and log note</summary>
     <div class="fields">
@@ -4171,11 +4206,13 @@ function onField(e) {
       if (up && v) for (const f of LAYER_COPY) if (!row[f]) row[f] = up[f] ?? '';
       const ld = $('#ldetail'); if (ld) ld.innerHTML = layerDetail(b); if (S.drawer?.kind === 'layer') renderDrawer();
     }
+    if (sec === 'layers' && ['mods', 'pg', 'colour', 'other'].includes(k) && t.closest('#ldetail, #drawer')) { clearTimeout(onField.st); onField.st = setTimeout(() => { const keep = document.activeElement?.id, pos = document.activeElement?.selectionStart; refreshLayerEditor(b); const el = keep && document.getElementById(keep); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch {} } }, 350); }
     if (sec === 'layers' && k === 'hz') { const o = $('#ld-hz-out'); if (o) o.textContent = hzMeaning(v) || '—'; }
     if (sec === 'layers' && k === 'uscs') {
       if (!stateList(v).includes(row.consistency)) row.consistency = '';
       const cs = $('#ld-consistency'); if (cs) { cs.innerHTML = opt(stateList(v), row.consistency); cs.closest('.fld').querySelector('label').textContent = stateLabel(v); }
       const mods = $('#ld-mods'); if (mods) mods.placeholder = soilOf(v)?.imp || 'e.g. silty, some sand, trace gravel';
+      if (v) btnUsed('uscs', v); if (t.closest('#ldetail, #drawer')) S.lstep = null;   // chosen: the next step opens
       setTimeout(() => refreshLayerEditor(b), 0);   // the state, plasticity and modifier buttons follow the soil
     }
     if (sec === 'samples' && /^b[123]$/.test(k)) {
@@ -6895,7 +6932,7 @@ function toggleChip(btn) {
   const k = btn.dataset.chip, term = btn.dataset.term, terms = splitTerms(l[k]);
   let next = terms.includes(term) ? terms.filter(x => x !== term) : [...terms.filter(x => k !== 'mods' || !MOD_PART(term) || MOD_PART(x) !== MOD_PART(term)), term];
   if (k === 'mods') next = next.sort((a, c) => MOD_RANK(a) - MOD_RANK(c));
-  l[k] = next.join(', ');
+  l[k] = next.join(', '); if (next.includes(term)) btnUsed(k, term);
   document.querySelectorAll(`[data-chip="${k}"]`).forEach(c => c.setAttribute('aria-pressed', String(splitTerms(l[k]).includes(c.dataset.term))));
   const inp = $('#ld-' + k); if (inp) inp.value = l[k];
   logChange(b, 'Soil layers'); store.save(b); refreshLayerRow(b); if (S.drawer) redrawLog();
@@ -7254,6 +7291,7 @@ function qlPane(b) {
   if (q.tab === 'layer') {
     const editing = q.i != null;
     return `<div class="ql-h"><b>${editing ? `Editing layer ${q.i + 1}` : `Layer ${qlLayers(b).length + 1}`}</b><span>from ${fu(q.top)}</span>${editing ? '<button class="btn link" data-ql="new-layer">Start a new layer instead</button>' : ''}</div>
+      <div class="ql-sec"><label class="ql-lab" for="ql-type">Type the layer</label><input id="ql-type" autocomplete="off" spellcheck="false" placeholder="e.g. 1.2-3.5 SP fine to medium grained, trace silt, compact, moist, brown" style="width:100%"><p class="note" id="ql-type-read" style="margin:4px 0 0">Or use the buttons below. Enter fills them in.</p></div>
       ${qlDepthCtl('bottom', 'Bottom of layer')}
       <div class="ql-sec"><span class="ql-lab">Soil type</span><div class="ql-tiles">${QL_TILES.map((t, i) => `<button type="button" class="ql-tile" data-qltile="${i}" aria-pressed="${q.tile === i}"><svg viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true">${soilRects(0, 0, 100, 34, t.code, t.origin)}</svg>${t.label}</button>`).join('')}</div></div>
       ${tile?.alts.length ? `<div class="ql-sec"><span class="ql-lab">Symbol</span>${qlChips('code', tile.alts, q.code)}</div>` : ''}
@@ -7302,6 +7340,16 @@ function qlPane(b) {
     <div class="ql-go"><button class="btn primary" data-ql="sample-save">Add sample</button></div>
     ${ss.length ? `<div class="ql-sec"><span class="ql-lab">Samples</span><div class="ql-list">${ss.map(s => `<div class="row"><b>${fu(s.depth)}</b><span>${esc(sampleId(s))}${sptN(s) != null ? ' · N = ' + sptN(s) : ''}${blowStr(s) ? ' · ' + blowStr(s) : ''}${s.cvc != null ? ' · ' + s.cvc + ' ppm' : ''}</span></div>`).join('')}</div></div>` : ''}`;
 }
+/* the guided flow's typing line: the same reading as everywhere else; Enter sets the buttons and, when given, the depths */
+document.addEventListener('input', e => { if (e.target.id === 'ql-type') $('#ql-type-read').textContent = e.target.value.trim() ? 'Reads as: ' + ltRead(e.target.value) : 'Or use the buttons below. Enter fills them in.'; });
+document.addEventListener('keydown', e => {
+  const t = e.target; if (t.id !== 'ql-type' || e.key !== 'Enter' || e.isComposing) return; e.preventDefault(); const q = S.ql, r = parseLayerText(t.value);
+  if (r.error) { $('#ql-type-read').textContent = r.error; return; }
+  Object.assign(q, { code: r.uscs || q.code, mods: r.mods || '', other: r.other || '', origin: r.origin || '', consistency: r.consistency || '', moisture: r.moisture || q.moisture, colour: r.colour || '' });
+  const ti = QL_TILES.findIndex(x => x.code === q.code || x.alts?.includes(q.code)); if (ti >= 0) q.tile = ti;
+  if (r.top != null && q.i == null) q.top = r.top; if (r.bottom != null) q.bottom = r.bottom;
+  renderQL();
+});
 function renderQL() {
   const b = cur(), el = $('#qlog'); if (!b || !el || !S.ql) return;
   const q = S.ql, ed = editable(b), keepScroll = el.querySelector('.ql-pane')?.scrollTop || 0;
@@ -10688,7 +10736,7 @@ document.addEventListener('click', e => {
   if (tr) { S.layer = +tr.dataset.layer; const b = cur(); $('#lgrid').innerHTML = layerRows(b); $('#ldetail').innerHTML = layerDetail(b); return; }
   const rt = e.target.closest('[data-rtab]'); if (rt) { setRibbonTab(rt.dataset.rtab); return; }
   const ch = e.target.closest('[data-chip]'); if (ch) { toggleChip(ch); return; }
-  const qpk = e.target.closest('[data-qpick]'); if (qpk) { const b = cur(), l = b?.layers[S.layer]; if (l && editable(b)) { const k = qpk.dataset.qpick, t = qpk.dataset.term; l[k] = String(l[k] || '').toLowerCase() === t.toLowerCase() ? '' : t; if (k === 'uscs' && l.consistency && !stateList(l.uscs).includes(l.consistency)) l.consistency = ''; logChange(b, 'Soil layers'); store.save(b); refreshLayerEditor(b); } return; }
+  const qpk = e.target.closest('[data-qpick]'); if (qpk) { const b = cur(), l = b?.layers[S.layer]; if (l && editable(b)) { const k = qpk.dataset.qpick, t = qpk.dataset.term; l[k] = String(l[k] || '').toLowerCase() === t.toLowerCase() ? '' : t; if (l[k]) btnUsed(k, t); if (qpk.closest('#ldetail, #drawer')) { S.lstep = null; S.lstepMore.clear(); } if (k === 'uscs' && l.consistency && !stateList(l.uscs).includes(l.consistency)) l.consistency = ''; logChange(b, 'Soil layers'); store.save(b); refreshLayerEditor(b); } return; }
   const gs = e.target.closest('[data-gsd]'); if (gs) { openGsd(+gs.dataset.gsd); return; }
   const gd = e.target.closest('[data-gsdel]'); if (gd) { gd.closest('tr').remove(); return; }
   const pd = e.target.closest('[data-phdel]'); if (pd) { if (!editable(cur())) return; photoStore.remove(pd.dataset.phdel).then(() => loadPhotos(cur())); return; }
