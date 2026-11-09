@@ -1872,6 +1872,41 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('log: thin layers keep their whole description, with a leader', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        const at = a => stackBlocks(a, 0, 100).map(x => x.at).join(',');
+        want(at([{ y: 0, h: 10 }, { y: 2, h: 10 }, { y: 30, h: 10 }]) === '0,10,30', 'text starts at its layer top, or below the text above: ' + at([{ y: 0, h: 10 }, { y: 2, h: 10 }, { y: 30, h: 10 }]));
+        want(at([{ y: 0, h: 10 }, { y: 60, h: 10 }, { y: 95, h: 20 }]) === '0,60,80', 'near the end of the hole the text moves up: ' + at([{ y: 0, h: 10 }, { y: 60, h: 10 }, { y: 95, h: 20 }]));
+        want(at([{ y: 0, h: 10 }, { y: 75, h: 20 }, { y: 95, h: 20 }]) === '0,60,80', 'and pushes the text above it up too: ' + at([{ y: 0, h: 10 }, { y: 75, h: 20 }, { y: 95, h: 20 }]));
+        loadDlExample(); await w(300); const b = cur(), units = S.units; S.units = 'm';
+        const txt = s => { const d = document.createElement('div'); d.innerHTML = s; d.querySelectorAll('title').forEach(e => e.remove()); return d.textContent; };
+        const pages = b => Array.from({ length: pageCount(b) }, (_, i) => pageSVG(b, i, pageCount(b))).join('');
+        for (const [what, svg] of [['log', () => logSVG(b, 1100)], ['PDF', () => pages(b)]]) want(!/data-leader/.test(svg()), what + ': an ordinary log has no leaders');
+        const L = (id, top, bottom, uscs, more) => Object.assign({ id, top, bottom, uscs, mods: '', consistency: '', moisture: 'Moist', colour: 'dark brown', other: '', origin: '' }, more);
+        b.layers = [L('t1', 0, 0.05, 'TOP', { mods: 'silty, some organics', other: 'rootlets throughout, trace roots' }),
+          L('t2', 0.05, 0.1, 'FILL', { mods: 'sandy, some gravel', colour: 'brown' }), L('t3', 0.1, 0.15, 'SM', { mods: 'trace gravel', colour: 'grey' }),
+          L('t4', 0.15, 5.95, 'CL', { consistency: 'Stiff', colour: 'grey' }), L('t5', 5.95, 6, 'SP', { colour: 'grey', moisture: 'Wet', other: 'fine grained, trace silt' })];
+        for (const [what, svg] of [['log', logSVG(b, 1100)], ['PDF', pages(b)]]) {
+          const t = txt(svg);
+          want(!t.slice(t.indexOf('TOPSOIL'), t.search(/END OF BOREHOLE/i)).includes('…'), what + ': no description cut off');
+          const flat = t.replace(/\\s+/g, ''); want(flat.includes('rootletsthroughout,traceroots') && flat.includes('finegrained,tracesilt'), what + ': thin layers at the top and bottom shown in full');
+          want((t.match(/\\(50 mm\\)/g) || []).length === 4, what + ': thin layers get their thickness: ' + (t.match(/\\(50 mm\\)/g) || []).length);
+          want(/data-leader/.test(svg), what + ': leaders join moved text to its layer');
+        }
+        const svg = logSVG(b, 1100), ys = re => [...svg.matchAll(re)].map(m => +m[1]);
+        const fill = ys(/<text class="dname" x="[^"]+" y="([^"]+)">FILL/g)[0], top = Math.max(...ys(/<text class="desc" x="[^"]+" y="([^"]+)">[^<]*rootlets/g));
+        want(fill > top, 'the next layer starts below the topsoil text: ' + [top, fill]);
+        const h = +svg.match(/viewBox="0 0 [^ ]+ ([^"]+)"/)[1], last = Math.max(...ys(/<text class="desc" x="[^"]+" y="([^"]+)">/g));
+        want(last < h, 'the bottom layer stays on the log: ' + [last, h]);
+        S.units = 'ft'; want(txt(logSVG(b, 1100)).includes('(2 in)'), 'in feet the thickness is in inches');
+        S.units = units;
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('log: a layer marked part of the unit above is a change within it', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
@@ -2194,6 +2229,51 @@ app.whenReady().then(async () => {
     expect(r[0] === r[1], `today() ${r[0]}, local date ${r[1]}`);
   });
 
+  await check('map: place a borehole by typing its coordinates and elevation', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); const units = S.units; S.units = 'm';
+        const near = (a, b, t = 1e-4) => Math.abs(a - b) < t, ll = (q, la, lo, kind) => { const p = parseCoords(q); want(!p.error && near(p.lat, la) && near(p.lon, lo) && (!kind || p.kind === kind), q + ' → ' + JSON.stringify(p)); };
+        ll('53.52, -113.52', 53.52, -113.52, 'latitude and longitude');
+        ll('53.52 N 113.52 W', 53.52, -113.52);
+        ll('53.52, 113.52', 53.52, -113.52);
+        ll('53°31\\'12"N 113°31\\'12"W', 53.52, -113.52, 'degrees, minutes and seconds');
+        ll('53 31 12 N, 113 31 12 W', 53.52, -113.52, 'degrees, minutes and seconds');
+        ll('53°31.2\\' N, 113°31.2\\' W', 53.52, -113.52, 'degrees and minutes');
+        const u = parseCoords('12U 335000 5935000'); want(u.kind === 'UTM' && u.zone === 12 && u.e === 335000 && u.n === 5935000, 'UTM with a zone: ' + JSON.stringify(u));
+        const u2 = parseCoords('559400.5 E, 6418000 N'); want(u2.kind === 'UTM' && u2.zone === crsZone() && u2.e === 559400.5 && u2.n === 6418000, 'UTM in the project zone: ' + JSON.stringify(u2));
+        const u3 = parseCoords('6418000 559400'); want(u3.e === 559400 && u3.n === 6418000, 'northing first is read too: ' + JSON.stringify(u3));
+        const d = parseCoords('NE 10-52-25 W4M'); want(d.kind === 'legal land description' && d.approx && d.lat > 53 && d.lon < -113, 'a legal land description is placed at its centre, marked approximate: ' + JSON.stringify(d));
+        for (const bad of ['hello', '95, 200', '53 61 0 N 113 0 0 W', '']) want(parseCoords(bad).error, 'refused: ' + bad);
+        goTab('site'); await w(300); if (!S.mapEdit) mapAct('map-edit'); await w(200);
+        S.mapTool = 'place'; S.placeId = 'new'; refreshMapEd(); await w(100);
+        const box = document.querySelector('#mf-coord'), elev = document.querySelector('#mf-elev'), go = document.querySelector('[data-act="place-xy"]');
+        want(box && elev && go, 'the Place borehole panel has a coordinates box, an elevation box and Place');
+        if (box && elev && go) {
+          const n0 = projList().length; box.value = crsZone() + ' 559400 6418000'; box.dispatchEvent(new Event('input', { bubbles: true })); await w(50);
+          want(/559400/.test(document.querySelector('#mf-coord-read')?.textContent || ''), 'reads it back before placing: ' + document.querySelector('#mf-coord-read')?.textContent);
+          box.value = '53.52, -113.52'; box.dispatchEvent(new Event('input', { bubbles: true })); await w(50);
+          want(/Check this/.test(document.querySelector('#mf-coord-read')?.textContent || ''), 'a point far from the site, or in another zone, is flagged: ' + document.querySelector('#mf-coord-read')?.textContent);
+          box.value = crsZone() + ' 559400 6418000';
+          elev.value = '487.2'; go.click(); await w(200);
+          const nb = projList().find(b => b.easting === 559400 && b.northing === 6418000);
+          want(projList().length === n0 + 1 && nb && nb.elevation === 487.2 && new RegExp('Zone ' + crsZone()).test(nb.crs), 'a new borehole at those coordinates and elevation: ' + JSON.stringify(nb && [nb.easting, nb.northing, nb.elevation, nb.crs]));
+          want(S.mv && near(S.mv.cx, 559400, 1) && near(S.mv.cy, 6418000, 1), 'the map goes to it');
+          const b1 = projList().find(b => editable(b) && b !== nb), [la, lo] = utmToLL(559500, 6418100, crsZone());
+          S.placeId = b1.id; refreshMapEd(); await w(50);
+          document.querySelector('#mf-coord').value = la.toFixed(7) + ', ' + lo.toFixed(7); S.units = 'ft'; document.querySelector('#mf-elev').value = '1600'; document.querySelector('[data-act="place-xy"]').click(); await w(200);
+          want(near(b1.easting, 559500, .1) && near(b1.northing, 6418100, .1), 'latitude and longitude land in the project zone: ' + [b1.easting, b1.northing]);
+          want(near(b1.elevation, 1600 / FT, 1e-3), 'elevation typed in feet is kept in metres: ' + b1.elevation);
+          S.units = 'm'; const e0 = b1.easting; document.querySelector('#mf-coord').value = 'nonsense'; document.querySelector('[data-act="place-xy"]').click(); await w(100);
+          want(b1.easting === e0, 'coordinates it cannot read change nothing');
+        }
+        S.units = units;
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('locations: a GNSS survey export (point_name, north, east, elevation) sets boreholes, names matched without leading zeros', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };

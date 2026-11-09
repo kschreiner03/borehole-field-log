@@ -1788,7 +1788,13 @@ function changeNote(l, up) {
 }
 /* the log's description for layer i of the depth-sorted list L: its change note when it is part of the unit above */
 const subNote = (L, i) => { const n = String(L[i].note || '').trim(); return n ? (/^[–-]/.test(n) ? n : '– ' + n) : changeNote(L[i], L[i - 1]); };
-const logDesc = (L, i) => subOf(L, i) ? { name: '', body: subNote(L, i), text: subNote(L, i) } : composeDesc(L[i]);
+/* a layer too thin for the soil column to show gets its thickness written after its name, e.g. TOPSOIL (50 mm) */
+const thinNote = l => { const t = l.bottom - l.top; return t > 0 && t < .15 - 1e-9 ? (S.units === 'ft' ? `(${Math.max(1, Math.round(t * FT * 12))} in)` : `(${Math.round(t * 1000)} mm)`) : ''; };
+const logDesc = (L, i) => {
+  const d = subOf(L, i) ? { name: '', body: subNote(L, i), text: subNote(L, i) } : composeDesc(L[i]), n = thinNote(L[i]);
+  if (!n) return d;
+  return d.name ? { ...d, name: `${d.name} ${n}`, text: `${d.name} ${n}${d.text.slice(d.name.length)}` } : { ...d, body: `${d.body} ${n}`.trim(), text: `${d.text} ${n}`.trim() };
+};
 /* CFEM classes: consistency from undrained shear strength (kPa), compactness from SPT N */
 function consistencyFromSu(su) { return su < 12 ? 'Very soft' : su < 25 ? 'Soft' : su < 50 ? 'Firm' : su < 100 ? 'Stiff' : su < 200 ? 'Very stiff' : 'Hard'; }
 function compactnessFromN(n) { return n < 4 ? 'Very loose' : n < 10 ? 'Loose' : n < 30 ? 'Compact' : n < 50 ? 'Dense' : 'Very dense'; }
@@ -2214,6 +2220,57 @@ function dlsToLL(q) {
   else if (r.qtr) { if (r.qtr[1] === 'W') x0 += 40 * CH; if (r.qtr[0] === 'N') y0 += 40 * CH; w = h = 40 * CH; label = `${r.qtr} ${label}`; }
   const poly = [[y0, x0], [y0, x0 + w], [y0 + h, x0 + w], [y0 + h, x0]].map(([y, x]) => [latAt(y), lonAt(x)]);
   return { poly, center: [latAt(y0 + h / 2), lonAt(x0 + w / 2)], label, size: Math.max(w, h) };
+}
+/* coordinates typed in any common form: decimal degrees, degrees and minutes (and seconds) with N/S/E/W, a UTM easting and northing
+   (with or without its zone, either order) or a legal land description (its centre, approximate). Returns { lat, lon, kind },
+   with { zone, e, n } for UTM, or { error } */
+function parseCoords(q) {
+  const t = String(q || '').trim(), no = 'Type latitude and longitude (53.52, -113.52 or 53°31\'12"N 113°31\'12"W), a UTM easting and northing (12U 335000 5935000) or a legal land description (NE 10-52-25 W4M).';
+  if (!t) return { error: no };
+  const dls = dlsToLL(t); if (dls) return { lat: dls.center[0], lon: dls.center[1], kind: 'legal land description', label: dls.label, approx: true };
+  const nums = [...t.matchAll(/-?\d+(?:\.\d+)?/g)].map(m => ({ v: parseFloat(m[0]), s: m[0], i: m.index })), big = nums.filter(x => Math.abs(x.v) >= 100000);
+  if (big.length) {
+    if (big.length !== 2) return { error: no };
+    const [e, n] = big.map(x => x.v).sort((a, c) => a - c);   // the northing is the larger number in Canada
+    if (e < 100000 || e > 900000 || n < 1000000 || n > 9400000) return { error: 'That doesn’t look like a UTM easting (6 digits) and northing (7 digits).' };
+    const z = nums.find(x => !big.includes(x) && /^\d{1,2}$/.test(x.s) && x.v >= 1 && x.v <= 60), zone = z ? z.v : crsZone(), [lat, lon] = utmToLL(e, n, zone);
+    return { lat, lon, zone, e, n, kind: 'UTM' };
+  }
+  // latitude and longitude: two halves, split at the hemisphere letters, else a comma, else the numbers shared evenly
+  const hem = [...t.matchAll(/(?<![a-z])[NSEW](?![a-z])/gi)];
+  let halves;
+  if (hem.length === 2) { const prefix = hem[0].index < (nums[0]?.i ?? 0), cut = prefix ? hem[1].index : hem[0].index + 1; halves = [t.slice(0, cut), t.slice(cut)]; }
+  else if (t.includes(',')) halves = [t.slice(0, t.indexOf(',')), t.slice(t.indexOf(',') + 1)];
+  else { const k = nums.length / 2; if (!Number.isInteger(k)) return { error: no }; halves = [t.slice(0, nums[k]?.i), t.slice(nums[k]?.i)]; }
+  const read = h => {
+    const v = [...h.matchAll(/\d+(?:\.\d+)?/g)].map(m => parseFloat(m[0])), L = /(?<![a-z])([NSEW])(?![a-z])/i.exec(h)?.[1]?.toUpperCase() || '';
+    if (!v.length || v.length > 3 || v.slice(1).some(x => x >= 60)) return null;
+    const d = v[0] + (v[1] || 0) / 60 + (v[2] || 0) / 3600;
+    return { d: /^[^\d]*-/.test(h) || L === 'S' || L === 'W' ? -d : d, L, n: v.length };
+  };
+  let [a, b] = halves.map(read); if (!a || !b) return { error: no };
+  if (a.L === 'E' || a.L === 'W' || b.L === 'N' || b.L === 'S') [a, b] = [b, a];
+  const lat = a.d, lon = b.d > 0 && b.L !== 'E' ? -b.d : b.d;   // a positive longitude on the Prairies is meant as west
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return { error: no };
+  return { lat, lon, kind: ['latitude and longitude', 'degrees and minutes', 'degrees, minutes and seconds'][Math.max(a.n, b.n) - 1] };
+}
+/* the zone and UTM a typed position lands at in this project; a project with no coordinate system yet takes the position's own zone */
+function coordsToProject(p) {
+  const fresh = !projList().some(b => /zone\s*\d/i.test(b.crs || '')), zone = fresh ? p.zone || zoneOfLon(p.lon) : crsZone();
+  const [e, n] = p.kind === 'UTM' && p.zone === zone ? [p.e, p.n] : llToUtm(p.lat, p.lon, zone);
+  return { zone, e: +e.toFixed(2), n: +n.toFixed(2), fresh };
+}
+const coordsRead = q => {
+  if (!String(q || '').trim()) return 'Latitude and longitude (decimal, or degrees, minutes and seconds), UTM, or a legal land description. Or click the plan.';
+  const p = parseCoords(q); if (p.error) return 'Not read yet: ' + p.error;
+  const c = coordsToProject(p);
+  return `Reads as ${p.label || p.kind}: ${p.lat.toFixed(6)}, ${p.lon.toFixed(6)} → UTM zone ${c.zone}: ${c.e.toFixed(1)} E, ${c.n.toFixed(1)} N${p.approx ? '. The centre of the section, computed from the survey grid: it can be off by a few hundred metres.' : ''}${coordsWarn(p, c)}`;
+};
+/* a typed position far from the site is usually a typo or the wrong zone: say so before it is placed */
+function coordsWarn(p, c) {
+  if (!c.fresh && zoneOfLon(p.lon) !== c.zone) return ` Check this: it is in UTM zone ${zoneOfLon(p.lon)}, but this project uses zone ${c.zone}.`;
+  const d = Math.min(...projList().filter(b => b.easting != null && b.northing != null).map(b => Math.hypot(b.easting - c.e, b.northing - c.n)));
+  return isFinite(d) && d > 20000 ? ` Check this: it is ${Math.round(d / 1000)} km from the nearest borehole.` : '';
 }
 /* Go to: latitude and longitude (decimal degrees, west negative or with W) or a UTM easting and northing */
 const goToHTML = () => `<form class="map-go" data-mapgo><input placeholder="NE 10-52-25 W4M, 53.52, -113.52 or E N" aria-label="Go to a legal land description, latitude and longitude, or easting and northing" autocomplete="off"><button class="btn">Go</button></form>`;
@@ -3409,6 +3466,14 @@ function descLines(d, maxChars) {
   if (!out.length) out.push(['sub', 'Not described']);
   return out;
 }
+/* description blocks down the log: each starts at its layer's top, or just below the text above it; text that would run past the end
+   moves up, pushing the text above it up too (never above lo). blocks are { y: layer top, h: text height } in depth order */
+function stackBlocks(blocks, lo, hi) {
+  const out = blocks.map(x => ({ ...x }));
+  out.forEach((x, i) => { x.at = Math.max(x.y, i ? out[i - 1].at + out[i - 1].h : lo); });
+  for (let i = out.length - 1, lim = hi; i >= 0; i--) { if (out[i].at + out[i].h > lim) out[i].at = Math.max(lo, lim - out[i].h); lim = out[i].at; }
+  return out;
+}
 function spread(items, gap, lo, hi) {
   items.sort((a, c) => a.y - c.y);
   for (let i = 0; i < items.length; i++) items[i].ly = Math.max(items[i].y, i ? items[i - 1].ly + gap : lo);
@@ -3643,8 +3708,8 @@ function logSVG(b, W) {
   const maxChars = Math.max(12, Math.floor(cDs.w / 6.6));
   const blocks = layers.map((l, i) => descLines(logDesc(layers, i), maxChars));
   let k = Math.max(680 / endM, 70);
-  layers.forEach((l, i) => { k = Math.max(k, (blocks[i].length * 14 + 12) / (l.bottom - l.top)); });
-  k = Math.min(k, 420);
+  layers.forEach((l, i) => { if (!thinNote(l)) k = Math.max(k, (blocks[i].length * 14 + 12) / (l.bottom - l.top)); });   // thin layers' text goes below them, on a leader
+  k = Math.max(Math.min(k, 420), blocks.reduce((a, c) => a + c.length * 14 + 6, 0) / Math.max(layers.length ? layers[layers.length - 1].bottom : endM, .1));
   const AG = well && well.stickup > 0 ? 38 : 0, H = endM * k, T = 92 + AG, y = m => T + m * k;
   const step = niceStep(endD, Math.max(4, H / 64));
   const out = []; let extra = 0;
@@ -3695,16 +3760,21 @@ function logSVG(b, W) {
   }
   [cD.w, cE.w ? cE.x + cE.w : null, cG.x + cG.w, cWl.w ? cWl.x + cWl.w : null, cOb.w ? cOb.x : null, cSm.x, cTy.x, cN.x, cNp.x, cSu.x, cA.x, cVp.x, cLb.x, ...GX.map(e => e.c.x), cW.x].filter(v => v != null)
     .forEach(xx => out.push(`<line x1="${xx}" x2="${xx}" y1="${[cSu.x, cA.x, cVp.x, cLb.x, ...GX.map(e => e.c.x)].includes(xx) && xx !== cNp.x ? 28 : T - 2}" y2="${T + H}" style="stroke:${[cSm.x, cNp.x, cSu.x, cA.x, cVp.x, cLb.x, cW.x].includes(xx) ? 'var(--muted)' : 'var(--line)'}"/>`));
+  const st = stackBlocks(layers.map((l, i) => ({ y: y(l.top), h: blocks[i].length * 14 + 6 })), T, layers.length ? y(layers[layers.length - 1].bottom) : T + H);
   layers.forEach((l, i) => {
     const y0 = y(l.top), y1 = y(l.bottom), h = y1 - y0;
     out.push(soilRects(cG.x, y0, cG.w, h, l.uscs, l.origin, l.texture), hzTag(cG.x, y0, h, l.hz));
     const dash = subOf(layers, i + 1) ? ' stroke-dasharray="4 3"' : '';
-    out.push(`<line x1="${cG.x}" x2="${cG.x + cG.w}" y1="${y1}" y2="${y1}" style="stroke:var(--muted)" stroke-width=".8"${dash}/><line x1="${cWl.x + cWl.w}" x2="${cSm.x}" y1="${y1}" y2="${y1}" style="stroke:var(--muted)" stroke-width=".8"${dash}/>`);
-    const lines = blocks[i], room = Math.floor((h - 6) / 14);
+    // the boundary in the description column sits where the next layer's text starts: a leader slants to it when the text moved
+    const DX = cWl.x + cWl.w, bl = i < layers.length - 1 ? st[i + 1].at : y1, sw = `style="stroke:var(--muted)" stroke-width=".8"${dash}`;
+    out.push(`<line x1="${cG.x}" x2="${cG.x + cG.w}" y1="${y1}" y2="${y1}" ${sw}/>` + (Math.abs(bl - y1) > .5
+      ? `<path data-leader="1" d="M${DX} ${y1}L${DX + 8} ${bl.toFixed(1)}H${cOb.x}" fill="none" ${sw}/>${cOb.w ? `<line x1="${cOb.x}" x2="${cSm.x}" y1="${y1}" y2="${y1}" ${sw}/>` : ''}`
+      : `<line x1="${DX}" x2="${cSm.x}" y1="${y1}" y2="${y1}" ${sw}/>`));
+    const lines = blocks[i], at = st[i].at, room = Math.floor(((i < layers.length - 1 ? st[i + 1].at : Math.max(y1, at + st[i].h)) - at - 6) / 14);
     if (room >= 1) {
       const shown = lines.slice(0, room);
       if (lines.length > room) shown[room - 1] = [shown[room - 1][0], shown[room - 1][1].replace(/\s*\S{0,3}$/, '') + '…'];
-      out.push(`<g><title>${esc(fu(l.top) + ' to ' + fu(l.bottom) + ': ' + composeDesc(l).text)}</title>` + shown.map(([c, t], j) => `<text class="${c}" x="${cDs.x}" y="${y0 + 15 + j * 14}">${esc(t)}</text>`).join('') + '</g>');
+      out.push(`<g><title>${esc(fu(l.top) + ' to ' + fu(l.bottom) + ': ' + composeDesc(l).text)}</title>` + shown.map(([c, t], j) => `<text class="${c}" x="${cDs.x}" y="${(at + 15 + j * 14).toFixed(1)}">${esc(t)}</text>`).join('') + '</g>');
     }
   });
   if (layers.length) {
@@ -7809,16 +7879,22 @@ function pageSVG(b, pi, pn) {
   }
   const layers = (b.layers || []).filter(l => l.top != null && l.bottom != null && l.bottom > l.top).sort((a, c) => a.top - c.top);
   const maxChars = Math.floor((C.desc.w - 8) / (5.3 * f)), LH = 12 * f;
-  layers.forEach((l, li) => {
-    const yA = Math.max(Y(l.top), by0), yB = Math.min(Y(l.bottom), by1); if (yB <= yA) return;
+  // the layers on this page, their description lines stacked down the column (thin layers' text goes below them, on a leader)
+  const vis = layers.map((l, li) => ({ l, li, yA: Math.max(Y(l.top), by0), yB: Math.min(Y(l.bottom), by1) })).filter(v => v.yB > v.yA);
+  vis.forEach(v => {
+    const d = v.d = logDesc(layers, v.li); v.cont = Y(v.l.top) < by0 - .5;
+    v.lines = [...(v.cont ? [['sub', '(continued)']] : []), ...(d.name ? wrap(d.name, maxChars).map(t => ['b', t]) : []), ...(d.body ? wrap(d.body, maxChars).map(t => ['n', t]) : [])];
+    // name and body run together when that is what fits the layer, as before; only text that fits neither way moves down
+    v.n = v.lines.length * LH + 3 <= v.yB - v.yA || !d.name || v.cont ? v.lines.length : wrap(d.name + (d.body ? ', ' + d.body : ''), maxChars).length;
+  });
+  const pst = stackBlocks(vis.map(v => ({ y: v.yA, h: v.n * LH + 4 })), by0, layers.length ? Math.min(by1, Y(layers[layers.length - 1].bottom)) : by1);
+  vis.forEach(({ l, li, yA, yB, d, cont, lines: lines2 }, vi) => {
     o.push(soilRects(C.sym.x, yA, C.sym.w, yB - yA, l.uscs, l.origin, l.texture), hzTag(C.sym.x, yA, yB - yA, l.hz, 7));
-    const dash = subOf(layers, li + 1) ? 'stroke-dasharray="4 3"' : '';
-    o.push(line(C.sym.x, Y(l.bottom), C.sym.x + C.sym.w, Y(l.bottom), 'var(--ink)', .7, dash), line(C.desc.x, Y(l.bottom), C.desc.x + C.desc.w, Y(l.bottom), 'var(--ink)', .7, dash));
-    const cont = Y(l.top) < by0 - .5;
-    const d = logDesc(layers, li), lines2 = [];
-    if (cont) lines2.push(['sub', '(continued)']);
-    if (d.name) wrap(d.name, maxChars).forEach(t => lines2.push(['b', t]));
-    if (d.body) wrap(d.body, maxChars).forEach(t => lines2.push(['n', t]));
+    const dash = subOf(layers, li + 1) ? 'stroke-dasharray="4 3"' : '', bl = vi < vis.length - 1 ? pst[vi + 1].at : Y(l.bottom);
+    o.push(line(C.sym.x, Y(l.bottom), C.sym.x + C.sym.w, Y(l.bottom), 'var(--ink)', .7, dash), Math.abs(bl - Y(l.bottom)) > .5
+      ? `<path data-leader="1" d="M${C.desc.x} ${Y(l.bottom).toFixed(1)}L${C.desc.x + 3} ${bl.toFixed(1)}H${C.desc.x + C.desc.w}" fill="none" style="stroke:var(--ink)" stroke-width=".7" ${dash}/>`
+      : line(C.desc.x, Y(l.bottom), C.desc.x + C.desc.w, Y(l.bottom), 'var(--ink)', .7, dash));
+    yA = pst[vi].at; yB = vi < vis.length - 1 ? pst[vi + 1].at : Math.max(yB, yA + pst[vi].h);
     const room = Math.max(0, Math.floor((yB - yA - 3) / LH));
     if (lines2.length > room && d.name && !cont) {
       // not enough height for separate name and body lines: run them together, name in bold
@@ -8150,7 +8226,11 @@ function mapEditorHTML() {
       <label class="cmp-lbl" for="mf-kind">Type</label><select id="mf-kind" data-mfeat="kind">${Object.entries(FEAT_KINDS).map(([k, [t]]) => `<option value="${k}" ${f.kind === k ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>
       ${f.type !== 'point' ? `<p class="note">${f.pts.length} points${f.type === 'polygon' ? ` · area ${Math.abs(f.pts.reduce((a, p, i) => { const q = f.pts[(i + 1) % f.pts.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0) / 2).toLocaleString('en-CA', { maximumFractionDigits: 0 })} m²` : ` · length ${f.pts.slice(1).reduce((a, p, i) => a + Math.hypot(p[0] - f.pts[i][0], p[1] - f.pts[i][1]), 0).toFixed(1)} m`}</p>` : ''}
       <div class="cmp-row"><button class="btn" data-act="mf-done">Done</button><button class="btn danger-text" data-act="mf-del">Delete</button></div>`
-    : S.mapTool === 'place' ? `<h4>Place borehole</h4><label class="cmp-lbl" for="mf-place">Borehole</label><select id="mf-place">${S.readOnly ? '' : `<option value="new" ${S.placeId === 'new' ? 'selected' : ''}>New borehole (${nextName()})</option>`}${projList().map(b => `<option value="${esc(b.id)}" ${S.placeId === b.id ? 'selected' : ''} ${editable(b) ? '' : 'disabled'}>${esc(b.name)}${b.easting == null ? ' (no location yet)' : ''}</option>`).join('')}</select><p class="note">${noLoc.length ? `${noLoc.length} borehole${noLoc.length === 1 ? ' has' : 's have'} no location yet.` : 'Every borehole has a location. Each click adds a new borehole; choose an existing one to move it.'}</p>`
+    : S.mapTool === 'place' ? `<h4>Place borehole</h4><label class="cmp-lbl" for="mf-place">Borehole</label><select id="mf-place">${S.readOnly ? '' : `<option value="new" ${S.placeId === 'new' ? 'selected' : ''}>New borehole (${nextName()})</option>`}${projList().map(b => `<option value="${esc(b.id)}" ${S.placeId === b.id ? 'selected' : ''} ${editable(b) ? '' : 'disabled'}>${esc(b.name)}${b.easting == null ? ' (no location yet)' : ''}</option>`).join('')}</select>
+      <label class="cmp-lbl" for="mf-coord">Coordinates</label><input id="mf-coord" autocomplete="off" spellcheck="false" placeholder="53.52, -113.52 · 13U 559400 6418000">
+      <p class="note" id="mf-coord-read">${esc(coordsRead(''))}</p>
+      <label class="cmp-lbl" for="mf-elev">Ground elevation (${LEN()}), optional</label><input id="mf-elev" inputmode="decimal" autocomplete="off">
+      <div class="cmp-row"><button class="btn" data-act="place-xy" ${S.readOnly ? 'disabled' : ''}>Place</button></div><p class="note">${noLoc.length ? `${noLoc.length} borehole${noLoc.length === 1 ? ' has' : 's have'} no location yet.` : 'Every borehole has a location. Each click adds a new borehole; choose an existing one to move it.'}</p>`
     : `${imageryOf().length ? `<h4>Imagery</h4><ul class="mf-list">${imageryOf().map(i => `<li class="im-row"><span>${esc(i.name)}${S.imgCache.has(i.id) ? '' : ' <span class="note">(not in this browser)</span>'}</span><label class="note">Opacity <input type="range" min="0.1" max="1" step="0.05" value="${i.op ?? 1}" data-imop="${i.id}"></label><span class="cmp-row"><button class="btn link" data-imzoom="${i.id}">Zoom to</button><button class="btn link danger-text" data-imdel="${i.id}">Remove</button></span></li>`).join('')}</ul>` : ''}<h4>Shapes on this plan</h4>${fs.length ? `<ul class="mf-list">${fs.map(x => `<li><button class="tl-btn" data-mfsel="${x.id}">${esc(x.name || FEAT_KINDS[x.kind]?.[0] || 'Shape')}<span>${x.type === 'polygon' ? 'area' : x.type}</span></button></li>`).join('')}</ul><button class="btn link" data-act="mf-clear">Remove all shapes</button>` : '<p class="note">None yet. Draw areas and lines with the tools above, or import a GeoJSON, KML, DXF or CSV file.</p>'}`;
   return `<div class="map-ed">
     <div class="map-bar"><span class="seg" role="group" aria-label="Map tool">${Object.entries(MAP_TOOLS).map(([k, [t]]) => `<button data-mtool="${k}" aria-pressed="${S.mapTool === k}">${t}</button>`).join('')}</span>
@@ -8177,6 +8257,28 @@ function finishDraft() {
   const f = { id: uid('f'), name: '', type: d.type, kind: d.type === 'line' ? 'pipeline' : 'other', pts: d.pts.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]) };
   saveFeats([...featsOf(), f]); S.mapSel = f.id; S.mapTool = 'select'; refreshMapEd(); $('#mf-name')?.focus();
 }
+/* the borehole chosen in the Place borehole panel, made when it is the new one */
+function placeTarget() {
+  let b = S.bh.get(S.placeId);
+  if (!b && S.placeId === 'new' && !S.readOnly) { const src = projList()[0]; b = blankBorehole(nextName()); if (src) for (const k of HEADER_COPY) b[k] = src[k]; S.bh.set(b.id, b); }
+  if (!b) { toast('Choose a borehole on the right first.'); return null; }
+  return editable(b) ? b : null;
+}
+/* Place borehole by typed coordinates and, optionally, the ground elevation */
+function placeTyped() {
+  const p = parseCoords($('#mf-coord')?.value), ev = ($('#mf-elev')?.value || '').trim(), el = ev ? num(ev) : null;
+  if (p.error) { toast(p.error); return; }
+  if (ev && el == null) { toast('The elevation should be a number.'); return; }
+  const b = placeTarget(); if (!b) return;
+  const c = coordsToProject(p), warn = coordsWarn(p, c);
+  if (c.fresh) setSite({ ...(siteOf() || {}), zone: c.zone });
+  b.easting = c.e; b.northing = c.n; if (!b.crs) b.crs = `UTM NAD83(CSRS) Zone ${c.zone}`;
+  if (el != null) b.elevation = +fromD(el).toFixed(3);
+  logChange(b, 'Location typed in on the site plan'); store.save(b);
+  const W = S._plan?.W || 800, H = S._plan?.H || 460; S.mv = { cx: c.e, cy: c.n, sc: S.mv?.sc || Math.min(W, H) / 800 }; S.mvProj = projKey(projList()[0]);
+  toast(`${b.name} placed at ${c.e.toFixed(1)} E, ${c.n.toFixed(1)} N${el != null ? `, ground ${fu(b.elevation)}` : ''}${p.approx ? ' (approximate: the centre of the section)' : ''}.${warn}`);
+  S.placeId = nextToPlace(); render();
+}
 let mDrag = null;
 document.addEventListener('pointerdown', e => {
   if (!S.mapEdit || !e.target.closest('#plan svg')) return;
@@ -8185,9 +8287,7 @@ document.addEventListener('pointerdown', e => {
   if (tool === 'area' || tool === 'line') { (S.draft ||= { type: tool === 'area' ? 'polygon' : 'line', pts: [] }).pts.push(w); drawDraft(); return; }
   if (tool === 'label') { const f = { id: uid('f'), name: 'Label', type: 'point', kind: 'other', pts: [[+w[0].toFixed(2), +w[1].toFixed(2)]] }; saveFeats([...featsOf(), f]); S.mapSel = f.id; S.mapTool = 'select'; refreshMapEd(); $('#mf-name')?.select(); return; }
   if (tool === 'place') {
-    let b = S.bh.get(S.placeId);
-    if (!b && S.placeId === 'new' && !S.readOnly) { const src = projList()[0]; b = blankBorehole(nextName()); if (src) for (const k of HEADER_COPY) b[k] = src[k]; S.bh.set(b.id, b); }
-    if (!b) { toast('Choose a borehole on the right first.'); return; } if (!editable(b)) return; b.easting = +w[0].toFixed(2); b.northing = +w[1].toFixed(2); if (!b.crs) b.crs = `UTM NAD83(CSRS) Zone ${crsZone()}`; logChange(b, 'Location placed on the site plan'); store.save(b); toast(`${b.name} placed at ${b.easting.toFixed(1)} E, ${b.northing.toFixed(1)} N.`); S.placeId = nextToPlace(); render(); return; }
+    const b = placeTarget(); if (!b) return; b.easting = +w[0].toFixed(2); b.northing = +w[1].toFixed(2); if (!b.crs) b.crs = `UTM NAD83(CSRS) Zone ${crsZone()}`; logChange(b, 'Location placed on the site plan'); store.save(b); toast(`${b.name} placed at ${b.easting.toFixed(1)} E, ${b.northing.toFixed(1)} N.`); S.placeId = nextToPlace(); render(); return; }
   if (tool === 'move') { const g = e.target.closest('[data-bhpt]'), b = g && S.bh.get(g.dataset.bhpt); if (!b) return; if (!editable(b)) { toast(`${b.name} is issued; revise it to move it.`); return; } mDrag = { b, g, w0: w, e0: b.easting, n0: b.northing }; e.preventDefault(); return; }
   const fe = e.target.closest('[data-feat]'); S.mapSel = fe ? fe.dataset.feat : null; refreshMapEd();
 });
@@ -8571,6 +8671,8 @@ function xsPlay() {
 }
 function xsSetDate(d) { setXs('date', d); const dates = xsDates(sectionList()); if ($('#xs-date')) $('#xs-date').value = Math.max(0, dates.indexOf(d)); if ($('#xs-date-l')) $('#xs-date-l').textContent = d; if ($('#xs-asof')) $('#xs-asof').value = d; }
 document.addEventListener('input', e => { if (e.target.id === 'v3d-cutpos') { S.v3dCut = { on: true, ...S.v3dCut, pos: +e.target.value }; v3dCutApply(); } });
+document.addEventListener('input', e => { if (e.target.id === 'mf-coord') $('#mf-coord-read').textContent = coordsRead(e.target.value); });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.id === 'mf-coord' || e.target.id === 'mf-elev')) { e.preventDefault(); placeTyped(); } });
 document.addEventListener('input', e => { if (e.target.id === 'xs-date') { const d = xsDates(sectionList())[+e.target.value]; if (d) xsSetDate(d); } });
 function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); const ms = $('#xs-model-sec'); if (ms) ms.outerHTML = xsModelHTML(); }   // the forecast panel reads the drawn section's geometry
 const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
@@ -10807,6 +10909,7 @@ document.addEventListener('click', e => {
     case 'cmp-tpl-apply': case 'cmp-tpl-save': case 'cmp-tpl-save-go': case 'cmp-tpl-del': case 'cmp-tpl-del-go': composeAct(act); break;
     case 'bh-tpl': saveBhTemplate(); break;
     case 'map-edit': case 'imp-loc': case 'imp-shp': case 'imp-img': case 'img-add-go': case 'loc-imp-go': case 'shp-imp-go': case 'mf-del': case 'mf-done': case 'mf-clear': mapAct(act); break;
+    case 'place-xy': placeTyped(); break;
     case 'bt-save-go': saveBhTemplateGo(); break;
     case 'apple-setup': appleSetup(); break;
     case 'apple-save': appleSave(); break;
