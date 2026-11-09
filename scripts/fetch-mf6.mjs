@@ -25,7 +25,9 @@ for (const t of targets) {
   const dir = join(tmpdir(), `mf6-${t}-${Date.now()}`); mkdirSync(dir, { recursive: true });
   const zip = join(dir, b.zip); writeFileSync(zip, buf);
   const member = `${b.zip.replace('.zip', '')}/bin/${b.bin}`;
-  execFileSync('tar', ['-xf', zip, '-C', dir, member]);   // bsdtar (macOS, Windows 10+) reads zip files
+  // bsdtar (macOS, Windows 10+) reads zip files; on Windows name it outright, as Git's GNU tar is often first on the PATH and cannot
+  const tar = process.platform === 'win32' ? join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
+  execFileSync(tar, ['-xf', zip, '-C', dir, member]);
   mkdirSync(join('resources', 'mf6', t), { recursive: true }); copyFileSync(join(dir, member), out); if (!b.bin.endsWith('.exe')) chmodSync(out, 0o755);
   rmSync(dir, { recursive: true, force: true });
   console.log(`MODFLOW 6 ${VERSION} for ${t} -> ${out}`);

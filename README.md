@@ -18,6 +18,7 @@ Borehole logging, groundwater and reporting, as a Windows and Mac desktop app (E
 | `npm run typecheck` | TypeScript check |
 | `npm run build` | Build into `out/` |
 | `npm run dist:win` / `npm run dist:mac` | Runs both test suites, then builds installers in `dist/` (build each on its own platform) |
+| `npm run package:win` / `npm run package:mac` | Builds the installer in `dist/` without the tests |
 
 ## Building the Windows installer on a Windows computer
 

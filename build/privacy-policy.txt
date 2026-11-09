@@ -1,0 +1,93 @@
+BOREHOLE FIELD LOG
+PRIVACY POLICY AND TERMS OF USE
+
+Effective 9 November 2026
+
+Please read this before installing. Choosing "I Agree" means you accept it.
+
+
+1. WHAT THE APP COLLECTS
+
+Nothing. Borehole Field Log has no account or sign-in, no analytics or
+usage tracking, no advertising, and sends no crash reports. It does not
+check for updates or contact any server of ours. Nothing you enter is
+sent to us. The only things sent anywhere are the map requests in
+section 3.
+
+
+2. WHERE YOUR DATA IS KEPT
+
+Everything you enter stays on this computer:
+
+- Boreholes, company settings and site plans, photos and imagery are kept
+  in the app's profile folder:
+  %APPDATA%\Borehole Field Log
+- If you set up Apple Maps, your Maps key (Team ID, Key ID and key) is
+  kept in the same folder, in apple-maps.json. It is never put in a
+  project file.
+- Project files (.bhp, .bhlog) and exports (PDF, Excel, AGS) are saved
+  only where you choose to save them.
+- Groundwater models are run by MODFLOW 6 on this computer, in a temporary
+  folder that is deleted when the run finishes.
+
+You control this data. Field records can include client, site and
+landowner information; keep and share project files according to your
+own organisation's privacy obligations.
+
+
+3. WHEN THE APP USES THE INTERNET
+
+The app works offline. It goes online only to draw a map background, and
+only while you are viewing a map:
+
+- Satellite, topographic and light grey maps come from Esri
+  (server.arcgisonline.com).
+- The street map comes from OpenStreetMap (tile.openstreetmap.org).
+- Satellite (Apple Maps) is used only if you set it up with a Maps key
+  from your own Apple Developer account. Pictures come from Apple
+  (snapshot.apple-mapkit.com); each request carries the centre and zoom
+  of the area in view and your Team ID and Key ID, signed on this
+  computer. The key itself is never sent.
+
+These requests tell that provider your computer's IP address and which
+map area you are viewing. No borehole data, names or files are sent.
+Map pieces you have viewed are kept on this computer so they show
+offline. The providers' own privacy policies apply to those requests:
+  https://www.esri.com/en-us/privacy/overview
+  https://osmfoundation.org/wiki/Privacy_Policy
+  https://www.apple.com/legal/privacy/
+
+Web links in the app open in your own web browser.
+
+
+4. UNINSTALLING
+
+Uninstalling removes the app but keeps your saved data, so reinstalling
+brings it back. To remove the data as well, delete the folder
+%APPDATA%\Borehole Field Log after uninstalling. Project files you saved
+elsewhere are never removed.
+
+
+5. TERMS OF USE
+
+The app is provided "as is", without warranty of any kind. Logs,
+classifications, calculations, groundwater models and reports it produces
+are aids to professional work: they must be checked and accepted by a
+qualified professional before they are relied on or issued.
+
+
+6. THIRD-PARTY COMPONENTS
+
+The app includes open-source software under its own licence: Electron
+and Chromium (MIT and others; see LICENSES.chromium.html in the
+installation folder), React (MIT), SheetJS (Apache-2.0), ExcelJS (MIT),
+jsPDF (MIT), geotiff.js (MIT), three.js (MIT), PDF.js (Apache-2.0) and
+pdf-lib (MIT). It includes MODFLOW 6 from the U.S. Geological Survey,
+which is public domain (CC0-1.0) and provided under the USGS disclaimer.
+
+
+7. CHANGES
+
+If this policy changes, the new version comes with the app update and is
+shown when that version is installed. It can be read at any time from
+Help > Privacy policy in the app.
