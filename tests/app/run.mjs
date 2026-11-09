@@ -2356,6 +2356,16 @@ app.whenReady().then(async () => {
         const s = b.samples[0]; s.type = 'J'; s.lel = 4; s.cvc = 120; s.name = 'J1';
         const log = logSVG(b, 1100); want(/J1 J – jar/.test(log) && /LEL 4%/.test(log), 'the log names the jar and the LEL reading');
         want(Object.keys(graphSeries()).includes('lel'), 'LEL can be graphed on the log');
+        // jars, bags and grabs taken at one depth each keep their own symbol; the VOC graph is a line unless another style is chosen
+        const pt = t => sampleGlyph(0, 20, 50, 50, t);
+        want(/bag/.test(SAMPLE_TYPES.B) && new Set(['J', 'B', 'G', 'A'].map(pt)).size === 4, 'point samples: jar, bag, grab and auger look different');
+        want(lay('vplot') === 'line' && /^<path d="M[^"]*h[^"]*a/.test(vapSwatch(0, 0, 16, 7)), 'VOC drawn as a line by default, with a line key: ' + lay('vplot'));
+        // water standing in a standpipe is tinted blue from the level down to the end cap, on screen, in the PDF and in the standpipe figure
+        { const wb = { ...b, cols: undefined, well: { ...blankWell(), installed: true, screenTop: 1, screenBottom: 3, depth: 3.2 }, water: [{ id: 'w1', kind: 'static', depth: 1.5, date: '2026-01-01' }] };
+          const tint = svg => (svg.match(/<rect data-pipewater="1"[^>]*>/) || [''])[0];
+          want(/height="[1-9]/.test(tint(logSVG(wb, 1100))), 'water tinted in the pipe on the log: ' + tint(logSVG(wb, 1100)));
+          want(/height="[1-9]/.test(tint(wellSVG(wb))), 'water tinted in the standpipe figure');
+          want(!tint(logSVG({ ...wb, water: [] }, 1100)), 'no tint without a water level'); }
         want(SHEETS.tests.cols.some(c => c[0] === 'lel' && /LEL/.test(c[1])), 'LEL in the data tables');
         S.dtab = 'samples'; S.dsel = { samples: 0 }; goTab('edit'); await w(300); want(!!document.querySelector('#s-' + s.id + '-lel'), 'LEL in the sample form');
         want(composeDesc({ uscs: 'CH', pg: 'medium plastic', mods: '', consistency: 'Stiff', moisture: 'Moist', colour: 'grey', other: '', origin: '' }).text === 'CLAY (CH), medium plastic, stiff, moist, grey', 'the override replaces the plasticity: ' + composeDesc({ uscs: 'CH', pg: 'medium plastic' }).text);
@@ -2408,7 +2418,7 @@ app.whenReady().then(async () => {
         put('depth', String(+(l.top + .1).toFixed(2))); await w(200); put('cvc', '340'); await w(150); put('lel', '2'); await w(150); put('type', 'J'); await w(200);
         want(Math.abs(s.depth - (l.top + .1)) < 1e-6 && s.cvc === 340 && s.lel === 2 && s.type === 'J', 'readings stored: ' + JSON.stringify([s.depth, s.cvc, s.lel, s.type]));
         want(!!document.querySelector('#ldetail .lstep'), 'changing the type keeps the layer editor');
-        want(LOG_COLS.cvc[1](b) && /vapour 340 ppm/.test(logSVG(b, 1100)), 'the vapour graph and log have it');
+        want(LOG_COLS.cvc[1](b) && /VOC 340 ppm/.test(logSVG(b, 1100)), 'the VOC graph and log have it');
         S.dtab = 'samples'; S.dsel = { samples: b.samples.indexOf(s) }; renderView(true); await w(250); want(document.querySelector('#s-' + s.id + '-lel')?.value === '2', 'the same sample on Samples & lab'); S.dtab = 'soil'; S.layer = 1; renderView(true); await w(250);
         const below = b.layers[2]; put('depth', String(+(below.top + .2).toFixed(2))); await w(250);
         want(!rows().includes(s.id) && /layer 3/i.test(document.querySelector('#toast')?.textContent || document.body.innerText), 'a depth in another layer moves it, with a note');

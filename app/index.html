@@ -1502,7 +1502,7 @@ const stateList = code => { const g = soilOf(code)?.group; return g === 'coarse'
 const stateLabel = code => { const g = soilOf(code)?.group; return g === 'coarse' ? 'Compactness' : g === 'fine' ? 'Consistency' : g === 'rock' ? 'Weathering' : 'Consistency / compactness'; };
 const ORIGINS = { '': '', topsoil: 'Topsoil', fill: 'Fill', lacustrine: 'Lacustrine', alluvium: 'Alluvium', till: 'Glacial till', glaciofluvial: 'Glaciofluvial', aeolian: 'Aeolian', bedrock: 'Bedrock' };
 const ORIGIN_TAG = { fill: 'FILL', lacustrine: 'LACUSTRINE', alluvium: 'ALLUVIUM', till: 'TILL', glaciofluvial: 'GLACIOFLUVIAL', aeolian: 'AEOLIAN' };
-const SAMPLE_TYPES = { SS: 'SS – split spoon (SPT)', ST: 'ST – Shelby tube', G: 'G – grab', J: 'J – jar', A: 'A – auger cuttings', B: 'B – bulk', C: 'C – rock core' };
+const SAMPLE_TYPES = { SS: 'SS – split spoon (SPT)', ST: 'ST – Shelby tube', G: 'G – grab', J: 'J – jar', A: 'A – auger cuttings', B: 'B – bag (bulk)', C: 'C – rock core' };
 const SAMPLE_ALIAS = { SPT: 'SS', SHELBY: 'ST', TUBE: 'ST', U100: 'ST', BULK: 'B', BAG: 'B', JAR: 'J', GRAB: 'G', AUGER: 'A', CORE: 'C', 'SPLIT SPOON': 'SS' };
 const WATER_KINDS = { strike: 'Seepage while drilling', completion: 'Upon completion', static: 'Standpipe reading', seepage: 'Seepage' };
 const METHODS = ['', 'Solid-stem auger', 'Hollow-stem auger', 'Mud rotary', 'Air rotary', 'Sonic', 'Diamond core', 'Direct push', 'Hydrovac', 'Hand auger', 'Test pit'];
@@ -2547,7 +2547,7 @@ const TIPS = {
   'lab class': 'Modified USCS class worked out from LL and PI (A-line PI = 0.73(LL − 20)). Orange means it disagrees with the logged symbol.',
   'pocket pen.': 'Pocket penetrometer reading, kPa. Roughly twice the undrained shear strength.',
   'field vane su': 'Undrained shear strength from a field vane test, kPa.',
-  'vapour': 'Combustible vapour headspace reading in ppm, used to screen for hydrocarbons.',
+  'vapour': 'VOC reading in ppm (headspace vapour), used to screen for hydrocarbons.',
   'sulphate so4': 'Water-soluble sulphate in soil, % by mass. Sets the CSA A23.1 exposure class for concrete.',
   'csa a23.1 class': 'Concrete sulphate exposure class: S-1 (≥ 2%), S-2 (0.2–2%), S-3 (0.1–0.2%).',
   'swell': 'Indicative swell potential from PI (after Chen 1975). Screening only.',
@@ -2644,7 +2644,7 @@ function sampleFormHTML(b, i, full) {
     <h4 class="ff-h">Field and lab tests</h4><div class="fields ff">
       ${n2('w', sm.w, 'Water content w (%)')}${n2('pl', sm.pl, 'Plastic limit (%)')}${n2('ll', sm.ll, 'Liquid limit (%)')}
       ${full ? out('pi', 'Plasticity index') + out('cls', 'Lab class') : ''}
-      ${n2('pp', sm.pp, 'Pocket pen. (kPa)')}${n2('su', sm.su, 'Field vane Su (kPa)')}${n2('cvc', sm.cvc, 'Vapour (ppm)')}${n2('lel', sm.lel, 'LEL (%)')}
+      ${n2('pp', sm.pp, 'Pocket pen. (kPa)')}${n2('su', sm.su, 'Field vane Su (kPa)')}${n2('cvc', sm.cvc, 'VOC (ppm)')}${n2('lel', sm.lel, 'LEL (%)')}
       ${n2('so4', sm.so4, 'Sulphate SO4 (%)')}${full ? out('so4c', 'CSA A23.1 class') + out('sw', 'Swell (indicative)') : ''}
       ${full ? `<div class="fld wide"><label>Grain size</label><div class="inline"><button class="btn" data-gsd="${i}">${sm.gsd?.length ? 'Edit curve' : 'Add curve'}</button><span class="out" data-calc="gsd-${i}"></span></div></div>` : ''}
       <div class="fld wide"><label for="s-${sm.id}-note">Remarks</label><input id="s-${sm.id}-note" type="text" data-sec="samples" data-i="${i}" data-k="note" value="${esc(sm.note || '')}" placeholder="e.g. 50/75 mm, wet at tip"></div>
@@ -2970,7 +2970,7 @@ const SHEETS = {
     blank: (b, prev) => ({ id: uid('s'), no: Math.max(0, ...b.samples.map(x => x.no || 0)) + 1, name: nextSampleName(prev?.name), purpose: prev?.purpose || '', depth: null, type: prev?.type || 'SS', b1: null, b2: null, b3: null, n: null, rec: null, rqd: null, w: null, pl: null, ll: null, pp: null, su: null, so4: null, note: '', lab: {}, labMeta: { lab: '', report: '', date: '' } }) },
   tests: { name: 'Field & lab tests', key: 'samples', by: 'depth', cols: [
     ['depth', 'Depth', 'depth'], ['id', 'Sample', 'calc', r => sampleId(r)], ['w', 'w (%)', 'num'], ['pl', 'PL (%)', 'num'], ['ll', 'LL (%)', 'num'], ['pi', 'PI', 'calc', r => r.ll != null && r.pl != null ? +(r.ll - r.pl).toFixed(1) : ''],
-    ['pp', 'PP (kPa)', 'num'], ['su', 'Su vane (kPa)', 'num'], ['so4', 'SO₄ (%)', 'num'], ['cvc', 'Vapour (ppm)', 'num'], ['lel', 'LEL (%)', 'num']],
+    ['pp', 'PP (kPa)', 'num'], ['su', 'Su vane (kPa)', 'num'], ['so4', 'SO₄ (%)', 'num'], ['cvc', 'VOC (ppm)', 'num'], ['lel', 'LEL (%)', 'num']],
     blank: (b, prev) => SHEETS.samples.blank(b, prev) },
   water: { name: 'Water levels', key: 'water', by: 'date', cols: [
     ['date', 'Date', 'date'], ['kind', 'Reading', 'pick', () => Object.values(WATER_KINDS), WATER_KINDS], ['measured', 'Depth to water', 'depth'], ['ref', 'Measured from', 'pick', () => ['Ground surface', 'Top of standpipe'], { gs: 'Ground surface', toc: 'Top of standpipe' }],
@@ -3496,7 +3496,7 @@ const LOG_COLS = {
   su: ['Shear strength graph (pocket pen., vane)', b => (b.samples || []).some(s => s.pp != null || s.su != null)],
   w: ['Water content and Atterberg limits graph', b => (b.samples || []).some(s => s.w != null || s.ll != null || s.pl != null)],
   obs: ['Observations column', b => (b.events || []).some(e => (e.layer || e.depth != null) && obsLabel(e))],
-  cvc: ['Vapour concentration graph (ppm, headspace)', b => (b.samples || []).some(s => s.cvc != null)],
+  cvc: ['VOC graph (ppm, headspace)', b => (b.samples || []).some(s => s.cvc != null)],
   lab: ['Lab results graph (chosen under Graphs)', b => (b.samples || []).some(sm => Object.values(sm.lab || {}).some(r => r?.v != null))],
   so4: ['Sulphate SO4 % (PDF)', b => (b.samples || []).some(s => s.so4 != null)],
   water: ['Water level column', b => (b.water || []).some(w => w.depth != null) || b.slough != null || !!b.gwNone],
@@ -3524,13 +3524,23 @@ function stickupGlyph(cx, cw, pw, gy, h, su, sc = 1) {
     `<text x="${cx + cw + 5 * sc}" y="${top + 4 * sc}" style="font:600 ${9 * sc}px Arial,Helvetica,sans-serif;fill:var(--ink)">Stick-up ${esc(fx(su))} ${LEN()}</text></g>`;
 }
 /* vapour (headspace) on a log scale, 1 to 10 000 ppm, drawn as bars as on environmental logs */
+/* the VOC key swatch in the graph's chosen style: a bar (bars, area), a line through a dot (line) or a dot (points) */
+const vapSwatch = (x, y, w, h, sc = 1) => { const t = lay('vplot'), m = y + h / 2, r = 2.6 * sc, cx = x + w / 2, dot = `M${cx - r} ${m}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
+  // one shape each, so the key reads as a single symbol
+  return t === 'line' ? `<path d="M${x} ${m}h${w}${dot}" style="fill:var(--warn);stroke:var(--warn)" stroke-width="${1.4 * sc}"/>` : t === 'points' ? `<path d="${dot}" style="fill:var(--warn)"/>` : `<rect x="${x}" y="${y}" width="${w}" height="${h}" style="fill:var(--warn)" opacity=".75"/>`; };
 const VX = (c, v, pad = 7) => c.x + pad + Math.log10(Math.max(1, Math.min(v, 1e4))) / 4 * (c.w - 2 * pad);
-/* sample type graphic in the sample column: SS split spoon open box with diagonal, ST tube solid, C core with centre line, grab/auger/bulk a small hatched square */
+/* sample type graphic in the sample column: SS split spoon open box with diagonal, ST tube solid, C core with centre line, J jar a filled lid,
+   B bag a tie (cross), G grab a dot, A auger cuttings an open box; very short samples a small hatched square */
 function sampleGlyph(x, w, y0, y1, type, sc = 1) {
-  if (y1 - y0 < 4 * sc) { const m = (y0 + y1) / 2, h = 7 * sc; return `<rect x="${x + w / 2 - h / 2}" y="${m - h / 2}" width="${h}" height="${h}" style="fill:#fff;stroke:var(--ink)" stroke-width="${.8 * sc}"/><path d="M${x + w / 2 - h / 2} ${m + h / 2}l${h} ${-h}" style="stroke:var(--ink)" stroke-width="${.7 * sc}"/>`; }
+  // a sample at a single depth: jar, bag and grab keep their own marking in a small square, the others a square with a diagonal
+  if (y1 - y0 < 4 * sc && ['J', 'B', 'G'].includes(type)) { const m = (y0 + y1) / 2, h = 7 * sc; x += w / 2 - h / 2 - 3 * sc; w = h + 6 * sc; y0 = m - h / 2; y1 = m + h / 2; }
+  else if (y1 - y0 < 4 * sc) { const m = (y0 + y1) / 2, h = 7 * sc; return `<rect x="${x + w / 2 - h / 2}" y="${m - h / 2}" width="${h}" height="${h}" style="fill:#fff;stroke:var(--ink)" stroke-width="${.8 * sc}"/><path d="M${x + w / 2 - h / 2} ${m + h / 2}l${h} ${-h}" style="stroke:var(--ink)" stroke-width="${.7 * sc}"/>`; }
   const r = `<rect x="${x + 3 * sc}" y="${y0}" width="${w - 6 * sc}" height="${y1 - y0}" style="fill:${type === 'ST' ? 'var(--ink)' : '#fff'};stroke:var(--ink)" stroke-width="${.8 * sc}"/>`;
   if (type === 'SS') return r + `<path d="M${x + 3 * sc} ${y1}L${x + w - 3 * sc} ${y0}" style="stroke:var(--ink)" stroke-width="${.7 * sc}"/>`;
   if (type === 'C') return r + `<path d="M${x + w / 2} ${y0}V${y1}" style="stroke:var(--ink)" stroke-width="${.7 * sc}"/>`;
+  if (type === 'J') return r + `<rect x="${x + 3 * sc}" y="${y0}" width="${w - 6 * sc}" height="${Math.min(3 * sc, (y1 - y0) / 3)}" style="fill:var(--ink)"/>`;
+  if (type === 'B') return r + `<path d="M${x + 3 * sc} ${y0}L${x + w - 3 * sc} ${y1}M${x + 3 * sc} ${y1}L${x + w - 3 * sc} ${y0}" style="stroke:var(--ink)" stroke-width="${.7 * sc}"/>`;
+  if (type === 'G') return r + `<circle cx="${x + w / 2}" cy="${(y0 + y1) / 2}" r="${Math.min(2 * sc, (y1 - y0) / 3)}" style="fill:var(--ink)"/>`;
   return r;
 }
 const attMax = b => Math.max(60, Math.ceil(Math.max(0, ...(b.samples || []).flatMap(s => [s.w, s.ll, s.pl].filter(v => v != null))) / 20) * 20);
@@ -3584,7 +3594,7 @@ function logLegendItems(b) {
   if (sm.some(s => s.pp != null)) items.push({ sw: (x, y, w, h) => `<path d="M${x + w / 2 - 4} ${y + h / 2 + 3.5}l4-7 4 7z" style="fill:var(--ink)"/>`, t: 'Pocket penetrometer' });
   if (sm.some(s => s.su != null)) items.push({ sw: (x, y, w, h) => `<rect x="${x + w / 2 - 3.5}" y="${y + h / 2 - 3.5}" width="7" height="7" style="fill:var(--ink)"/>`, t: 'Field vane Su' });
   if (sm.some(s => s.w != null)) items.push({ sw: (x, y, w, h) => `<path d="M${x + 2} ${y + h / 2}H${x + w - 2}M${x + 2} ${y + h / 2 - 3}v6M${x + w - 2} ${y + h / 2 - 3}v6" style="stroke:var(--ink)"/><circle cx="${x + w / 2}" cy="${y + h / 2}" r="2.6" style="fill:var(--ink)"/>`, t: 'Water content, PL–LL' });
-  if (sm.some(s => s.cvc != null)) items.push({ sw: (x, y, w, h) => `<rect x="${x + 2}" y="${y + h / 2 - 3}" width="${w - 6}" height="6" style="fill:var(--warn)" opacity=".75"/>`, t: 'Vapour, headspace (ppm)' });
+  if (sm.some(s => s.cvc != null)) items.push({ sw: (x, y, w, h) => vapSwatch(x + 2, y + h / 2 - 3, w - 6, 6), t: 'VOC, headspace (ppm)' });
   const p = colOn(b, 'lab') && labGraphParam();
   if (p) { items.push({ sw: (x, y, w, h) => `<rect x="${x + 2}" y="${y + h / 2 - 3}" width="${w - 6}" height="6" style="fill:#f6a868"/>`, t: `${LAB_PARAMS[p].label} below guideline` }, { sw: (x, y, w, h) => `<rect x="${x + 2}" y="${y + h / 2 - 3}" width="${w - 6}" height="6" style="fill:#d4533f"/>`, t: 'Exceeds guideline' }, { sw: (x, y, w, h) => `<circle cx="${x + w / 2}" cy="${y + h / 2}" r="3" style="fill:#fff;stroke:#a8743a" stroke-width="1.2"/>`, t: 'Not detected (< detection limit)' }); }
   return items;
@@ -3600,7 +3610,7 @@ const GRAPH_TYPES = { line: 'Line', points: 'Points', bars: 'Bars', lollipop: 'L
 function graphSeries() {
   const fr = s => s.gsd?.length > 1 ? gsdFractions(s.gsd) : null;
   const S0 = {
-    cvc: ['Vapour, headspace', 'ppm', 'log', s => s.cvc], lel: ['LEL (combustible gas)', '% LEL', 'lin', s => s.lel], n: ['SPT N', NUNIT(), 'lin', s => sptN(s)], n60: ['SPT N60', 'blows/0.3 m', 'lin', (s, b) => sptCorr(b, s)?.N60], n160: ['SPT (N1)60', 'blows/0.3 m', 'lin', (s, b) => sptCorr(b, s)?.N160],
+    cvc: ['VOC, headspace', 'ppm', 'log', s => s.cvc], lel: ['LEL (combustible gas)', '% LEL', 'lin', s => s.lel], n: ['SPT N', NUNIT(), 'lin', s => sptN(s)], n60: ['SPT N60', 'blows/0.3 m', 'lin', (s, b) => sptCorr(b, s)?.N60], n160: ['SPT (N1)60', 'blows/0.3 m', 'lin', (s, b) => sptCorr(b, s)?.N160],
     pp: ['Pocket penetrometer', 'kPa', 'lin', s => s.pp], su: ['Field vane Su', 'kPa', 'lin', s => s.su], w: ['Water content', '%', 'lin', s => s.w], ll: ['Liquid limit', '%', 'lin', s => s.ll], pl: ['Plastic limit', '%', 'lin', s => s.pl],
     pi: ['Plasticity index', '%', 'lin', s => s.ll != null && s.pl != null ? s.ll - s.pl : null], fines: ['Fines (< 0.075 mm)', '%', 'lin', s => fr(s)?.fines], gravel: ['Gravel', '%', 'lin', s => fr(s)?.gravel], sand: ['Sand', '%', 'lin', s => fr(s)?.sand], clay: ['Clay (< 0.002 mm)', '%', 'lin', s => fr(s)?.clay],
     so4: ['Sulphate SO4', '%', 'lin', s => s.so4], rec: ['Core recovery', '%', 'lin', s => s.rec], rqd: ['RQD', '%', 'lin', s => s.rqd],
@@ -3650,7 +3660,7 @@ function graphsRowHTML() {
   const PC = b ? pdfCols(b) : null, shown = k => b ? (PDF_KEYS.includes(k) ? PC.on.has(k) : colOn(b, k)) : S.co.cols?.[k] === 'on', gi = k => gs.findIndex(g => g.series === k);
   const style = i => i < 0 ? '' : `<span class="gr-sty"><select data-graph="${i}" data-gk="type" aria-label="Drawn as" ${ro}>${opts(GRAPH_TYPES, gs[i].type)}</select><select data-graph="${i}" data-gk="scale" aria-label="Scale" ${ro}>${opts({ '': 'Scale: automatic', lin: 'Linear', log: 'Log' }, gs[i].scale || '')}</select></span>`;
   const row = (key, label, on, i = -1) => `<div class="gr-row"><label class="check"><input type="checkbox" data-gtick="${key}" ${on ? 'checked' : ''} ${ro}> ${esc(label)}</label>${on ? style(i) : ''}</div>`;
-  const field = [['nplot', 'SPT N'], ['su', 'Shear strength (pocket pen., vane)'], ['w', 'Water content and limits'], ['cvc', 'Vapour (ppm, headspace)']].filter(([k]) => S.co.cols?.[k] === 'on' || ps.some(x => LOG_COLS[k][1](x)));
+  const field = [['nplot', 'SPT N'], ['su', 'Shear strength (pocket pen., vane)'], ['w', 'Water content and limits'], ['cvc', 'VOC (ppm, headspace)']].filter(([k]) => S.co.cols?.[k] === 'on' || ps.some(x => LOG_COLS[k][1](x)));
   const lp = labGraphParam(), labCol = shown('lab'), lab = labParamsUsed(ps);
   const other = Object.keys(SR).filter(k => !k.startsWith('lab:') && !['cvc', 'n'].includes(k) && ps.some(x => (x.samples || []).some(sm => val(SR[k][3](sm, x)))));
   const head = t => `<div class="gr-h">${t}</div>`, rowKeys = new Set([...lab.map(p => 'lab:' + p), ...other]), extra = gs.filter((g, i) => !rowKeys.has(g.series) && gs.findIndex(x => x.series === g.series) === i);
@@ -3734,7 +3744,7 @@ function logSVG(b, W) {
   if (cSu.w) out.push(`<text class="lbl" x="${cSu.x + cSu.w / 2}" y="40" text-anchor="middle">Shear strength (kPa)</text><path d="M${cSu.x + 16} 54l4-7 4 7z" ${ink}/>${key(cSu.x + 27, 54)}PP</text><rect x="${cSu.x + 60}" y="47.5" width="6.5" height="6.5" ${ink}/>${key(cSu.x + 70, 54)}Vane</text>`);
   if (cA.w) out.push(`<text class="lbl" x="${cA.x + cA.w / 2}" y="40" text-anchor="middle">Water content (%)</text>${key(cA.x + 18, 54)}PL</text><path d="M${cA.x + 36} 50.5h40M${cA.x + 36} 47v7M${cA.x + 76} 47v7" style="stroke:var(--ink)" stroke-width="1.2"/><circle cx="${cA.x + 56}" cy="50.5" r="3" ${ink}/>${key(cA.x + 80, 54)}LL</text>`);
   if (cVp.w) {
-    out.push(`<text class="lbl" x="${cVp.x + cVp.w / 2}" y="40" text-anchor="middle">Vapour (ppm)</text><rect x="${cVp.x + 22}" y="47" width="16" height="7" style="fill:var(--warn)" opacity=".75"/>${key(cVp.x + 42, 54)}headspace, log</text>`);
+    out.push(`<text class="lbl" x="${cVp.x + cVp.w / 2}" y="40" text-anchor="middle">VOC (ppm)</text>${vapSwatch(cVp.x + 22, 47, 16, 7)}${key(cVp.x + 42, 54)}headspace, log</text>`);
     [10, 100, 1000].forEach(v => out.push(`<text class="tick" x="${VX(cVp, v)}" y="${T - 10}" text-anchor="middle">${v >= 1000 ? '1k' : v}</text><line x1="${VX(cVp, v)}" x2="${VX(cVp, v)}" y1="${T - 6}" y2="${T - 2}" style="stroke:var(--muted)"/>`));
     [1, 10, 100, 1000, 1e4].forEach(v => { for (let m = 2; m <= 9 && v < 1e4; m++) out.push(`<line x1="${VX(cVp, v * m)}" x2="${VX(cVp, v * m)}" y1="${T}" y2="${T + H}" style="stroke:var(--grid)" stroke-width=".6"/>`); out.push(`<line x1="${VX(cVp, v)}" x2="${VX(cVp, v)}" y1="${T}" y2="${T + H}" style="stroke:var(--grid)" stroke-width="1.2"/>`); });
   }
@@ -3801,7 +3811,7 @@ function logSVG(b, W) {
   const npts = [], vpts = [], vType = lay('vplot');
   for (const it of sm) {
     const s = it.s, ly = it.ly, N = sptN(s), y0 = y(it.t), y1 = y(it.bt);
-    out.push(`<g><title>${esc(`${sampleId(s)} ${SAMPLE_TYPES[s.type] || s.type} at ${fu(s.depth)}${blowStr(s) ? ' · blows ' + blowStr(s) : ''}${N != null ? ' · N = ' + N : ''}${s.pp != null ? ' · PP ' + s.pp + ' kPa' : ''}${s.su != null ? ' · Su ' + s.su + ' kPa' : ''}${s.so4 != null ? ' · SO4 ' + s.so4 + '%' : ''}${s.cvc != null ? ' · vapour ' + s.cvc + ' ppm' : ''}${s.lel != null ? ' · LEL ' + s.lel + '%' : ''}`)}</title>`);
+    out.push(`<g><title>${esc(`${sampleId(s)} ${SAMPLE_TYPES[s.type] || s.type} at ${fu(s.depth)}${blowStr(s) ? ' · blows ' + blowStr(s) : ''}${N != null ? ' · N = ' + N : ''}${s.pp != null ? ' · PP ' + s.pp + ' kPa' : ''}${s.su != null ? ' · Su ' + s.su + ' kPa' : ''}${s.so4 != null ? ' · SO4 ' + s.so4 + '%' : ''}${s.cvc != null ? ' · VOC ' + s.cvc + ' ppm' : ''}${s.lel != null ? ' · LEL ' + s.lel + '%' : ''}`)}</title>`);
     if (y1 - y0 >= 4) out.push(`<path d="M${cSm.x} ${y0}H${cN.x + cN.w}M${cSm.x} ${y1}H${cN.x + cN.w}" style="stroke:var(--line)"/>`);
     out.push(sampleGlyph(cTy.x, cTy.w, y0, y1, s.type));
     if (Math.abs(ly - it.y) > .5) out.push(`<path d="M${cSm.x + cSm.w - 2} ${ly}L${cTy.x} ${it.y}" style="stroke:var(--muted)" fill="none"/>`);
@@ -3816,7 +3826,7 @@ function logSVG(b, W) {
     if (s.pl != null && s.ll != null && cA.w) out.push(`<path d="M${AX(s.pl)} ${it.y}H${AX(s.ll)}M${AX(s.pl)} ${it.y - 4}v8M${AX(s.ll)} ${it.y - 4}v8" style="stroke:var(--ink)" stroke-width="1.2"><title>PL ${s.pl} – LL ${s.ll}</title></path>`);
     if (s.w != null && cA.w) out.push(`<circle cx="${AX(s.w)}" cy="${it.y}" r="3.4" style="fill:var(--ink)"><title>w = ${s.w}%</title></circle>`);
     if (s.cvc != null && cVp.w && vType !== 'bars') vpts.push({ v: s.cvc, y: it.y, label: s.cvc });
-    else if (s.cvc != null && cVp.w) out.push(`<g><title>Vapour ${s.cvc} ppm (headspace)</title><rect x="${cVp.x + 7}" y="${it.y - 4.5}" width="${Math.max(1.5, VX(cVp, s.cvc) - cVp.x - 7)}" height="9" style="fill:var(--warn)" opacity=".75"/>${VX(cVp, s.cvc) + 34 > cVp.x + cVp.w ? `<text class="tick" x="${VX(cVp, s.cvc) - 3}" y="${it.y + 3.5}" text-anchor="end" style="fill:#fff;font-weight:700">${s.cvc}</text>` : `<text class="tick" x="${VX(cVp, s.cvc) + 4}" y="${it.y + 4}">${s.cvc}</text>`}</g>`);
+    else if (s.cvc != null && cVp.w) out.push(`<g><title>VOC ${s.cvc} ppm (headspace)</title><rect x="${cVp.x + 7}" y="${it.y - 4.5}" width="${Math.max(1.5, VX(cVp, s.cvc) - cVp.x - 7)}" height="9" style="fill:var(--warn)" opacity=".75"/>${VX(cVp, s.cvc) + 34 > cVp.x + cVp.w ? `<text class="tick" x="${VX(cVp, s.cvc) - 3}" y="${it.y + 3.5}" text-anchor="end" style="fill:#fff;font-weight:700">${s.cvc}</text>` : `<text class="tick" x="${VX(cVp, s.cvc) + 4}" y="${it.y + 4}">${s.cvc}</text>`}</g>`);
     extra = Math.max(extra, ly + 14 - (T + H), y1 + 4 - (T + H));
   }
   out.push(profileSVG(npts, NX, NX(0), lay('nplot'), { color: 'var(--accent)', r: 3, bh: 8 }));
@@ -3840,7 +3850,8 @@ function logSVG(b, W) {
     if (wb > well.screenBottom + 1e-6) out.push(`<rect x="${px}" y="${y(well.screenBottom)}" width="${pw}" height="${y(wb) - y(well.screenBottom)}" style="fill:var(--panel);stroke:var(--ink)" stroke-width="1.2"/>`);
     out.push(`<path d="M${px - 2} ${y(wb)}h${pw + 4}" style="stroke:var(--ink)" stroke-width="2.5"/>`);
     const lw = latestWater(b);
-    if (lw && lw.kind !== 'strike' && lw.depth <= wb) out.push(`<path d="M${px + 1} ${y(lw.depth)}h${pw - 2}" style="stroke:var(--water)" stroke-width="2.5"/>`);
+    // water standing in the pipe, tinted from the level down to the end cap
+    if (lw && lw.kind !== 'strike' && lw.depth <= wb) out.push(`<rect data-pipewater="1" x="${px + .6}" y="${y(lw.depth)}" width="${pw - 1.2}" height="${y(wb) - y(lw.depth)}" style="fill:var(--water)" opacity=".3"><title>Water in the pipe from ${fu(lw.depth)}</title></rect><path d="M${px + 1} ${y(lw.depth)}h${pw - 2}" style="stroke:var(--water)" stroke-width="2.5"/>`);
   }
   // water
   const water = (b.water || []).filter(w => w.depth != null);
@@ -3975,12 +3986,12 @@ function editHTML(b) {
     <section class="sec" id="sec-tests">
       <header><h3>Field &amp; lab tests</h3></header>
       <div class="body"><div class="scroll-x"><table class="grid tests">
-        <thead><tr><th style="width:70px">Sample</th><th style="width:70px">Depth</th><th style="width:70px">w (%)</th><th style="width:70px">PL (%)</th><th style="width:70px">LL (%)</th><th style="width:44px">PI</th><th style="width:60px">Class</th><th style="width:80px">PP (kPa)</th><th style="width:80px">Su vane (kPa)</th><th style="width:76px">SO4 (%)</th><th style="width:86px" title="Combustible vapour, headspace">Vapour (ppm)</th><th style="width:110px">CSA class</th><th style="width:70px">Swell</th><th>Grain size</th></tr></thead>
+        <thead><tr><th style="width:70px">Sample</th><th style="width:70px">Depth</th><th style="width:70px">w (%)</th><th style="width:70px">PL (%)</th><th style="width:70px">LL (%)</th><th style="width:44px">PI</th><th style="width:60px">Class</th><th style="width:80px">PP (kPa)</th><th style="width:80px">Su vane (kPa)</th><th style="width:76px">SO4 (%)</th><th style="width:86px" title="VOC, headspace">VOC (ppm)</th><th style="width:110px">CSA class</th><th style="width:70px">Swell</th><th>Grain size</th></tr></thead>
         <tbody>${(b.samples || []).map((s, i) => `<tr>
           <td data-label="Sample"><b>${esc(sampleId(s))}</b></td><td data-label="Depth" class="out">${fu(s.depth)}</td>
           ${['w', 'pl', 'll'].map(k => `<td data-label="${{ w: 'w (%)', pl: 'PL (%)', ll: 'LL (%)' }[k]}">${numIn(`t-${s.id}-${k}`, `min="0" data-sec="samples" data-i="${i}" data-k="${k}"`, s[k])}</td>`).join('')}
           <td data-label="PI" class="out" data-calc="pi-${i}"></td><td data-label="Class" class="out" data-calc="cls-${i}"></td>
-          ${['pp', 'su', 'so4', 'cvc'].map(k => `<td data-label="${{ pp: 'PP (kPa)', su: 'Su (kPa)', so4: 'SO4 (%)', cvc: 'Vapour (ppm)' }[k]}">${numIn(`t-${s.id}-${k}`, `min="0" data-sec="samples" data-i="${i}" data-k="${k}"`, s[k])}</td>`).join('')}
+          ${['pp', 'su', 'so4', 'cvc'].map(k => `<td data-label="${{ pp: 'PP (kPa)', su: 'Su (kPa)', so4: 'SO4 (%)', cvc: 'VOC (ppm)' }[k]}">${numIn(`t-${s.id}-${k}`, `min="0" data-sec="samples" data-i="${i}" data-k="${k}"`, s[k])}</td>`).join('')}
           <td data-label="CSA class" class="out" data-calc="so4c-${i}"></td><td data-label="Swell" class="out" data-calc="sw-${i}"></td>
           <td data-label="Grain size" class="wide"><button class="btn" data-gsd="${i}" style="min-height:28px;padding:2px 8px">${s.gsd?.length ? 'Edit curve' : 'Add curve'}</button> <span class="out" data-calc="gsd-${i}" style="white-space:nowrap"></span></td></tr>`).join('') || `<tr><td colspan="13" class="note">Add samples first.</td></tr>`}</tbody>
       </table></div><p class="note" style="margin-top:6px">Class = Modified USCS from LL and PI (A-line PI = 0.73(LL − 20); L &lt; 30, I 30–50, H &gt; 50). CSA class = CSA A23.1 Table 3 sulphate exposure. Swell = indicative from PI (after Chen 1975). PP = pocket penetrometer; Su = field vane.</p></div>
@@ -4442,7 +4453,7 @@ function wellSVG(b) {
   o.push(`<path d="M${px - 3} ${y(wb)}h${pw + 6}" style="stroke:var(--ink)" stroke-width="3"/>`);
   if (su > 0) o.push(`<rect x="${px - 4}" y="${y(-su) - 4}" width="${pw + 8}" height="6" style="fill:var(--ink)"/>`);
   const lw = latestWater(b);
-  if (lw && lw.kind !== 'strike' && lw.depth <= wb) o.push(`<path d="M${px + 1.5} ${y(lw.depth)}h${pw - 3}" style="stroke:var(--water)" stroke-width="3"/><path d="M${bx - 4} ${y(lw.depth) - 9}h10l-5 8z" style="fill:var(--water)"/>`);
+  if (lw && lw.kind !== 'strike' && lw.depth <= wb) o.push(`<rect data-pipewater="1" x="${px + .7}" y="${y(lw.depth)}" width="${pw - 1.4}" height="${y(wb) - y(lw.depth)}" style="fill:var(--water)" opacity=".3"/><path d="M${px + 1.5} ${y(lw.depth)}h${pw - 3}" style="stroke:var(--water)" stroke-width="3"/><path d="M${bx - 4} ${y(lw.depth) - 9}h10l-5 8z" style="fill:var(--water)"/>`);
   // labels, spread so none overlap
   const labs = [];
   if (su > 0) labs.push({ y: y(-su), t: `Stick-up ${fx(su)} ${L}` });
@@ -6170,7 +6181,7 @@ const ALIASES = {
   n: ['n', 'spt', 'sptn', 'nvalue'],
   rec: ['recovery', 'rec', 'tcr'], rqd: ['rqd'],
   w: ['w', 'mc', 'moisturecontent', 'watercontent', 'wc'], ll: ['ll', 'liquidlimit'], pl: ['pl', 'plasticlimit'],
-  pp: ['pp', 'pocketpen', 'pocketpenetrometer'], su: ['su', 'vane', 'fieldvane', 'cu', 'shearstrength'], so4: ['so4', 'sulphate', 'sulfate', 'solublesulphate'], cvc: ['cvc', 'vapour', 'vapor', 'vapourppm', 'headspace', 'pid', 'voc', 'combustiblevapour', 'combustiblevapor', 'hydrocarbonvapour'],
+  pp: ['pp', 'pocketpen', 'pocketpenetrometer'], su: ['su', 'vane', 'fieldvane', 'cu', 'shearstrength'], so4: ['so4', 'sulphate', 'sulfate', 'solublesulphate'], cvc: ['cvc', 'vapour', 'vapor', 'vapourppm', 'headspace', 'pid', 'voc', 'vocppm', 'combustiblevapour', 'combustiblevapor', 'hydrocarbonvapour'],
   date: ['date', 'readingdate', 'drilldate', 'datedrilled', 'started', 'startdate'], dateEnd: ['enddate', 'datecompleted', 'completed', 'finished'],
   easting: ['easting', 'east', 'x', 'e'], northing: ['northing', 'north', 'y'],
   elevation: ['elevation', 'groundelevation', 'groundsurfaceelevation', 'rl', 'gl', 'elev', 'bhelev', 'surfaceelevation', 'z'],
@@ -6335,7 +6346,7 @@ function dataRows(bhs, unit) {
       [`Elevation ${u}`]: c(b.elevation), Datum: b.datum || '', 'Start date': b.date || '', 'End date': b.dateEnd || '', Contractor: b.contractor || '', Rig: b.rig || '', Method: b.method || '', 'Diameter (mm)': b.diameter ?? '',
       'Logged by': b.logger || '', 'Reviewed by': b.reviewer || '', Weather: b.weather || '', Termination: b.termination || '', [`Slough ${u}`]: c(b.slough), 'CSSC classification': [b.csscSub, b.csscGG].filter(Boolean).join(' '), Notes: b.notes || '' })),
     Layers: bhs.flatMap(b => (b.layers || []).map(l => ({ Borehole: b.name, [`From ${u}`]: c(l.top), [`To ${u}`]: c(l.bottom), Horizon: l.hz || '', Texture: texOf(l)?.name || '', Symbol: l.uscs || '', Modifiers: l.mods || '', Consistency: l.consistency || '', Moisture: l.moisture || '', Colour: l.colour || '', Other: l.other || '', Origin: ORIGINS[l.origin] || '', Description: composeDesc(l).text }))),
-    Samples: bhs.flatMap(b => (b.samples || []).map(s => ({ Borehole: b.name, [`Depth ${u}`]: c(s.depth), Name: sampleId(s), Type: s.type || '', No: s.no ?? '', 'Purpose / analyses': s.purpose || '', Blows: blowStr(s), 'SPT N': sptN(s) ?? '', 'Recovery %': s.rec ?? '', RQD: s.rqd ?? '', w: s.w ?? '', PL: s.pl ?? '', LL: s.ll ?? '', PP: s.pp ?? '', Su: s.su ?? '', SO4: s.so4 ?? '', 'Vapour (ppm)': s.cvc ?? '', 'LEL (%)': s.lel ?? '', Remarks: s.note || '' }))),
+    Samples: bhs.flatMap(b => (b.samples || []).map(s => ({ Borehole: b.name, [`Depth ${u}`]: c(s.depth), Name: sampleId(s), Type: s.type || '', No: s.no ?? '', 'Purpose / analyses': s.purpose || '', Blows: blowStr(s), 'SPT N': sptN(s) ?? '', 'Recovery %': s.rec ?? '', RQD: s.rqd ?? '', w: s.w ?? '', PL: s.pl ?? '', LL: s.ll ?? '', PP: s.pp ?? '', Su: s.su ?? '', SO4: s.so4 ?? '', 'VOC (ppm)': s.cvc ?? '', 'LEL (%)': s.lel ?? '', Remarks: s.note || '' }))),
     Water: bhs.flatMap(b => (b.water || []).filter(w => w.depth != null).map(w => ({ Borehole: b.name, Date: w.date || '', [`Depth to water ${u}`]: c(w.depth), Type: WATER_KINDS[w.kind] || '' }))),
   };
 }
@@ -7405,7 +7416,7 @@ function qlPane(b) {
     ${qlDepthCtl('sd', 'Sample depth')}
     <div class="ql-sec"><span class="ql-lab">Type</span><div class="ql-chips">${Object.keys(SAMPLE_TYPES).map(t => `<button type="button" data-qlset="stype" data-v="${t}" aria-pressed="${q.stype === t}">${esc(SAMPLE_TYPES[t])}</button>`).join('')}</div></div>
     ${q.stype === 'SS' ? `<div class="ql-sec"><span class="ql-lab">Blows per ${INC()}</span><div class="ql-blows">${[1, 2, 3].map(i => `<input data-qlt="b${i}" type="number" step="1" inputmode="numeric" placeholder="${i}" value="${esc(q['b' + i])}">`).join('')}</div></div>` : ''}
-    <div class="ql-sec"><label for="ql-cvc">Vapour, headspace (ppm)</label><input id="ql-cvc" data-qlt="cvc" type="number" step="any" inputmode="decimal" value="${esc(q.cvc ?? '')}" style="max-width:200px;min-height:52px;font-size:18px"></div>
+    <div class="ql-sec"><label for="ql-cvc">VOC, headspace (ppm)</label><input id="ql-cvc" data-qlt="cvc" type="number" step="any" inputmode="decimal" value="${esc(q.cvc ?? '')}" style="max-width:200px;min-height:52px;font-size:18px"></div>
     <div class="ql-sec"><label for="ql-snote">Remarks</label><input id="ql-snote" data-qlt="snote" type="text" value="${esc(q.snote)}" placeholder="e.g. 50/75 mm, wet at tip" style="min-height:48px;font-size:16px"></div>
     <div class="ql-go"><button class="btn primary" data-ql="sample-save">Add sample</button></div>
     ${ss.length ? `<div class="ql-sec"><span class="ql-lab">Samples</span><div class="ql-list">${ss.map(s => `<div class="row"><b>${fu(s.depth)}</b><span>${esc(sampleId(s))}${sptN(s) != null ? ' · N = ' + sptN(s) : ''}${blowStr(s) ? ' · ' + blowStr(s) : ''}${s.cvc != null ? ' · ' + s.cvc + ' ppm' : ''}</span></div>`).join('')}</div></div>` : ''}`;
@@ -7755,9 +7766,9 @@ CTL.log = () => { const b = cur(); return b ? CTL.report().filter(g => g.id !== 
 const LAYOUT = {
   text: { label: 'Text size', opts: { small: ['Small', 1.1], normal: ['Normal', 1.3], large: ['Large', 1.5] }, tip: 'Size of all text on the log' },
   sym: { label: 'Borehole column', opts: { narrow: ['Narrow', 40], normal: ['Normal', 52], wide: ['Wide', 72] }, tip: 'Width of the soil symbol column; the standpipe is a little narrower' },
-  graph: { label: 'Graphs', opts: { narrow: ['Narrow', 48], normal: ['Normal', 60], wide: ['Wide', 80] }, tip: 'Width of each test graph (SPT N, shear strength, water content, vapour)' },
+  graph: { label: 'Graphs', opts: { narrow: ['Narrow', 48], normal: ['Normal', 60], wide: ['Wide', 80] }, tip: 'Width of each test graph (SPT N, shear strength, water content, VOC)' },
   nplot: { label: 'SPT N graph', def: 'line', opts: { line: ['Line', 'line'], points: ['Points', 'points'], bars: ['Bars', 'bars'], step: ['Steps', 'step'] }, tip: 'How SPT N values are drawn' },
-  vplot: { label: 'Vapour graph', def: 'bars', opts: { bars: ['Bars', 'bars'], line: ['Line', 'line'], points: ['Points', 'points'], area: ['Area', 'area'] }, tip: 'How headspace vapour readings are drawn (log scale)' },
+  vplot: { label: 'VOC graph', def: 'line', opts: { line: ['Line', 'line'], bars: ['Bars', 'bars'], points: ['Points', 'points'], area: ['Area', 'area'] }, tip: 'How VOC (headspace) readings are drawn (log scale)' },
   lplot: { label: 'Lab graph', def: 'bars', opts: { bars: ['Bars', 'bars'], points: ['Points', 'points'], line: ['Line', 'line'] }, tip: 'How the chosen lab result is drawn (log scale, guideline dashed)' },
   well: { label: 'Standpipe', def: 'left', opts: { left: ['Beside soil column', 0], right: ['Before the graphs', 1] }, tip: 'Where the standpipe or well diagram sits on the log' },
 };
@@ -7768,7 +7779,7 @@ const pdfW = k => ['nplot', 'su', 'w', 'cvc', 'lab'].includes(k) ? lay('graph') 
 const PDF_DROP = ['so4', 'blows', 'lab', 'w', 'su', 'obs', 'nplot', 'cvc'];
 const LOG_PRESETS = {
   essential: { label: 'Essential', tip: 'Depth, elevation, symbol, standpipe, description, samples, SPT N and water level' , cols: { blows: 'off', nplot: 'off', su: 'off', w: 'off', obs: 'off', cvc: 'off', so4: 'off' } },
-  standard: { label: 'Standard', tip: 'Adds the SPT N graph, observations and vapour when there is data', cols: { blows: 'off', su: 'off', w: 'off', so4: 'off' } },
+  standard: { label: 'Standard', tip: 'Adds the SPT N graph, observations and VOC when there is data', cols: { blows: 'off', su: 'off', w: 'off', so4: 'off' } },
   auto: { label: 'Everything with data', tip: 'Every column the borehole has data for; the least used are left out if the page gets too crowded', cols: {} },
 };
 const presetOf = () => Object.keys(LOG_PRESETS).find(k => { const c = LOG_PRESETS[k].cols, cur = S.co.cols || {}; return Object.keys(LOG_COLS).every(x => (c[x] || 'auto') === (cur[x] || 'auto')); }) || '';
@@ -7814,7 +7825,7 @@ function pageSVG(b, pi, pn) {
   const cols = []; let x = M;
   const add = (k, w, h1, h2 = '') => { cols.push({ k, x, w, h1, h2 }); x += w; };
   const RC = [on('obs') && ['ob', pdfW('obs'), 'Observations'], ['sid', Math.round(Math.min(60, Math.max(32, longestId(b) * 4.1 + 6))), (b.samples || []).some(s => s.name) ? 'Sample' : 'No.'], ['sty', 14, ''], on('blows') && ['blows', pdfW('blows'), 'Blows/', S.units === 'ft' ? '6 in' : '150 mm'], on('n') && ['n', pdfW('n'), 'N'],
-    on('nplot') && ['np', pdfW('nplot'), 'SPT N'], on('su') && ['sp', pdfW('su'), 'Su (kPa)'], on('w') && ['ap', pdfW('w'), 'w (%)'], on('cvc') && ['vp', pdfW('cvc'), 'Vapour (ppm)'], on('lab') && labGraphParam() && ['lp', pdfW('lab'), LAB_PARAMS[labGraphParam()].label.replace(/ \(.*\)$/, '').slice(0, 14), LAB_PARAMS[labGraphParam()].unit || ''], ...graphsOf().map((g, i) => ['gx' + i, lay('graph'), graphSeries()[g.series][0].replace(/ \(.*\)$/, '').slice(0, 14), graphSeries()[g.series][1]]), on('so4') && ['so4', pdfW('so4'), 'SO4', '%'], on('water') && ['gw', pdfW('water'), 'Level']].filter(Boolean);
+    on('nplot') && ['np', pdfW('nplot'), 'SPT N'], on('su') && ['sp', pdfW('su'), 'Su (kPa)'], on('w') && ['ap', pdfW('w'), 'w (%)'], on('cvc') && ['vp', pdfW('cvc'), 'VOC (ppm)'], on('lab') && labGraphParam() && ['lp', pdfW('lab'), LAB_PARAMS[labGraphParam()].label.replace(/ \(.*\)$/, '').slice(0, 14), LAB_PARAMS[labGraphParam()].unit || ''], ...graphsOf().map((g, i) => ['gx' + i, lay('graph'), graphSeries()[g.series][0].replace(/ \(.*\)$/, '').slice(0, 14), graphSeries()[g.series][1]]), on('so4') && ['so4', pdfW('so4'), 'SO4', '%'], on('water') && ['gw', pdfW('water'), 'Level']].filter(Boolean);
   // soil column up to 52 px and standpipe a little narrower, never squeezing the description under 170 px
   const elevW = b.elevation != null && on('elev') ? 48 : 0, avail = X1 - M - 38 - elevW - RC.reduce((a, c) => a + c[1], 0);
   const symW = Math.max(32, Math.min(lay('sym'), (avail - 170) / (well ? 1.85 : 1))), wellW = Math.round(symW * .85);
@@ -7860,7 +7871,7 @@ function pageSVG(b, pi, pn) {
   if (C.ap) keyG(C.ap, 49 + fw('LL', 6) - 2, T(C.ap.x + 5, hy + 43.5, 'PL', { s: 6, c: 'var(--muted)' }), `<path d="M${C.ap.x + 16} ${hy + 41.5}h30M${C.ap.x + 16} ${hy + 39}v5M${C.ap.x + 46} ${hy + 39}v5" style="stroke:var(--ink)" stroke-width=".8"/><circle cx="${C.ap.x + 31}" cy="${hy + 41.5}" r="2" style="fill:var(--ink)"/>`, T(C.ap.x + 49, hy + 43.5, 'LL', { s: 6, c: 'var(--muted)' }));
   // thin dividers keep each test column's heading and scale numbers visibly its own
   tests.slice(1).forEach(c => o.push(line(c.x, hy + 18, c.x, by0, 'var(--line)', .4)));
-  if (C.vp) { keyG(C.vp, 19 + fw('headspace', 6) - 2, `<rect x="${C.vp.x + 6}" y="${hy + 38.5}" width="10" height="5" style="fill:var(--warn)" opacity=".75"/>`, T(C.vp.x + 19, hy + 43.5, 'headspace', { s: 6, c: 'var(--muted)' })); scaleRow(C.vp, [10, 100, 1000].map(v => [VX(C.vp, v, 5), v >= 1000 ? '1k' : String(v)]), hy + 58); [10, 100, 1000].forEach(v => o.push(line(VX(C.vp, v, 5), hy + 61, VX(C.vp, v, 5), by0, 'var(--muted)', .5))); }
+  if (C.vp) { keyG(C.vp, 19 + fw('headspace', 6) - 2, vapSwatch(C.vp.x + 6, hy + 38.5, 10, 5, .6), T(C.vp.x + 19, hy + 43.5, 'headspace', { s: 6, c: 'var(--muted)' })); scaleRow(C.vp, [10, 100, 1000].map(v => [VX(C.vp, v, 5), v >= 1000 ? '1k' : String(v)]), hy + 58); [10, 100, 1000].forEach(v => o.push(line(VX(C.vp, v, 5), hy + 61, VX(C.vp, v, 5), by0, 'var(--muted)', .5))); }
   for (const [c, p, X] of [[C.np, P.n, NX], [C.sp, P.su, SX], [C.ap, P.w, AX]].filter(([c]) => c)) { scaleRow(c, p.lab.map(v => [X(v), String(v)]), hy + 58); p.lab.forEach(v => o.push(line(X(v), hy + 61, X(v), by0, 'var(--muted)', .5))); }
   const LG = C.lp ? labGraphData(b, labGraphParam()) : null, LX = v => LGX(C.lp, LG.lo, LG.hi, v, 5);
   if (LG) scaleRow(C.lp, Array.from({ length: LG.hi - LG.lo + 1 }, (_, i) => 10 ** (LG.lo + i)).map(v => [LX(v), String(v >= 1000 ? (v / 1000) + 'k' : +v.toPrecision(1))]), hy + 58);
@@ -7966,7 +7977,9 @@ function pageSVG(b, pi, pn) {
   const strike = (b.water || []).filter(w => w.kind === 'strike' && w.depth != null).sort(byDate)[0], lw = latestWater(b);
   const tri = (dm, open) => { const yy = Y(dm); if (yy < by0 || yy > by1) return; o.push(wTri(C.sym.x + C.sym.w - 7, yy, open, 4.2)); if (C.well) o.push(wTri(C.well.x + C.well.w - 6, yy, open, 3.8)); if (C.gw) o.push(`<path d="M${C.gw.x + 4} ${yy - 8}h12l-6 8z" style="fill:${open ? '#fff' : 'var(--water)'};stroke:var(--water)" stroke-width="1"/>`); o.push(line(C.sym.x, yy, C.sym.x + C.sym.w, yy, 'var(--water)', 1.2, open ? 'stroke-dasharray="3 2"' : '')); };
   if (strike) tri(strike.depth, true);
-  if (lw && lw.kind !== 'strike') { tri(lw.depth, false); if (well && Y(lw.depth) > by0 && Y(lw.depth) < by1) o.push(line(C.well.x + (C.well.w - 10) / 2 + 1, Y(lw.depth), C.well.x + (C.well.w + 10) / 2 - 1, Y(lw.depth), 'var(--water)', 2)); }
+  if (lw && lw.kind !== 'strike') { tri(lw.depth, false);
+    if (well) { const wb = Math.max(well.depth ?? well.screenBottom, well.screenBottom), yA = Math.max(Y(lw.depth), by0), yB = Math.min(Y(wb), by1); if (lw.depth <= wb && yB > yA) o.push(`<rect data-pipewater="1" x="${C.well.x + (C.well.w - 10) / 2 + .5}" y="${yA}" width="9" height="${yB - yA}" style="fill:var(--water)" opacity=".3"/>`); }
+    if (well && Y(lw.depth) > by0 && Y(lw.depth) < by1) o.push(line(C.well.x + (C.well.w - 10) / 2 + 1, Y(lw.depth), C.well.x + (C.well.w + 10) / 2 - 1, Y(lw.depth), 'var(--water)', 2)); }
   if (b.slough != null && C.gw && Y(b.slough) >= by0 && Y(b.slough) <= by1) o.push(T(C.gw.x + 10, Y(b.slough) + 3, 'S', { s: 7.5, w: 700, c: 'var(--muted)', a: 'middle' }));
   o.push('</g>');
   if (well && pi === 0 && well.stickup > 0) o.push(stickupGlyph(C.well.x, C.well.w, 10, by0, 9, well.stickup, .7));
