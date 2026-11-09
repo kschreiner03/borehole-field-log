@@ -28,7 +28,8 @@ describe('Apple Maps snapshots', () => {
     const f = join(mkdtempSync(join(tmpdir(), 'bh-apple-')), 'apple-maps.json');
     expect((await saveCreds(f, { ...creds, keyId: 'x' })).ok).toBe(false);
     expect((await saveCreds(f, creds)).ok).toBe(true);
-    expect(statSync(f).mode & 0o077).toBe(0);
+    // Windows has no Unix permission bits (the profile folder is the user's own there)
+    if (process.platform !== 'win32') expect(statSync(f).mode & 0o077).toBe(0);
     expect(await loadCreds(f)).toEqual({ ...creds, key: pem.trim() });
   });
   it('returns the picture as a data URL, trying the other signature form once if the key is refused', async () => {

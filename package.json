@@ -9,11 +9,13 @@
   "scripts": {
     "sync-legacy": "node scripts/sync-legacy.mjs",
     "fetch-mf6": "node scripts/fetch-mf6.mjs",
-    "dev": "npm run sync-legacy && electron-vite dev",
+    "dev": "npm run sync-legacy && node scripts/dev.mjs",
     "build": "npm run sync-legacy && electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:app": "npm run sync-legacy && node scripts/test-app.mjs",
+    "package:win": "node scripts/fetch-mf6.mjs win32-x64 && npm run build && electron-builder --win",
+    "package:mac": "node scripts/fetch-mf6.mjs darwin-arm64 && npm run build && electron-builder --mac",
     "dist:win": "node scripts/fetch-mf6.mjs win32-x64 && npm test && npm run test:app && npm run build && electron-builder --win",
     "dist:mac": "node scripts/fetch-mf6.mjs darwin-arm64 && npm test && npm run test:app && npm run build && APPLE_KEYCHAIN_PROFILE=${APPLE_KEYCHAIN_PROFILE:-borehole-notary} electron-builder --mac"
   },
@@ -29,6 +31,12 @@
       "resources/**",
       "!resources/mf6/**",
       "resources/mf6/NOTICE.md"
+    ],
+    "extraResources": [
+      {
+        "from": "build/privacy-policy.txt",
+        "to": "privacy-policy.txt"
+      }
     ],
     "asarUnpack": [
       "resources/mf6/**"
@@ -88,7 +96,11 @@
       "uninstallDisplayName": "Borehole Field Log",
       "artifactName": "Borehole-Field-Log-Setup-${version}.exe",
       "deleteAppDataOnUninstall": false,
-      "runAfterFinish": true
+      "runAfterFinish": true,
+      "license": "build/privacy-policy.txt",
+      "installerSidebar": "build/installer-sidebar.bmp",
+      "uninstallerSidebar": "build/installer-sidebar.bmp",
+      "installerHeader": "build/installer-header.bmp"
     }
   },
   "dependencies": {

@@ -130,6 +130,8 @@ function buildMenu(model: MenuModel = DEFAULT_MENU) {
       else if (it && typeof it === 'object' && typeof it.role === 'string') sub.push(...role(it.role));
     }
     if (name === 'File') sub.push({ type: 'separator' }, isMac ? { role: 'close' } : { role: 'quit' });
+    // the policy the installer showed, beside the app once installed
+    if (name === 'Help') sub.push({ type: 'separator' }, { label: 'Privacy policy', click: () => shell.openPath(app.isPackaged ? join(process.resourcesPath, 'privacy-policy.txt') : join(app.getAppPath(), 'build/privacy-policy.txt')) });
     template.push({ label: name, submenu: sub, ...(name === 'Help' ? { role: 'help' as const } : {}) });
     if (name === 'Reports' || (name === 'View' && !model.some(g => g[0] === 'Reports'))) template.push({ role: 'windowMenu' });
   }
