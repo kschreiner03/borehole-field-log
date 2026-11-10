@@ -1872,6 +1872,33 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('PDF log: long titles stay inside their boxes', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); const b = cur(), co = S.co.name;
+        const fits = (what, name, cname) => {
+          b.name = name; S.co.name = cname;
+          const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:0;top:0;width:1200px'; host.innerHTML = pageSVG(b, 0, 1); document.body.appendChild(host);
+          const box = [...host.querySelectorAll('rect')].find(e => e.getAttribute('stroke-width') === '1.2'), x0 = +box.getAttribute('x'), x1 = x0 + +box.getAttribute('width');
+          const vs = [...host.querySelectorAll('line')].map(e => +e.getAttribute('x1')).filter(x => x > x0 && x < x1 && Math.abs(x - (x1 - 220)) < 1 || Math.abs(x - (x0 + 152)) < 1);
+          const mid = x1 - 220, texts = [...host.querySelectorAll('text')], ext = e => { const bb = e.getBBox(); return [bb.x, bb.x + bb.width]; };
+          const top = +box.getAttribute('y'), nameT = texts.filter(e => Math.abs(ext(e)[1] - (x1 - 8)) < 3 && e.getBBox().y < top + 30), coT = texts.filter(e => { const [a] = ext(e); return a > x0 + 150 && a < x0 + 170 && e.getBBox().y < +box.getAttribute('y') + 36; });
+          for (const e of nameT) want(ext(e)[1] <= x1 - 2 && ext(e)[0] >= mid + 2, what + ': borehole title inside its box: ' + e.textContent + ' ' + ext(e) + ' / ' + [mid, x1]);
+          for (const e of coT) want(ext(e)[1] <= mid - 2, what + ': company title inside its box: ' + e.textContent + ' ' + ext(e) + ' / ' + mid);
+          const joined = nameT.map(e => e.textContent).join(' ').replace(/\\s+/g, ' ');
+          host.remove(); return joined;
+        };
+        const j = fits('long', 'BH26-01-REVISED-NORTH-PAD-EXTENSION', 'Prairie Geotechnical and Environmental Engineering Consultants Ltd.');
+        want(j.includes('BH26-01-REVISED-NORTH-PAD-EXTENSION'), 'a long borehole name is shown whole: ' + j);
+        fits('very long', 'BH26-01 REVISED NORTH PAD EXTENSION AREA SOUTH OF THE ACCESS ROAD NEAR THE TANK FARM', 'Prairie Geotechnical and Environmental Engineering Consultants Ltd. of Saskatoon and Regina and Calgary');
+        const short = fits('short', 'BH26-01', 'Borehole Log'); want(short === 'BOREHOLE BH26-01', 'a short name is unchanged: ' + short);
+        S.co.name = co;
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('log: thin layers keep their whole description, with a leader', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
