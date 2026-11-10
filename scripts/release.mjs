@@ -18,7 +18,7 @@ const args = process.argv.slice(2), flag = k => { const i = args.indexOf(k); ret
 const dry = args.includes('--dry'), want = args.find(a => /^v?\d+\.\d+\.\d+/.test(a))?.replace(/^v/, '');
 const notesArg = flag('--notes') ?? (flag('--notes-file') ? readFileSync(flag('--notes-file'), 'utf8') : undefined);
 const stop = msg => { console.error(`\n${msg}\n`); process.exit(1); };
-const out = (cmd, a) => execFileSync(cmd, a, { encoding: 'utf8', shell: process.platform === 'win32' }).trim();
+const out = (cmd, a) => execFileSync(cmd, a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' }).trim();
 const run = (cmd, a, env) => { console.log(`\n> ${cmd} ${a.join(' ')}`); if (!dry) execFileSync(cmd, a, { stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, ...env } }); };
 const pkg = () => JSON.parse(readFileSync('package.json', 'utf8'));
 
