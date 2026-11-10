@@ -8694,6 +8694,7 @@ function xsPlay() {
 }
 function xsSetDate(d) { setXs('date', d); const dates = xsDates(sectionList()); if ($('#xs-date')) $('#xs-date').value = Math.max(0, dates.indexOf(d)); if ($('#xs-date-l')) $('#xs-date-l').textContent = d; if ($('#xs-asof')) $('#xs-asof').value = d; }
 document.addEventListener('input', e => { if (e.target.id === 'v3d-cutpos') { S.v3dCut = { on: true, ...S.v3dCut, pos: +e.target.value }; v3dCutApply(); } });
+document.addEventListener('change', e => { if (e.target.id === 'upd-auto') lsSet(UPD.auto, e.target.checked ? '1' : '0'); });
 document.addEventListener('input', e => { if (e.target.id === 'mf-coord') $('#mf-coord-read').textContent = coordsRead(e.target.value); });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.id === 'mf-coord' || e.target.id === 'mf-elev')) { e.preventDefault(); placeTyped(); } });
 document.addEventListener('input', e => { if (e.target.id === 'xs-date') { const d = xsDates(sectionList())[+e.target.value]; if (d) xsSetDate(d); } });
@@ -11018,6 +11019,10 @@ document.addEventListener('click', e => {
     case 'typical-ann': if (editable(b)) typicalAnnulus(b); break;
     case 'import': openImport(); break;
     case 'close': closeOverlay(); break;
+    case 'upd-check': updateCheck(true); break;
+    case 'upd-get': window.desktop?.updates?.open(); closeOverlay(); break;
+    case 'upd-later': closeOverlay(); break;
+    case 'upd-skip': if (S.upd) lsSet(UPD.skip, S.upd.version); closeOverlay(); break;
     case 'do-import': commitImport(); break;
     case 'template': saveFile('borehole-import-template.xlsx', workbookFor(exampleBoreholes().slice(0, 2), 'm')); break;
     case 'export': openExport(); break;
@@ -11185,7 +11190,7 @@ const MENUS = [
     ['Duplicate', 'duplicate'], ['Save as template', 'bh-tpl'], ['Delete…', 'delete']]],
   ['Tools', [['Find anything…', 'find', 'Mod+K'], ['Log columns…', 'log-cols'], ['Graphs…', 'graphs'], ['Company, logo and initials…', 'settings'], '-', ['Load example: oil lease delineation', 'load-lloyd'], ['Load example: service-station plume', 'load-sk'], ['Load example: Dawn Lake excavation', 'load-dl'], ['Load example: cross-section and plume', 'load-xs']]],
   ['Reports', [['This log (PDF)', 'pdf-one', 'Mod+P'], ['All logs in the project (PDF)', 'pdf-all'], ['Report appendix (PDF)…', 'appendix'], ['Location plan (PDF)', 'plan-pdf'], '-', ['Report editor', 'tab:compose'], ['Excel workbook…', 'export']]],
-  ['Help', [['Tutorial: cross-section', 'tut-xsec'], ['Tutorial: groundwater model', 'tut-gwm'], '-', ['Keyboard shortcuts', 'shortcuts', 'F1'], ['About Borehole Field Log', 'about']]],
+  ['Help', [['Tutorial: cross-section', 'tut-xsec'], ['Tutorial: groundwater model', 'tut-gwm'], '-', ['Keyboard shortcuts', 'shortcuts', 'F1'], ['Check for updates…', 'upd-check'], ['About Borehole Field Log', 'about']]],
 ];
 const IS_MAC = /Mac|iP(hone|ad|od)/.test(navigator.platform);
 const keyLabel = k => k ? (IS_MAC ? k.replace(/Mod\+/, '⌘').replace(/Shift\+/, '⇧').replace(/Alt\+/, '⌥') : k.replace(/Mod\+/, 'Ctrl+')) : '';
@@ -11195,6 +11200,7 @@ function runAct(act) {
   if (act.startsWith('tab:')) { const k = act.slice(4); if (BH_TABS.includes(k) && !cur()) { toast('Select a borehole first.'); return; } goTab(k); return; }
   if (act === 'shortcuts') { openShortcuts(); return; }
   if (act === 'about') { openAbout(); return; }
+  if (act === 'upd-check') { updateCheck(true); return; }
   const t = document.createElement('button'); t.dataset.act = act; t.hidden = true; document.body.append(t); t.click(); t.remove();
 }
 function renderMenubar() {
@@ -11269,6 +11275,35 @@ function openShortcuts() {
     ['Log & data / full log / PDF preview', 'Mod+1 / 2 / 3'], ['This log as PDF', 'Mod+P'], ['Settings', 'Mod+,'], ['Next cell in a table', 'Tab, Shift+Tab'], ['Next row in a table', 'Enter'], ['Copy the cell above', 'Mod+D'], ['Close a dialog or menu', 'Esc']];
   dialog('Keyboard shortcuts', `<table class="sum kbd-t"><tbody>${rows.map(([t, k]) => `<tr><td>${esc(t)}</td><td class="r"><kbd>${esc(k.split(' / ').map(x => x.split(' or ').map(keyLabel).join(' or ')).join(' / '))}</kbd></td></tr>`).join('')}</tbody></table>`, '<button class="btn primary" data-act="close">Close</button>');
 }
+/* updates (desktop app): at start, once a day unless turned off, the shell asks GitHub for the newest release. A newer one gets a
+   pop-up with what is new; Download opens the download page in the browser and the person installs it as they did this one.
+   Help › Check for updates asks at any time. Kept per person on this computer. */
+const UPD = { day: 'bhlog.updDay', skip: 'bhlog.updSkip', auto: 'bhlog.updAuto' };
+const updAutoHTML = () => `<label class="note" style="display:flex;gap:6px;align-items:center;margin-top:10px"><input type="checkbox" id="upd-auto" ${lsGet(UPD.auto) === '0' ? '' : 'checked'}> Check for updates once a day when the app starts</label>`;
+const updNotesHTML = t => {
+  const out = []; let ul = [];
+  const flush = () => { if (ul.length) out.push(`<ul style="margin:4px 0 8px;padding-left:20px">${ul.join('')}</ul>`); ul = []; };
+  for (const ln of String(t || '').split('\n').map(x => x.trim()).filter(Boolean)) {
+    if (/^[-*] /.test(ln)) ul.push(`<li>${esc(ln.slice(2))}</li>`);
+    else { flush(); out.push(`<p style="margin:0 0 6px">${esc(ln.replace(/^#+\s*/, ''))}</p>`); }
+  }
+  flush(); return out.join('');
+};
+async function updateCheck(manual) {
+  const u = window.desktop?.updates;
+  if (!u) { if (manual) toast('Updates are checked by the desktop app.'); return; }
+  if (!manual) { const today = new Date().toISOString().slice(0, 10); if (lsGet(UPD.auto) === '0' || lsGet(UPD.day) === today) return; lsSet(UPD.day, today); }
+  const r = await u.check().catch(e => ({ ok: false, error: String(e) }));
+  if (!r?.ok) { if (manual) dialog('Check for updates', `<p style="margin:0">Couldn’t check for updates. The app needs an internet connection to reach GitHub; try again when you are online.</p>${updAutoHTML()}`, '<button class="btn primary" data-act="close">Close</button>'); return; }
+  if (!r.newer) { if (manual) dialog('Check for updates', `<p style="margin:0">You have the latest version${r.current ? ` (${esc(r.current)})` : ''}.</p>${updAutoHTML()}`, '<button class="btn primary" data-act="close">Close</button>'); return; }
+  if (!manual && lsGet(UPD.skip) === r.version) return;
+  S.upd = r;
+  const win = (window.desktop.platform || '') === 'win32';
+  dialog('Update available', `<p style="margin:0 0 8px"><b>Borehole Field Log ${esc(r.version)}</b> is available${r.date ? ` (${esc(r.date)})` : ''}. You have ${esc(r.current || 'an older version')}.</p>
+    ${r.notes ? `<div style="max-height:220px;overflow:auto;margin:0 0 8px">${updNotesHTML(r.notes)}</div>` : ''}
+    <p class="note" style="margin:0">Download opens the download page in your browser. Install it the way you installed this one; your boreholes, projects and settings stay as they are.${win ? ' Windows may say it protected your PC from an unrecognised app: choose More info, then Run anyway.' : ''}</p>${updAutoHTML()}`,
+    '<button class="btn" data-act="upd-skip">Skip this version</button><button class="btn" data-act="upd-later">Later</button><button class="btn primary" data-act="upd-get">Download</button>');
+}
 function openAbout() {
   dialog('About Borehole Field Log', `<p style="margin:0 0 8px"><b>Borehole Field Log</b>${window.desktop ? ' for desktop' : ''}</p><p class="note" style="margin:0">Borehole logging, groundwater and reporting for Alberta and Saskatchewan consultants. Works offline; boreholes are saved on this computer and in the project files you save.</p>`, '<button class="btn primary" data-act="close">Close</button>');
 }
@@ -11281,6 +11316,7 @@ if (window.desktop) {   // desktop app: menu commands and project files opened f
   window.desktop.onMenu(runAct);
   window.desktop.onOpenFile(f => { const go = () => S.loaded ? restore(new File([f.text], f.name), { name: f.name, path: f.path }) : setTimeout(go, 120); go(); });
   window.desktop.ready();
+  setTimeout(() => updateCheck(false), 5000);   // after start-up has settled; silent when offline or up to date
 }
 store.init().then(() => {
   if (!(location.hash === '#quick' || window.QUICK_LOG_ONLY || lsGet('bhlog.startQL') === '1')) return;

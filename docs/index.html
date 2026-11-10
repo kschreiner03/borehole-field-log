@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Borehole Field Log · Download</title>
+<meta name="description" content="Download Borehole Field Log for Mac and Windows: borehole logging, groundwater and reporting for Alberta and Saskatchewan consultants.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  /* The download page. The newest release, its installers, checksums and notes come from GitHub when the page opens,
+     so it never needs editing for a release (scripts/release.mjs publishes them). */
+  :root { --bg: #f4f6f8; --card: #ffffff; --ink: #1c2329; --muted: #5c6873; --line: #dde3e8; --accent: #1d5f9e; --accent-2: #174d80; --accent-ink: #fff; --soft: #e8f0f7; --warn: #8a5a00; --warn-soft: #fbf4d8; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #12171c; --card: #1a2128; --ink: #e6ebef; --muted: #9aa7b3; --line: #2b353f; --accent: #6aa8e0; --accent-2: #8bbbe8; --accent-ink: #0d1a26; --soft: #1d2a37; --warn: #e2c26a; --warn-soft: #2c2716; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 16px 56px; }
+  header { display: flex; gap: 16px; align-items: center; margin-bottom: 24px; }
+  header img { width: 64px; height: 64px; flex: none; }
+  h1 { margin: 0; font-size: 28px; line-height: 1.2; }
+  .tag { margin: 4px 0 0; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin: 0 0 16px; }
+  h2 { margin: 0 0 12px; font-size: 19px; }
+  h3 { margin: 18px 0 8px; font-size: 16px; }
+  .ver { color: var(--muted); margin: -6px 0 16px; }
+  .dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .os { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 8px; align-content: start; }
+  .os b { font-size: 16px; }
+  .btn { display: inline-block; text-align: center; background: var(--accent); color: var(--accent-ink); text-decoration: none; font-weight: 600; padding: 10px 14px; border-radius: 8px; }
+  .btn:hover { background: var(--accent-2); }
+  .btn[aria-disabled="true"] { background: var(--line); color: var(--muted); pointer-events: none; }
+  .small { font-size: 13.5px; color: var(--muted); }
+  .sum { font: 12px var(--mono); word-break: break-all; color: var(--muted); }
+  .notes ul { margin: 4px 0 10px; padding-left: 22px; }
+  .notes p { margin: 0 0 8px; }
+  ol { padding-left: 22px; margin: 6px 0; }
+  li { margin: 4px 0; }
+  a { color: var(--accent); }
+  .warnbox { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 10px 12px; font-size: 14.5px; margin: 0 0 12px; }
+  /* a drawing of the Windows SmartScreen screen, so the warning is recognised and not alarming */
+  .ss { background: #1f6fbf; color: #fff; border-radius: 8px; padding: 16px 18px; max-width: 420px; font-family: "Segoe UI", system-ui, sans-serif; margin: 10px 0; }
+  .ss .t { font-size: 20px; font-weight: 300; margin: 0 0 8px; }
+  .ss .m { font-size: 13px; margin: 0 0 10px; opacity: .95; }
+  .ss .more { color: #fff; text-decoration: underline; font-size: 13px; }
+  .ss .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .ss .b { border: 2px solid #fff; padding: 4px 14px; font-size: 13px; }
+  .ss .b.run { outline: 3px solid #ffd54a; outline-offset: 2px; }
+  footer { color: var(--muted); font-size: 14px; margin-top: 24px; }
+  @media (max-width: 520px) { h1 { font-size: 23px; } header img { width: 48px; height: 48px; } .card { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="icon.svg" alt="">
+    <div><h1>Borehole Field Log</h1><p class="tag">Borehole logging, groundwater and reporting for Alberta and Saskatchewan consultants. Works offline.</p></div>
+  </header>
+
+  <section class="card" aria-live="polite">
+    <h2 id="rel-h">Download</h2>
+    <p class="ver" id="rel-ver">Looking up the newest version…</p>
+    <div class="dl">
+      <div class="os">
+        <b>Mac</b>
+        <span class="small">Apple silicon (M1 or newer) · signed and notarized by Apple</span>
+        <a class="btn" id="dl-mac" aria-disabled="true" href="#">Download for Mac</a>
+        <span class="sum" id="sum-mac"></span>
+      </div>
+      <div class="os">
+        <b>Windows</b>
+        <span class="small">Windows 10 or 11, 64-bit · not code-signed (see below)</span>
+        <a class="btn" id="dl-win" aria-disabled="true" href="#">Download for Windows</a>
+        <span class="sum" id="sum-win"></span>
+      </div>
+    </div>
+    <div class="notes" id="notes"></div>
+  </section>
+
+  <section class="card">
+    <h2>Installing</h2>
+    <h3>Windows</h3>
+    <p class="warnbox">The Windows installer isn’t code-signed, so Windows and your browser warn about it. That’s expected; the steps below get past it. Each new version shows the warning again.</p>
+    <ol>
+      <li>If your browser says the file isn’t commonly downloaded, choose <b>Keep</b> (in Edge: <b>…</b> then <b>Keep</b>).</li>
+      <li>Open <b>Borehole-Field-Log-Setup</b>. If Windows shows “Windows protected your PC”, choose <b>More info</b>, then <b>Run anyway</b>.</li>
+      <li>Read and accept the privacy policy, and finish the installer. Your boreholes and settings from an earlier version stay as they are.</li>
+    </ol>
+    <div class="ss" role="img" aria-label="Drawing of the Windows protected your PC screen, with More info and then Run anyway">
+      <p class="t">Windows protected your PC</p>
+      <p class="m">Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.</p>
+      <span class="more">More info</span> <span class="small" style="color:#fff">← choose this first</span>
+      <div class="row"><span class="b run">Run anyway</span><span class="b">Don’t run</span></div>
+    </div>
+    <p class="small">To be sure the file is the one published here, compare its SHA-256 checksum (shown under the download button) with what Windows reports: in PowerShell, <code>Get-FileHash .\Borehole-Field-Log-Setup-*.exe</code>.</p>
+    <h3>Mac</h3>
+    <ol>
+      <li>Open the downloaded <b>.dmg</b> and drag <b>Borehole Field Log</b> to <b>Applications</b>.</li>
+      <li>Open it from Applications. It is signed and notarized by Apple, so it opens without warnings.</li>
+    </ol>
+    <h3>Updates</h3>
+    <p>Once a day when it starts, the app checks here for a newer version and tells you if there is one. <b>Download</b> brings you back to this page; install it the same way. You can turn the daily check off under <b>Help › Check for updates</b>.</p>
+  </section>
+
+  <section class="card">
+    <h2>Privacy</h2>
+    <p>No account, no tracking, no analytics. Your boreholes and projects stay on your computer. The app goes online only for map backgrounds and the daily update check, which sends nothing about you or your projects.</p>
+    <p><a href="https://github.com/kschreiner03/borehole-field-log/blob/main/build/privacy-policy.txt">Read the privacy policy and terms of use</a></p>
+  </section>
+
+  <footer>
+    <a id="all" href="https://github.com/kschreiner03/borehole-field-log/releases">All versions and release notes</a>
+  </footer>
+</div>
+<script>
+(async () => {
+  const API = 'https://api.github.com/repos/kschreiner03/borehole-field-log/releases/latest', ALL = 'https://github.com/kschreiner03/borehole-field-log/releases';
+  const $ = id => document.getElementById(id), esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const mb = n => n ? ` · ${(n / 1048576).toFixed(0)} MB` : '';
+  const say = t => { $('rel-ver').innerHTML = t; };
+  let r;
+  try {
+    const res = await fetch(API, { headers: { Accept: 'application/vnd.github+json' } });
+    if (res.status === 404) { say(`The first release is on its way. Check <a href="${ALL}">the releases page</a> soon.`); return; }
+    if (!res.ok) throw new Error(res.status);
+    r = await res.json();
+  } catch { say(`Couldn’t look up the newest version just now. Downloads are on <a href="${ALL}">the releases page</a>.`); return; }
+  const version = String(r.tag_name || '').replace(/^v/, ''), [notes, sums = ''] = String(r.body || '').split('### Checksums (SHA-256)');
+  const sha = name => (new RegExp('- `' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '`: `([0-9a-f]{64})`').exec(sums) || [])[1];
+  $('rel-h').textContent = `Download version ${version}`;
+  say(`Released ${esc(String(r.published_at || '').slice(0, 10))} · <a href="${esc(r.html_url || ALL)}">release on GitHub</a>`);
+  for (const [k, re, label] of [['mac', /\.dmg$/i, 'Mac'], ['win', /setup.*\.exe$/i, 'Windows']]) {
+    const a = (r.assets || []).find(x => re.test(x.name)), btn = $('dl-' + k);
+    if (!a) { btn.textContent = `${label} version coming soon`; continue; }
+    btn.href = a.browser_download_url; btn.removeAttribute('aria-disabled'); btn.textContent = `Download for ${label}${mb(a.size)}`;
+    const s = sha(a.name); if (s) $('sum-' + k).textContent = `SHA-256 ${s}`;
+  }
+  const out = []; let ul = [];
+  const flush = () => { if (ul.length) out.push(`<ul>${ul.join('')}</ul>`); ul = []; };
+  for (const ln of notes.split('\n').map(x => x.trim()).filter(Boolean)) {
+    if (/^[-*] /.test(ln)) ul.push(`<li>${esc(ln.slice(2))}</li>`); else { flush(); out.push(`<p>${esc(ln.replace(/^#+\s*/, ''))}</p>`); }
+  }
+  flush(); if (out.length) $('notes').innerHTML = `<h3>What’s new</h3>${out.join('')}`;
+})();
+</script>
+</body>
+</html>
