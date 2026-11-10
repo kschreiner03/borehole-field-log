@@ -7800,16 +7800,26 @@ function pageSVG(b, pi, pn) {
   const o = [];
   const T = (x, y, t, o2 = {}) => `<text x="${x}" y="${y}" style="font:${o2.w || ''} ${+((o2.s || 8) * F).toFixed(2)}px Arial,Helvetica,sans-serif;fill:${o2.c || 'var(--ink)'}" ${o2.a ? `text-anchor="${o2.a}"` : ''}>${esc(t)}</text>`;
   const line = (x1, y1, x2, y2, c = 'var(--ink)', w = .6, extra = '') => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:${c}" stroke-width="${w}" ${extra}/>`;
+  // a title too long for its box gets a little smaller, then goes onto two lines (at a space near the middle), never crossing the box
+  const fitT = (x, y, t, maxW, o2) => {
+    const wOf = (l, sz) => textW(l, `${o2.w || ''} ${(sz * F).toFixed(2)}px Arial,Helvetica,sans-serif`), s0 = o2.s, w0 = wOf(t, s0);
+    if (w0 <= maxW) return T(x, y, t, o2);
+    if (w0 * .8 <= maxW) return T(x, y, t, { ...o2, s: s0 * maxW / w0 });
+    const sp = [...t.matchAll(/ /g)].map(m => m.index).sort((a, c) => Math.abs(a - t.length / 2) - Math.abs(c - t.length / 2))[0] ?? Math.floor(t.length / 2);
+    const two = [t.slice(0, sp).trim(), t.slice(sp).trim()], s = Math.max(s0 * .5, Math.min(s0 * .7, s0 * maxW / Math.max(...two.map(l => wOf(l, s0))))), lh = s * F * 1.15;
+    const clip = l => { while (wOf(l, s) > maxW && l.length > 2) l = l.replace(/.?…?$/, '') + '…'; return l; };
+    return two.map((l, i) => T(x, y - lh / 2 + i * lh, clip(l), { ...o2, s })).join('');
+  };
   // title block
   const tb = M, tbH = 104, X1 = W - M;
   o.push(`<rect x="${M}" y="${tb}" width="${W - 2 * M}" height="${tbH}" fill="none" style="stroke:var(--ink)" stroke-width="1.2"/>`);
   if (S.co.logo) o.push(`<image href="${S.co.logo}" x="${M + 6}" y="${tb + 8}" width="140" height="${tbH - 16}" preserveAspectRatio="xMinYMid meet"/>`);
   else o.push(T(M + 8, tb + 50, 'LOGO', { s: 10, c: 'var(--line)', w: 700 }));
   o.push(line(M + 152, tb, M + 152, tb + tbH));
-  o.push(T(M + 162, tb + 22, S.co.name || 'Borehole Log', { s: 13, w: 700 }));
+  o.push(fitT(M + 162, tb + 22, S.co.name || 'Borehole Log', X1 - 220 - (M + 162) - 8, { s: 13, w: 700 }));
   o.push(...[['Project', b.project], ['Client', b.client], ['Location', b.location]].map(([h, v], i) => { const t = `${h}: ${v || '—'}`, n = Math.round(62 / f); return T(M + 162, tb + 46 + i * 20, t.length > n ? t.slice(0, n - 1) + '…' : t, { s: 9 }); }));
   o.push(line(X1 - 220, tb, X1 - 220, tb + tbH));
-  o.push(T(X1 - 8, tb + 22, `BOREHOLE ${b.name}`, { s: 14 / Math.max(1, f), w: 700, c: 'var(--accent-2)', a: 'end' }));
+  o.push(fitT(X1 - 8, tb + 22, `BOREHOLE ${b.name}`, 220 - 16, { s: 14 / Math.max(1, f), w: 700, c: 'var(--accent-2)', a: 'end' }));
   o.push(T(X1 - 8, tb + 46, `${S.co.projLabel || 'Project No.'}: ${b.projNo || '—'}`, { s: 9, a: 'end' }), T(X1 - 8, tb + 63, `Sheet ${pi + 1} of ${pn}`, { s: 9, a: 'end' }));
   const st = b.status === 'issued' ? `ISSUED · REV ${b.issued?.rev ?? b.rev} · ${b.issued?.date || ''}` : `${(STATUS[b.status] || 'Draft').toUpperCase()}${b.rev ? ' · REV ' + b.rev : ''} · NOT FOR CONSTRUCTION`;
   o.push(`<rect x="${X1 - 214}" y="${tb + 74}" width="208" height="22" rx="2" style="fill:${b.status === 'issued' ? '#e2f3e8' : '#fbf4d8'};stroke:${b.status === 'issued' ? '#7fbf95' : '#d9c46a'}"/>`);
