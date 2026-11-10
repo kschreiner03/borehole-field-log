@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { mf6Binary, runMf6 } from './mf6run.mjs';
 import { clearCreds, fetchSnapshot, loadCreds, saveCreds } from './applemaps.mjs';
+import { checkForUpdate, HUB } from './updates.mjs';
 
 /* The desktop shell. The current interface ("classic") runs from resources/legacy; the React interface is being
    built alongside it and opens from View > New interface (preview). Project files are ordinary files on disk. */
@@ -95,6 +96,10 @@ ipcMain.handle('apple:snapshot', async (e, q) => {
   if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' };
   try { return await fetchSnapshot(q, await loadCreds(appleFile())); } catch (err) { return { ok: false, error: (err as Error).message }; }
 });
+
+/* updates: the newest release on GitHub against this version; the download page opens in the person's browser */
+ipcMain.handle('update:check', async e => e.sender !== win?.webContents ? { ok: false, error: 'Not allowed.' } : checkForUpdate({ current: app.getVersion(), platform: process.platform }));
+ipcMain.handle('update:open', async e => { if (e.sender === win?.webContents) await shell.openExternal(HUB); });
 
 ipcMain.handle('file:open', async () => {
   const r = await dialog.showOpenDialog(win!, { properties: ['openFile'], filters: [{ name: 'Borehole project or workspace', extensions: PROJECT_EXT }] });

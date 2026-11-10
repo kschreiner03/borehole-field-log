@@ -1,7 +1,7 @@
 BOREHOLE FIELD LOG
 PRIVACY POLICY AND TERMS OF USE
 
-Effective 9 November 2026
+Effective 10 November 2026
 
 Please read this before installing. Choosing "I Agree" means you accept it.
 
@@ -10,8 +10,8 @@ Please read this before installing. Choosing "I Agree" means you accept it.
 
 Nothing. Borehole Field Log has no account or sign-in, no analytics or
 usage tracking, no advertising, and sends no crash reports. It does not
-check for updates or contact any server of ours. Nothing you enter is
-sent to us. The only things sent anywhere are the map requests in
+contact any server of ours. Nothing you enter is sent to us. The only
+things sent anywhere are the map requests and the update check in
 section 3.
 
 
@@ -37,8 +37,10 @@ own organisation's privacy obligations.
 
 3. WHEN THE APP USES THE INTERNET
 
-The app works offline. It goes online only to draw a map background, and
-only while you are viewing a map:
+The app works offline. It goes online only to draw a map background
+while you are viewing a map, and to check for updates.
+
+Map backgrounds:
 
 - Satellite, topographic and light grey maps come from Esri
   (server.arcgisonline.com).
@@ -56,6 +58,16 @@ offline. The providers' own privacy policies apply to those requests:
   https://www.esri.com/en-us/privacy/overview
   https://osmfoundation.org/wiki/Privacy_Policy
   https://www.apple.com/legal/privacy/
+
+Updates: once a day, when the desktop app starts, it asks GitHub
+whether a newer version has been released (api.github.com). Like any
+web request it tells GitHub your computer's IP address; it contains
+nothing about you or your projects. If there is a
+newer version, the app tells you; nothing is downloaded or installed
+unless you choose Download, which opens the download page in your web
+browser. You can turn the daily check off in the update window
+(Help > Check for updates). GitHub's privacy statement applies:
+  https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement
 
 Web links in the app open in your own web browser.
 

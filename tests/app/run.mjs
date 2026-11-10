@@ -1872,6 +1872,39 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('updates: a newer release gets a pop-up; Download, Later, Skip and once a day', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      const had = window.desktop;
+      try {
+        let calls = 0, opened = 0, res = { ok: true, newer: true, version: '0.2.0', current: '0.1.0', notes: 'Thin layers keep their whole description.\\n- Type coordinates to place a borehole', date: '2026-11-12' };
+        window.desktop = { ...(had || {}), platform: 'win32', updates: { check: async () => { calls++; return res; }, open: async () => { opened++; } } };
+        for (const k of ['bhlog.updDay', 'bhlog.updSkip', 'bhlog.updAuto']) localStorage.removeItem(k);
+        const dlg = () => { const o = document.querySelector('#overlay'); return o && !o.hidden ? o.innerText : ''; }, click = a => document.querySelector('#overlay [data-act="' + a + '"]')?.click();
+        want(MENUS.find(m => m[0] === 'Help')[1].some(i => i[1] === 'upd-check'), 'Help has Check for updates');
+        await updateCheck(false); await w(50);
+        want(/0\\.2\\.0/.test(dlg()) && /0\\.1\\.0/.test(dlg()) && /Thin layers/.test(dlg()) && document.querySelector('#overlay li')?.textContent.includes('Type coordinates'), 'pop-up names the new version, this one and what is new: ' + dlg().slice(0, 300));
+        want(/Run anyway/.test(dlg()), 'Windows: how to get past the unrecognised-app warning');
+        click('upd-get'); await w(50); want(opened === 1 && !dlg(), 'Download opens the download page and closes the pop-up');
+        await updateCheck(false); want(calls === 1, 'not asked again the same day: ' + calls);
+        localStorage.removeItem('bhlog.updDay'); await updateCheck(false); await w(50); click('upd-skip'); await w(50);
+        want(localStorage.getItem('bhlog.updSkip') === '0.2.0' && !dlg(), 'Skip this version remembers it');
+        localStorage.removeItem('bhlog.updDay'); await updateCheck(false); await w(50); want(!dlg(), 'a skipped version is not offered on its own');
+        await updateCheck(true); await w(50); want(/0\\.2\\.0/.test(dlg()), 'Check for updates still shows it'); click('upd-later'); await w(50); want(!dlg(), 'Later closes it');
+        res = { ok: true, newer: false, version: '0.1.0', current: '0.1.0' }; await updateCheck(true); await w(50); want(/latest version/i.test(dlg()), 'up to date: ' + dlg().slice(0, 120)); click('close');
+        res = { ok: false, error: 'fetch failed' }; localStorage.removeItem('bhlog.updDay'); await updateCheck(false); await w(50); want(!dlg(), 'offline at start: nothing shown');
+        await updateCheck(true); await w(50); want(/couldn.t check/i.test(dlg()), 'offline when asked: says so: ' + dlg().slice(0, 120)); click('close');
+        localStorage.removeItem('bhlog.updDay'); localStorage.setItem('bhlog.updAuto', '0'); const c0 = calls; await updateCheck(false); want(calls === c0, 'turned off: no check at start');
+        res = { ok: true, newer: false, version: '0.1.0', current: '0.1.0' }; await updateCheck(true); await w(50);
+        const box = document.querySelector('#upd-auto'); want(box && !box.checked, 'the once-a-day box shows it is off');
+        if (box) { box.checked = true; box.dispatchEvent(new Event('change', { bubbles: true })); want(localStorage.getItem('bhlog.updAuto') === '1', 'ticking it turns it back on'); }
+        click('close');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      window.desktop = had; for (const k of ['bhlog.updDay', 'bhlog.updSkip', 'bhlog.updAuto']) localStorage.removeItem(k);
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('PDF log: long titles stay inside their boxes', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };

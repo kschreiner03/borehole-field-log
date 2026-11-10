@@ -17,6 +17,7 @@
     "package:win": "node scripts/fetch-mf6.mjs win32-x64 && npm run build && electron-builder --win",
     "package:mac": "node scripts/fetch-mf6.mjs darwin-arm64 && npm run build && electron-builder --mac",
     "dist:win": "node scripts/fetch-mf6.mjs win32-x64 && npm test && npm run test:app && npm run build && electron-builder --win",
+    "release": "node scripts/release.mjs",
     "dist:mac": "node scripts/fetch-mf6.mjs darwin-arm64 && npm test && npm run test:app && npm run build && APPLE_KEYCHAIN_PROFILE=${APPLE_KEYCHAIN_PROFILE:-borehole-notary} electron-builder --mac"
   },
   "build": {
@@ -83,7 +84,8 @@
       ],
       "gatekeeperAssess": false,
       "identity": "KOLE KRISTIAN SCHREINER (UUUUG5QGQ9)",
-      "notarize": true
+      "notarize": true,
+      "artifactName": "Borehole-Field-Log-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,

@@ -19,6 +19,7 @@ Borehole logging, groundwater and reporting, as a Windows and Mac desktop app (E
 | `npm run build` | Build into `out/` |
 | `npm run dist:win` / `npm run dist:mac` | Runs both test suites, then builds installers in `dist/` (build each on its own platform) |
 | `npm run package:win` / `npm run package:mac` | Builds the installer in `dist/` without the tests |
+| `npm run release -- <version> --notes "…"` | Publishes an update: see Updates below |
 
 ## Building the Windows installer on a Windows computer
 
@@ -56,7 +57,18 @@ Unsigned installers work, but Windows SmartScreen warns about them and macOS ref
   It asks for an app-specific password (make one at account.apple.com › Sign-In and Security › App-Specific Passwords). The password stays in your keychain, never in the project. Without the profile the app is still signed but not notarized. Hardened runtime is on; builds are Apple Silicon (arm64), matching the MODFLOW 6 build.
 - **Windows**: a code-signing certificate as `CSC_LINK` (a .pfx path or base64) and `CSC_KEY_PASSWORD`, or Azure Trusted Signing.
 
-Raise `version` in `package.json` for each release. The app icon is `build/icon.png` (1024 px, made from `build/icon.svg`).
+The app icon is `build/icon.png` (1024 px, made from `build/icon.svg`).
+
+## Updates
+
+The desktop app checks GitHub once a day when it starts (`src/main/updates.mjs`; it can be turned off under Help › Check for updates). When the latest [release](https://github.com/kschreiner03/borehole-field-log/releases) is newer than the app and has that computer's installer, a pop-up shows what is new; **Download** opens the download page, https://kschreiner03.github.io/borehole-field-log/ (`docs/index.html`, served by GitHub Pages from `main` › `/docs`). The page reads the latest release from GitHub when it opens, so it never needs editing. Nothing is installed by the app itself.
+
+To publish an update, with `main` the same as on GitHub and nothing uncommitted:
+
+1. On the Mac: `npm run release -- 0.2.0 --notes "One line on what is new"` (or `--notes-file notes.md`; lines starting `- ` become bullets). It sets the version, commits and pushes it, runs the quick tests, builds the signed and notarized `.dmg`, and creates the GitHub release `v0.2.0` with the installer and its SHA-256.
+2. On the Windows computer: `git pull`, then `npm run release`. It builds the setup `.exe` and adds it, and its checksum, to the same release.
+
+Until both are on the release, only people on the platform already there are told about the update. Add `--dry` to see what it would do. It needs the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`) on each computer. Run `npm run test:app` before releasing; the release runs only the quick tests.
 
 ## Soil survey
 
