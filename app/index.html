@@ -1394,7 +1394,8 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
 <input type="file" id="img-file" accept=".tif,.tiff,.png,.jpg,.jpeg,.jgw,.pgw,.tfw,.wld,.jpw" multiple hidden>
 <input type="file" id="cmp-img-file" accept="image/*" hidden>
 <input type="file" id="rep-file" accept=".pdf,application/pdf,image/*" multiple hidden>
-<input type="file" id="restore-file" accept=".bhp,.bhlog,.json,application/json" hidden>
+<input type="file" id="restore-file" accept=".bhp,.bhlog,.bh,.json,application/json" hidden>
+<input type="file" id="bh-file" accept=".bh,application/json" multiple hidden>
 <aside class="drawer edit" id="drawer" hidden aria-label="Edit"></aside>
 <div class="find" id="find" hidden></div>
 <div class="ql" id="qlog" hidden></div>
@@ -6517,6 +6518,28 @@ async function saveTo(key, name, ext, data, as, quiet) {
   }
   if (await saveFile(name, blob)) done(name);
 }
+/* one borehole as its own file (.bh), with its photos; Import borehole puts it into the project that is open */
+async function saveBorehole(b = cur()) {
+  if (!b) { toast('Select a borehole first.'); return; }
+  const data = { app: 'borehole-field-log', kind: 'borehole', version: 1, saved: new Date().toISOString(), borehole: b, photos: await photosFor(new Set([b.id])) };
+  await saveFile(`${fileSlug(b.name) || 'borehole'}.bh`, new Blob([JSON.stringify(data)], { type: 'application/json' }));
+}
+async function importBorehole(file) {
+  if (S.readOnly) { toast('This log is view only; boreholes cannot be imported into it.'); return; }
+  let data = null; try { data = JSON.parse(await file.text()); } catch { /* not JSON */ }
+  if (data?.app !== 'borehole-field-log' || data.kind !== 'borehole' || !data.borehole || typeof data.borehole !== 'object') { toast(`${file.name} is not a borehole file (.bh).`); return; }
+  const into = cur() || projList()[0], b = normalize(structuredClone(data.borehole)); delete b.example;
+  if (into) for (const k of ['project', 'projNo', 'client']) b[k] = into[k] || '';
+  const same = b.id && S.bh.get(b.id), here = same && projKey(same) === projKey(b);
+  const replace = here && confirm(`${same.name} is already in this project. Replace it with the copy in ${file.name}? Cancel keeps both.`);
+  if (!replace) { if (same || !b.id) b.id = uid('bh-'); if (sortedList().some(x => x.id !== b.id && projKey(x) === projKey(b) && (x.name || '').toLowerCase() === (b.name || '').toLowerCase())) b.name = `${b.name} (copy)`; }
+  b.history = [...(b.history || []), { at: new Date().toISOString(), by: S.me || '', what: `Imported from ${file.name}` }];
+  S.bh.set(b.id, b); store.save(b);
+  for (const ph of Array.isArray(data.photos) ? data.photos : []) if (ph && typeof ph.data === 'string') { try { await photoStore.put({ ...ph, id: replace ? ph.id : uid('ph'), bhId: b.id }); } catch { /* storage full: the log still comes in */ } }
+  if (S.mode === 'local') store.saveLocal();
+  S.sel = b.id; S.layer = 0; S.formStale = true; render(); setSync();
+  toast(`${b.name} ${replace ? 'replaced' : 'imported'} into ${projKey(b) || 'this project'}.`);
+}
 async function openFile() {
   if (window.desktop) { const r = await window.desktop.open(); if (r) restore(new File([r.text], r.name), { name: r.name, path: r.path }); return; }
   if (!('showOpenFilePicker' in window) || window.self !== window.top) { $('#restore-file').click(); return; }
@@ -6528,6 +6551,7 @@ async function openFile() {
 async function restore(file, handle) {
   try {
     const data = JSON.parse(await file.text());
+    if (data?.kind === 'borehole') { await importBorehole(file); return; }
     const list = Array.isArray(data) ? data : data.boreholes;
     if (!Array.isArray(list) || (data.app && data.app !== 'borehole-field-log')) throw 0;
     if (S.readOnly) { toast('This log is view only; files cannot be opened into it.'); return; }
@@ -6563,6 +6587,8 @@ function openFileMenu() {
     ['save-proj-as', 'Save project as…', `${MOD}Shift+S · a copy under a new name or folder`, I('<path d="M4 3h13l3 3v15H4z"/><path d="M8 3v6h8V3"/><path d="M9 15.5h6M12 12.5v6"/>')],
     ['open-file', 'Open…', `${MOD}O · .bhp project, .bhlog workspace or older .json backup`, I('<path d="M3 6.5h6l2 2h10V19H3z"/>')],
     ['backup', 'Save workspace', `Every project, company settings and photos as .bhlog${ws ? ` · linked to ${ws.name}` : ''}`, I('<rect x="3" y="4" width="18" height="5" rx="1"/><rect x="3" y="11" width="18" height="5" rx="1"/><path d="M7 6.5h2M7 13.5h2M5 19h14"/>')],
+    ['save-bh', 'Save this borehole', 'The selected borehole and its photos as .bh, to share or move', I('<path d="M6 2.5h9l4 4V21.5H6z"/><path d="M15 2.5v4h4"/><path d="M12 10v7M9 14l3 3 3-3"/>')],
+    ['imp-bh', 'Import borehole', 'A .bh file into this project', I('<path d="M6 2.5h9l4 4V21.5H6z"/><path d="M15 2.5v4h4"/><path d="M12 17v-7M9 13l3-3 3 3"/>')],
     ['pdf-one', 'Download this log (PDF)', 'The selected borehole with your title block', I('<path d="M6 2.5h9l4 4V21.5H6z"/><path d="M15 2.5v4h4"/><path d="M9 13h7M9 16.5h5"/>')],
     ['import', 'Import Excel', 'Boreholes, layers and samples from a spreadsheet', I('<path d="M4 15v5h16v-5M12 3v12M7.5 10.5 12 15l4.5-4.5"/>')],
     ['export', 'Excel workbook', 'This project as an .xlsx report workbook', I('<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M4 9h16M4 15h16M10 3v18"/>')],
@@ -11099,6 +11125,8 @@ document.addEventListener('click', e => {
     case 'export-data': if (!S.bh.size) toast('No boreholes to export.'); else saveFile(`borehole-data-${today()}.xlsx`, workbookFor(sortedList(), S.units)); break;
     case 'backup': backup(); break;
     case 'restore': case 'open-file': openFile(); break;
+    case 'save-bh': saveBorehole(); break;
+    case 'imp-bh': if (!S.readOnly) $('#bh-file').click(); break;
     case 'save-proj': saveProject(); break;
     case 'same-above': { const l = b?.layers[S.layer], up = b?.layers[S.layer - 1]; if (!l || !up || !editable(b)) break; for (const k of LAYER_COPY) l[k] = up[k] ?? ''; logChange(b, 'Soil layers'); store.save(b); refreshLayerEditor(b); break; }
     case 'imp-lab': if (!S.readOnly) importLab(); break;
@@ -11216,6 +11244,7 @@ document.addEventListener('change', e => {
   else if (t.id === 'page-depth' || t.id === 'rp-depth') { S.pageFit = t.value === 'fit'; lsSet('bhlog.pageFit', S.pageFit ? '1' : '0'); if (!S.pageFit) { S.pageDepth = +t.value; lsSet('bhlog.pageDepth', S.pageDepth); } updateRibbon(); if (S.tab === 'report') renderView(true); }
   else if (t.id === 'ph-file') { if (t.files.length) addPhotos([...t.files]); t.value = ''; }
   else if (t.id === 'restore-file') { if (t.files[0]) restore(t.files[0]); t.value = ''; }
+  else if (t.id === 'bh-file') { (async () => { for (const f of t.files) await importBorehole(f); t.value = ''; })(); }
   else if (t.dataset.delpick != null) delCount();
   else if (t.id === 'opt-contours') { S.contours = t.checked; lsSet('bhlog.contours', t.checked ? '1' : ''); drawPlan(); renderList(sortedList()); }
   else if (t.id === 'opt-units') { S.showUnits = t.checked; drawSection($('#section'), $('#section-note'), undefined, sectionList()); }
@@ -11258,13 +11287,13 @@ setSync();
    An item is [label, act, shortcut] ('tab:<page>' opens a page); '-' is a separator. Shortcuts are written Mod+S (Ctrl on
    Windows, ⌘ on Mac). Roles are native-only items the desktop app supplies itself (cut, copy, paste, zoom...). */
 const MENUS = [
-  ['File', [['New project…', 'new-project'], ['New borehole', 'new', 'Mod+N'], '-', ['Open…', 'open-file', 'Mod+O'], ['Save project', 'save-proj', 'Mod+S'], ['Save project as…', 'save-proj-as', 'Mod+Shift+S'], ['Save workspace (all projects)…', 'backup'], '-',
+  ['File', [['New project…', 'new-project'], ['New borehole', 'new', 'Mod+N'], '-', ['Open…', 'open-file', 'Mod+O'], ['Save project', 'save-proj', 'Mod+S'], ['Save project as…', 'save-proj-as', 'Mod+Shift+S'], ['Save workspace (all projects)…', 'backup'], '-', ['Save borehole (.bh)…', 'save-bh'], ['Import borehole (.bh)…', 'imp-bh'], '-',
     ['Import Excel…', 'import'], ['Import lab results…', 'imp-lab'], '-', ['Export Excel workbook…', 'export'], ['Export all data (Excel)…', 'export-data'], ['Export AGS 4…', 'ags'], ['Export GIS…', 'gis'], '-', ['Settings…', 'prefs', 'Mod+,']]],
   ['Edit', [['Undo', 'undo', 'Mod+Z'], ['Redo', 'redo', 'Mod+Y'], '-', { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }, '-', ['Find…', 'find', 'Mod+F']]],
   ['View', [['Overview', 'tab:home'], ['Map & sections', 'tab:site'], ['Data tables', 'tab:table'], ['Groundwater', 'tab:gw'], ['Lab & contamination', 'tab:contam'], ['Reports', 'tab:compose'], '-',
     ['Log & data', 'tab:edit', 'Mod+1'], ['Full log', 'tab:log', 'Mod+2'], ['PDF preview', 'tab:report', 'Mod+3'], '-', ['Field mode (large controls)', 'field'], { role: 'zoom' }, { role: 'dev' }]],
   ['Project', [['New borehole', 'new'], ['Monitoring round…', 'round'], ['Copy details to all boreholes…', 'apply-project'], '-', ['Site drawing…', 'site-img'], ['Import locations…', 'imp-loc'], ['Import shapes…', 'imp-shp'], ['Add imagery…', 'imp-img'], '-', ['Remove example boreholes', 'clear-examples']]],
-  ['Boreholes', [['Log step by step', 'qlog', 'Mod+L'], ['Add sample', 'quick'], ['Drilling note', 'quick-note'], '-', ['Check log', 'check-log'], ['Mark ready for review', 'to-review'], ['Issue…', 'issue'], ['Revise', 'revise'], ['Comments', 'comments'], ['History', 'history'], '-',
+  ['Boreholes', [['Save this borehole (.bh)…', 'save-bh'], ['Import a borehole (.bh)…', 'imp-bh'], '-', ['Log step by step', 'qlog', 'Mod+L'], ['Add sample', 'quick'], ['Drilling note', 'quick-note'], '-', ['Check log', 'check-log'], ['Mark ready for review', 'to-review'], ['Issue…', 'issue'], ['Revise', 'revise'], ['Comments', 'comments'], ['History', 'history'], '-',
     ['Duplicate', 'duplicate'], ['Save as template', 'bh-tpl'], ['Delete…', 'delete']]],
   ['Tools', [['Find anything…', 'find', 'Mod+K'], ['Log columns…', 'log-cols'], ['Graphs…', 'graphs'], ['Company, logo and initials…', 'settings'], '-', ['Load example: oil lease delineation', 'load-lloyd'], ['Load example: service-station plume', 'load-sk'], ['Load example: Dawn Lake excavation', 'load-dl'], ['Load example: cross-section and plume', 'load-xs']]],
   ['Reports', [['This log (PDF)', 'pdf-one', 'Mod+P'], ['All logs in the project (PDF)', 'pdf-all'], ['Report appendix (PDF)…', 'appendix'], ['Location plan (PDF)', 'plan-pdf'], '-', ['Report editor', 'tab:compose'], ['Excel workbook…', 'export']]],

@@ -274,6 +274,40 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('borehole files: save one borehole as .bh, import it into the open project', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, keepSave = window.saveFile, keepConfirm = window.confirm;
+      try {
+        loadDlExample(); loadSkExample(); await w(400);
+        const src = sortedList().find(b => b.project && /Dawn Lake|Excavation/.test(b.project) && b.layers.length); S.sel = src.id;
+        await photoStore.put({ id: 'ph-bhf', bhId: src.id, caption: 'core box', data: 'data:image/png;base64,iVBORw0KGgo=', takenAt: '2026-07-01T00:00:00Z' });
+        const saved = []; window.saveFile = async (n, d) => { saved.push([n, d]); return true; };
+        runAct('save-bh'); await w(400);
+        want(saved.length === 1 && saved[0][0] === fileSlug(src.name) + '.bh', 'Save borehole writes <name>.bh: ' + saved.map(s => s[0]));
+        const text = saved[0] ? await saved[0][1].text() : '{}', data = JSON.parse(text);
+        want(data.kind === 'borehole' && data.borehole?.name === src.name && data.borehole.layers.length === src.layers.length && data.photos?.some(p => p.id === 'ph-bhf'), 'the file holds the whole borehole and its photos');
+        const other = sortedList().find(b => projKey(b) !== projKey(src)); S.sel = other.id; const n0 = projList().length;
+        await importBorehole(new File([text], src.name + '.bh')); await w(200);
+        const got = projList().find(b => b.name === src.name);
+        want(projList().length === n0 + 1 && got && got.id !== src.id, 'imported into the open project as its own borehole: ' + [projList().length, n0, got?.id === src.id]);
+        want(got && got.project === other.project && got.projNo === other.projNo && got.client === other.client, 'it takes the open project: ' + [got?.project, other.project]);
+        want(got && got.layers.length === src.layers.length && got.samples.length === src.samples.length && got.water.length === src.water.length, 'with all its layers, samples and water levels');
+        want((await photosFor(new Set([got?.id]))).some(p => p.caption === 'core box'), 'and its photos');
+        want(S.bh.get(src.id)?.project === src.project, 'the original stays in its own project');
+        S.sel = src.id; window.confirm = () => false; const n1 = projList().length;
+        await importBorehole(new File([text], src.name + '.bh')); await w(150);
+        want(projList().length === n1 + 1 && projList().some(b => b.name === src.name + ' (copy)'), 'into its own project, kept as a copy when not replacing');
+        window.confirm = () => true; src.notes = 'changed here'; const n2 = projList().length;
+        await importBorehole(new File([text], src.name + '.bh')); await w(150);
+        want(projList().length === n2 && S.bh.get(src.id).notes !== 'changed here', 'or replaces it when asked');
+        const n3 = projList().length; await importBorehole(new File(['{"app":"other"}'], 'x.bh')); want(projList().length === n3, 'a file that is not a borehole is refused');
+        window.confirm = () => false; const n4 = projList().length; await restore(new File([text], 'opened.bh')); await w(150); want(projList().length === n4 + 1, 'opening a .bh file (double-click) imports it the same way');
+        want(MENUS.some(m => m[1].some(i => i[1] === 'save-bh')) && MENUS.some(m => m[1].some(i => i[1] === 'imp-bh')), 'Save borehole and Import borehole are in the menus');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      window.saveFile = keepSave; window.confirm = keepConfirm; return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('saved data moves from local storage to IndexedDB and survives a restart', async (run, load) => {
     await run(`localStorage.setItem('bhlog.local', JSON.stringify([{ ...blankBorehole('OLD-01'), id: 'old1' }])); localStorage.setItem('bhlog.company', JSON.stringify({ name: 'Old Firm' })); 1`);
     await load();

@@ -12,10 +12,11 @@ import { fileGuard } from './guard.mjs';
 const isMac = process.platform === 'darwin';
 // tests run in their own profile, beside a copy already open
 if (process.env.BOREHOLE_USER_DATA) app.setPath('userData', process.env.BOREHOLE_USER_DATA);
-const PROJECT_EXT = ['bhp', 'bhlog', 'json'];
+const PROJECT_EXT = ['bhp', 'bhlog', 'bh', 'json'];
 const FILTERS: Record<string, Electron.FileFilter[]> = {
   bhp: [{ name: 'Borehole project', extensions: ['bhp'] }],
   bhlog: [{ name: 'Borehole workspace', extensions: ['bhlog'] }],
+  bh: [{ name: 'Borehole', extensions: ['bh'] }],
   pdf: [{ name: 'PDF', extensions: ['pdf'] }],
   xlsx: [{ name: 'Excel workbook', extensions: ['xlsx'] }],
 };
@@ -112,7 +113,7 @@ ipcMain.handle('update:open', async e => { if (e.sender === win?.webContents) aw
 
 ipcMain.handle('file:open', async e => {
   if (e.sender !== win?.webContents) return null;
-  const r = await dialog.showOpenDialog(win!, { properties: ['openFile'], filters: [{ name: 'Borehole project or workspace', extensions: PROJECT_EXT }] });
+  const r = await dialog.showOpenDialog(win!, { properties: ['openFile'], filters: [{ name: 'Borehole project, workspace or borehole', extensions: PROJECT_EXT }] });
   if (r.canceled || !r.filePaths[0]) return null;
   const path = r.filePaths[0];
   remember(path); app.addRecentDocument(path);
