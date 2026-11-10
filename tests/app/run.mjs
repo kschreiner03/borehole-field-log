@@ -93,6 +93,67 @@ app.whenReady().then(async () => {
     expect(!fired.length, 'script ran from fields: ' + fired.join(', '));
   });
 
+  await check('text from a project file never runs as code: soil survey, map shapes, samples and layers', async run => {
+    const fired = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), P = n => '"><img src=x onerror="window.__xss=(window.__xss||[]).concat(\\'' + n + '\\')">';
+      window.__xss = [];
+      const b = blankBorehole('BH-X'); b.project = 'XSS test'; Object.assign(b, { easting: 500000, northing: 5900000, crs: 'UTM NAD83(CSRS) Zone 12' });
+      b.layers = [{ ...newLayer(0), bottom: 0.05, uscs: 'TOP', mods: P('mods'), pg: P('pg'), note: P('note') }, { ...newLayer(0.05), top: 0.05, bottom: 2, uscs: 'CL', sub: true, colour: P('colour2'), note: P('subnote') }];
+      b.samples = [{ depth: 1, type: 'J', name: P('sname'), purpose: P('purpose'), method: P('smethod'), cvc: 40, lel: 3 }];
+      const sp = { id: 'sp1', name: P('spname'), e: 500010, n: 5900010, z: null, notes: P('spnotes'), order: P('order'), gg: P('gg'), sub: P('sub'),
+        samples: [{ id: 'ss1', name: P('ssname'), from: 0, to: .15, method: P('ssmethod'), hz: P('hz'), texture: P('tex'), colour: P('sscol'), notes: P('ssnotes'), sand: 40, silt: 40, clay: 20, lab: { ec: { v: 1 }, [P('labk')]: { v: 2 } }, gsd: [] }] };
+      const site = { features: [{ id: 'f1', name: P('feat'), type: 'point', kind: 'other', pts: [[500005, 5900005]] }],
+        soil: { survey: { name: P('survey'), date: P('sdate'), strategy: P('strategy'), notes: P('snotes'), issued: false }, points: [sp, { ...sp, id: 'sp2', name: P('sp2'), e: 500060, n: 5900040 }, { ...sp, id: 'sp3', e: 500020, n: 5900080 }] } };
+      await restore(new File([JSON.stringify({ app: 'borehole-field-log', kind: 'project', version: 4, project: 'XSS test', company: S.co, site, boreholes: [b] })], 'x.bhp')); await w(300);
+      S.layer = 0; for (const t of ['home', 'site', 'soil', 'table', 'reports', 'compose', 'log', 'edit']) { goTab(t); await w(120); if (t === 'edit') for (const d of ['details', 'soil', 'samples']) { S.dtab = d; renderView(true); await w(80); } }
+      goTab('soil'); await w(150); try { soilSelect?.('sp1'); } catch {} await w(150);
+      goTab('site'); await w(150); if (!S.mapEdit) mapAct('map-edit'); S.mapSel = 'f1'; refreshMapEd(); await w(100); S.mapTool = 'place'; S.mapSel = null; refreshMapEd(); await w(100); mapAct('map-edit');
+      await w(300); return window.__xss || [];
+    })()`);
+    expect(!fired.length, 'script ran from fields: ' + fired.join(', '));
+  });
+  await check('security: only the app’s own code runs, and the page talks only to the map servers', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, seen = [];
+      document.addEventListener('securitypolicyviolation', e => seen.push(e.violatedDirective + ' ' + (e.blockedURI || '')));
+      try {
+        const csp = document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content || '';
+        const dir = k => (csp.split(';').map(x => x.trim()).find(x => x.startsWith(k + ' ')) || '');
+        want(csp && !/unsafe-inline|unsafe-eval/.test(dir('script-src')) && /object-src 'none'/.test(csp) && /base-uri 'none'/.test(csp), 'a strict policy is set: ' + csp.slice(0, 200));
+        const host = document.createElement('div'); host.innerHTML = '<img src="x" onerror="window.__cspx=1"><svg><image href="x" onerror="window.__cspx=2"></image></svg>'; document.body.append(host); await w(300); host.remove();
+        want(!window.__cspx, 'an injected handler is refused even without escaping');
+        let sent = false; try { await fetch('https://example.com/?d=1'); sent = true; } catch {} want(!sent, 'the page cannot send to an unknown server'); await w(300);
+        want(seen.some(v => v.startsWith('connect-src') && v.includes('example.com')), 'and the policy is what stopped it: ' + seen.join(' | '));
+        const before = seen.length;
+        loadDlExample(); await w(300); window.saveFile = async () => true;
+        for (const t of ['home', 'site', 'soil', 'table', 'gw', 'reports', 'compose', 'log', 'edit', 'report', 'v3d']) { try { goTab(t); } catch {} await w(150); }
+        XLSX.read(XLSX.write(XLSX.utils.book_new_with ? XLSX.utils.book_new() : (() => { const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['a', 1]]), 'S'); return wb; })(), { type: 'array', bookType: 'xlsx' }));
+        S.sel = sortedList()[0].id; goTab('log'); await pdfLogs([cur()]); await w(500);
+        const pdfBytes = new jspdf.jsPDF().output('arraybuffer'), doc = await pdfjsLib.getDocument({ data: new Uint8Array(pdfBytes), isEvalSupported: false }).promise; await doc.getPage(1); doc.destroy();
+        await loadScript('lib/geotiff.js');
+        await w(300);
+        want(seen.length === before, 'the app’s own features break no rule: ' + seen.slice(before).join(' | '));
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('security: PDFs added to a report are read with font code turned off (CVE-2024-4367)', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, opts = [], lib = window.pdfjsLib;
+      try {
+        window.pdfjsLib = new Proxy(lib, { get: (t, k) => k === 'getDocument' ? (o => { opts.push(o); return t.getDocument(o); }) : t[k] });
+        loadDlExample(); await w(300); goTab('compose'); await w(200);
+        const bytes = new jspdf.jsPDF().output('arraybuffer');
+        await importReportFiles([new File([bytes], 'appendix.pdf', { type: 'application/pdf' })]); await w(800);
+        want(opts.length >= 1, 'a PDF was opened: ' + opts.length);
+        want(opts.every(o => o.isEvalSupported === false), 'every PDF is opened with isEvalSupported off: ' + JSON.stringify(opts.map(o => o.isEvalSupported)));
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      window.pdfjsLib = lib;
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('saved data moves from local storage to IndexedDB and survives a restart', async (run, load) => {
     await run(`localStorage.setItem('bhlog.local', JSON.stringify([{ ...blankBorehole('OLD-01'), id: 'old1' }])); localStorage.setItem('bhlog.company', JSON.stringify({ name: 'Old Firm' })); 1`);
     await load();
