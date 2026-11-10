@@ -70,6 +70,19 @@ To publish an update, with `main` the same as on GitHub and nothing uncommitted:
 
 Until both are on the release, only people on the platform already there are told about the update. Add `--dry` to see what it would do. It needs the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`) on each computer. Run `npm run test:app` before releasing; the release runs only the quick tests.
 
+## Security
+
+What protects people who open files from others (projects, spreadsheets, PDFs, map files) and the computers the app runs on:
+
+- **The window can't touch the computer.** It runs sandboxed with context isolation; its only bridge (`src/preload`) is a short list of calls, each checked to come from the app's own window. It never loads outside pages, and web links open in the person's browser.
+- **Only the app's own code runs.** `scripts/sync-legacy.mjs` writes a content security policy into the page: scripts only from `lib/` and the app's inline scripts by their SHA-256, no `eval`, and network access only to the two map tile servers. Text from files is escaped as well, and the tests open booby-trapped projects to prove nothing runs.
+- **Files.** The shell writes without a dialog only to project files the person opened or saved through it (`src/main/guard.mjs`); everything else goes through the save dialog. MODFLOW runs in a temporary folder with plain file names only. PDFs are read with pdf.js font code turned off (CVE-2024-4367).
+- **Permissions.** Camera, microphone, location, notifications and the like are refused; no embedded web views.
+- **The packaged app** has Electron's fuses set (`electronFuses` in `package.json`): it can't be run as plain Node, ignores `NODE_OPTIONS` and debugger switches, and only loads its own checked `app.asar`.
+- **Updates** are never installed by the app; the download page gives each installer's SHA-256. The Mac app is signed and notarized. Keep two-factor sign-in on the GitHub account, since releases come from it.
+
+Known: SheetJS (`lib/xlsx.full.min.js`) is 0.18.5, which has two published flaws with crafted workbooks (CVE-2023-30533, CVE-2024-22363); upgrade to 0.20.3 from https://cdn.sheetjs.com. `npm audit` reports moderate issues in the build tools only (nothing that ships).
+
 ## Soil survey
 
 The Soil page holds surface soil surveys, separate from boreholes: points with any number of depth samples, CSSC classification, particle size and lab results, entered in a grid, pasted from Excel, or imported (the survey CSV and lab files both work). A project can hold a survey with no boreholes at all.

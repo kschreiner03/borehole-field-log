@@ -1,9 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell, type MenuItemConstructorOptions } from 'electron';
+import { readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { mf6Binary, runMf6 } from './mf6run.mjs';
 import { clearCreds, fetchSnapshot, loadCreds, saveCreds } from './applemaps.mjs';
 import { checkForUpdate, HUB } from './updates.mjs';
+import { fileGuard } from './guard.mjs';
 
 /* The desktop shell. The current interface ("classic") runs from resources/legacy; the React interface is being
    built alongside it and opens from View > New interface (preview). Project files are ordinary files on disk. */
@@ -18,6 +20,11 @@ const FILTERS: Record<string, Electron.FileFilter[]> = {
   xlsx: [{ name: 'Excel workbook', extensions: ['xlsx'] }],
 };
 let win: BrowserWindow | null = null;
+// project files the person opened or saved through the shell: the only ones written without a dialog. The list is the shell's own,
+// in its profile folder, so the window cannot add to it; it survives restarts so a linked project keeps saving in place
+const knownFile = () => join(app.getPath('userData'), 'project-files.json');
+const files = fileGuard(process.platform, (() => { try { return JSON.parse(readFileSync(knownFile(), 'utf8')); } catch { return []; } })());
+const remember = (path: string) => { if (files.remember(path)) writeFile(knownFile(), JSON.stringify(files.list())).catch(() => undefined); };
 let rendererReady = false;
 let quitting = false;
 const queued: string[] = [];   // project files opened from the OS before the window was ready
@@ -61,16 +68,17 @@ function createWindow(view: 'classic' | 'preview' = 'classic') {
 async function sendFile(path: string) {
   if (!PROJECT_EXT.includes(extname(path).slice(1).toLowerCase())) return;
   if (!win || !rendererReady) { queued.push(path); return; }
-  try { win.webContents.send('open-file', { path, name: basename(path), text: await readFile(path, 'utf8') }); app.addRecentDocument(path); }
+  try { win.webContents.send('open-file', { path, name: basename(path), text: await readFile(path, 'utf8') }); remember(path); app.addRecentDocument(path); }
   catch (e) { dialog.showErrorBox('Could not open the file', `${path}\n\n${(e as Error).message}`); }
 }
 
 ipcMain.on('renderer-ready', () => { rendererReady = true; for (const p of queued.splice(0)) sendFile(p); });
 
 /* save: write to the remembered path, or ask where (Save as, or the first save) */
-ipcMain.handle('file:save', async (_e, o: { name: string; data: ArrayBuffer; path?: string | null; saveAs?: boolean }) => {
-  // writing without asking is only for a linked project file; anything else goes through the dialog
-  let path = !o.saveAs && o.path && /\.(bhp|bhlog)$/i.test(o.path) ? o.path : null;
+ipcMain.handle('file:save', async (e, o: { name: string; data: ArrayBuffer; path?: string | null; saveAs?: boolean }) => {
+  if (e.sender !== win?.webContents) return null;
+  // writing without asking is only for a project file the person opened or saved here; anything else goes through the dialog
+  let path = !o.saveAs && files.canWrite(o.path) ? o.path! : null;
   if (!path) {
     const ext = extname(o.name).slice(1).toLowerCase();
     const r = await dialog.showSaveDialog(win!, { defaultPath: o.name, filters: FILTERS[ext] || [{ name: 'All files', extensions: ['*'] }] });
@@ -78,6 +86,7 @@ ipcMain.handle('file:save', async (_e, o: { name: string; data: ArrayBuffer; pat
     path = r.filePath;
   }
   await writeFile(path, Buffer.from(o.data));
+  remember(path);
   if (/\.(bhp|bhlog)$/i.test(path)) app.addRecentDocument(path);
   return { path, name: basename(path) };
 });
@@ -101,11 +110,12 @@ ipcMain.handle('apple:snapshot', async (e, q) => {
 ipcMain.handle('update:check', async e => e.sender !== win?.webContents ? { ok: false, error: 'Not allowed.' } : checkForUpdate({ current: app.getVersion(), platform: process.platform }));
 ipcMain.handle('update:open', async e => { if (e.sender === win?.webContents) await shell.openExternal(HUB); });
 
-ipcMain.handle('file:open', async () => {
+ipcMain.handle('file:open', async e => {
+  if (e.sender !== win?.webContents) return null;
   const r = await dialog.showOpenDialog(win!, { properties: ['openFile'], filters: [{ name: 'Borehole project or workspace', extensions: PROJECT_EXT }] });
   if (r.canceled || !r.filePaths[0]) return null;
   const path = r.filePaths[0];
-  app.addRecentDocument(path);
+  remember(path); app.addRecentDocument(path);
   return { path, name: basename(path), text: await readFile(path, 'utf8') };
 });
 
@@ -144,12 +154,22 @@ function buildMenu(model: MenuModel = DEFAULT_MENU) {
 }
 ipcMain.on('menu:set', (e, model: unknown) => { if (e.sender === win?.webContents && isModel(model)) buildMenu(model); });
 
+/* any page the app ever opens: no embedded web views, and new windows go to the person's browser (web links only) */
+app.on('web-contents-created', (_e, wc) => {
+  wc.on('will-attach-webview', ev => ev.preventDefault());
+  wc.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
+});
+
 /* one copy of the app: a second launch (double-clicking another project) opens the file in the running window */
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', (_e, argv) => { const f = argv.find(a => PROJECT_EXT.some(x => a.toLowerCase().endsWith('.' + x))); if (f) sendFile(f); win?.isMinimized() && win.restore(); win?.focus(); });
   app.on('open-file', (e, path) => { e.preventDefault(); sendFile(path); });   // macOS: double-click or drop on the Dock icon
   app.whenReady().then(() => {
+    // the window asks for nothing beyond copying to the clipboard and full screen: camera, microphone, location, notifications… are refused
+    const allowed = new Set(['clipboard-sanitized-write', 'fullscreen']);
+    session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(allowed.has(perm)));
+    session.defaultSession.setPermissionCheckHandler((_wc, perm) => allowed.has(perm));
     buildMenu();
     createWindow(process.env.BOREHOLE_VIEW === 'preview' ? 'preview' : 'classic');
     const f = process.argv.slice(1).find(a => PROJECT_EXT.some(x => a.toLowerCase().endsWith('.' + x))); if (f) sendFile(f);

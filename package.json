@@ -22,6 +22,14 @@
   },
   "build": {
     "appId": "ca.boreholefieldlog.app",
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
     "productName": "Borehole Field Log",
     "directories": {
       "output": "dist",

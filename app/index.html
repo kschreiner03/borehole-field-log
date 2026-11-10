@@ -9316,12 +9316,14 @@ const REPORT_FILE_MAX = 15e6;   // the online project keeps each file as one dat
 const RFILES = new Map();
 const dataUrlBytes = u => Uint8Array.from(atob(u.slice(u.indexOf(',') + 1)), c => c.charCodeAt(0));
 const bytesDataUrl = (bytes, type) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(new Blob([bytes], { type })); });
+/* PDFs are read with pdf.js's font code generation off: a crafted PDF could otherwise run code (CVE-2024-4367) */
+const openPdf = data => pdfjsLib.getDocument({ data, isEvalSupported: false });
 async function reportFile(id) {
   if (!RFILES.has(id)) RFILES.set(id, (async () => {
     const rec = (await photoStore.all(REPORT_FILE_KEY(projKey(projList()[0])))).find(x => x.id === id) || (await photoStore.all()).find(x => x.id === id);
     if (!rec) throw new Error('The imported file is missing.');
     const bytes = dataUrlBytes(rec.data);
-    return { bytes, rec, doc: await pdfjsLib.getDocument({ data: bytes.slice() }).promise };
+    return { bytes, rec, doc: await openPdf(bytes.slice()).promise };
   })().catch(e => { RFILES.delete(id); throw e; }));
   return RFILES.get(id);
 }
@@ -9368,7 +9370,7 @@ async function importReportFiles(files, at = S.cpage) {
     if (/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name)) {
       const bytes = new Uint8Array(await file.arrayBuffer());
       let n = 0;
-      try { const d = await pdfjsLib.getDocument({ data: bytes.slice() }).promise; n = d.numPages; d.destroy(); } catch { toast(`${file.name} could not be opened. It may be damaged or password-protected.`); continue; }
+      try { const d = await openPdf(bytes.slice()).promise; n = d.numPages; d.destroy(); } catch { toast(`${file.name} could not be opened. It may be damaged or password-protected.`); continue; }
       /* the export copies pages with pdf-lib, which cannot decrypt: a secured file (even one that opens without a password) would come out blank */
       try { await PDFLib.PDFDocument.load(bytes); } catch (e) { toast(/encrypt/i.test(`${e?.name} ${e?.message}`) ? `${file.name} is secured, so its pages cannot be copied into the report. Save an unsecured copy (for example with Print to PDF) and add that.` : `${file.name} could not be read for the report. Save a fresh copy (for example with Print to PDF) and add that.`); continue; }
       if (S.mode === 'db' && bytes.length > REPORT_FILE_MAX) { toast(`${file.name} is larger than ${REPORT_FILE_MAX / 1e6} MB, too big for the shared online project. Add it in the desktop or offline app, or split it.`); continue; }
