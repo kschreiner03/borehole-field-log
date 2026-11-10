@@ -308,6 +308,35 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('log layout: samples as symbols, icons or type codes, on the PDF, the screen log and the key', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, keep = S.co.layout;
+      try {
+        loadDlExample(); await w(300); const b = cur();
+        b.samples = ['SS', 'ST', 'C', 'J', 'B', 'G', 'A'].map((t, i) => ({ id: 'sm' + i, no: i + 1, depth: 0.5 + i * 0.7, type: t, name: '', b1: t === 'SS' ? 3 : null, b2: t === 'SS' ? 4 : null, b3: t === 'SS' ? 5 : null, note: '', lab: {}, labMeta: {}, gsd: [] }));
+        normalize(b);
+        want(LAYOUT.smp && Object.keys(LAYOUT.smp.opts).join() === 'symbols,icons,codes', 'a Samples choice with symbols, icons and type codes');
+        goTab('report'); await w(300);
+        want(document.querySelector('[data-lay="smp:icons"]'), 'the Page layout panel offers it');
+        const page = () => Array.from({ length: pageCount(b) }, (_, i) => pageSVG(b, i, pageCount(b))).join('');
+        const marks = (svg, style) => new Set([...svg.matchAll(new RegExp('data-smp="' + style + '-([A-Z]+)"', 'g'))].map(m => m[1]));
+        for (const style of ['symbols', 'icons', 'codes']) {
+          S.co.layout = { ...(keep || {}), smp: style };
+          for (const [what, svg] of [['PDF', page()], ['screen log', logSVG(b, 1100)]]) {
+            const got = marks(svg, style);
+            want(['SS', 'ST', 'C', 'J', 'B', 'G', 'A'].every(t => got.has(t)), what + ' ' + style + ': every sample type drawn that way: ' + [...got]);
+            want(!['symbols', 'icons', 'codes'].filter(x => x !== style).some(x => marks(svg, x).size), what + ' ' + style + ': and no other way');
+          }
+        }
+        S.co.layout = { ...(keep || {}), smp: 'codes' }; const txt = page().replace(/<title>[\\s\\S]*?<\\/title>/g, '');
+        want(['SS', 'ST', 'J', 'B'].every(c => txt.includes('>' + c + '<')), 'type codes are readable letters on the log');
+        document.querySelector('[data-lay="smp:icons"]')?.click(); await w(200);
+        want(S.co.layout?.smp === 'icons', 'choosing it is saved with the company layout: ' + S.co.layout?.smp);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      S.co.layout = keep; return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('saved data moves from local storage to IndexedDB and survives a restart', async (run, load) => {
     await run(`localStorage.setItem('bhlog.local', JSON.stringify([{ ...blankBorehole('OLD-01'), id: 'old1' }])); localStorage.setItem('bhlog.company', JSON.stringify({ name: 'Old Firm' })); 1`);
     await load();
