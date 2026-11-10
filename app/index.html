@@ -3536,7 +3536,28 @@ const vapSwatch = (x, y, w, h, sc = 1) => { const t = lay('vplot'), m = y + h / 
 const VX = (c, v, pad = 7) => c.x + pad + Math.log10(Math.max(1, Math.min(v, 1e4))) / 4 * (c.w - 2 * pad);
 /* sample type graphic in the sample column: SS split spoon open box with diagonal, ST tube solid, C core with centre line, J jar a filled lid,
    B bag a tie (cross), G grab a dot, A auger cuttings an open box; very short samples a small hatched square */
+/* sample marks in the chosen style (Page layout › Samples): standard symbols, small pictures, or the type code in a tag */
+const SMP_ICON = {   // on a 10 × 10 grid
+  SS: '<rect x="3.5" y=".5" width="3" height="8" rx=".5" class="f"/><path d="M5 .5V8.5M3.5 8.5 5 10l1.5-1.5"/>',
+  ST: '<rect x="3.5" y=".5" width="3" height="9" rx=".5" class="k"/><path d="M2.8 .5h4.4"/>',
+  C: '<path d="M2 2v6a3 1.2 0 0 0 6 0V2" class="f"/><ellipse cx="5" cy="2" rx="3" ry="1.2" class="f"/>',
+  J: '<rect x="2.5" y=".7" width="5" height="1.7" rx=".4" class="k"/><rect x="2" y="2.6" width="6" height="6.9" rx="1.2" class="f"/>',
+  B: '<path d="M3.6 2.2h2.8L8 9a.6.6 0 0 1-.6.6H2.6A.6.6 0 0 1 2 9z" class="f"/><path d="M3.8.6 5 2.2 6.2.6"/>',
+  G: '<path d="M5 9.6 2.4 5.2Q5 3.6 7.6 5.2z" class="f"/><path d="M5 4.4V.4"/>',
+  A: '<path d="M5 .4v9.2M2.6 1.8l4.8 1.4M2.6 4.4l4.8 1.4M2.6 7l4.8 1.4"/>',
+};
 function sampleGlyph(x, w, y0, y1, type, sc = 1) {
+  const style = lay('smp'), wrap = body => `<g data-smp="${style}-${type}">${body}</g>`;
+  if (style === 'symbols') return wrap(sampleSymbol(x, w, y0, y1, type, sc));
+  const m = (y0 + y1) / 2, ink = 'style="stroke:var(--ink)"', span = y1 - y0 > 9 * sc ? `<path d="M${x + 1.5 * sc} ${y0}v${y1 - y0}M${x + 1.5 * sc} ${y0}h${2 * sc}M${x + 1.5 * sc} ${y1}h${2 * sc}" fill="none" ${ink} stroke-width="${.6 * sc}"/>` : '';
+  if (style === 'codes') {
+    const fs = 10 * sc, tw = Math.min(w - 2 * sc, (type.length * .62 + .7) * fs), th = fs * 1.25;
+    return wrap(`${span}<rect x="${(x + w / 2 - tw / 2).toFixed(2)}" y="${(m - th / 2).toFixed(2)}" width="${tw.toFixed(2)}" height="${th.toFixed(2)}" rx="${1.5 * sc}" style="fill:#fff;stroke:var(--ink)" stroke-width="${.7 * sc}"/><text x="${(x + w / 2).toFixed(2)}" y="${(m + fs * .36).toFixed(2)}" text-anchor="middle" style="font:700 ${fs.toFixed(2)}px Arial,Helvetica,sans-serif;fill:var(--ink)">${esc(type)}</text>`);
+  }
+  const z = Math.min(w - 4 * sc, 20 * sc), k = z / 10;
+  return wrap(`${span}<g transform="translate(${(x + w / 2 - z / 2).toFixed(2)} ${(m - z / 2).toFixed(2)}) scale(${k.toFixed(3)})" style="fill:none;stroke:var(--ink)" stroke-width="${(.75 * sc / k).toFixed(3)}" stroke-linejoin="round" stroke-linecap="round">${(SMP_ICON[type] || '<circle cx="5" cy="5" r="3" class="f"/>').replace(/class="f"/g, 'style="fill:#fff"').replace(/class="k"/g, 'style="fill:var(--ink)"')}</g>`);
+}
+function sampleSymbol(x, w, y0, y1, type, sc = 1) {
   // a sample at a single depth: jar, bag and grab keep their own marking in a small square, the others a square with a diagonal
   if (y1 - y0 < 4 * sc && ['J', 'B', 'G'].includes(type)) { const m = (y0 + y1) / 2, h = 7 * sc; x += w / 2 - h / 2 - 3 * sc; w = h + 6 * sc; y0 = m - h / 2; y1 = m + h / 2; }
   else if (y1 - y0 < 4 * sc) { const m = (y0 + y1) / 2, h = 7 * sc; return `<rect x="${x + w / 2 - h / 2}" y="${m - h / 2}" width="${h}" height="${h}" style="fill:#fff;stroke:var(--ink)" stroke-width="${.8 * sc}"/><path d="M${x + w / 2 - h / 2} ${m + h / 2}l${h} ${-h}" style="stroke:var(--ink)" stroke-width="${.7 * sc}"/>`; }
@@ -7842,6 +7863,7 @@ const LAYOUT = {
   sym: { label: 'Borehole column', opts: { narrow: ['Narrow', 40], normal: ['Normal', 52], wide: ['Wide', 72] }, tip: 'Width of the soil symbol column; the standpipe is a little narrower' },
   graph: { label: 'Graphs', opts: { narrow: ['Narrow', 48], normal: ['Normal', 60], wide: ['Wide', 80] }, tip: 'Width of each test graph (SPT N, shear strength, water content, VOC)' },
   nplot: { label: 'SPT N graph', def: 'line', opts: { line: ['Line', 'line'], points: ['Points', 'points'], bars: ['Bars', 'bars'], step: ['Steps', 'step'] }, tip: 'How SPT N values are drawn' },
+  smp: { label: 'Samples', def: 'symbols', opts: { symbols: ['Symbols', 'symbols'], icons: ['Icons', 'icons'], codes: ['Type codes', 'codes'] }, tip: 'How sample types are drawn on the log and in the key: standard symbols, small pictures (tube, jar, bag…), or the type code' },
   vplot: { label: 'VOC graph', def: 'line', opts: { line: ['Line', 'line'], bars: ['Bars', 'bars'], points: ['Points', 'points'], area: ['Area', 'area'] }, tip: 'How VOC (headspace) readings are drawn (log scale)' },
   lplot: { label: 'Lab graph', def: 'bars', opts: { bars: ['Bars', 'bars'], points: ['Points', 'points'], line: ['Line', 'line'] }, tip: 'How the chosen lab result is drawn (log scale, guideline dashed)' },
   well: { label: 'Standpipe', def: 'left', opts: { left: ['Beside soil column', 0], right: ['Before the graphs', 1] }, tip: 'Where the standpipe or well diagram sits on the log' },
@@ -7908,7 +7930,7 @@ function pageSVG(b, pi, pn) {
   // columns
   const cols = []; let x = M;
   const add = (k, w, h1, h2 = '') => { cols.push({ k, x, w, h1, h2 }); x += w; };
-  const RC = [on('obs') && ['ob', pdfW('obs'), 'Observations'], ['sid', Math.round(Math.min(60, Math.max(32, longestId(b) * 4.1 + 6))), (b.samples || []).some(s => s.name) ? 'Sample' : 'No.'], ['sty', 14, ''], on('blows') && ['blows', pdfW('blows'), 'Blows/', S.units === 'ft' ? '6 in' : '150 mm'], on('n') && ['n', pdfW('n'), 'N'],
+  const RC = [on('obs') && ['ob', pdfW('obs'), 'Observations'], ['sid', Math.round(Math.min(60, Math.max(32, longestId(b) * 4.1 + 6))), (b.samples || []).some(s => s.name) ? 'Sample' : 'No.'], ['sty', lay('smp') === 'symbols' ? 14 : 20, ''], on('blows') && ['blows', pdfW('blows'), 'Blows/', S.units === 'ft' ? '6 in' : '150 mm'], on('n') && ['n', pdfW('n'), 'N'],
     on('nplot') && ['np', pdfW('nplot'), 'SPT N'], on('su') && ['sp', pdfW('su'), 'Su (kPa)'], on('w') && ['ap', pdfW('w'), 'w (%)'], on('cvc') && ['vp', pdfW('cvc'), 'VOC (ppm)'], on('lab') && labGraphParam() && ['lp', pdfW('lab'), LAB_PARAMS[labGraphParam()].label.replace(/ \(.*\)$/, '').slice(0, 14), LAB_PARAMS[labGraphParam()].unit || ''], ...graphsOf().map((g, i) => ['gx' + i, lay('graph'), graphSeries()[g.series][0].replace(/ \(.*\)$/, '').slice(0, 14), graphSeries()[g.series][1]]), on('so4') && ['so4', pdfW('so4'), 'SO4', '%'], on('water') && ['gw', pdfW('water'), 'Level']].filter(Boolean);
   // soil column up to 52 px and standpipe a little narrower, never squeezing the description under 170 px
   const elevW = b.elevation != null && on('elev') ? 48 : 0, avail = X1 - M - 38 - elevW - RC.reduce((a, c) => a + c[1], 0);
