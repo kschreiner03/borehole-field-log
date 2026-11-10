@@ -1394,7 +1394,8 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
 <input type="file" id="img-file" accept=".tif,.tiff,.png,.jpg,.jpeg,.jgw,.pgw,.tfw,.wld,.jpw" multiple hidden>
 <input type="file" id="cmp-img-file" accept="image/*" hidden>
 <input type="file" id="rep-file" accept=".pdf,application/pdf,image/*" multiple hidden>
-<input type="file" id="restore-file" accept=".bhp,.bhlog,.json,application/json" hidden>
+<input type="file" id="restore-file" accept=".bhp,.bhlog,.bh,.json,application/json" hidden>
+<input type="file" id="bh-file" accept=".bh,application/json" multiple hidden>
 <aside class="drawer edit" id="drawer" hidden aria-label="Edit"></aside>
 <div class="find" id="find" hidden></div>
 <div class="ql" id="qlog" hidden></div>
@@ -2811,6 +2812,7 @@ function drawerHTML(b) {
       <div class="actions"><button class="btn" data-act="drawer-layer-below">Add layer below</button><button class="btn danger" data-act="drawer-del" data-what="layers">Delete layer</button></div></div>`;
   }
   if (d.kind === 'sample') { const sm = b.samples[i]; if (!sm) return ''; return head(`Sample ${esc(sampleId(sm))}`, `at ${fu(sm.depth)}`) + `<div class="dbody">${sampleFormHTML(b, i, false)}</div>`; }
+  if (d.kind === 'obs') { const ev = b.events?.[i]; if (!ev) return ''; return head('Observation', obsLayer(b, ev) ? layerName(obsLayer(b, ev)) : obsDepth(ev)) + `<div class="dbody">${obsFormHTML(b, i)}</div>`; }
   if (d.kind === 'water') { const w = b.water[i]; if (!w) return ''; return head('Water level', w.ref === 'toc' && w.depth != null ? `${fu(w.depth)} below ground` : '') + `<div class="dbody">${waterFormHTML(b, i)}</div>`; }
   if (d.kind === 'well') {
     const w = b.well;
@@ -2842,7 +2844,7 @@ document.addEventListener('click', e => {
   const depth = Math.max(0, snapD((((e.clientY - r.top) / sc) - +svg.dataset.t) / +svg.dataset.k));
   const ed = z.dataset.ed, i = z.dataset.i != null ? +z.dataset.i : null;
   if (ed === 'layer' && z.dataset.desc != null) { openDrawer('layer', i); ltInline(i); return; }
-  if (ed === 'layer' || ed === 'sample' || ed === 'water') { openDrawer(ed, i); return; }
+  if (ed === 'layer' || ed === 'sample' || ed === 'water' || ed === 'obs') { openDrawer(ed, i); return; }
   if (ed === 'well') { if (!b.well.installed) { b.well.installed = true; b.well.type ||= 'standpipe'; store.save(b); redrawLog(); } openDrawer('well'); return; }
   if (ed === 'add-layer') {
     const top = Math.max(0, ...b.layers.map(l => l.bottom ?? 0));
@@ -2854,6 +2856,9 @@ document.addEventListener('click', e => {
     const s2 = { id: uid('s'), no: Math.max(0, ...b.samples.map(x => x.no || 0)) + 1, depth, type: 'SS', b1: null, b2: null, b3: null, n: null, rec: null, rqd: null, w: null, pl: null, ll: null, pp: null, su: null, so4: null, cvc: null, gsd: [], gravel: null, sand: null, silt: null, clay: null, note: '' };
     b.samples.push(s2); b.samples.sort((a, c) => (a.depth ?? 0) - (c.depth ?? 0));
     logChange(b, 'Samples & SPT'); store.save(b); redrawLog(); openDrawer('sample', b.samples.indexOf(s2)); toast(`Sample added at ${fu(depth)}.`);
+  } else if (ed === 'add-obs') {
+    const ev = { id: uid('e'), time: new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 16), depth, to: null, kind: '', level: '', text: '' };
+    b.events.push(ev); b.events.sort((a, c) => (a.depth ?? -1) - (c.depth ?? -1)); logChange(b, 'Drilling notes'); store.save(b); redrawLog(); openDrawer('obs', b.events.indexOf(ev)); toast(`Observation added at ${fu(depth)}. Choose what was seen in the panel.`);
   } else if (ed === 'add-water') {
     const w = { id: uid('w'), date: today(), measured: depth, depth, ref: 'gs', kind: 'strike' };
     b.water.push(w); b.gwNone = false; logChange(b, 'Groundwater'); store.save(b); redrawLog(); openDrawer('water', b.water.indexOf(w)); toast(`Water level added at ${fu(depth)}.`);
@@ -3793,7 +3798,8 @@ function logSVG(b, W) {
     out.push(`<text class="sub" x="${cDs.x}" y="${y(eoh) + 16}">END OF BOREHOLE at ${fu(eoh)}${b.termination ? ' (' + esc(b.termination.toLowerCase()) + ')' : ''}</text>`);
     extra = Math.max(extra, y(eoh) + 24 - (T + H));
   } else out.push(`<text class="sub" x="${cDs.x}" y="${T + 24}">No layers yet. Add them on the Edit tab.</text>`);
-  // observations: listed inside the band of the layer they belong to
+  // observations: listed inside the band of the layer they belong to, or at their own depth; obsHits are their click areas
+  const obsHits = [];
   if (cOb.w) {
     const { groups, loose } = obsByLayer(b), cpl = Math.floor((cOb.w - 16) / 6.3);
     for (const [l, evs] of groups) {
@@ -3801,9 +3807,18 @@ function logSVG(b, W) {
       const shown = lines.length > room ? [...lines.slice(0, room - 1), { t: `+ ${lines.length - room + 1} more line${lines.length - room + 1 === 1 ? '' : 's'}`, more: true }] : lines;
       out.push(`<g><title>${esc(`${fx(l.top)}–${fu(l.bottom)} · ${evs.map(obsLabel).join('; ')}`)}</title>`);
       shown.forEach((x, j) => out.push(`<text x="${cOb.x + (x.first ? 8 : 16)}" y="${y0 + 16 + j * 13}" style="font:${x.more ? 'italic ' : ''}12px var(--f-body);fill:var(--earth)">${x.first ? '• ' : ''}${esc(x.t)}</text>`));
+      shown.forEach((x, j) => { if (x.e) { const h = obsHits.find(o => o.e === x.e); if (h) h.h = y0 + 19 + j * 13 - h.y; else obsHits.push({ e: x.e, y: y0 + 6 + j * 13, h: 13 }); } });
       out.push('</g>');
     }
-    for (const e of loose) out.push(`<text x="${cOb.x + 8}" y="${y(e.depth) + 4}" style="font:12px var(--f-body);fill:var(--earth)">• ${esc(obsLabel(e))}</text>`);
+    const lz = loose.map(e => ({ e, lines: wrap(obsLabel(e), cpl) })), lst = stackBlocks(lz.map(x => ({ y: y(x.e.depth) - 9, h: x.lines.length * 13 + 3 })), T, T + H);
+    lz.forEach(({ e, lines }, k) => {
+      const at = lst[k].at, y0 = y(e.depth), y1 = e.to != null ? y(e.to) : null, bx = cOb.x + 3;
+      out.push(`<g><title>${esc(`${obsDepth(e)} · ${obsLabel(e)}`)}</title>`);
+      if (y1 != null && y1 - y0 > 2) out.push(`<path d="M${bx + 3} ${y0}H${bx}V${y1}H${bx + 3}" fill="none" style="stroke:var(--earth)" stroke-width="1"/>`);
+      if (Math.abs(at + 9 - y0) > 2) out.push(`<path d="M${bx} ${y0}L${bx + 4} ${(at + 9).toFixed(1)}" fill="none" style="stroke:var(--earth)" stroke-width=".8"/>`);
+      lines.forEach((t, j) => out.push(`<text x="${cOb.x + (j ? 16 : 8)}" y="${(at + 13 + j * 13).toFixed(1)}" style="font:12px var(--f-body);fill:var(--earth)">${j ? '' : '• '}${esc(t)}</text>`));
+      out.push('</g>'); obsHits.push({ e, y: at + 2, h: lines.length * 13 + 2 });
+    });
   }
   // samples (drawn over the sampled interval), then the test plots at mid-sample depth
   const sm = (b.samples || []).filter(s => s.depth != null).sort((a, c) => a.depth - c.depth).map(s => { const [t, bt] = sampleSpan(b, s); return { s, t, bt, y: y((t + bt) / 2) }; });
@@ -3883,6 +3898,7 @@ function logSVG(b, W) {
     const sx0 = cSm.x, sx1 = Math.max(tEnd, cVp.w ? cVp.x + cVp.w : cA.x + cA.w), eoh = layers.length ? layers[layers.length - 1].bottom : 0;
     out.push(z(cSm.x, T, sx1 - sx0, H, 'add-sample', null, 'Click to add a sample at this depth'));
     if (cW.w) out.push(z(cW.x, T, cW.w, H, 'add-water', null, 'Click to add a water level at this depth'));
+    if (cOb.w) out.push(z(cOb.x, T, cOb.w, H, 'add-obs', null, 'Click to add an observation at this depth'), ...obsHits.map(o => z(cOb.x, o.y, cOb.w, o.h, 'obs', b.events.indexOf(o.e), 'Edit this observation')));
     out.push(z(cG.x, y(eoh), cDs.x + cDs.w + 10 - cG.x, T + H - y(eoh) + 24, 'add-layer', null, 'Click to add the next layer down to this depth'));
     layers.forEach(l => out.push(z(cG.x, y(l.top), cG.w, y(l.bottom) - y(l.top), 'layer', b.layers.indexOf(l), 'Edit this layer'), z(cDs.x - 10, y(l.top), cDs.w + 20, y(l.bottom) - y(l.top), 'layer', b.layers.indexOf(l), 'Click to type this layer; the panel has the buttons').replace('data-ed="layer"', 'data-ed="layer" data-desc="1"')));
     if (cWl.w) out.push(z(cWl.x, T - AG, cWl.w, H + AG, 'well', null, 'Edit the standpipe / well'));
@@ -6190,7 +6206,13 @@ const ALIASES = {
   contractor: ['contractor', 'drillingcontractor', 'driller'], rig: ['rig', 'rigtype', 'drillrig'], weather: ['weather'], termination: ['termination', 'terminationreason'],
   logger: ['logger', 'loggedby', 'geologist'], reviewer: ['reviewer', 'reviewedby', 'checkedby'], method: ['method', 'drillmethod', 'drillingmethod'],
   diameter: ['diameter', 'holediameter', 'boreholediameter', 'dia'], totalDepth: ['totaldepth', 'finaldepth', 'eoh', 'depthofhole'], slough: ['slough', 'sloughdepth'],
+  hammer: ['hammer', 'hammertype'], er: ['energyratio', 'er', 'hammerenergyratio'], gwNone: ['nogroundwater', 'dryhole'],
+  pg: ['plasticitygradation', 'plasticity', 'gradation'], sub: ['partofunitabove'], lnote: ['changenote'], xunit: ['sectionunit', 'crosssectionunit', 'unit'],
+  sname: ['name', 'samplename', 'sampleid'], purpose: ['purposeanalyses', 'purpose', 'analyses'], lel: ['lel', 'lelpercent'],
+  gravel: ['gravel'], sand: ['sand'], silt: ['silt'], clay: ['clay'], labname: ['laboratory'], labreport: ['labreport', 'reportno'], labdate: ['labreportdate', 'reportdate'],
+  measured: ['measured', 'measureddepth', 'readingdepth'], ref: ['measuredfrom', 'reference'],
 };
+const yes = v => /^(y|yes|true|1|x)$/i.test(String(v ?? '').trim());
 const normH = h => String(h).toLowerCase().replace(/\(.*?\)|\[.*?\]/g, '').replace(/[^a-z0-9]/g, '');
 const unitH = h => /\((ft|feet)\b|\[(ft|feet)\]/i.test(h) ? 'ft' : /\((m|metres|meters)\b|\[(m|metres|meters)\]/i.test(h) ? 'm' : /\((in)\)/i.test(h) ? 'in' : /\((mm)\)/i.test(h) ? 'mm' : null;
 function mapHeaders(headers) { const map = {}; for (const h of headers) { const n = normH(h); for (const [k, list] of Object.entries(ALIASES)) if (!map[k] && list.includes(n)) { map[k] = { h, unit: unitH(h) }; break; } } return map; }
@@ -6198,6 +6220,7 @@ function cellDate(v) {
   if (v instanceof Date && !isNaN(v)) return new Date(v.getTime() - v.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
   if (typeof v === 'number' && v > 20000 && v < 80000) return new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10);
   const s = String(v || '').trim(); if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}(?![\d:])/.test(s)) return s.slice(0, 10);   // already a date: a time zone must not move it
   const d = new Date(s); return isNaN(d) ? s : new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 }
 function matchList(v, lists) {
@@ -6210,18 +6233,21 @@ function matchList(v, lists) {
 }
 function parseWorkbook(wb, fileUnit) {
   const found = new Map();
-  const get = name => { const key = String(name).trim(); if (!found.has(key)) found.set(key, { name: key, header: {}, layers: [], samples: [], water: [] }); return found.get(key); };
+  const get = name => { const key = String(name).trim(); if (!found.has(key)) found.set(key, { name: key, header: {}, layers: [], samples: [], water: [], events: [], well: null }); return found.get(key); };
   const notes = [];
   for (const sn of wb.SheetNames) {
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { defval: '', raw: true });
     if (!rows.length) continue;
     const map = mapHeaders(Object.keys(rows[0]));
-    const sname = sn.toLowerCase();
+    const sname = sn.toLowerCase(), labCols = Object.keys(rows[0]).map(h => [h, Object.keys(LAB_PARAMS).find(p => normH(labCol(p)) === normH(h))]).filter(x => x[1]);
     const len = (row, k) => { const c = map[k]; if (!c) return null; const v = num(row[c.h]); if (v == null) return null; return (c.unit || fileUnit) === 'ft' ? v / FT : v; };
     const val = (row, k) => map[k] ? String(row[map[k].h] ?? '').trim() : '';
     const nv = (row, k) => num(map[k] ? row[map[k].h] : null);
     let kind;
-    if (map.top && map.bottom) kind = 'layers';
+    if (/^wells?$/.test(sname)) kind = 'well';
+    else if (/annulus|backfill|seals?$/.test(sname)) kind = 'annulus';
+    else if (/observ/.test(sname)) kind = 'events';
+    else if (map.top && map.bottom) kind = 'layers';
     else if (/sample|spt|test/.test(sname) || ((map.n || map.blows || map.w) && map.depth)) kind = 'samples';
     else if (/water|gw|level|piez|standpipe/.test(sname) || (map.depth && map.date && !map.easting)) kind = 'water';
     else if (map.easting || map.elevation || map.logger || map.method || /bore|hole|collar|location|header/.test(sname)) kind = 'header';
@@ -6230,8 +6256,14 @@ function parseWorkbook(wb, fileUnit) {
     if (kind === 'header' && !map.id) { notes.push(`Skipped sheet “${sn}”: no borehole column.`); continue; }
     for (const row of rows) {
       const id = idFor(row); if (!id) continue;
-      const bh = get(id);
-      if (kind === 'layers') {
+      const bh = get(id), col = k => { const h = Object.keys(row).find(x => normH(x) === k); return h == null ? '' : row[h]; }, colLen = k => { const h = Object.keys(row).find(x => normH(x) === k); const v = num(h == null ? null : row[h]); return v == null ? null : (unitH(h) || fileUnit) === 'ft' ? v / FT : v; };
+      if (kind === 'well') {
+        bh.well = { ...blankWell(), installed: true, type: String(col('type') || 'standpipe'), dia: num(col('diameter')), material: String(col('material') || ''), stickup: colLen('stickup'), screenTop: colLen('screentop'), screenBottom: colLen('screenbottom'), slot: String(col('slot') || ''), depth: colLen('depth'), annulus: bh.well?.annulus || [] };
+      } else if (kind === 'annulus') {
+        (bh.well ||= { ...blankWell(), annulus: [] }).annulus.push({ id: uid('a'), top: len(row, 'top'), bottom: len(row, 'bottom'), mat: String(col('material') || '') });
+      } else if (kind === 'events') {
+        bh.events.push({ id: uid('e'), depth: len(row, 'top'), to: len(row, 'bottom'), kind: String(col('observation') || ''), level: String(col('strength') || ''), text: String(col('note') || ''), time: String(col('dateandtime') || '') });
+      } else if (kind === 'layers') {
         const top = len(row, 'top'), bottom = len(row, 'bottom'); if (top == null && bottom == null) continue;
         const raw = val(row, 'uscs').toUpperCase().replace(/[^A-Z-]/g, '');
         const code = SOILS[raw] ? raw : LEGACY_SYM[raw] || Object.keys(SOILS).filter(k => raw.startsWith(k)).sort((a, c) => c.length - a.length)[0] || (/TOPSOIL/.test(raw) ? 'TOP' : /FILL/.test(raw) ? 'FILL' : '');
@@ -6239,19 +6271,24 @@ function parseWorkbook(wb, fileUnit) {
         const tn = val(row, 'texture').toLowerCase(), tsys = tn && ['cssc', 'astm', 'cfem', 'bs', 'aashto'].find(k => TEXTURES[k].list.some(x => x.toLowerCase() === tn));
         bh.layers.push({ id: uid('l'), top, bottom, hz: val(row, 'hz'), texture: tsys ? `${tsys}|${TEXTURES[tsys].list.find(x => x.toLowerCase() === tn)}` : '', uscs: code, mods: val(row, 'mods'), colour: val(row, 'colour').toLowerCase(), other: val(row, 'other') || (code ? '' : val(row, 'uscs')),
           origin: Object.keys(ORIGINS).find(k => k && (og.includes(k) || og.includes(ORIGINS[k].toLowerCase()))) || '',
-          moisture: matchList(val(row, 'moisture'), [MOISTURE]), consistency: matchList(val(row, 'consistency'), [stateList(code), COHESIVE, GRANULAR, WEATHERING]) });
+          moisture: matchList(val(row, 'moisture'), [MOISTURE]), consistency: matchList(val(row, 'consistency'), [stateList(code), COHESIVE, GRANULAR, WEATHERING]),
+          pg: val(row, 'pg'), sub: yes(val(row, 'sub')), note: val(row, 'lnote'), unit: val(row, 'xunit') });
       } else if (kind === 'samples') {
         const depth = len(row, 'depth'); if (depth == null) continue;
         const t = val(row, 'type').toUpperCase().replace(/\d+$/, '');
         const s = { id: uid('s'), no: nv(row, 'no'), depth, type: SAMPLE_TYPES[t] ? t : SAMPLE_ALIAS[t] || 'SS', b1: null, b2: null, b3: null, n: nv(row, 'n'), rec: nv(row, 'rec'), rqd: nv(row, 'rqd'),
-          w: nv(row, 'w'), ll: nv(row, 'll'), pl: nv(row, 'pl'), pp: nv(row, 'pp'), su: nv(row, 'su'), so4: nv(row, 'so4'), cvc: nv(row, 'cvc'), note: val(row, 'other') };
+          w: nv(row, 'w'), ll: nv(row, 'll'), pl: nv(row, 'pl'), pp: nv(row, 'pp'), su: nv(row, 'su'), so4: nv(row, 'so4'), cvc: nv(row, 'cvc'), lel: nv(row, 'lel'), note: val(row, 'other'),
+          name: val(row, 'sname'), purpose: val(row, 'purpose'), gravel: nv(row, 'gravel'), sand: nv(row, 'sand'), silt: nv(row, 'silt'), clay: nv(row, 'clay'),
+          labMeta: { lab: val(row, 'labname'), report: val(row, 'labreport'), date: map.labdate ? cellDate(row[map.labdate.h]) : '' },
+          lab: Object.fromEntries(labCols.map(([h, p]) => { const t = String(row[h] ?? '').trim(), v = num(t.replace(/^</, '')); return v == null ? null : [p, t.startsWith('<') ? { v, lt: true } : { v }]; }).filter(Boolean)) };
         const bl = /(\d+)\D+(\d+)\D+(\d+)/.exec(val(row, 'blows'));
         if (bl) { s.b1 = +bl[1]; s.b2 = +bl[2]; s.b3 = +bl[3]; s.n = s.b2 + s.b3; }
         bh.samples.push(s);
       } else if (kind === 'water') {
         const depth = len(row, 'depth'); if (depth == null) continue;
         const t = val(row, 'type').toLowerCase();
-        bh.water.push({ id: uid('w'), date: map.date ? cellDate(row[map.date.h]) : '', depth, measured: depth, ref: 'gs', kind: /seep|strike|drill|encounter/.test(t) ? 'strike' : /complet|eoh|end/.test(t) ? 'completion' : 'static' });
+        const kindOf = Object.keys(WATER_KINDS).find(k => WATER_KINDS[k].toLowerCase() === t) || (/seep|strike|drill|encounter/.test(t) ? 'strike' : /complet|eoh|end/.test(t) ? 'completion' : 'static');
+        bh.water.push({ id: uid('w'), date: map.date ? cellDate(row[map.date.h]) : '', depth, measured: len(row, 'measured') ?? depth, ref: /top|pipe|toc|casing/i.test(val(row, 'ref')) ? 'toc' : 'gs', kind: kindOf });
       } else {
         const h = bh.header;
         for (const k of ['easting', 'northing']) if (map[k]) h[k] = num(row[map[k].h]);
@@ -6259,7 +6296,9 @@ function parseWorkbook(wb, fileUnit) {
         if (map.diameter) { const d = num(row[map.diameter.h]); const u = map.diameter.unit || (fileUnit === 'ft' ? 'in' : 'mm'); h.diameter = d == null ? null : u === 'in' || u === 'ft' ? d * 25.4 : d; }
         if (map.date) h.date = cellDate(row[map.date.h]);
         if (map.dateEnd) h.dateEnd = cellDate(row[map.dateEnd.h]);
-        for (const k of ['logger', 'reviewer', 'method', 'datum', 'crs', 'project', 'projNo', 'client', 'location', 'contractor', 'rig', 'weather', 'termination']) if (map[k]) h[k] = val(row, k);
+        for (const k of ['logger', 'reviewer', 'method', 'datum', 'crs', 'project', 'projNo', 'client', 'location', 'contractor', 'rig', 'weather', 'termination', 'hammer']) if (map[k]) h[k] = val(row, k);
+        if (map.er) h.er = nv(row, 'er');
+        if (map.gwNone) h.gwNone = yes(val(row, 'gwNone'));
         if (map.other) h.notes = val(row, 'other');
         if (map.cssc) Object.assign(h, csscParse(val(row, 'cssc')));
       }
@@ -6323,13 +6362,15 @@ function commitImport() {
     if ($('#imp-merge')?.checked && p.samples.length) {
       for (const ns of p.samples) {
         const m2 = b.samples.find(x => ns.no != null && x.no === ns.no && (!ns.type || x.type === ns.type)) || b.samples.find(x => x.depth != null && ns.depth != null && Math.abs(x.depth - ns.depth) <= .15);
-        if (m2) { for (const k of ['w', 'pl', 'll', 'pp', 'su', 'so4', 'cvc', 'rec', 'rqd']) if (ns[k] != null) m2[k] = ns[k]; } else b.samples.push(ns);
+        if (m2) { for (const k of ['w', 'pl', 'll', 'pp', 'su', 'so4', 'cvc', 'lel', 'rec', 'rqd', 'gravel', 'sand', 'silt', 'clay']) if (ns[k] != null) m2[k] = ns[k]; if (ns.lab && Object.keys(ns.lab).length) m2.lab = { ...(m2.lab || {}), ...ns.lab }; } else b.samples.push(ns);
       }
       logChange(b, 'Lab results imported'); normalize(b); store.save(b); first ||= b.id; continue;
     }
     if (p.layers.length) b.layers = p.layers;
     if (p.samples.length) b.samples = p.samples;
     if (p.water.length) b.water = [...(b.water || []), ...p.water];
+    if (p.well) b.well = { ...blankWell(), ...p.well };
+    if (p.events?.length) b.events = p.events;
     normalize(b); store.save(b); first ||= b.id;
   }
   closeOverlay();
@@ -6344,15 +6385,23 @@ function dataRows(bhs, unit) {
   return {
     Boreholes: bhs.map(b => ({ Borehole: b.name, 'Project No': b.projNo || '', Project: b.project || '', Client: b.client || '', Location: b.location || '', Easting: b.easting ?? '', Northing: b.northing ?? '', 'Coordinate system': b.crs || '',
       [`Elevation ${u}`]: c(b.elevation), Datum: b.datum || '', 'Start date': b.date || '', 'End date': b.dateEnd || '', Contractor: b.contractor || '', Rig: b.rig || '', Method: b.method || '', 'Diameter (mm)': b.diameter ?? '',
-      'Logged by': b.logger || '', 'Reviewed by': b.reviewer || '', Weather: b.weather || '', Termination: b.termination || '', [`Slough ${u}`]: c(b.slough), 'CSSC classification': [b.csscSub, b.csscGG].filter(Boolean).join(' '), Notes: b.notes || '' })),
-    Layers: bhs.flatMap(b => (b.layers || []).map(l => ({ Borehole: b.name, [`From ${u}`]: c(l.top), [`To ${u}`]: c(l.bottom), Horizon: l.hz || '', Texture: texOf(l)?.name || '', Symbol: l.uscs || '', Modifiers: l.mods || '', Consistency: l.consistency || '', Moisture: l.moisture || '', Colour: l.colour || '', Other: l.other || '', Origin: ORIGINS[l.origin] || '', Description: composeDesc(l).text }))),
-    Samples: bhs.flatMap(b => (b.samples || []).map(s => ({ Borehole: b.name, [`Depth ${u}`]: c(s.depth), Name: sampleId(s), Type: s.type || '', No: s.no ?? '', 'Purpose / analyses': s.purpose || '', Blows: blowStr(s), 'SPT N': sptN(s) ?? '', 'Recovery %': s.rec ?? '', RQD: s.rqd ?? '', w: s.w ?? '', PL: s.pl ?? '', LL: s.ll ?? '', PP: s.pp ?? '', Su: s.su ?? '', SO4: s.so4 ?? '', 'VOC (ppm)': s.cvc ?? '', 'LEL (%)': s.lel ?? '', Remarks: s.note || '' }))),
-    Water: bhs.flatMap(b => (b.water || []).filter(w => w.depth != null).map(w => ({ Borehole: b.name, Date: w.date || '', [`Depth to water ${u}`]: c(w.depth), Type: WATER_KINDS[w.kind] || '' }))),
+      'Logged by': b.logger || '', 'Reviewed by': b.reviewer || '', Weather: b.weather || '', Termination: b.termination || '', [`Slough ${u}`]: c(b.slough), 'CSSC classification': [b.csscSub, b.csscGG].filter(Boolean).join(' '),
+      Hammer: b.hammer || '', 'Energy ratio (%)': b.er ?? '', 'No groundwater': b.gwNone ? 'Yes' : '', Notes: b.notes || '' })),
+    Layers: bhs.flatMap(b => (b.layers || []).map(l => ({ Borehole: b.name, [`From ${u}`]: c(l.top), [`To ${u}`]: c(l.bottom), Horizon: l.hz || '', Texture: texOf(l)?.name || '', Symbol: l.uscs || '', Modifiers: l.mods || '', Consistency: l.consistency || '', Moisture: l.moisture || '', Colour: l.colour || '', Other: l.other || '', Origin: ORIGINS[l.origin] || '', 'Plasticity / gradation': l.pg || '', 'Part of unit above': l.sub ? 'Yes' : '', 'Change note': l.note || '', 'Section unit': l.unit || '', Description: composeDesc(l).text }))),
+    Samples: bhs.flatMap(b => (b.samples || []).map(s => ({ Borehole: b.name, [`Depth ${u}`]: c(s.depth), Name: s.name || '', Type: s.type || '', No: s.no ?? '', 'Purpose / analyses': s.purpose || '', Blows: blowStr(s), 'SPT N': sptN(s) ?? '', 'Recovery %': s.rec ?? '', RQD: s.rqd ?? '', w: s.w ?? '', PL: s.pl ?? '', LL: s.ll ?? '', PP: s.pp ?? '', Su: s.su ?? '', SO4: s.so4 ?? '', 'VOC (ppm)': s.cvc ?? '', 'LEL (%)': s.lel ?? '',
+      'Gravel %': s.gravel ?? '', 'Sand %': s.sand ?? '', 'Silt %': s.silt ?? '', 'Clay %': s.clay ?? '', Laboratory: s.labMeta?.lab || '', 'Lab report': s.labMeta?.report || '', 'Lab report date': s.labMeta?.date || '',
+      ...Object.fromEntries(Object.entries(s.lab || {}).filter(([p, x]) => LAB_PARAMS[p] && x?.v != null).map(([p, x]) => [labCol(p), x.lt ? '<' + x.v : x.v])), Remarks: s.note || '' }))),
+    Water: bhs.flatMap(b => (b.water || []).filter(w => w.depth != null).map(w => ({ Borehole: b.name, Date: w.date || '', [`Depth to water ${u}`]: c(w.depth), Type: WATER_KINDS[w.kind] || '', [`Measured ${u}`]: c(w.measured ?? w.depth), 'Measured from': w.ref === 'toc' ? 'Top of standpipe' : 'Ground surface' }))),
+    Wells: bhs.filter(b => b.well?.installed).map(b => ({ Borehole: b.name, Type: b.well.type || '', 'Diameter (mm)': b.well.dia ?? '', Material: b.well.material || '', [`Stick-up ${u}`]: c(b.well.stickup), [`Screen top ${u}`]: c(b.well.screenTop), [`Screen bottom ${u}`]: c(b.well.screenBottom), Slot: b.well.slot || '', [`Depth ${u}`]: c(b.well.depth) })),
+    Annulus: bhs.filter(b => b.well?.installed).flatMap(b => (b.well.annulus || []).map(a => ({ Borehole: b.name, [`From ${u}`]: c(a.top), [`To ${u}`]: c(a.bottom), Material: a.mat || '' }))),
+    Observations: bhs.flatMap(b => (b.events || []).map(e => ({ Borehole: b.name, [`From ${u}`]: c(e.depth), [`To ${u}`]: c(e.to), Observation: e.kind || '', Strength: e.level || '', Note: e.text || '', 'Date and time': e.time || '' }))),
   };
 }
+/* lab results as their own columns: "Lab Benzene (mg/kg)"; a value below detection is written <0.005 */
+const labCol = p => `Lab ${LAB_PARAMS[p].label}${LAB_PARAMS[p].unit ? ` (${LAB_PARAMS[p].unit})` : ''}`;
 function workbookFor(bhs, unit) {
   const wb = XLSX.utils.book_new();
-  for (const [name, rows] of Object.entries(dataRows(bhs, unit))) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), name);
+  for (const [name, rows] of Object.entries(dataRows(bhs, unit))) if (rows.length || ['Boreholes', 'Layers', 'Samples', 'Water'].includes(name)) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), name);
   return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
 }
 /* save through the viewer when hosted; plain browser download when opened from disk */
@@ -6469,6 +6518,28 @@ async function saveTo(key, name, ext, data, as, quiet) {
   }
   if (await saveFile(name, blob)) done(name);
 }
+/* one borehole as its own file (.bh), with its photos; Import borehole puts it into the project that is open */
+async function saveBorehole(b = cur()) {
+  if (!b) { toast('Select a borehole first.'); return; }
+  const data = { app: 'borehole-field-log', kind: 'borehole', version: 1, saved: new Date().toISOString(), borehole: b, photos: await photosFor(new Set([b.id])) };
+  await saveFile(`${fileSlug(b.name) || 'borehole'}.bh`, new Blob([JSON.stringify(data)], { type: 'application/json' }));
+}
+async function importBorehole(file) {
+  if (S.readOnly) { toast('This log is view only; boreholes cannot be imported into it.'); return; }
+  let data = null; try { data = JSON.parse(await file.text()); } catch { /* not JSON */ }
+  if (data?.app !== 'borehole-field-log' || data.kind !== 'borehole' || !data.borehole || typeof data.borehole !== 'object') { toast(`${file.name} is not a borehole file (.bh).`); return; }
+  const into = cur() || projList()[0], b = normalize(structuredClone(data.borehole)); delete b.example;
+  if (into) for (const k of ['project', 'projNo', 'client']) b[k] = into[k] || '';
+  const same = b.id && S.bh.get(b.id), here = same && projKey(same) === projKey(b);
+  const replace = here && confirm(`${same.name} is already in this project. Replace it with the copy in ${file.name}? Cancel keeps both.`);
+  if (!replace) { if (same || !b.id) b.id = uid('bh-'); if (sortedList().some(x => x.id !== b.id && projKey(x) === projKey(b) && (x.name || '').toLowerCase() === (b.name || '').toLowerCase())) b.name = `${b.name} (copy)`; }
+  b.history = [...(b.history || []), { at: new Date().toISOString(), by: S.me || '', what: `Imported from ${file.name}` }];
+  S.bh.set(b.id, b); store.save(b);
+  for (const ph of Array.isArray(data.photos) ? data.photos : []) if (ph && typeof ph.data === 'string') { try { await photoStore.put({ ...ph, id: replace ? ph.id : uid('ph'), bhId: b.id }); } catch { /* storage full: the log still comes in */ } }
+  if (S.mode === 'local') store.saveLocal();
+  S.sel = b.id; S.layer = 0; S.formStale = true; render(); setSync();
+  toast(`${b.name} ${replace ? 'replaced' : 'imported'} into ${projKey(b) || 'this project'}.`);
+}
 async function openFile() {
   if (window.desktop) { const r = await window.desktop.open(); if (r) restore(new File([r.text], r.name), { name: r.name, path: r.path }); return; }
   if (!('showOpenFilePicker' in window) || window.self !== window.top) { $('#restore-file').click(); return; }
@@ -6480,6 +6551,7 @@ async function openFile() {
 async function restore(file, handle) {
   try {
     const data = JSON.parse(await file.text());
+    if (data?.kind === 'borehole') { await importBorehole(file); return; }
     const list = Array.isArray(data) ? data : data.boreholes;
     if (!Array.isArray(list) || (data.app && data.app !== 'borehole-field-log')) throw 0;
     if (S.readOnly) { toast('This log is view only; files cannot be opened into it.'); return; }
@@ -6515,6 +6587,8 @@ function openFileMenu() {
     ['save-proj-as', 'Save project as…', `${MOD}Shift+S · a copy under a new name or folder`, I('<path d="M4 3h13l3 3v15H4z"/><path d="M8 3v6h8V3"/><path d="M9 15.5h6M12 12.5v6"/>')],
     ['open-file', 'Open…', `${MOD}O · .bhp project, .bhlog workspace or older .json backup`, I('<path d="M3 6.5h6l2 2h10V19H3z"/>')],
     ['backup', 'Save workspace', `Every project, company settings and photos as .bhlog${ws ? ` · linked to ${ws.name}` : ''}`, I('<rect x="3" y="4" width="18" height="5" rx="1"/><rect x="3" y="11" width="18" height="5" rx="1"/><path d="M7 6.5h2M7 13.5h2M5 19h14"/>')],
+    ['save-bh', 'Save this borehole', 'The selected borehole and its photos as .bh, to share or move', I('<path d="M6 2.5h9l4 4V21.5H6z"/><path d="M15 2.5v4h4"/><path d="M12 10v7M9 14l3 3 3-3"/>')],
+    ['imp-bh', 'Import borehole', 'A .bh file into this project', I('<path d="M6 2.5h9l4 4V21.5H6z"/><path d="M15 2.5v4h4"/><path d="M12 17v-7M9 13l3-3 3 3"/>')],
     ['pdf-one', 'Download this log (PDF)', 'The selected borehole with your title block', I('<path d="M6 2.5h9l4 4V21.5H6z"/><path d="M15 2.5v4h4"/><path d="M9 13h7M9 16.5h5"/>')],
     ['import', 'Import Excel', 'Boreholes, layers and samples from a spreadsheet', I('<path d="M4 15v5h16v-5M12 3v12M7.5 10.5 12 15l4.5-4.5"/>')],
     ['export', 'Excel workbook', 'This project as an .xlsx report workbook', I('<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M4 9h16M4 15h16M10 3v18"/>')],
@@ -7944,7 +8018,13 @@ function pageSVG(b, pi, pn) {
       const shown = lines.length > room ? [...lines.slice(0, room - 1), { t: `+ ${lines.length - room + 1} more`, more: true }] : lines;
       shown.forEach((x, j) => o.push(T(C.ob.x + (x.first ? 4 : 9), yA + lh + 1 + j * lh, (x.first ? '• ' : '') + x.t, { s: 6.2, c: 'var(--earth)' })));
     }
-    for (const e of loose) { const yy = Y(e.depth); if (yy >= by0 && yy <= by1) o.push(T(C.ob.x + 4, yy + 3, '• ' + obsLabel(e), { s: 6.2, c: 'var(--earth)' })); }
+    const lz = loose.filter(e => Y(e.depth) >= by0 && Y(e.depth) <= by1).map(e => ({ e, lines: wrap(obsLabel(e), cpl) })), lst = stackBlocks(lz.map(x => ({ y: Y(x.e.depth) - lh * .7, h: x.lines.length * lh + 2 })), by0, by1);
+    lz.forEach(({ e, lines }, k) => {
+      const at = lst[k].at, y0 = Y(e.depth), y1 = e.to != null ? Math.min(Y(e.to), by1) : null, bx = C.ob.x + 2;
+      if (y1 != null && y1 - y0 > 2) o.push(`<path d="M${bx + 2} ${y0}H${bx}V${y1}H${bx + 2}" fill="none" style="stroke:var(--earth)" stroke-width=".6"/>`);
+      if (Math.abs(at + lh * .7 - y0) > 1.5) o.push(`<path d="M${bx} ${y0}L${bx + 2} ${(at + lh * .7).toFixed(1)}" fill="none" style="stroke:var(--earth)" stroke-width=".5"/>`);
+      lines.forEach((t, j) => o.push(T(C.ob.x + (j ? 9 : 4), at + lh + j * lh, (j ? '' : '• ') + t, { s: 6.2, c: 'var(--earth)' })));
+    });
   }
   // samples over their sampled interval; tests plotted at mid-sample depth
   const pts = [], vpts = [];
@@ -9891,7 +9971,7 @@ function reportsHubHTML(b) {
       ${out('pdf-all', 'All borehole logs (PDF)', 'Every log in the project with your title block.')}
       ${out('export', 'Excel report', 'Formatted workbook: one log sheet per borehole, tests, groundwater and charts.')}
       ${out('export-data', 'Data tables (Excel)', 'Plain tables that can be imported back into this app.')}
-      ${out('ags', 'AGS 4', 'For gINT, HoleBASE and Leapfrog.')}
+      ${out('export-data', 'All data (Excel)', 'Every detail, one sheet per kind, for other logging software. The app imports it back too.')}${out('ags', 'AGS 4', 'For gINT, HoleBASE and Leapfrog.')}
       ${out('gis', 'GIS / CSV', 'Borehole locations for mapping software.')}
     </div></section>
     <section class="sec"><header><h3>${b ? esc(b.name) : 'This borehole'}</h3></header><div class="body rep-list">
@@ -9972,8 +10052,9 @@ function labFormHTML(b, i) {
           <td>${esc(P.unit)}</td><td class="r">${g[p] != null ? (+g[p]).toLocaleString('en-CA') : '—'}</td><td>${x ? '<span class="pill review" style="color:#831c1e;background:#ffedea;border-color:#f5c2bb">Exceeds</span>' : ''}${!P.computed && ed ? `<button class="x" data-labdel="${p}" data-i="${i}" aria-label="Remove ${esc(P.label)}">×</button>` : ''}</td></tr>`; }).join('')}
     </tbody></table><p class="note">Tick &lt; DL for a non-detect and enter the detection limit as the result. F1 − BTEX is calculated from F1 and the four BTEX results. Guidelines are set for the project on the Contamination view.</p>` : '<p class="note">Add the suites the lab analysed for this sample.</p>'}`;
 }
-/* observations belong to a soil layer and take its depths; older ones recorded at a depth fall in the layer holding that depth */
-const obsLayer = (b, e) => (e.layer && (b.layers || []).find(l => l.id === e.layer)) || (e.depth != null ? layerAt(b, e.depth + 1e-6) || (b.layers || []).find(l => l.top != null && l.bottom != null && Math.abs(e.depth - l.bottom) < 1e-6) : null);
+/* an observation is either for a whole soil layer (it takes the layer's depths) or at its own depth, or From–To range, anywhere in the hole */
+const obsLayer = (b, e) => (e.layer && (b.layers || []).find(l => l.id === e.layer)) || null;
+const obsDepth = e => e.depth == null ? '' : e.to != null && e.to > e.depth ? `${fx(e.depth)}–${fu(e.to)}` : fu(e.depth);
 function syncObs(b) { for (const e of b.events || []) { const l = e.layer && (b.layers || []).find(x => x.id === e.layer); if (l && l.top != null && l.bottom != null && (e.depth !== l.top || e.to !== l.bottom)) { e.depth = l.top; e.to = l.bottom; } } }
 const layerName = l => { const s = soilOf(l.uscs), tx = l.texture ? texOf({ texture: l.texture }) : null; return s ? `${s.p}${l.uscs && !/^FILL|^TOP|^PT|^OL$/i.test(l.uscs) ? ` (${l.uscs.toUpperCase()})` : ''}` : tx?.name || (l.uscs || 'Layer').toUpperCase(); };
 /* the observation lines inside each layer's band; ox is the column's left edge, lh the line height */
@@ -9981,20 +10062,22 @@ function obsByLayer(b) {
   syncObs(b);
   const groups = new Map(), loose = [];
   for (const e of (b.events || []).filter(e => obsLabel(e))) { const l = obsLayer(b, e); if (l) { if (!groups.has(l)) groups.set(l, []); groups.get(l).push(e); } else if (e.depth != null) loose.push(e); }
-  return { groups: [...groups.entries()].sort((a, c) => a[0].top - c[0].top), loose };
+  return { groups: [...groups.entries()].sort((a, c) => a[0].top - c[0].top), loose: loose.sort((a, c) => a.depth - c.depth) };
 }
 function obsFormHTML(b, i) {
   const e = b.events[i]; if (!e) return '';
   const L = LEN();
   return `<div class="fields ff">
-      <div class="fld wide"><label for="ob-${e.id}-layer">Soil layer</label><select id="ob-${e.id}-layer" data-oblayer="${i}">${obsLayer(b, e) ? '' : '<option value="" selected>Choose the layer…</option>'}${(b.layers || []).filter(l => l.top != null && l.bottom != null).sort((a, c) => a.top - c.top).map(l => `<option value="${esc(l.id)}" ${obsLayer(b, e) === l ? 'selected' : ''}>${fx(l.top)}–${fx(l.bottom)} ${L} · ${esc(layerName(l))}</option>`).join('')}</select><span class="note">The observation uses this layer's depths and moves with it if the layer changes.</span></div>
+      <div class="fld"><label for="ob-${e.id}-depth">From (${L})</label><input id="ob-${e.id}-depth" type="number" step="any" inputmode="decimal" data-obdepth="depth" data-i="${i}" value="${e.depth == null ? '' : +toD(e.depth).toFixed(3)}"></div>
+      <div class="fld"><label for="ob-${e.id}-to">To (${L}), for a range</label><input id="ob-${e.id}-to" type="number" step="any" inputmode="decimal" data-obdepth="to" data-i="${i}" value="${e.to == null ? '' : +toD(e.to).toFixed(3)}"></div>
+      <div class="fld wide"><label for="ob-${e.id}-layer">Or a whole soil layer</label><select id="ob-${e.id}-layer" data-oblayer="${i}">${obsLayer(b, e) ? '' : '<option value="" selected>At the depths above</option>'}${(b.layers || []).filter(l => l.top != null && l.bottom != null).sort((a, c) => a.top - c.top).map(l => `<option value="${esc(l.id)}" ${obsLayer(b, e) === l ? 'selected' : ''}>${fx(l.top)}–${fx(l.bottom)} ${L} · ${esc(layerName(l))}</option>`).join('')}</select><span class="note">The observation uses this layer's depths and moves with it if the layer changes.</span></div>
       <div class="fld"><label for="ob-${e.id}-kind">Observation</label><select id="ob-${e.id}-kind" data-sec="events" data-i="${i}" data-k="kind">${opt(['', ...OBS_KINDS], e.kind, { '': '—' })}</select></div>
       <div class="fld"><label for="ob-${e.id}-level">Strength</label><select id="ob-${e.id}-level" data-sec="events" data-i="${i}" data-k="level">${opt(['', ...OBS_LEVELS], e.level, { '': '—' })}</select></div>
       <div class="fld wide"><label for="ob-${e.id}-text">Note</label><input id="ob-${e.id}-text" type="text" list="event-list" data-sec="events" data-i="${i}" data-k="text" value="${esc(e.text || '')}" placeholder="e.g. sheen on water in auger flights"></div>
       <div class="fld"><label for="ob-${e.id}-time">Date and time</label><input id="ob-${e.id}-time" type="datetime-local" data-sec="events" data-i="${i}" data-k="time" value="${esc(e.time || '')}"></div></div>
     <div class="actions"><button class="btn danger" data-act="drawer-del" data-what="events" data-idx="${i}">Delete observation</button></div>`;
 }
-const obsListHTML = b => (syncObs(b), b.events || []).map((e, i) => ({ e, i })).sort((a, c) => (a.e.depth ?? -1) - (c.e.depth ?? -1)).map(({ e, i }) => `<button class="lf-item" data-opick="${i}" aria-current="${i === (S.dsel?.events ?? 0)}"><b>${obsLayer(b, e) ? `${fx(obsLayer(b, e).top)}–${fx(obsLayer(b, e).bottom)} ${LEN()} · ${esc(layerName(obsLayer(b, e)))}` : e.depth != null ? fx(e.depth) + ' ' + LEN() : 'No layer'}</b><span>${esc(e.kind || '')}</span><small>${esc(obsLabel(e) || '—')}</small></button>`).join('') || '<p class="note" style="padding:8px">No observations yet.</p>';
+const obsListHTML = b => (syncObs(b), b.events || []).map((e, i) => ({ e, i })).sort((a, c) => (a.e.depth ?? -1) - (c.e.depth ?? -1)).map(({ e, i }) => `<button class="lf-item" data-opick="${i}" aria-current="${i === (S.dsel?.events ?? 0)}"><b>${obsLayer(b, e) ? `${fx(obsLayer(b, e).top)}–${fx(obsLayer(b, e).bottom)} ${LEN()} · ${esc(layerName(obsLayer(b, e)))}` : e.depth != null ? esc(obsDepth(e)) : 'No depth yet'}</b><span>${esc(e.kind || '')}</span><small>${esc(obsLabel(e) || '—')}</small></button>`).join('') || '<p class="note" style="padding:8px">No observations yet.</p>';
 /* map value for a lab parameter: highest detected result in the borehole, else the lowest detection limit as a non-detect */
 function paramMax(b, p) {
   const rs = (b.samples || []).map(sm => ({ sm, r: labVal(sm, p) })).filter(x => x.r);
@@ -10393,12 +10476,12 @@ function agsText(list = sortedList()) {
   group('PROJ', [['PROJ_ID', '', 'ID'], ['PROJ_NAME', '', 'X'], ['PROJ_LOC', '', 'X'], ['PROJ_CLNT', '', 'X'], ['PROJ_CONT', '', 'X'], ['PROJ_ENG', '', 'X']],
     [[list[0]?.projNo || 'BH', list[0]?.project || '', list[0]?.location || '', list[0]?.client || '', list[0]?.contractor || '', S.co.name || '']]);
   group('LOCA', [['LOCA_ID', '', 'ID'], ['LOCA_TYPE', '', 'PA'], ['LOCA_STAT', '', 'PA'], ['LOCA_NATE', 'm', '2DP'], ['LOCA_NATN', 'm', '2DP'], ['LOCA_GREF', '', 'PA'], ['LOCA_GL', 'm', '2DP'], ['LOCA_REM', '', 'X'], ['LOCA_FDEP', 'm', '2DP'], ['LOCA_STAR', 'yyyy-mm-dd', 'DT'], ['LOCA_ENDD', 'yyyy-mm-dd', 'DT'], ['LOCA_LOCA', '', 'X'], ['LOCA_DATM', '', 'PA']],
-    list.map(b => [b.name, ab('LOCA_TYPE', 'BH', 'Borehole'), ab('LOCA_STAT', b.status === 'issued' ? 'F' : 'P', b.status === 'issued' ? 'Final' : 'Preliminary'), d2(b.easting), d2(b.northing), b.crs ? ab('LOCA_GREF', b.crs.replace(/[^\w]+/g, '').slice(0, 20), b.crs) : '', d2(b.elevation), [b.method, b.termination].filter(Boolean).join('; '), d2(depthOf(b)), b.date || '', b.dateEnd || '', b.location || '', b.datum ? ab('LOCA_DATM', b.datum.replace(/[^\w]+/g, '').slice(0, 20), b.datum) : '']));
-  group('GEOL', [['LOCA_ID', '', 'ID'], ['GEOL_TOP', 'm', '2DP'], ['GEOL_BASE', 'm', '2DP'], ['GEOL_DESC', '', 'X'], ['GEOL_LEG', '', 'PA'], ['GEOL_GEOL', '', 'PA']],
-    list.flatMap(b => b.layers.filter(l => l.top != null && l.bottom != null).map(l => [b.name, d2(l.top), d2(l.bottom), composeDesc(l).text, l.uscs ? ab('GEOL_LEG', l.uscs.toUpperCase(), symLabel(l.uscs.toUpperCase(), soilOf(l.uscs) || { p: l.uscs })) : '', l.origin ? ab('GEOL_GEOL', l.origin.toUpperCase(), ORIGINS[l.origin]) : ''])));
+    list.map(b => [b.name, ab('LOCA_TYPE', 'BH', 'Borehole'), ab('LOCA_STAT', b.status === 'issued' ? 'F' : 'P', b.status === 'issued' ? 'Final' : 'Preliminary'), d2(b.easting), d2(b.northing), b.crs ? ab('LOCA_GREF', b.crs.replace(/[^\w]+/g, '').slice(0, 20), b.crs) : '', d2(b.elevation), [b.method, b.diameter != null && `${b.diameter} mm diameter`, b.rig && `Rig: ${b.rig}`, b.contractor && `Contractor: ${b.contractor}`, b.hammer && `Hammer: ${b.hammer}${b.er != null ? `, ER ${b.er} %` : ''}`, b.logger && `Logged by ${b.logger}`, b.reviewer && `Reviewed by ${b.reviewer}`, b.weather && `Weather: ${b.weather}`, b.termination && `Termination: ${b.termination}`, b.gwNone && 'No groundwater', b.notes].filter(Boolean).join('; '), d2(depthOf(b)), b.date || '', b.dateEnd || '', b.location || '', b.datum ? ab('LOCA_DATM', b.datum.replace(/[^\w]+/g, '').slice(0, 20), b.datum) : '']));
+  group('GEOL', [['LOCA_ID', '', 'ID'], ['GEOL_TOP', 'm', '2DP'], ['GEOL_BASE', 'm', '2DP'], ['GEOL_DESC', '', 'X'], ['GEOL_LEG', '', 'PA'], ['GEOL_GEOL', '', 'PA'], ['GEOL_REM', '', 'X']],
+    list.flatMap(b => b.layers.filter(l => l.top != null && l.bottom != null).map(l => [b.name, d2(l.top), d2(l.bottom), composeDesc(l).text, l.uscs ? ab('GEOL_LEG', l.uscs.toUpperCase(), symLabel(l.uscs.toUpperCase(), soilOf(l.uscs) || { p: l.uscs })) : '', l.origin ? ab('GEOL_GEOL', l.origin.toUpperCase(), ORIGINS[l.origin]) : '', [l.sub && l.note ? `Change within the unit above: ${l.note}` : l.sub ? 'Part of the unit above' : '', l.unit && `Section unit ${l.unit}`, l.hz && `Horizon ${l.hz}`].filter(Boolean).join('; ')])));
   const sampKey = s => [s.depth == null ? '' : d2(s.depth), String(s.no ?? ''), s.type || '', sampleId(s)];
   group('SAMP', [['LOCA_ID', '', 'ID'], ['SAMP_TOP', 'm', '2DP'], ['SAMP_REF', '', 'X'], ['SAMP_TYPE', '', 'PA'], ['SAMP_ID', '', 'ID'], ['SAMP_REM', '', 'X']],
-    list.flatMap(b => b.samples.filter(s => s.depth != null).map(s => { ab('SAMP_TYPE', s.type, SAMPLE_TYPES[s.type] || s.type); return [b.name, ...sampKey(s), s.note || '']; })));
+    list.flatMap(b => b.samples.filter(s => s.depth != null).map(s => { ab('SAMP_TYPE', s.type, SAMPLE_TYPES[s.type] || s.type); return [b.name, ...sampKey(s), [s.note, s.purpose && `Purpose: ${s.purpose}`, s.cvc != null && `VOC ${s.cvc} ppm`, s.lel != null && `LEL ${s.lel} %`].filter(Boolean).join('; ')]; })));
   group('ISPT', [['LOCA_ID', '', 'ID'], ['ISPT_TOP', 'm', '2DP'], ['ISPT_SEAT', '', '0DP'], ['ISPT_MAIN', '', '0DP'], ['ISPT_NVAL', '', '0DP'], ['ISPT_REP', '', 'X'], ['ISPT_ERAT', '%', '0DP']],
     list.flatMap(b => b.samples.filter(s => s.depth != null && sptN(s) != null).map(s => [b.name, d2(s.depth), s.b1 ?? '', s.b2 != null && s.b3 != null ? s.b2 + s.b3 : '', sptN(s), blowStr(s) ? `${blowStr(s)} (150 mm increments)` : '', b.er ?? ''])));
   group('LNMC', [['LOCA_ID', '', 'ID'], ['SAMP_TOP', 'm', '2DP'], ['SAMP_REF', '', 'X'], ['SAMP_TYPE', '', 'PA'], ['SAMP_ID', '', 'ID'], ['SPEC_REF', '', 'X'], ['SPEC_DPTH', 'm', '2DP'], ['LNMC_MC', '%', 'XN']],
@@ -10407,6 +10490,15 @@ function agsText(list = sortedList()) {
     list.flatMap(b => b.samples.filter(s => s.ll != null && s.pl != null && s.depth != null).map(s => [b.name, ...sampKey(s), '1', d2(s.depth), s.ll, s.pl, s.ll - s.pl])));
   group('MOND', [['LOCA_ID', '', 'ID'], ['MONP_ID', '', 'X'], ['MOND_DTIM', 'yyyy-mm-dd', 'DT'], ['MOND_TYPE', '', 'PA'], ['MOND_RDNG', 'm', 'XN'], ['MOND_UNIT', '', 'PU'], ['MOND_REM', '', 'X']],
     list.flatMap(b => b.water.filter(w => w.depth != null).map(w => [b.name, b.well?.installed ? 'SP1' : 'HOLE', w.date || '', ab('MOND_TYPE', 'WDEP', 'Depth to water below ground level'), (+w.depth).toFixed(2), 'm', WATER_KINDS[w.kind]])));
+  // standpipes and wells: the pipe (plain riser over the slotted screen), then the backfill and seals around it
+  const wells = list.filter(b => b.well?.installed && b.well.screenTop != null && b.well.screenBottom != null);
+  group('PIPE', [['LOCA_ID', '', 'ID'], ['PIPE_REF', '', 'X'], ['PIPE_TOP', 'm', '2DP'], ['PIPE_BASE', 'm', '2DP'], ['PIPE_DIAM', 'mm', '0DP'], ['PIPE_TYPE', '', 'PA'], ['PIPE_REM', '', 'X']],
+    wells.flatMap(b => { const w = b.well, rem = [w.material, w.stickup != null && `stick-up ${d2(w.stickup)} m`].filter(Boolean).join('; ');
+      return [[b.name, '1', d2(0), d2(w.screenTop), w.dia ?? '', ab('PIPE_TYPE', 'PLN', 'Plain pipe'), rem], [b.name, '1', d2(w.screenTop), d2(w.screenBottom), w.dia ?? '', ab('PIPE_TYPE', 'SLT', 'Slotted pipe'), [rem, w.slot && `slot ${w.slot}`].filter(Boolean).join('; ')]]; }));
+  group('FILL', [['LOCA_ID', '', 'ID'], ['FILL_TOP', 'm', '2DP'], ['FILL_BASE', 'm', '2DP'], ['FILL_DESC', '', 'X']],
+    wells.flatMap(b => (b.well.annulus || []).filter(a => a.top != null && a.bottom != null).map(a => [b.name, d2(a.top), d2(a.bottom), ANNULUS[a.mat]?.name || a.mat])));
+  group('DETL', [['LOCA_ID', '', 'ID'], ['DETL_TOP', 'm', '2DP'], ['DETL_BASE', 'm', '2DP'], ['DETL_DESC', '', 'X']],
+    list.flatMap(b => (b.events || []).filter(e => e.depth != null).map(e => [b.name, d2(e.depth), d2(e.to ?? e.depth), [e.kind, e.level && e.level.toLowerCase(), e.text, e.time && `(${e.time.replace('T', ' ')})`].filter(Boolean).join(', ')])));
   const body = L.join('\r\n');
   const head = [];
   const push = (name, heads, rows) => { head.push([q('GROUP'), q(name)].join(','), [q('HEADING'), ...heads.map(h => q(h[0]))].join(','), [q('UNIT'), ...heads.map(h => q(h[1]))].join(','), [q('TYPE'), ...heads.map(h => q(h[2]))].join(','), ...rows.map(r => [q('DATA'), ...r.map(q)].join(',')), ''); };
@@ -10994,6 +11086,7 @@ document.addEventListener('click', e => {
     case 'gis-geojson': exportGis('geojson'); break;
     case 'gis-shp': exportGis('shp'); break;
     case 'gis-csv': exportGis('csv'); break;
+    case 'export-data': saveFile(`${(sortedList()[0]?.projNo || 'boreholes').replace(/[^\w.-]+/g, '-')}-data-${today()}.xlsx`, workbookFor(sortedList(), S.units === 'ft' ? 'ft' : 'm')); break;
     case 'ags': saveFile(`${(sortedList()[0]?.projNo || 'boreholes').replace(/[^\w.-]+/g, '-')}-${today()}.ags`, new Blob([agsText()], { type: 'text/plain' })); break;
     case 'plan-pdf': planPdf(); break;
     case 'slug-save': if (editable(b)) { readSlug(); const { i, t: tt } = S._slug; if (i == null) b.slug.push(tt); else b.slug[i] = tt; logChange(b, 'Slug / bail test'); store.save(b); closeOverlay(); renderView(true); } break;
@@ -11032,6 +11125,8 @@ document.addEventListener('click', e => {
     case 'export-data': if (!S.bh.size) toast('No boreholes to export.'); else saveFile(`borehole-data-${today()}.xlsx`, workbookFor(sortedList(), S.units)); break;
     case 'backup': backup(); break;
     case 'restore': case 'open-file': openFile(); break;
+    case 'save-bh': saveBorehole(); break;
+    case 'imp-bh': if (!S.readOnly) $('#bh-file').click(); break;
     case 'save-proj': saveProject(); break;
     case 'same-above': { const l = b?.layers[S.layer], up = b?.layers[S.layer - 1]; if (!l || !up || !editable(b)) break; for (const k of LAYER_COPY) l[k] = up[k] ?? ''; logChange(b, 'Soil layers'); store.save(b); refreshLayerEditor(b); break; }
     case 'imp-lab': if (!S.readOnly) importLab(); break;
@@ -11081,7 +11176,16 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   if (e.target.dataset.gtick) { if (!S.readOnly) gtickSet(e.target.dataset.gtick, e.target.checked); return; }
   if (e.target.dataset.graph != null) { if (!S.readOnly) { const g = S.co.graphs[+e.target.dataset.graph]; g[e.target.dataset.gk] = e.target.value; store.saveCompany(); refreshGraphs(); } return; }
-  if (e.target.dataset.oblayer != null) { const b = cur(); if (!editable(b)) return; const ev = b.events[+e.target.dataset.oblayer], l = b.layers.find(x => x.id === e.target.value); if (ev && l) { ev.layer = l.id; ev.depth = l.top; ev.to = l.bottom; b.events.sort((a, c) => (a.depth ?? -1) - (c.depth ?? -1)); S.dsel.events = b.events.indexOf(ev); logChange(b, 'Drilling notes'); store.save(b); if (S.drawer) renderDrawer(); else renderView(true); } return; }
+  if (e.target.dataset.obdepth) {   // a typed depth: the observation is at that depth, no longer tied to a layer
+    const b = cur(); if (!editable(b)) return; const ev = b.events[+e.target.dataset.i]; if (!ev) return;
+    const v = e.target.value.trim() === '' ? null : fromD(num(e.target.value)); if (e.target.value.trim() !== '' && v == null) { toast('Type the depth as a number.'); return; }
+    if (e.target.dataset.obdepth === 'depth') { if (ev.layer) ev.to = null; ev.depth = v; } else ev.to = v;
+    delete ev.layer;
+    if (ev.depth != null && ev.to != null && ev.to < ev.depth) [ev.depth, ev.to] = [ev.to, ev.depth];
+    if (ev.depth != null && ev.to != null && ev.to === ev.depth) ev.to = null;
+    b.events.sort((a, c) => (a.depth ?? -1) - (c.depth ?? -1)); (S.dsel ||= {}).events = b.events.indexOf(ev); if (S.drawer?.kind === 'obs') S.drawer.i = b.events.indexOf(ev); logChange(b, 'Drilling notes'); store.save(b); if (S.drawer) { renderDrawer(); redrawLog(); } else renderView(true); return;
+  }
+  if (e.target.dataset.oblayer != null) { const b = cur(); if (!editable(b)) return; const ev = b.events[+e.target.dataset.oblayer], l = b.layers.find(x => x.id === e.target.value); if (ev && l) { ev.layer = l.id; ev.depth = l.top; ev.to = l.bottom; b.events.sort((a, c) => (a.depth ?? -1) - (c.depth ?? -1)); (S.dsel ||= {}).events = b.events.indexOf(ev); if (S.drawer?.kind === 'obs') S.drawer.i = b.events.indexOf(ev); logChange(b, 'Drilling notes'); store.save(b); if (S.drawer) { renderDrawer(); redrawLog(); } else renderView(true); } return; }
   if (e.target.id === 'basemap') { if (!S.readOnly) { setSite({ ...(siteOf() || {}), basemap: e.target.value }); S.tileWarned = false; renderView(true); } return; }
   if (e.target.id === 'lab-graph') { if (!S.readOnly) { S.co.labGraph = e.target.value; store.saveCompany(); renderView(true); } return; }
   if (e.target.id === 'img-file') { if (e.target.files.length) addImagery(e.target.files); e.target.value = ''; return; }
@@ -11140,6 +11244,7 @@ document.addEventListener('change', e => {
   else if (t.id === 'page-depth' || t.id === 'rp-depth') { S.pageFit = t.value === 'fit'; lsSet('bhlog.pageFit', S.pageFit ? '1' : '0'); if (!S.pageFit) { S.pageDepth = +t.value; lsSet('bhlog.pageDepth', S.pageDepth); } updateRibbon(); if (S.tab === 'report') renderView(true); }
   else if (t.id === 'ph-file') { if (t.files.length) addPhotos([...t.files]); t.value = ''; }
   else if (t.id === 'restore-file') { if (t.files[0]) restore(t.files[0]); t.value = ''; }
+  else if (t.id === 'bh-file') { (async () => { for (const f of t.files) await importBorehole(f); t.value = ''; })(); }
   else if (t.dataset.delpick != null) delCount();
   else if (t.id === 'opt-contours') { S.contours = t.checked; lsSet('bhlog.contours', t.checked ? '1' : ''); drawPlan(); renderList(sortedList()); }
   else if (t.id === 'opt-units') { S.showUnits = t.checked; drawSection($('#section'), $('#section-note'), undefined, sectionList()); }
@@ -11182,13 +11287,13 @@ setSync();
    An item is [label, act, shortcut] ('tab:<page>' opens a page); '-' is a separator. Shortcuts are written Mod+S (Ctrl on
    Windows, ⌘ on Mac). Roles are native-only items the desktop app supplies itself (cut, copy, paste, zoom...). */
 const MENUS = [
-  ['File', [['New project…', 'new-project'], ['New borehole', 'new', 'Mod+N'], '-', ['Open…', 'open-file', 'Mod+O'], ['Save project', 'save-proj', 'Mod+S'], ['Save project as…', 'save-proj-as', 'Mod+Shift+S'], ['Save workspace (all projects)…', 'backup'], '-',
-    ['Import Excel…', 'import'], ['Import lab results…', 'imp-lab'], '-', ['Export Excel workbook…', 'export'], ['Export AGS 4…', 'ags'], ['Export GIS…', 'gis'], '-', ['Settings…', 'prefs', 'Mod+,']]],
+  ['File', [['New project…', 'new-project'], ['New borehole', 'new', 'Mod+N'], '-', ['Open…', 'open-file', 'Mod+O'], ['Save project', 'save-proj', 'Mod+S'], ['Save project as…', 'save-proj-as', 'Mod+Shift+S'], ['Save workspace (all projects)…', 'backup'], '-', ['Save borehole (.bh)…', 'save-bh'], ['Import borehole (.bh)…', 'imp-bh'], '-',
+    ['Import Excel…', 'import'], ['Import lab results…', 'imp-lab'], '-', ['Export Excel workbook…', 'export'], ['Export all data (Excel)…', 'export-data'], ['Export AGS 4…', 'ags'], ['Export GIS…', 'gis'], '-', ['Settings…', 'prefs', 'Mod+,']]],
   ['Edit', [['Undo', 'undo', 'Mod+Z'], ['Redo', 'redo', 'Mod+Y'], '-', { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }, '-', ['Find…', 'find', 'Mod+F']]],
   ['View', [['Overview', 'tab:home'], ['Map & sections', 'tab:site'], ['Data tables', 'tab:table'], ['Groundwater', 'tab:gw'], ['Lab & contamination', 'tab:contam'], ['Reports', 'tab:compose'], '-',
     ['Log & data', 'tab:edit', 'Mod+1'], ['Full log', 'tab:log', 'Mod+2'], ['PDF preview', 'tab:report', 'Mod+3'], '-', ['Field mode (large controls)', 'field'], { role: 'zoom' }, { role: 'dev' }]],
   ['Project', [['New borehole', 'new'], ['Monitoring round…', 'round'], ['Copy details to all boreholes…', 'apply-project'], '-', ['Site drawing…', 'site-img'], ['Import locations…', 'imp-loc'], ['Import shapes…', 'imp-shp'], ['Add imagery…', 'imp-img'], '-', ['Remove example boreholes', 'clear-examples']]],
-  ['Boreholes', [['Log step by step', 'qlog', 'Mod+L'], ['Add sample', 'quick'], ['Drilling note', 'quick-note'], '-', ['Check log', 'check-log'], ['Mark ready for review', 'to-review'], ['Issue…', 'issue'], ['Revise', 'revise'], ['Comments', 'comments'], ['History', 'history'], '-',
+  ['Boreholes', [['Save this borehole (.bh)…', 'save-bh'], ['Import a borehole (.bh)…', 'imp-bh'], '-', ['Log step by step', 'qlog', 'Mod+L'], ['Add sample', 'quick'], ['Drilling note', 'quick-note'], '-', ['Check log', 'check-log'], ['Mark ready for review', 'to-review'], ['Issue…', 'issue'], ['Revise', 'revise'], ['Comments', 'comments'], ['History', 'history'], '-',
     ['Duplicate', 'duplicate'], ['Save as template', 'bh-tpl'], ['Delete…', 'delete']]],
   ['Tools', [['Find anything…', 'find', 'Mod+K'], ['Log columns…', 'log-cols'], ['Graphs…', 'graphs'], ['Company, logo and initials…', 'settings'], '-', ['Load example: oil lease delineation', 'load-lloyd'], ['Load example: service-station plume', 'load-sk'], ['Load example: Dawn Lake excavation', 'load-dl'], ['Load example: cross-section and plume', 'load-xs']]],
   ['Reports', [['This log (PDF)', 'pdf-one', 'Mod+P'], ['All logs in the project (PDF)', 'pdf-all'], ['Report appendix (PDF)…', 'appendix'], ['Location plan (PDF)', 'plan-pdf'], '-', ['Report editor', 'tab:compose'], ['Excel workbook…', 'export']]],

@@ -154,6 +154,160 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('export: every detail of a borehole survives the data workbook, in metres and in feet, and reaches AGS 4', async run => {
+    const r = await run(`(async () => {
+      const F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, units = S.units;
+      try {
+        const b = blankBorehole('BH-RT1');
+        Object.assign(b, { project: 'Round trip site', projNo: 'RT-2026-01', client: 'Client Co', location: 'NE 10-52-25 W4M', contractor: 'Drill Co', rig: 'CME 55', method: 'Solid-stem auger', diameter: 150,
+          date: '2026-07-01', dateEnd: '2026-07-02', logger: 'K.S.', reviewer: 'A.B., P.Eng.', weather: 'Sunny, 24 °C', easting: 559400.25, northing: 6418000.75, crs: 'UTM NAD83(CSRS) Zone 13', elevation: 486.123, datum: 'CGVD2013',
+          termination: 'Auger refusal', slough: 5.2, notes: 'Hole note', gwNone: false, csscGG: 'Gray Luvisol', csscSub: 'Orthic', hammer: 'Automatic', er: 82 });
+        b.layers = [
+          { id: 'l1', top: 0, bottom: 0.05, uscs: 'TOP', hz: 'Ah', texture: 'cssc|Loam', mods: 'silty, some organics', consistency: '', moisture: 'Moist', colour: 'dark brown', other: 'rootlets', origin: 'topsoil', unit: 'U1', pg: '', sub: false, note: '' },
+          { id: 'l2', top: 0.05, bottom: 2.5, uscs: 'CL', hz: '', texture: '', mods: 'silty, trace sand', consistency: 'Stiff', moisture: 'Moist', colour: 'brown', other: 'oxide staining', origin: 'till', unit: 'U2', pg: 'medium plastic', sub: false, note: '' },
+          { id: 'l3', top: 2.5, bottom: 6, uscs: 'CL', hz: '', texture: '', mods: 'silty, trace sand', consistency: 'Firm', moisture: 'Wet', colour: 'grey', other: '', origin: 'till', unit: 'U2', pg: '', sub: true, note: 'becoming grey, wet' }];
+        b.samples = [
+          { id: 's1', no: 1, depth: 0.75, type: 'SS', name: 'SS1-A', purpose: 'BTEX, F1–F4', b1: 4, b2: 6, b3: 7, n: null, rec: 80, rqd: null, w: 18.5, pl: 16, ll: 34, pp: 150, su: 60, so4: 0.12, cvc: 455, lel: 7, note: 'hydrocarbon odour',
+            lab: { benzene: { v: 0.005, lt: true }, f2: { v: 590 } }, labMeta: { lab: 'Lab Co', report: 'R-123', date: '2026-07-10' }, gsd: [], gravel: 5, sand: 30, silt: 40, clay: 25 },
+          { id: 's2', no: 2, depth: 3.1, type: 'J', name: 'J2', purpose: 'Metals', b1: null, b2: null, b3: null, n: null, rec: null, rqd: null, w: null, pl: null, ll: null, pp: null, su: null, so4: null, cvc: 12, lel: 0, note: '', lab: {}, labMeta: { lab: '', report: '', date: '' }, gsd: [], gravel: null, sand: null, silt: null, clay: null }];
+        b.water = [{ id: 'w1', date: '2026-07-02', depth: 2.48, measured: 3.38, ref: 'toc', kind: 'static' }, { id: 'w2', date: '2026-07-01', depth: 4.1, measured: 4.1, ref: 'gs', kind: 'strike' }];
+        b.well = { installed: true, type: 'standpipe', dia: 50, material: '50 mm PVC Sch 40', stickup: 0.9, screenTop: 3, screenBottom: 6, slot: '0.25 mm (#10)', depth: 6,
+          annulus: [{ id: 'a1', top: 0, bottom: 0.3, mat: 'concrete' }, { id: 'a2', top: 0.3, bottom: 2.4, mat: 'bentonite' }, { id: 'a3', top: 2.4, bottom: 6, mat: 'sand' }] };
+        b.events = [{ id: 'e1', kind: 'Odour', level: 'Moderate', text: 'diesel', time: '2026-07-01T10:30', depth: 0.8, to: 1.2 }];
+        normalize(b);
+        for (const u of ['m', 'ft']) {
+          const got = parseWorkbook(XLSX.read(workbookFor([b], u), { cellDates: true }), u).boreholes.find(x => x.name === 'BH-RT1');
+          if (!got) { F.push(u + ': borehole not read back'); continue; }
+          const h = got.header, close = (a, c) => a == null && c == null || a != null && c != null && Math.abs(a - c) < 2e-3, miss = [];
+          for (const k of ['project', 'projNo', 'client', 'location', 'contractor', 'rig', 'method', 'date', 'dateEnd', 'logger', 'reviewer', 'weather', 'crs', 'datum', 'termination', 'notes', 'csscGG', 'csscSub', 'hammer']) if (String(h[k] ?? '') !== String(b[k] ?? '')) miss.push(k + '=' + h[k]);
+          for (const k of ['easting', 'northing', 'elevation', 'slough', 'diameter', 'er']) if (!close(h[k], b[k])) miss.push(k + '=' + h[k]);
+          b.layers.forEach((l, i) => { const g = got.layers[i] || {}; for (const k of ['hz', 'texture', 'uscs', 'mods', 'consistency', 'moisture', 'colour', 'other', 'origin', 'unit', 'pg', 'note']) if (String(g[k] ?? '') !== String(l[k] ?? '')) miss.push('layer ' + (i + 1) + ' ' + k + '=' + g[k]); for (const k of ['top', 'bottom']) if (!close(g[k], l[k])) miss.push('layer ' + (i + 1) + ' ' + k + '=' + g[k]); if (!!g.sub !== !!l.sub) miss.push('layer ' + (i + 1) + ' sub'); });
+          b.samples.forEach((s, i) => { const g = got.samples[i] || {}; for (const k of ['type', 'name', 'purpose', 'note']) if (String(g[k] ?? '') !== String(s[k] ?? '')) miss.push('sample ' + (i + 1) + ' ' + k + '=' + g[k]); for (const k of ['no', 'b1', 'b2', 'b3', 'rec', 'w', 'pl', 'll', 'pp', 'su', 'so4', 'cvc', 'lel', 'gravel', 'sand', 'silt', 'clay']) if (!close(g[k], s[k])) miss.push('sample ' + (i + 1) + ' ' + k + '=' + g[k]); if (!close(g.depth, s.depth)) miss.push('sample ' + (i + 1) + ' depth');
+            for (const [p, x] of Object.entries(s.lab)) if (!g.lab?.[p] || !close(g.lab[p].v, x.v) || !!g.lab[p].lt !== !!x.lt) miss.push('sample ' + (i + 1) + ' lab ' + p + '=' + JSON.stringify(g.lab?.[p]));
+            for (const k of ['lab', 'report', 'date']) if (String(g.labMeta?.[k] ?? '') !== String(s.labMeta[k] ?? '')) miss.push('sample ' + (i + 1) + ' lab ' + k); });
+          const wsort = a => [...a].sort((x, y) => x.date.localeCompare(y.date));
+          wsort(b.water).forEach((w, i) => { const g = wsort(got.water)[i] || {}; if (g.date !== w.date || g.kind !== w.kind || g.ref !== w.ref || !close(g.depth, w.depth) || !close(g.measured, w.measured)) miss.push('water ' + w.date + '=' + JSON.stringify(g)); });
+          const gw = got.well || {}; for (const k of ['installed', 'type', 'material', 'slot']) if (String(gw[k] ?? '') !== String(b.well[k] ?? '')) miss.push('well ' + k + '=' + gw[k]); for (const k of ['dia', 'stickup', 'screenTop', 'screenBottom', 'depth']) if (!close(gw[k], b.well[k])) miss.push('well ' + k + '=' + gw[k]);
+          b.well.annulus.forEach((a, i) => { const g = gw.annulus?.[i] || {}; if (g.mat !== a.mat || !close(g.top, a.top) || !close(g.bottom, a.bottom)) miss.push('annulus ' + (i + 1) + '=' + JSON.stringify(g)); });
+          const ge = got.events?.[0] || {}; for (const k of ['kind', 'level', 'text', 'time']) if (String(ge[k] ?? '') !== String(b.events[0][k])) miss.push('observation ' + k + '=' + ge[k]); for (const k of ['depth', 'to']) if (!close(ge[k], b.events[0][k])) miss.push('observation ' + k + '=' + ge[k]);
+          want(!miss.length, u + ': not carried: ' + miss.join(', '));
+        }
+        const saved = [], keep = window.saveFile; window.saveFile = async (n, d) => { saved.push([n, d?.byteLength ?? d?.size]); return true; }; runAct('export-data'); await new Promise(r => setTimeout(r, 300)); window.saveFile = keep;
+        want(saved.length === 1 && saved[0][0].includes('-data-') && saved[0][0].endsWith('.xlsx') && saved[0][1] > 1000, 'Export all data saves a workbook: ' + JSON.stringify(saved));
+        want(MENUS.some(m => m[1].some(i => i[1] === 'export-data')), 'Export all data is in the menu');
+        const ags = agsText([b]);
+        for (const v of ['SS1-A', 'BTEX, F1–F4', '455', 'hydrocarbon odour', 'Auger refusal', 'CME 55', 'K.S.', 'CGVD2013', '50 mm PVC Sch 40', '0.25 mm (#10)', 'Bentonite seal', 'diesel', 'becoming grey, wet', 'medium plastic'])
+          want(ags.includes(v), 'AGS 4 is missing ' + v);
+        want(/"GROUP","PIPE"/.test(ags) && /"GROUP","FILL"/.test(ags) && /"GROUP","DETL"/.test(ags), 'AGS 4 has the well (PIPE, FILL) and observations (DETL)');
+        want(/LEL 7 %/.test(ags), 'AGS 4 carries the LEL reading');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
+      S.units = units; return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('observations: recorded at any depth; comments on a layer are saved and shown', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, units = S.units;
+      const fire = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+      try {
+        S.units = 'm'; loadDlExample(); await w(300); const b = cur(); b.events = []; S.dtab = 'notes'; goTab('edit'); await w(250);
+        document.querySelector('[data-act="ev-add"]')?.click(); await w(250);
+        const e = b.events.at(-1), from = document.querySelector('#ob-' + e?.id + '-depth'), to = document.querySelector('#ob-' + e?.id + '-to');
+        want(e && from && to, 'the observation form has From and To depth boxes');
+        if (from && to) {
+          fire(from, '3.4'); await w(150); fire(document.querySelector('#ob-' + e.id + '-kind'), 'Seepage'); await w(150);
+          want(e.depth === 3.4 && e.to == null && !e.layer, 'a typed depth is kept, not moved to a layer top: ' + JSON.stringify([e.depth, e.to, e.layer]));
+          obsByLayer(b); want(e.depth === 3.4, 'drawing the log does not move it: ' + e.depth);
+          fire(document.querySelector('#ob-' + e.id + '-to'), '3.9'); await w(150); want(e.to === 3.9, 'a To depth makes it a range: ' + e.to);
+          const svg = logSVG(b, 1100); want(/Seepage/.test(svg), 'shown on the log');
+          b.events.push({ id: 'shallow', kind: 'Staining', level: '', text: 'grey', depth: 0.9, to: 1.4, time: '' });
+          const ys = name => { const t = logSVG(b, 1100), k = t.indexOf('>• ' + name), y = t.lastIndexOf('y="', k); return k < 0 ? NaN : parseFloat(t.slice(y + 3)); };
+          want(ys('Staining') < ys('Seepage'), 'observations are drawn in depth order: ' + [ys('Staining'), ys('Seepage')]);
+          b.events = b.events.filter(x => x.id !== 'shallow');
+          const sel = document.querySelector('#ob-' + e.id + '-layer'), l = b.layers.find(x => x.top != null && x.bottom != null && x.top > 0);
+          fire(sel, l.id); await w(150); want(e.depth === l.top && e.to === l.bottom, 'choosing a layer still fills in its depths: ' + JSON.stringify([e.depth, e.to, l.top, l.bottom]));
+          const f2 = document.querySelector('#ob-' + e.id + '-depth'); fire(f2, '2.25'); await w(150);
+          want(e.depth === 2.25 && !e.layer, 'typing a depth after choosing a layer frees it from the layer: ' + JSON.stringify([e.depth, e.layer]));
+          S.units = 'ft'; renderView(true); await w(150); fire(document.querySelector('#ob-' + e.id + '-depth'), '10'); await w(150);
+          want(Math.abs(e.depth - 10 / FT) < 1e-6, 'depths typed in feet are kept in metres: ' + e.depth); S.units = 'm';
+        }
+        b.comments = []; S.layer = 1; S.dtab = 'soil'; goTab('edit'); await w(250);
+        const btn = document.querySelector('[data-act="comments"][data-target="layer:' + b.layers[1].id + '"]');
+        want(btn && btn.offsetParent, 'Comment on this layer is shown for the selected layer');
+        btn?.click(); await w(150);
+        want(document.querySelector('#cm-target')?.value === 'layer:' + b.layers[1].id, 'the comment is about that layer: ' + document.querySelector('#cm-target')?.value);
+        const t = document.querySelector('#cm-text'); if (t) { t.value = 'Check consistency against PP'; document.querySelector('[data-act="cm-add"]')?.click(); await w(200); }
+        want(b.comments.length === 1 && b.comments[0].target === 'layer:' + b.layers[1].id && b.comments[0].text === 'Check consistency against PP', 'the comment is saved: ' + JSON.stringify(b.comments));
+        closeOverlay(); goTab('edit'); await w(250);
+        want(/1 open review comment/.test(document.querySelector('#ldetail')?.textContent || ''), 'the layer shows its open comment');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      S.units = units; return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('observations on the Full log: click the column to add one at that depth, click one to edit it', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, units = S.units;
+      const fire = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+      try {
+        S.units = 'm'; loadDlExample(); await w(300); const b = cur(); b.events = []; S.co.cols = { ...(S.co.cols || {}), obs: 'on' }; goTab('log'); await w(300);
+        const svg = document.querySelector('#log svg'), zone = svg?.querySelector('[data-ed="add-obs"]');
+        want(zone, 'the Observations column can be clicked to add one');
+        if (zone) {
+          const rc = svg.getBoundingClientRect(), sc = rc.height / svg.viewBox.baseVal.height, clientY = rc.top + (+svg.dataset.t + 2 * +svg.dataset.k) * sc;
+          zone.dispatchEvent(new MouseEvent('click', { bubbles: true, clientY, clientX: zone.getBoundingClientRect().left + 5 })); await w(250);
+          const e = b.events[0];
+          want(e && Math.abs(e.depth - 2) < 0.06 && !e.layer, 'added at the clicked depth: ' + JSON.stringify(e));
+          want(S.drawer?.kind === 'obs' && document.querySelector('#drawer #ob-' + e?.id + '-kind'), 'the side panel opens on it');
+          const k = document.querySelector('#drawer #ob-' + e?.id + '-kind'); if (k) { fire(k, 'Sheen'); await w(200); }
+          want(e?.kind === 'Sheen', 'its type is saved from the side panel: ' + e?.kind);
+          want(/Sheen/.test(document.querySelector('#log')?.innerHTML || ''), 'and drawn on the log');
+          closeDrawer(); await w(150);
+          const hit = document.querySelector('#log [data-ed="obs"][data-i="0"]'); want(hit, 'the observation can be clicked');
+          hit?.dispatchEvent(new MouseEvent('click', { bubbles: true, clientY: hit.getBoundingClientRect().top + 2 })); await w(200);
+          want(S.drawer?.kind === 'obs' && S.drawer.i === 0, 'clicking it opens it again');
+          const d = document.querySelector('#drawer #ob-' + e.id + '-depth'); if (d) { fire(d, '2.6'); await w(200); }
+          want(e.depth === 2.6, 'its depth can be changed there: ' + e.depth);
+        }
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      S.units = units; return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('borehole files: save one borehole as .bh, import it into the open project', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, keepSave = window.saveFile, keepConfirm = window.confirm;
+      try {
+        loadDlExample(); loadSkExample(); await w(400);
+        const src = sortedList().find(b => b.project && /Dawn Lake|Excavation/.test(b.project) && b.layers.length); S.sel = src.id;
+        await photoStore.put({ id: 'ph-bhf', bhId: src.id, caption: 'core box', data: 'data:image/png;base64,iVBORw0KGgo=', takenAt: '2026-07-01T00:00:00Z' });
+        const saved = []; window.saveFile = async (n, d) => { saved.push([n, d]); return true; };
+        runAct('save-bh'); await w(400);
+        want(saved.length === 1 && saved[0][0] === fileSlug(src.name) + '.bh', 'Save borehole writes <name>.bh: ' + saved.map(s => s[0]));
+        const text = saved[0] ? await saved[0][1].text() : '{}', data = JSON.parse(text);
+        want(data.kind === 'borehole' && data.borehole?.name === src.name && data.borehole.layers.length === src.layers.length && data.photos?.some(p => p.id === 'ph-bhf'), 'the file holds the whole borehole and its photos');
+        const other = sortedList().find(b => projKey(b) !== projKey(src)); S.sel = other.id; const n0 = projList().length;
+        await importBorehole(new File([text], src.name + '.bh')); await w(200);
+        const got = projList().find(b => b.name === src.name);
+        want(projList().length === n0 + 1 && got && got.id !== src.id, 'imported into the open project as its own borehole: ' + [projList().length, n0, got?.id === src.id]);
+        want(got && got.project === other.project && got.projNo === other.projNo && got.client === other.client, 'it takes the open project: ' + [got?.project, other.project]);
+        want(got && got.layers.length === src.layers.length && got.samples.length === src.samples.length && got.water.length === src.water.length, 'with all its layers, samples and water levels');
+        want((await photosFor(new Set([got?.id]))).some(p => p.caption === 'core box'), 'and its photos');
+        want(S.bh.get(src.id)?.project === src.project, 'the original stays in its own project');
+        S.sel = src.id; window.confirm = () => false; const n1 = projList().length;
+        await importBorehole(new File([text], src.name + '.bh')); await w(150);
+        want(projList().length === n1 + 1 && projList().some(b => b.name === src.name + ' (copy)'), 'into its own project, kept as a copy when not replacing');
+        window.confirm = () => true; src.notes = 'changed here'; const n2 = projList().length;
+        await importBorehole(new File([text], src.name + '.bh')); await w(150);
+        want(projList().length === n2 && S.bh.get(src.id).notes !== 'changed here', 'or replaces it when asked');
+        const n3 = projList().length; await importBorehole(new File(['{"app":"other"}'], 'x.bh')); want(projList().length === n3, 'a file that is not a borehole is refused');
+        window.confirm = () => false; const n4 = projList().length; await restore(new File([text], 'opened.bh')); await w(150); want(projList().length === n4 + 1, 'opening a .bh file (double-click) imports it the same way');
+        want(MENUS.some(m => m[1].some(i => i[1] === 'save-bh')) && MENUS.some(m => m[1].some(i => i[1] === 'imp-bh')), 'Save borehole and Import borehole are in the menus');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      window.saveFile = keepSave; window.confirm = keepConfirm; return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('saved data moves from local storage to IndexedDB and survives a restart', async (run, load) => {
     await run(`localStorage.setItem('bhlog.local', JSON.stringify([{ ...blankBorehole('OLD-01'), id: 'old1' }])); localStorage.setItem('bhlog.company', JSON.stringify({ name: 'Old Firm' })); 1`);
     await load();
