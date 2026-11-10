@@ -68,7 +68,7 @@ To publish an update, with `main` the same as on GitHub and nothing uncommitted:
 1. On the Mac: `npm run release -- 0.2.0 --notes "One line on what is new"` (or `--notes-file notes.md`; lines starting `- ` become bullets). It sets the version, commits and pushes it, runs the quick tests, builds the signed and notarized `.dmg`, and creates the GitHub release `v0.2.0` with the installer and its SHA-256.
 2. On the Windows computer: `git pull`, then `npm run release`. It builds the setup `.exe` and adds it, and its checksum, to the same release.
 
-Until both are on the release, only people on the platform already there are told about the update. Add `--dry` to see what it would do. It needs the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`) on each computer. Run `npm run test:app` before releasing; the release runs only the quick tests.
+Until both are on the release, only people on the platform already there are told about the update. Add `--dry` to see what it would do, or `--no-build` to publish the installer already in `dist/` (build with `npm run package:mac`, open it once, then release that file). It needs the [GitHub CLI](https://cli.github.com) signed in (`gh auth login`) on each computer. Run `npm run test:app` before releasing; the release runs only the quick tests.
 
 ## Security
 

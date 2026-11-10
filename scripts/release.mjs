@@ -4,7 +4,7 @@
 //   npm run release -- 0.2.0 --notes "What is new"   new version: sets it, commits and pushes, builds, creates the release
 //   npm run release -- 0.2.0 --notes-file notes.md   the same, notes from a file (a line starting "- " is a bullet)
 //   npm run release                                   this version again: builds and adds this computer's installer
-//   add --dry to see what it would do
+//   add --dry to see what it would do; --no-build publishes the installer already in dist/ (the one you tested)
 //
 // Needs the GitHub CLI (gh), signed in, and main in step with GitHub, so both computers release the same code.
 import { execFileSync } from 'node:child_process';
@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { newer, withChecksum, HUB } from '../src/main/updates.mjs';
 
 const args = process.argv.slice(2), flag = k => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : undefined; };
-const dry = args.includes('--dry'), want = args.find(a => /^v?\d+\.\d+\.\d+/.test(a))?.replace(/^v/, '');
+const dry = args.includes('--dry'), noBuild = args.includes('--no-build'), want = args.find(a => /^v?\d+\.\d+\.\d+/.test(a))?.replace(/^v/, '');
 const notesArg = flag('--notes') ?? (flag('--notes-file') ? readFileSync(flag('--notes-file'), 'utf8') : undefined);
 const stop = msg => { console.error(`\n${msg}\n`); process.exit(1); };
 const out = (cmd, a) => execFileSync(cmd, a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' }).trim();
@@ -45,12 +45,15 @@ try { existing = JSON.parse(out('gh', ['release', 'view', tag, '--json', 'body,a
 if (!existing && !notesArg) stop(`There is no release ${tag} yet. Give its notes: npm run release -- ${version} --notes "What is new"`);
 
 // 3. build this computer's installer (quick tests first)
-run('npm', ['test']);
-run('npm', ['run', 'typecheck']);
 const plat = process.platform;
-if (plat === 'darwin') run('npm', ['run', 'package:mac'], { APPLE_KEYCHAIN_PROFILE: process.env.APPLE_KEYCHAIN_PROFILE || 'borehole-notary' });
-else if (plat === 'win32') run('npm', ['run', 'package:win']);
-else stop('Releases are built on the Mac (signed and notarized .dmg) and on Windows (setup .exe).');
+if (plat !== 'darwin' && plat !== 'win32') stop('Releases are built on the Mac (signed and notarized .dmg) and on Windows (setup .exe).');
+if (noBuild) console.log('\nUsing the installer already built in dist/.');
+else {
+  run('npm', ['test']);
+  run('npm', ['run', 'typecheck']);
+  if (plat === 'darwin') run('npm', ['run', 'package:mac'], { APPLE_KEYCHAIN_PROFILE: process.env.APPLE_KEYCHAIN_PROFILE || 'borehole-notary' });
+  else run('npm', ['run', 'package:win']);
+}
 const name = plat === 'darwin' ? `Borehole-Field-Log-${version}-arm64.dmg` : `Borehole-Field-Log-Setup-${version}.exe`, file = join('dist', name);
 if (dry) { console.log(`\nWould ${existing ? 'add' : 'create the release with'} ${name} on ${tag}. Nothing was changed.`); process.exit(0); }
 if (!existsSync(file)) stop(`The build finished but ${file} is not there.`);

@@ -1,7 +1,7 @@
 {
   "name": "borehole-field-log",
   "productName": "Borehole Field Log",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Borehole logging, groundwater and reporting for Alberta and Saskatchewan consultants",
   "main": "./out/main/index.js",
   "type": "module",

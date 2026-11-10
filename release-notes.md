@@ -1,0 +1,13 @@
+The first version that tells you when an update is out (Help › Check for updates).
+- Soil survey: sample points with full classification and lab results, interpolated maps with warnings, and texture, particle size and salinity graphs
+- Soil layers in classification order, with the layer's samples and their VOC and LEL readings right there, and your own standard buttons; soil type is a dropdown, and a whole layer can be typed in one line
+- Thin layers, such as 50 mm of topsoil, keep their whole description on the log, on a leader, with their thickness
+- Observations at any depth or From–To range, added and edited from the Full log too
+- Samples on logs as standard symbols, icons or type codes (Page layout › Samples)
+- Save one borehole as a .bh file and import it into any project
+- Export all data (Excel) and AGS 4 now carry every detail: wells, backfill, observations, sample names and purpose, VOC, LEL and lab results
+- Place a borehole by typing its coordinates (decimal or degrees-minutes-seconds, UTM, or a legal land description) and its elevation
+- Long titles stay inside their boxes on PDF logs; VOC graph drawn as a line; jar, bag and grab sample symbols
+- GNSS survey CSV import, a basemap that stays when zoomed in, and Apple Maps satellite pictures (with your own Maps key)
+- Fixed: dates in imported spreadsheets no longer move back a day
+- Security: only the app's own code can run in it, PDFs and project files from others are handled more safely, and the app is locked against tampering
