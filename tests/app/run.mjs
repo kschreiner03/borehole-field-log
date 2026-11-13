@@ -337,6 +337,14 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   });
+  await check('the Data tabs stay readable while the page scrolls under them', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)); loadDlExample(); await w(300); S.dtab = 'soil'; goTab('edit'); await w(300);
+      const t = document.querySelector('.dtabs'); if (!t) return 'no tabs';
+      const cs = getComputedStyle(t); return cs.position === 'sticky' && /rgba\\(0, 0, 0, 0\\)|transparent/.test(cs.backgroundColor) ? 'see-through: ' + cs.backgroundColor : '';
+    })()`);
+    expect(!r, r);
+  });
   await check('saved data moves from local storage to IndexedDB and survives a restart', async (run, load) => {
     await run(`localStorage.setItem('bhlog.local', JSON.stringify([{ ...blankBorehole('OLD-01'), id: 'old1' }])); localStorage.setItem('bhlog.company', JSON.stringify({ name: 'Old Firm' })); 1`);
     await load();
