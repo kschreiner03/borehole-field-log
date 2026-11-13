@@ -345,6 +345,46 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r, r);
   });
+  await check('sites: the app opens on its sites; open, create, rename and remove a site; four stops on the rail', async (run, load) => {
+    await run(`localStorage.setItem('bhlog.tab', 'gw'); 1`);
+    await load();
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, keepC = window.confirm;
+      try {
+        want(S.tab === 'sites' && document.querySelector('#view [data-view="sites"]'), 'the app opens on the sites page, whatever was open last: ' + S.tab);
+        want(/Sites/.test(document.querySelector('#view h2')?.textContent || ''), 'it is titled Sites');
+        loadDlExample(); loadSkExample(); await w(400); goTab('sites'); await w(200);
+        const rows = [...document.querySelectorAll('#view [data-site-row]')];
+        want(rows.length === siteList().length && rows.length >= 2, 'one row per site: ' + rows.length + ' / ' + siteList().length);
+        const dl = siteList().find(s => /Dawn Lake/.test(s.name));
+        want(dl && dl.n === sortedList().filter(b => projKey(b) === dl.key).length, 'a site counts its boreholes: ' + JSON.stringify(dl && [dl.n, dl.wells]));
+        const rail = [...document.querySelectorAll('#prail [data-tab]')].map(b => b.dataset.tab + ':' + b.textContent.trim());
+        want(rail.join('|') === 'sites:Sites|edit:Boreholes|site:Map & data|compose:Outputs', 'four stops on the rail: ' + rail.join('|'));
+        document.querySelector('#view [data-site-open="' + CSS.escape(dl.key) + '"]')?.click(); await w(300);
+        want(S.tab === 'edit' && projKey(cur()) === dl.key, 'opening a site goes to its boreholes: ' + S.tab + ' ' + projKey(cur()));
+        want(/Sites/.test(document.querySelector('#crumbs')?.textContent || ''), 'the breadcrumb leads back to Sites');
+        goTab('gw'); await w(300);
+        const md = [...document.querySelectorAll('#view .mdtabs [data-tab]')].map(b => b.dataset.tab);
+        want(md.join() === 'home,site,gw,contam,soil,xsec,gwm,v3d,table', 'Map & data has its pages as tabs: ' + md.join());
+        want(document.querySelector('#view .mdtabs [data-tab="gw"]')?.getAttribute('aria-current') === 'page' && document.querySelector('#prail [data-tab="site"]')?.getAttribute('aria-current') === 'page', 'the tab and the rail stop both show where you are');
+        goTab('sites'); await w(200);
+        window.confirm = () => true;
+        const n0 = siteList().length; renameSite(dl.key, 'Dawn Lake renamed'); await w(100);
+        want(siteList().some(s => s.key === 'Dawn Lake renamed') && !siteList().some(s => s.key === dl.key) && siteList().length === n0, 'renaming moves every borehole: ' + siteList().map(s => s.key).join(' / '));
+        const b1 = sortedList().find(b => projKey(b) === 'Dawn Lake renamed'); b1.status = 'issued';
+        renameSite('Dawn Lake renamed', 'Blocked'); want(!siteList().some(s => s.key === 'Blocked'), 'a site with issued logs is not renamed');
+        removeSite('Dawn Lake renamed'); want(siteList().some(s => s.key === 'Dawn Lake renamed'), 'or removed');
+        b1.status = 'draft'; removeSite('Dawn Lake renamed'); await w(100);
+        want(!siteList().some(s => s.key === 'Dawn Lake renamed') && siteList().length === n0 - 1 && sortedList().length > 0, 'removing takes only that site: ' + siteList().length);
+        runAct('new-site'); await w(150); const nm = document.querySelector('#np-name'); if (nm) { nm.value = 'Test site 01'; document.querySelector('[data-act="np-save"]').click(); await w(300); }
+        want(siteList().some(s => s.key === 'Test site 01') && S.tab === 'edit' && projKey(cur()) === 'Test site 01', 'New site creates it and opens its boreholes: ' + S.tab + ' ' + projKey(cur()));
+        for (const b of [...S.bh.values()]) store.remove(b.id); render(); goTab('sites'); await w(200);
+        want(/New site/.test(document.querySelector('#view')?.textContent || '') && !document.querySelector('#view [data-site-row]'), 'with no sites, it says how to start');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      window.confirm = keepC; return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('saved data moves from local storage to IndexedDB and survives a restart', async (run, load) => {
     await run(`localStorage.setItem('bhlog.local', JSON.stringify([{ ...blankBorehole('OLD-01'), id: 'old1' }])); localStorage.setItem('bhlog.company', JSON.stringify({ name: 'Old Firm' })); 1`);
     await load();
@@ -466,7 +506,7 @@ app.whenReady().then(async () => {
       return { has, added, focusedCell: fresh?.dataset?.c, top, prevBottom, nl: { bottom: nl.bottom, uscs: nl.uscs }, logHasSand: /SAND/.test(logText), focusedRow, sheets, which: document.querySelector('[data-which="samples"]')?.textContent, sel: S.dsel.samples };
     })()`);
     expect(r.has.grid && r.has.log, 'workspace parts: ' + JSON.stringify(r.has));
-    expect(r.has.tree.join() === 'Overview,Borehole,Map,Tables,Water,Lab,Soil,Section,Model,3D,Reports' && r.has.cur === 'Borehole' && r.has.rows === r.has.want, 'rail and list: ' + JSON.stringify(r.has));
+    expect(r.has.tree.join() === 'Sites,Boreholes,Map & data,Outputs' && r.has.cur === 'Boreholes' && r.has.rows === r.has.want, 'rail and list: ' + JSON.stringify(r.has));
     expect(r.added === 1 && r.top === r.prevBottom, 'Enter on the last row: ' + JSON.stringify(r));
     expect(r.nl.uscs === 'SP' && Math.abs(r.nl.bottom - (r.prevBottom + 1.2)) < 1e-6 && r.logHasSand, 'typed interval: ' + JSON.stringify(r.nl) + ' log has sand ' + r.logHasSand);
     expect(r.focusedRow === 0, 'log click focused row ' + r.focusedRow);
@@ -488,7 +528,7 @@ app.whenReady().then(async () => {
     })()`);
     expect(r.filtered === 9 && r.wells === r.wantWells && r.wells > 0, 'filter and chips: ' + JSON.stringify(r));
     expect(r.top === r.max, 'sort by vapour: ' + JSON.stringify(r));
-    expect(r.tab === 'edit' && r.rail === 'Borehole', 'picking a borehole opens it: ' + JSON.stringify(r));
+    expect(r.tab === 'edit' && r.rail === 'Boreholes', 'picking a borehole opens it: ' + JSON.stringify(r));
   });
 
   await check('report: imported PDF pages and images become pages and travel in the project file', async run => {
@@ -776,12 +816,12 @@ app.whenReady().then(async () => {
   await check('cross-section: page on the rail', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); await w(100);
-      const tabs = [...document.querySelectorAll('#prail [data-tab]')].map(b => b.dataset.tab);
+      goTab('site'); await w(150); const tabs = [...document.querySelectorAll('#view .mdtabs [data-tab]')].map(b => b.dataset.tab);   /* the site's pages are the Map & data tabs */
       goTab('xsec'); await w(200); const svg = !!document.querySelector('#xs-draw svg'), chips = document.querySelectorAll('#ctl [data-secpick]').length;   /* the section line moved into the settings panel */
       goTab('site'); await w(200); const link = !!document.querySelector('#view [data-tab="xsec"]'), old = !!document.querySelector('#section');
       return { tabs, svg, chips, link, old };
     })()`);
-    expect(r.tabs.indexOf('soil') === r.tabs.indexOf('contam') + 1 && r.tabs.indexOf('xsec') === r.tabs.indexOf('soil') + 1 && r.tabs.indexOf('gwm') === r.tabs.indexOf('xsec') + 1 && r.tabs.indexOf('v3d') === r.tabs.indexOf('gwm') + 1 && r.tabs.indexOf('compose') === r.tabs.indexOf('v3d') + 1, 'rail order: ' + r.tabs);
+    expect(r.tabs.indexOf('soil') === r.tabs.indexOf('contam') + 1 && r.tabs.indexOf('xsec') === r.tabs.indexOf('soil') + 1 && r.tabs.indexOf('gwm') === r.tabs.indexOf('xsec') + 1 && r.tabs.indexOf('v3d') === r.tabs.indexOf('gwm') + 1, 'Map & data tab order: ' + r.tabs);
     expect(r.svg && r.chips >= 2, 'section page draws: ' + JSON.stringify(r));
     expect(r.link && !r.old, 'map page links to the section page: ' + JSON.stringify(r));
   });
@@ -1513,7 +1553,7 @@ app.whenReady().then(async () => {
       const until = async (f, ms = 120000) => { const t0 = Date.now(); while (!f() && Date.now() - t0 < ms) await w(250); return f(); };
       try {
         loadXsExample(); await w(400);
-        want(document.querySelector('#prail [data-tab="gwm"]'), 'a Model page on the rail');
+        goTab('site'); await w(150); want(document.querySelector('#view .mdtabs [data-tab="gwm"]'), 'a Model page in Map & data');
         goTab('gwm'); await w(300); const v = () => document.querySelector('#view') || document.body;
         want(/MODFLOW 6/.test(v().textContent), 'names the engine');
         for (const a of ['gw-run', 'gw-cal', 'gw-calt', 'gw-trans', 'gw-export', 'gw-feat-add']) want(document.querySelector('[data-act="' + a + '"]'), 'button ' + a);
@@ -2381,7 +2421,7 @@ app.whenReady().then(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
       try {
         loadXsExample(); await w(400);
-        want(document.querySelector('#prail [data-tab="v3d"]'), 'a 3D page on the rail');
+        goTab('site'); await w(150); want(document.querySelector('#view .mdtabs [data-tab="v3d"]'), 'a 3D page in Map & data');
         goTab('v3d'); await w(800);
         const V = S.v3d; want(V && V.ok, '3D scene built: ' + (V && V.error));
         if (V && V.ok) {

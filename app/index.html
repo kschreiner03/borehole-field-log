@@ -389,6 +389,24 @@ table.sum .r { text-align: right; }
 .next .btn { min-height: 34px; background: var(--panel); }
 .next .done { color: var(--ok); font-size: 13px; }
 .start { display: grid; gap: 18px; padding: 28px 8px; max-width: 980px; }
+/* the sites page: the app's home; no site is open, so the borehole list steps aside */
+body.on-sites .shell { --sidebar-width: 0px; }
+body.on-sites .side { visibility: hidden; overflow: hidden; min-width: 0; }
+body.on-sites .tb-proj { visibility: hidden; }
+.sites-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 4px 0 16px; }
+.sites-head h2 { margin: 0; font-size: 16px; font-weight: 600; margin-right: auto; }
+.sites-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.sites-t { width: 100%; }
+.sites-t td { vertical-align: middle; }
+.sites-t td:nth-child(1), .sites-t td:nth-child(3), .sites-t td:nth-child(4) { white-space: normal; }
+.sites-t td:nth-child(1) { min-width: 240px; }
+.sites-t td:nth-child(4) { min-width: 180px; }
+.sites-t .lmenu-pop { right: 0; left: auto; }
+.sites-t .site-nm { font-weight: 600; text-align: left; }
+.sites-t .site-acts { white-space: nowrap; }
+.sites-t .site-acts .btn + .btn { margin-left: 6px; }
+.sites-empty { padding-top: 8px; }
+.mdtabs { margin: 0 0 12px; }
 .start h2 { margin: 0; font-size: 22px; }
 .start > p { margin: 0; color: var(--muted); max-width: 70ch; }
 .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
@@ -1523,7 +1541,7 @@ const ANNULUS = {
 };
 
 /* ---------- state ---------- */
-const S = { bh: new Map(), sel: null, layer: 0, tab: lsGet('bhlog.tab') || 'home', units: lsGet('bhlog.units') === 'ft' ? 'ft' : 'm', gw: 'elev', round: '', hidden: new Set(),
+const S = { bh: new Map(), sel: null, layer: 0, tab: 'sites', units: lsGet('bhlog.units') === 'ft' ? 'ft' : 'm', gw: 'elev', round: '', hidden: new Set(),
   mode: 'loading', db: null, dl: null, readOnly: false, q: '', loaded: false, formStale: true,
   co: { name: '', logo: '', projLabel: 'Project No.', address: '' }, me: lsGet('bhlog.me') || '', pageDepth: +(lsGet('bhlog.pageDepth') || 0), secIds: new Set() };
 S.site = (() => { try { return JSON.parse(lsGet('bhlog.site') || 'null'); } catch { return null; } })(); S.contours = lsGet('bhlog.contours') === '1';
@@ -1542,7 +1560,6 @@ const pageDepth = b => {
 };
 const pageDepthLabel = () => S.pageFit ? `fitted to each borehole's depth (up to ${FIT_MAX()} ${S.units} on one page)` : `${fixedDepth()} ${S.units} per page`;
 S.pageFit = lsGet('bhlog.pageFit') !== '0';
-if (!['log', 'edit', 'gw', 'report', 'site'].includes(S.tab)) S.tab = 'log';
 
 const LEN = () => S.units;
 const toD = m => m == null ? null : (S.units === 'ft' ? m * FT : m);
@@ -2119,7 +2136,7 @@ function treeGroup(key, label, count, kids, extra = '') {
   return `<li class="tg${open ? ' open' : ''}"><div class="tr">${extra}<button class="tw" data-fold="${key}" aria-expanded="${open}" title="${open ? 'Collapse' : 'Expand'} ${esc(label)}">${TW}<span>${esc(label)}</span></button>${count != null ? `<span class="tc">${count}</span>` : ''}</div>${open ? `<ul class="tk">${kids}</ul>` : ''}</li>`;
 }
 const BH_TABS = ['log', 'edit', 'report'];
-const NAV_LABEL = { v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
+const NAV_LABEL = { sites: 'Sites', v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
 const NAV_ICON = { soil: '<path d="M3 9l9-5 9 5-9 5z"/><path d="M3 14l9 5 9-5"/>', v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 /* ---------- the Settings panel: each page with view settings lists its groups in CTL; the shell draws them on the right.
@@ -2164,7 +2181,11 @@ document.addEventListener('pointerdown', e => {
 const bhGlyph = well => `<svg class="bhg" viewBox="0 0 16 16" aria-hidden="true">${well ? '<circle cx="8" cy="8" r="4.6" fill="#fff" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/>' : '<circle cx="8" cy="8" r="4.6" fill="currentColor"/>'}</svg>`;
 /* the sidebar is the project as a tree: project pages, and each borehole with its own pages nested under it when chosen */
 /* the left side: a rail of project pages, then the project's boreholes as a list with a filter, status chips and a sort */
-const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['soil', 'Soil'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['compose', 'Reports']];
+/* the rail is the work in order: the sites, logging a site's boreholes, its map and everything measured on it, then what goes out */
+const RAIL_PAGES = [['sites', 'Sites'], ['edit', 'Boreholes'], ['site', 'Map & data'], ['compose', 'Outputs']];
+/* Map & data: the map and every page of a site's data, one click apart */
+const MD_TABS = [['home', 'Overview'], ['site', 'Map'], ['gw', 'Water'], ['contam', 'Lab'], ['soil', 'Soil survey'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['table', 'Tables']];
+const mdTabsHTML = () => `<nav class="dtabs mdtabs" aria-label="Map and data">${MD_TABS.map(([k, t]) => `<button type="button" data-tab="${k}" aria-current="${S.tab === k ? 'page' : 'false'}">${t}</button>`).join('')}</nav>`;
 const BH_ICON = '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M8 9h8M8 14h8"/>';
 S.bl = { q: '', st: lsGet('bhlog.blSt') || 'all', sort: lsGet('bhlog.blSort') || 'name' };
 const blMeta = b => { const w = latestWater(b), v = vapourMax(b, null, null); return { d: depthOf(b), w: w ? w.depth : null, v: v ? v.cvc : null }; };
@@ -2175,8 +2196,8 @@ function renderList(list) {
   foot.innerHTML = ex ? `${ex} example borehole${ex > 1 ? 's' : ''} · <button class="btn link" data-act="clear-examples">Remove examples</button>` : '';
   const tab = S.tab === 'reports' ? 'compose' : S.tab, onBh = BH_TABS.includes(tab), b0 = cur();
   $('#prail').innerHTML = RAIL_PAGES.map(([k, t]) => {
-    const on = k === 'edit' ? onBh : tab === k, off = k === 'edit' && !b0;
-    return `<button type="button" data-tab="${k}" aria-current="${on ? 'page' : 'false'}" ${off ? 'disabled' : ''} title="${esc(k === 'edit' ? (b0 ? `${b0.name}: log and data` : 'Select a borehole first') : NAV_LABEL[k])}">${svgI(k === 'edit' ? BH_ICON : NAV_ICON[k])}<span>${t}</span></button>`;
+    const on = k === 'edit' ? onBh : k === 'site' ? MD_TABS.some(([x]) => x === tab) : tab === k, off = k === 'edit' && !b0;
+    return `<button type="button" data-tab="${k}" aria-current="${on ? 'page' : 'false'}" ${off ? 'disabled' : ''} title="${esc(k === 'edit' ? (b0 ? `${b0.name}: log and data` : 'Open a site first') : k === 'site' ? 'Map, water, lab, soil survey, sections, model and tables' : k === 'compose' ? 'Logs, reports and exports' : NAV_LABEL[k])}">${svgI(k === 'edit' ? BH_ICON : k === 'sites' ? NAV_ICON.home : NAV_ICON[k])}<span>${t}</span></button>`;
   }).join('');
   const ps = projList(), n = { draft: 0, review: 0, issued: 0, wells: 0 };
   for (const b of ps) { n[b.status || 'draft']++; if (b.well?.installed) n.wells++; }
@@ -2194,6 +2215,12 @@ function renderList(list) {
     return `<li><button type="button" class="bl-row" data-pick="${esc(b.id)}" aria-current="${sel ? 'true' : 'false'}" title="${esc(`${b.name || 'Untitled'} · ${b.well?.installed ? 'monitoring well' : 'borehole'}`)}">${bhGlyph(b.well?.installed)}<span class="nm">${esc(b.name || 'Untitled')}</span><span class="st st-${s2}">${s2 === 'issued' ? `Rev ${b.issued?.rev ?? b.rev ?? 0}` : s2 === 'review' ? 'Review' : 'Draft'}</span><span class="meta">${esc(meta)}</span></button></li>`;
   }).join('') || `<li class="note bl-empty">${ps.length ? 'No boreholes match.' : 'No boreholes yet.'}</li>`;
 }
+document.addEventListener('click', e => {
+  const o = e.target.closest('[data-site-open]'); if (o) { openSite(o.dataset.siteOpen); return; }
+  const r = e.target.closest('[data-site-rename]'); if (r) { openRenameSite(r.dataset.siteRename); return; }
+  const d = e.target.closest('[data-site-del]'); if (d) removeSite(d.dataset.siteDel);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'site-name') { e.preventDefault(); if (renameSite(S.renameKey, e.target.value)) closeOverlay(); } });
 document.addEventListener('input', e => { if (e.target.id === 'bl-q') { S.bl.q = e.target.value; renderList(sortedList()); } });
 document.addEventListener('click', e => {
   const c = e.target.closest('[data-blst]'); if (c) { S.bl.st = c.dataset.blst; lsSet('bhlog.blSt', S.bl.st); $('#bl-head').innerHTML = ''; renderList(sortedList()); return; }
@@ -2339,7 +2366,7 @@ const BH_MORE = [['duplicate', 'Duplicate'], ['bh-tpl', 'Save as template'], ['a
 function renderBar(b) {
   const cr = $('#crumbs'), tl = $('#pg-tools'); if (!cr || !tl) return;
   const tab = S.tab === 'reports' ? 'compose' : S.tab, onBh = BH_TABS.includes(tab), st = b?.status || 'draft';
-  const parts = [[projKey(b) || 'No project', 'home']];
+  const parts = [['Sites', 'sites'], [projKey(b) || 'No project', 'home']];
   if (onBh) parts.push([b?.name || 'Untitled', 'log'], [tab === 'report' ? 'PDF' : NAV_LABEL[tab], null]); else parts.push([NAV_LABEL[tab], null]);   // every page has the same trail, so titles sit in the same place
   cr.hidden = false;
   cr.innerHTML = parts.map(([t, go], i) => (i ? '<span class="sep" aria-hidden="true">›</span>' : '') + (go && i < parts.length - 1 ? `<button class="btn link" data-tab="${go}">${esc(t)}</button>` : `<span aria-current="${i === parts.length - 1 ? 'page' : 'false'}">${esc(t)}</span>`)).join('');
@@ -2440,13 +2467,13 @@ function exampleOpts(ps) {
   return ex.length ? `<optgroup label="Examples">${ex.map(x => `<option value="__ex:${x[0]}">Example: ${esc(x[1])}</option>`).join('')}</optgroup>` : '';
 }
 function openNewProject() {
-  dialog('New project', `<div class="fields" style="grid-template-columns:1fr 1fr">
-      <div class="fld wide"><label for="np-name">Project name</label><input id="np-name" type="text" placeholder="e.g. Phase II ESA, 08-12-049-02 W4M"></div>
+  dialog('New site', `<div class="fields" style="grid-template-columns:1fr 1fr">
+      <div class="fld wide"><label for="np-name">Site or project name</label><input id="np-name" type="text" placeholder="e.g. Phase II ESA, 08-12-049-02 W4M"></div>
       <div class="fld"><label for="np-no">${esc(S.co.projLabel || 'Project No.')}</label><input id="np-no" type="text"></div>
       <div class="fld"><label for="np-client">Client</label><input id="np-client" type="text"></div>
       <div class="fld wide"><label for="np-loc">Location</label><input id="np-loc" type="text" placeholder="e.g. LSD 08-12-049-02 W4M"></div></div>
     <p class="note" style="margin:0">Creates the first borehole of the project. Boreholes you add next copy these details.</p>`,
-    `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="np-save">Create project</button>`);
+    `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="np-save">Create site</button>`);
   $('#np-name').focus();
 }
 /* every tool from the old ribbon, grouped by job, with its description */
@@ -2884,6 +2911,8 @@ function renderMain() {
   const main = $('#main');
   if (!S.loaded) return;
   const b = cur();
+  document.body.classList.toggle('on-sites', S.tab === 'sites' || !b && S.tab !== 'soil');
+  if (S.tab === 'sites' || !b && S.tab !== 'soil') { if (S.tab !== 'sites') S.tab = 'sites'; renderRail(); ctlLayout(); main.dataset.bh = ''; main.innerHTML = '<div id="view"></div>'; renderView(true); return; }   // the sites page needs no borehole
   if (!b && S.tab === 'soil') { renderRail(); ctlLayout(); main.dataset.bh = ''; main.innerHTML = '<div id="view"></div>'; renderView(true); return; }   // a soil survey needs no borehole
   if (!b) {
     renderRail(); ctlLayout();
@@ -2931,10 +2960,71 @@ function renderFacts(b) {
   el.textContent = [b.project, `${fx(depthOf(b))} ${LEN()} deep`, b.elevation != null ? `ground el. ${fu(b.elevation)}` : '', b.gwNone && !w ? 'dry on completion' : w ? `water ${fu(w.depth)} (${w.date || 'undated'})` : ''].filter(Boolean).join(' · ');
 }
 function formFocused() { const a = document.activeElement; return !!(a && a.closest && a.closest('.edit')); }
+function siteList() {
+  const m = new Map();
+  for (const b of sortedList()) { const k = projKey(b); (m.get(k) || m.set(k, []).get(k)).push(b); }
+  for (const [k, v] of Object.entries(S.site?.projects || {})) if (k !== '*' && !m.has(k) && v?.soil?.points?.length) m.set(k, []);
+  return [...m].map(([key, list]) => {
+    const b0 = list[0] || {}, by = st => list.filter(b => (b.status || 'draft') === st).length;
+    return { key, name: key || 'Untitled site', list, n: list.length, wells: list.filter(b => b.well?.installed).length, projNo: b0.projNo || '', client: b0.client || '', location: b0.location || '',
+      draft: by('draft'), review: by('review'), issued: by('issued'), updated: list.map(b => b.updated || '').sort().pop() || '', example: list.some(b => b.example) };
+  }).sort((a, c) => c.updated.localeCompare(a.updated) || a.name.localeCompare(c.name));
+}
+function openSite(key) {
+  const b = sortedList().find(x => projKey(x) === key);
+  if (b) { S.sel = b.id; S.layer = 0; S.secIds = new Set(); goTab('edit'); } else { S.sel = null; goTab('soil'); }
+}
+/* a site's name is on every one of its logs: an issued log keeps the name it was issued under until it is revised */
+const siteIssued = key => sortedList().filter(b => projKey(b) === key && b.status === 'issued');
+function renameSite(key, name) {
+  name = String(name || '').trim(); if (S.readOnly || !name || name === key) return false;
+  const iss = siteIssued(key); if (iss.length) { toast(`${iss.map(b => b.name).join(', ')} ${iss.length === 1 ? 'is' : 'are'} issued under this name. Revise ${iss.length === 1 ? 'it' : 'them'} first.`); return false; }
+  if (siteList().some(x => x.key === name)) { toast(`There is already a site called ${name}.`); return false; }
+  for (const b of sortedList()) if (projKey(b) === key) { b.project = name; logChange(b, 'Site renamed'); store.save(b); }
+  if (S.site?.projects?.[key]) { S.site.projects[name] = S.site.projects[key]; delete S.site.projects[key]; saveSite(); }
+  const fl = fileLinks(); if (fl[key]) { fl[name] = fl[key]; delete fl[key]; lsSet('bhlog.files', JSON.stringify(fl)); }
+  if (S.fh.has(key)) { S.fh.set(name, S.fh.get(key)); S.fh.delete(key); }
+  S.formStale = true; render(); toast(`Renamed to ${name}.`); return true;
+}
+function removeSite(key) {
+  if (S.readOnly) return false;
+  const list = sortedList().filter(b => projKey(b) === key), iss = siteIssued(key);
+  if (iss.length) { toast(`${iss.map(b => b.name).join(', ')} ${iss.length === 1 ? 'is an issued log' : 'are issued logs'}. Revise ${iss.length === 1 ? 'it' : 'them'} before removing the site.`); return false; }
+  if (!confirm(`Remove ${key || 'this site'} and its ${list.length} borehole${list.length === 1 ? '' : 's'} from this computer? Save the project file first if you will need it again.`)) return false;
+  for (const b of list) { store.remove(b.id); S.secIds.delete(b.id); photoStore.all(b.id).then(ps => ps.forEach(ph => photoStore.remove(ph.id))).catch(() => {}); }
+  if (S.site?.projects?.[key]) { delete S.site.projects[key]; saveSite(); }
+  if (list.some(b => b.id === S.sel)) { S.sel = null; S.layer = 0; }
+  S.formStale = true; render(); toast(`Removed ${key || 'the site'}.`); return true;
+}
+function openRenameSite(key) {
+  S.renameKey = key;
+  dialog('Rename site', `<div class="fields" style="grid-template-columns:1fr"><div class="fld"><label for="site-name">Site name</label><input id="site-name" type="text" value="${esc(key)}"></div></div><p class="note" style="margin:0">Changes the project name on every borehole of the site.</p>`,
+    '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="site-rename-go">Rename</button>');
+  $('#site-name').select();
+}
+function sitesHTML() {
+  const list = siteList(), ro = S.readOnly ? 'disabled' : '';
+  const tools = `<div class="sites-tools"><button class="btn primary" data-act="new-site" ${ro}>New site</button><button class="btn" data-act="open-file" ${ro}>Open project file…</button><button class="btn" data-act="imp-bh" ${ro}>Import a borehole (.bh)…</button></div>`;
+  const status = x => [x.draft && `${x.draft} draft`, x.review && `${x.review} for review`, x.issued && `${x.issued} issued`].filter(Boolean).join(' · ') || '—';
+  const when = iso => iso ? new Date(iso).toLocaleDateString('en-CA') : '—';
+  const body = list.length ? `<section class="sec"><header><h3>${list.length} site${list.length === 1 ? '' : 's'}</h3><span class="note">Open a site to log its boreholes; its map, water, lab results and reports all use the same data.</span></header>
+    <div class="body flush"><table class="sum sites-t"><thead><tr><th>Site</th><th>${esc(S.co.projLabel || 'Project No.')}</th><th>Client</th><th>Location</th><th class="r">Boreholes</th><th>Logs</th><th>Last change</th><th></th></tr></thead><tbody>
+    ${list.map(x => `<tr data-site-row="${esc(x.key)}"><td><button type="button" class="btn link site-nm" data-site-open="${esc(x.key)}">${esc(x.name)}</button>${x.example ? ' <span class="tag">Example</span>' : ''}</td><td>${esc(x.projNo || '—')}</td><td>${esc(x.client || '—')}</td><td>${esc(x.location || '—')}</td>
+      <td class="r">${x.n}${x.wells ? ` <span class="note">(${x.wells} well${x.wells === 1 ? '' : 's'})</span>` : ''}</td><td>${status(x)}</td><td>${when(x.updated)}</td>
+      <td class="r site-acts">${S.readOnly ? '' : `<details class="lmenu"><summary class="btn" aria-label="More for ${esc(x.name)}" title="Rename or remove this site">⋯</summary><span class="lmenu-pop"><button type="button" data-site-rename="${esc(x.key)}">Rename…</button><button type="button" class="danger-text" data-site-del="${esc(x.key)}">Remove…</button></span></details>`}</td></tr>`).join('')}
+    </tbody></table></div></section>`
+    : `<div class="start sites-empty"><p>No sites on this computer yet. A site holds a project's boreholes, map, water levels, lab results and reports.</p>
+      <div class="steps"><div class="step"><span class="n">1</span><h3>Start a site</h3><p>Name it and add the project number, client and location; every borehole copies them.</p><button class="btn primary" data-act="new-site" ${ro}>New site</button></div>
+      <div class="step"><span class="n">2</span><h3>Log boreholes</h3><p>Log borehole walks you through soil, samples, water and well; the log draws as you go.</p></div>
+      <div class="step"><span class="n">3</span><h3>Map and report</h3><p>The site's map, water levels, lab results and sections come from the same data, ready for PDFs and reports.</p></div></div>
+      <div class="actions"><button class="btn" data-act="load-lloyd" ${ro}>Example: oil lease delineation</button><button class="btn" data-act="load-sk" ${ro}>Example: service-station plume</button><button class="btn" data-act="load-dl" ${ro}>Example: excavation and monitoring</button></div></div>`;
+  return `<div class="sites-page" data-view="sites"><div class="sites-head"><h2>Sites</h2>${tools}</div>${body}</div>`;
+}
 function renderView(full) {
   const v = $('#view'); if (!v) return; ctlLayout();
   if (S.tab === 'reports') S.tab = 'compose';   // the Reports page and the report editor are one page
   const b = cur();
+  if (S.tab === 'sites') { v.innerHTML = sitesHTML(); ctlRender(); return; }
   if (S.tab === 'edit') {
     if (full || !v.querySelector('.edit')) { v.innerHTML = wsHTML(b); loadPhotos(b); wsDecorate(b); }
     checkLayers(b); refreshCalc(b); wsLog();
@@ -2952,6 +3042,7 @@ function renderView(full) {
   else if (S.tab === 'compose') { v.innerHTML = composeHTML(); requestAnimationFrame(() => { drawCompose(); fillThumbs(); gwComposeEnsure(); }); }
   else { v.innerHTML = nextSteps(b) + (editable(b) ? '<div class="lt-new"><label for="lt-new">Add a layer by typing</label><input id="lt-new" autocomplete="off" spellcheck="false" placeholder="e.g. 2.4-3.1 CL silty clay, stiff, moist, brown (depths optional: it starts at the bottom of the log)"><span class="note" id="lt-new-read"></span></div>' : '') + (editable(b) ? '<p class="log-hint">Click any layer, sample, water level or the standpipe on the log to edit it. Click empty space in a column to add one at that depth.</p>' : '') + sheetHTML(b) + logLegendHTML(b); const el = $('#log'); el.innerHTML = logSVG(b, Math.max(el.clientWidth, 900)); }
   if (MAP_TABS.includes(S.tab)) v.insertAdjacentHTML('afterbegin', hiddenNote());
+  if (MD_TABS.some(([k]) => k === S.tab)) v.insertAdjacentHTML('afterbegin', mdTabsHTML());
   if (BH_TABS.includes(S.tab)) markIssues(b);
   ctlRender();
 }
@@ -11068,11 +11159,12 @@ document.addEventListener('click', e => {
     case 'drawer-layer-below': if (editable(b) && S.drawer?.kind === 'layer') { const l0 = b.layers[S.drawer.i], top = l0.bottom ?? l0.top ?? 0, nl = newLayer(top); nl.bottom = top + fromD(S.units === 'ft' ? 2 : .5); const nx = b.layers[S.drawer.i + 1]; if (nx && nx.top != null && nx.top < nl.bottom) nl.bottom = nx.top; b.layers.splice(S.drawer.i + 1, 0, nl); logChange(b, 'Soil layers'); store.save(b); redrawLog(); openDrawer('layer', S.drawer.i + 1); } break;
     case 'drawer-edit-full': S.drawer = null; renderDrawer(); S.tab = 'edit'; S.formStale = true; renderMain(); setTimeout(() => $('#sec-well')?.scrollIntoView({ block: 'start' }), 50); break;
     case 'prefs': openPrefs(); break;
-    case 'new-project': openNewProject(); break;
+    case 'new-project': case 'new-site': openNewProject(); break;
+    case 'site-rename-go': if (renameSite(S.renameKey, $('#site-name')?.value)) closeOverlay(); break;
     case 'np-save': {
       const name = $('#np-name').value.trim(); if (!name) { $('#np-name').classList.add('bad'); $('#np-name').focus(); return; }
       const nb = blankBorehole('BH01'); Object.assign(nb, { project: name, projNo: $('#np-no').value.trim(), client: $('#np-client').value.trim(), location: $('#np-loc').value.trim() });
-      S.bh.set(nb.id, nb); store.save(nb); S.sel = nb.id; S.layer = 0; S.tab = 'edit'; closeOverlay(); S.formStale = true; render(); $('#f-name')?.focus(); $('#f-name')?.select(); toast(`Project created with ${nb.name}.`); break;
+      S.bh.set(nb.id, nb); store.save(nb); S.sel = nb.id; S.layer = 0; S.tab = 'edit'; closeOverlay(); S.formStale = true; render(); $('#f-name')?.focus(); $('#f-name')?.select(); toast(`Site created with ${nb.name}.`); break;
     }
     case 'new': if (!S.readOnly && S.co.bhTpls?.length) {
       dialog('New borehole', `<div class="fields" id="nt-pick" style="grid-template-columns:1fr"><label class="check nt-row"><input type="radio" name="nt" value="" checked> ${b ? `Blank, with the project details of ${esc(b.name)}` : 'Blank'}</label>${S.co.bhTpls.map(t => `<span class="nt-row"><label class="check"><input type="radio" name="nt" value="${t.id}"> ${esc(t.name)} <span class="note">${[t.hdr && 'drilling and people', t.well && 'well design', t.layers && `${t.layers.length} soil layers`].filter(Boolean).join(', ')}</span></label><button class="btn link" data-btdel="${t.id}" title="Delete this template">Delete</button></span>`).join('')}</div>`,
