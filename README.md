@@ -98,8 +98,8 @@ The classic interface keeps boreholes, company settings and site plans in Indexe
 
 | File | Holds | Made with |
 |---|---|---|
-| `.bhp` | one project: its boreholes, site drawing, report pages and photos | File › Save project |
-| `.bhlog` | every project and the company settings | File › Save workspace |
-| `.bh` | one borehole and its photos, to share or move between projects | File › Save borehole; File › Import borehole puts it into the open project (a copy, or replacing the same borehole when asked) |
+| `.bhp` | one project: its boreholes, site drawing, report pages and photos | File › Save project. The file is the master copy: File › Open replaces your copy of that project with it (boreholes it no longer has are removed), after listing any work of yours it lacks, and later changes save back to it |
+| `.bhlog` | every project and the company settings | File › Back up everything; Open adds it to what is here |
+| `.bh` | one borehole and its photos, to share or move between projects | File › Export this borehole. Open puts it back in its own project, replacing the copy there; File › Import a borehole into this project copies it into the open project instead |
 
 For other software: **File › Export all data (Excel)** writes every detail (boreholes, layers, samples with lab results, water levels, wells, annulus, observations), one sheet per kind, and the app imports the same workbook back; a test checks that round trip field by field, in metres and feet. **Export AGS 4** carries the same data in AGS groups (LOCA, GEOL, SAMP, ISPT, LNMC, LLPL, MOND, PIPE, FILL, DETL), with what AGS has no field for (sample purpose, VOC, LEL, rig, logger…) in the remarks.

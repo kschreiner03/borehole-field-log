@@ -17,7 +17,8 @@ const LIBS = {
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js': 'lib/pdf.worker.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js': 'lib/pdf-lib.min.js',
 };
-let html = readFileSync(join(src, 'index.html'), 'utf8');
+// the browser reads CRLF as LF before hashing inline scripts, so a Windows checkout (CRLF) would hash differently and every script be blocked
+let html = readFileSync(join(src, 'index.html'), 'utf8').replace(/\r\n?/g, '\n');
 for (const [url, local] of Object.entries(LIBS)) html = html.split(url).join(local);
 // integrity checks are for the CDN copies; a page opened from disk cannot verify local files
 html = html.replace(/ integrity="sha384-[^"]+" crossorigin="anonymous"/g, '');

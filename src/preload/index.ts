@@ -11,6 +11,8 @@ const desktop = {
   onMenu: (cb: (act: string) => void) => { ipcRenderer.on('menu', (_e, act: string) => cb(act)); },
   onOpenFile: (cb: (f: OpenedFile) => void) => { ipcRenderer.on('open-file', (_e, f: OpenedFile) => cb(f)); },
   ready: () => ipcRenderer.send('renderer-ready'),
+  // a vector PDF of page drawings (SVG, sizes in inches), printed by the shell so text stays text
+  svgPdf: (o: { pages: { svg: string; w: number; h: number }[] }): Promise<{ ok: boolean; data?: Uint8Array; error?: string }> => ipcRenderer.invoke('pdf:svg', o),
   // MODFLOW 6, run on this computer: model files in, listed outputs (bytes) back
   mf6Run: (o: { files: Record<string, string>; outputs?: string[] }): Promise<{ ok: boolean; error?: string; stdout?: string; seconds?: number; files?: Record<string, Uint8Array> }> => ipcRenderer.invoke('mf6:run', o),
   // updates: whether GitHub has a newer release (nothing about the user is sent), and the download page in the browser

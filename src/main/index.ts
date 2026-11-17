@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell, type MenuItemConstructorOptions } from 'electron';
 import { readFileSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { mf6Binary, runMf6 } from './mf6run.mjs';
 import { clearCreds, fetchSnapshot, loadCreds, saveCreds } from './applemaps.mjs';
@@ -111,6 +111,24 @@ ipcMain.handle('apple:snapshot', async (e, q) => {
 ipcMain.handle('update:check', async e => e.sender !== win?.webContents ? { ok: false, error: 'Not allowed.' } : checkForUpdate({ current: app.getVersion(), platform: process.platform }));
 ipcMain.handle('update:open', async e => { if (e.sender === win?.webContents) await shell.openExternal(HUB); });
 
+/* vector PDF: the window's page drawings (standalone SVG) printed by Chromium, so text stays real text that can be selected and
+   edited in Acrobat; each page keeps its own paper size (inches). The print window runs no scripts and is closed straight after */
+type PdfPage = { svg: string; w: number; h: number };
+const isPages = (p: unknown): p is PdfPage[] => Array.isArray(p) && p.length > 0 && p.length <= 2000 && p.every(x => x && typeof x.svg === 'string' && x.w > 0 && x.w < 100 && x.h > 0 && x.h < 100);
+ipcMain.handle('pdf:svg', async (e, o: { pages?: unknown }) => {
+  if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' };
+  const pages = o?.pages; if (!isPages(pages)) return { ok: false, error: 'No pages to print.' };
+  const css = pages.map((p, i) => `@page p${i}{size:${p.w}in ${p.h}in;margin:0}.p${i}{page:p${i};width:${p.w}in;height:${p.h}in}`).join('');
+  const html = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:#fff}.pg{overflow:hidden;break-after:page}.pg:last-child{break-after:auto}.pg>svg{display:block;width:100%;height:100%}${css}</style>` + pages.map((p, i) => `<div class="pg p${i}">${p.svg}</div>`).join('');
+  const file = join(app.getPath('temp'), `bhlog-print-${process.pid}-${Date.now()}.html`);
+  const pw = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true } });
+  try {
+    await writeFile(file, html); await pw.loadFile(file);
+    const data = await pw.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true, margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    return { ok: true, data };
+  } catch (err) { return { ok: false, error: (err as Error).message }; }
+  finally { pw.destroy(); unlink(file).catch(() => {}); }
+});
 ipcMain.handle('file:open', async e => {
   if (e.sender !== win?.webContents) return null;
   const r = await dialog.showOpenDialog(win!, { properties: ['openFile'], filters: [{ name: 'Borehole project, workspace or borehole', extensions: PROJECT_EXT }] });

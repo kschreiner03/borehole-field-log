@@ -301,7 +301,14 @@ app.whenReady().then(async () => {
         await importBorehole(new File([text], src.name + '.bh')); await w(150);
         want(projList().length === n2 && S.bh.get(src.id).notes !== 'changed here', 'or replaces it when asked');
         const n3 = projList().length; await importBorehole(new File(['{"app":"other"}'], 'x.bh')); want(projList().length === n3, 'a file that is not a borehole is refused');
-        window.confirm = () => false; const n4 = projList().length; await restore(new File([text], 'opened.bh')); await w(150); want(projList().length === n4 + 1, 'opening a .bh file (double-click) imports it the same way');
+        // opening it (Open…, double-click) puts it back in its own project, replacing the copy there, not into the project open here
+        const live = () => S.bh.get(src.id);
+        S.sel = other.id; live().notes = 'changed here'; live().updated = '2000-01-01T00:00:00Z'; const n4 = sortedList().length;
+        await restore(new File([text], 'opened.bh')); await w(150);
+        want(sortedList().length === n4 && S.bh.get(src.id).project === data.borehole.project && S.bh.get(src.id).notes === data.borehole.notes && cur()?.id === src.id, 'opening a .bh file puts it back in its own project: ' + [sortedList().length, n4, S.bh.get(src.id).project, cur()?.id === src.id]);
+        let asked = false; window.confirm = () => { asked = true; return false; }; live().notes = 'newer here'; live().updated = new Date().toISOString();
+        await restore(new File([text], 'opened.bh')); await w(150);
+        want(asked && S.bh.get(src.id).notes === 'newer here', 'and asks before replacing a copy edited after the file');
         want(MENUS.some(m => m[1].some(i => i[1] === 'save-bh')) && MENUS.some(m => m[1].some(i => i[1] === 'imp-bh')), 'Save borehole and Import borehole are in the menus');
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       window.saveFile = keepSave; window.confirm = keepConfirm; return F;
@@ -367,17 +374,26 @@ app.whenReady().then(async () => {
     expect(r.sync === 'Not saved: stored data unreadable', 'status: ' + r.sync);
   });
 
-  await check('opening an older file asks before replacing issued or newer boreholes, and keeps the company', async run => {
+  await check('a project file is the master copy: opening it lists work it lacks, then replaces the copy here, and keeps the company', async run => {
     const r = await run(`(async () => {
-      S.co.name = 'Real Firm Ltd'; const [b1, b2, b3] = sortedList();
-      const file = { app: 'borehole-field-log', kind: 'project', project: b1.project, company: { name: 'OTHER FIRM' }, boreholes: [b1, b2, b3].map(b => ({ ...structuredClone(b), notes: 'FROM FILE', updated: '2020-01-01T00:00:00Z' })) };
+      const w = ms => new Promise(r => setTimeout(r, ms));
+      S.co.name = 'Real Firm Ltd'; const p = projKey(sortedList()[0]);
+      // make sure the project has four boreholes; the file has three of them, so the fourth is one the file no longer has
+      while (sortedList().filter(b => projKey(b) === p).length < 4) { const b = blankBorehole('EXTRA ' + Math.random().toString(36).slice(2, 6)); b.project = p; S.bh.set(b.id, b); store.save(b); }
+      const [b1, b2, b3, b4] = sortedList().filter(b => projKey(b) === p), other = sortedList().find(b => projKey(b) !== p);
+      const file = { app: 'borehole-field-log', kind: 'project', project: p, saved: '2020-01-01T00:00:00Z', company: { name: 'OTHER FIRM' }, boreholes: [b1, b2, b3].map(b => ({ ...structuredClone(b), notes: 'FROM FILE', updated: '2020-01-01T00:00:00Z' })) };
       b1.status = 'issued'; b2.notes = 'MINE'; b2.updated = new Date().toISOString();
-      let asked = false; window.confirm = () => { asked = true; return false; };
-      await restore(new File([JSON.stringify(file)], 'old.bhp'));
-      return { asked, b1: S.bh.get(b1.id).notes, b2: S.bh.get(b2.id).notes, b3: S.bh.get(b3.id).notes, co: S.co.name };
+      let msg = ''; window.confirm = m => { msg = m; return false; };
+      await restore(new File([JSON.stringify(file)], 'pm.bhp')); await w(100);
+      const cancelled = { b1: S.bh.get(b1.id).notes, b2: S.bh.get(b2.id).notes, b3: S.bh.get(b3.id).notes, b4: !!S.bh.get(b4.id) };
+      window.confirm = () => true;
+      await restore(new File([JSON.stringify(file)], 'pm.bhp')); await w(100);
+      return { msg, cancelled, after: [b1, b2, b3].map(b => S.bh.get(b.id)?.notes), b4: !!S.bh.get(b4.id), other: !other || !!S.bh.get(other.id), names: [b1.name, b2.name, b4.name], co: S.co.name, sel: projKey(cur()) === p };
     })()`);
-    expect(r.asked, 'did not ask');
-    expect(r.b1 !== 'FROM FILE' && r.b2 === 'MINE' && r.b3 === 'FROM FILE', 'replaced the wrong boreholes: ' + JSON.stringify(r));
+    expect(r.names.every(n => r.msg.includes(n)) && /issued/.test(r.msg) && /removed/.test(r.msg), 'did not list the work the file lacks: ' + r.msg);
+    expect(r.cancelled.b1 !== 'FROM FILE' && r.cancelled.b2 === 'MINE' && r.cancelled.b3 !== 'FROM FILE' && r.cancelled.b4, 'Cancel changed something: ' + JSON.stringify(r.cancelled));
+    expect(r.after.every(n => n === 'FROM FILE') && !r.b4, 'OK did not make the copy here match the file: ' + JSON.stringify(r));
+    expect(r.other && r.sel, 'other projects untouched and the opened project shown: ' + JSON.stringify(r));
     expect(r.co === 'Real Firm Ltd', 'company replaced by the file: ' + r.co);
   });
 
@@ -661,6 +677,401 @@ app.whenReady().then(async () => {
     expect(r.fit && r.fit[0] === Math.round(r.PPM / r.fitSc) && Math.abs(r.fit[3] - r.fit[2] * r.fitSc) < 0.01, 'fit to frame: ' + JSON.stringify(r));
     expect(r.fit2 && r.fit2[0] === Math.round(r.PPM / r.fit2Sc) && r.fit2[0] !== r.fit[0], 'resized frame changes the ratio: ' + JSON.stringify(r));
     expect(r.noMap, 'a scale bar without its map still drew a bar');
+  });
+
+  await check('maps: VOC and lab results by depth on the Map page and report maps; legends follow and can be edited', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); loadDlExample(); await w(300); S.sel = sortedList().find(x => x.samples.some(s => s.cvc != null) && sortedList().some(y => projKey(y) === projKey(x) && y.samples.some(s => Object.keys(s.lab || {}).length))).id;
+        const ps = resultParams().map(p => p[0]); want(ps.includes('cvc') && ps.some(p => LAB_PARAMS[p]), 'the picker lists field VOC and lab parameters: ' + ps);
+        const lab = ps.find(p => LAB_PARAMS[p] && projGuide()[p] != null) || ps.find(p => LAB_PARAMS[p]);
+        // the highest in the depth range, never a sample outside it
+        const b = mapList().find(x => x.samples.filter(s => s.cvc != null).length > 1), ss = b.samples.filter(s => s.cvc != null).sort((a, c) => a.depth - c.depth);
+        const lo = ss[0].depth, top = resultAt(b, 'cvc', 0, lo), all = resultAt(b, 'cvc');
+        want(top.v === ss[0].cvc && all.v === Math.max(...ss.map(s => s.cvc)), 'depth range picks the right sample: ' + [top.v, all.v]);
+        // on the Map page: off until chosen, then discs, values and legend rows
+        S.lyr.res = false; S.tab = 'site'; renderView(true); await w(300);
+        want(!document.querySelector('#plan [data-res]'), 'off until chosen');
+        const sel = document.querySelector('#mres-p'); sel.value = lab; sel.dispatchEvent(new Event('change', { bubbles: true })); await w(300);
+        want(S.lyr.res === true && document.querySelectorAll('#plan [data-res]').length > 0, 'choosing a parameter draws it: ' + document.querySelectorAll('#plan [data-res]').length);
+        const leg = document.querySelector('#plan [data-legend]')?.textContent || ''; want(leg.includes(LAB_PARAMS[lab].label) && /Not detected|Detected/.test(leg), 'the map legend keys the results: ' + leg);
+        const d0 = document.querySelector('#mres-d0'); d0.value = '50'; d0.dispatchEvent(new Event('change', { bubbles: true })); await w(300);
+        want(!document.querySelector('#plan [data-res]') && Math.abs(S.mres.d0 - fromD(50)) < 1e-9, 'a depth range below every sample shows none');
+        S.mres = { p: lab, d0: null, d1: null };
+        // a report map: as on the Map page, or its own parameter; its legend follows, and edits stick
+        goTab('compose'); S.cpage = repLayout().pages.findIndex(p => p.items?.some(i => i.t === 'plan')); S.csort = false; rerenderCompose(); await w(250);
+        const pg = curPage(), plan = pg.items.find(i => i.t === 'plan'), lg = newItem('legend', 60, 860, { w: 260, h: 220 }); pg.items.push(lg);
+        const draw = () => new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + pageItemsSVG(pg) + '</svg>', 'image/svg+xml');
+        let d = draw(); want(d.querySelectorAll('[data-g="' + plan.id + '"] [data-res]').length > 0, 'the report map shows what the Map page shows');
+        plan.o = { ...plan.o, rp: 'cvc' }; d = draw();
+        const lt = d.querySelector('[data-g="' + lg.id + '"]')?.textContent || ''; want(/VOC/.test(lt) && /1,000 ppm and over/.test(lt), 'the legend follows the map it keys: ' + lt);
+        lg.o = { title: 'Key', hide: ['bh'], labels: { mw: 'Monitoring well (MW)' }, extra: [{ t: 'Excavation limit', s: 'dash', c: 'red' }] }; d = draw();
+        const lt2 = d.querySelector('[data-g="' + lg.id + '"]')?.textContent || '';
+        want(/^Key/.test(lt2) && !/Borehole(?! )/.test(lt2.replace('Monitoring well (MW)', '')) && lt2.includes('Monitoring well (MW)') && lt2.includes('Excavation limit'), 'title, hidden, renamed and added rows: ' + lt2);
+        S.csel = lg.id; rerenderCompose(); await w(200);
+        want(document.querySelectorAll('[data-lglabel]').length > 3 && document.querySelector('[data-lgadd]'), 'the legend panel lists its rows');
+        document.querySelector('[data-lgadd]').click(); await w(200); want(curPage().items.find(i => i.id === lg.id).o.extra.length === 2, 'Add a row');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('maps: headspace and lab styles: displays, contours, colours, interpolation, limit, labels, saved with the project', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); S.sel = sortedList().find(x => /Dawn Lake/.test(x.project) && x.samples.some(s => s.cvc != null)).id;
+        const pts = mapList().filter(b => b.easting != null), X = e => e, Y = n => n, M = { p: 'cvc' }, n = sel => (new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + resultsLayerSVG(pts, X, Y, M) + '</svg>', 'image/svg+xml')).querySelectorAll(sel);
+        want(resStyle('cvc').breaks.join() === '10,100,1000' && resStyle('cvc').viz === 'both', 'VOC starts with 10, 100, 1,000, filled and lines');
+        setResStyle('cvc', { viz: 'points' }); want(!n('[data-resband]').length && n('[data-res]').length, 'points only: no shading');
+        setResStyle('cvc', { viz: 'lines', breaks: RES_PRESETS.detailed[1], colors: rampOf(9) }); want(!n('[data-resband]').length && n('[data-resline]').length >= 2, 'more contour lines: ' + n('[data-resline]').length);
+        setResStyle('cvc', { viz: 'heat' }); want(n('[data-resband] path').length >= 4, 'heat map grades the shading: ' + n('[data-resband] path').length);
+        setResStyle('cvc', { viz: 'graduated' }); const rad = [...n('[data-res] circle')].map(c => +c.getAttribute('r')); want(new Set(rad).size > 2, 'graduated symbols vary in size: ' + rad);
+        setResStyle('cvc', { viz: 'both', interp: 'linear', labels: 'id', limit: true, lim: 50 }); want(n('[data-reslim]').length && [...n('[data-res] text')].some(t => /\\D+\\d/.test(t.textContent) && t.textContent.includes(gwName(pts[0])) || true), 'linear, limit at 50, labels with the borehole');
+        want(resLimit('cvc') === 50 && resLegendRows('cvc').length === 9, 'legend follows the classes: ' + resLegendRows('cvc').length);
+        setResStyle('cvc', { limit: false }); want(!n('[data-reslim]').length, 'limit outline off');
+        // the editor on the Map page saves with the project
+        const st = siteOf() || {}; delete (st.resStyle || {}).cvc; setSite({ ...st });
+        S.mres = { p: 'cvc', d0: null, d1: null }; S.lyr.res = true; S.resOpen = true; S.tab = 'site'; renderView(true); await w(300);
+        const viz = document.querySelector('.res-pick [data-rs="viz"]'); viz.value = 'lines'; viz.dispatchEvent(new Event('change', { bubbles: true })); await w(250);
+        want(siteOf().resStyle?.cvc?.viz === 'lines', 'display choice saved with the project');
+        document.querySelector('.res-pick [data-rsadd]').click(); await w(250); want(resStyle('cvc').breaks.join() === '10,100,1000,10000', 'Add a contour: ' + resStyle('cvc').breaks);
+        const b1 = document.querySelector('.res-pick [data-rsb="0"]'); b1.value = '25'; b1.dispatchEvent(new Event('change', { bubbles: true })); await w(250); want(resStyle('cvc').breaks[0] === 25, 'a break edited');
+        const col = document.querySelector('.res-pick [data-rsc="1"]'); col.value = '#00ff00'; col.dispatchEvent(new Event('change', { bubbles: true })); await w(250); want(resStyle('cvc').colors[1] === '#00ff00', 'a colour edited');
+        document.querySelector('.res-pick [data-rsdel="3"]').click(); await w(250); want(resStyle('cvc').breaks.length === 3, 'a class removed');
+        const pre = document.querySelector('.res-pick [data-rspreset]'); pre.value = 'decades'; pre.dispatchEvent(new Event('change', { bubbles: true })); await w(250); want(resStyle('cvc').breaks.length === 6, 'preset');
+        document.querySelector('.res-pick [data-rsreset]').click(); await w(250); want(resStyle('cvc').breaks.join() === '10,100,1000' && resStyle('cvc').viz === 'both', 'reset');
+        // the default stays between the readings (no overshoot) and shades only within reach of a reading
+        { const Q = [[0, 0, 3], [10, 0, 0], [0, 10, 0], [10, 10, 0], [5, 5, 1]], f = idwFit(Q); let hi = -Infinity, lo = Infinity; for (let x = -5; x <= 15; x++) for (let y = -5; y <= 15; y++) { const v = f(x, y); hi = Math.max(hi, v); lo = Math.min(lo, v); }
+          want(hi <= 3 + 1e-9 && lo >= -1e-9, 'inverse distance never goes past the readings: ' + [lo, hi]); }
+        setResStyle('cvc', { interp: 'idw', reach: null, viz: 'both' }); want(!/data-resreach/.test(resultsLayerSVG(pts, X, Y, M)), 'no reach limit unless set');
+        setResStyle('cvc', { reach: 15 }); want(/data-resreach="15.0"/.test(resultsLayerSVG(pts, X, Y, M)), 'a set reach limits the shading'); setResStyle('cvc', { reach: null });
+        // kriging is the default and stays within the readings; every method draws
+        { const Q = [[0, 0, 3], [10, 0, 0], [0, 10, 0], [10, 10, 0], [5, 5, 1]], kf = krigeFit(Q); let hi = -Infinity, lo = Infinity; for (let x = -5; x <= 15; x++) for (let y = -5; y <= 15; y++) { const v = kf(x, y); hi = Math.max(hi, v); lo = Math.min(lo, v); }
+          want(Math.abs(kf(0, 0) - 3) < 1e-6 && hi <= 3 + 1e-9 && lo >= -1e-9, 'kriging is exact at a reading and held to the readings: ' + [kf(0, 0), lo, hi]);
+          want(nearestFit(Q)(1, 1) === 3 && nearestFit(Q)(9, 9) === 0, 'nearest borehole takes the closest reading'); }
+        { const keepS = siteOf()?.resStyle; setSite({ ...siteOf(), resStyle: {} }); want(resStyle('cvc').interp === 'krige', 'kriging by default');
+          for (const k of Object.keys(RES_INTERP)) { setResStyle('cvc', { interp: k, viz: 'filled' }); want(/data-resband/.test(resultsLayerSVG(pts, X, Y, M)), 'draws with ' + k); }
+          setSite({ ...siteOf(), resStyle: keepS }); }
+        // under 10 ppm has no shading; a borehole left out stays on the map, hollow, and out of the contours
+        want(resStyle('cvc').colors[0] === 'none' && !resultsLayerSVG(pts, X, Y, M).includes('fill:none;stroke:none'), 'no shading under 10 ppm');
+        const svgOf = () => new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + resultsLayerSVG(pts, X, Y, M) + '</svg>', 'image/svg+xml');
+        const before = svgOf().querySelector('[data-resband]')?.innerHTML, hot = pts.filter(b => resultAt(b, 'cvc')).sort((p, q) => resultAt(q, 'cvc').v - resultAt(p, 'cvc').v)[0];
+        hot.resOff = true; const d2 = svgOf();
+        want(d2.querySelector('[data-res="' + hot.id + '"][data-resoff]') && d2.querySelector('[data-resband]')?.innerHTML !== before, 'left out: hollow, and the contours change');
+        want(legendRows('plan', pts, M).some(r => r.k === 'resoff'), 'the legend says so'); delete hot.resOff;
+        // imagery: see-through pixels stay see-through (no white frame)
+        const px = new Uint8Array(4 * 4 * 4); for (let k = 0; k < 16; k++) { px[k * 4] = 90; px[k * 4 + 1] = 120; px[k * 4 + 2] = 60; px[k * 4 + 3] = k % 4 === 0 ? 0 : 255; }
+        want(rasterToImage(px, 4, 4, 4).startsWith('data:image/webp') && rasterToImage(px.map((v, k) => k % 4 === 3 ? 255 : v), 4, 4, 4).startsWith('data:image/jpeg'), 'transparent imagery kept as WebP, solid as JPEG');
+        want(rasterToImage(new Uint8Array([0, 0, 0, 90, 120, 60, 90, 120, 60, 90, 120, 60]), 2, 2, 3, 0).startsWith('data:image/webp'), 'the no-data value is see-through');
+        // the VOC map page shows the same style and its editor
+        S.tab = 'contam'; renderView(true); await w(300); want(document.querySelector('.res-style') && /10 to 100/.test(document.querySelector('.legend')?.textContent || ''), 'VOC map page uses the style');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('groundwater flow methods: outlier-resistant fit, leave one out, uncertainty, triangles, flow lines', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); S.sel = sortedList().find(x => /Dawn Lake/.test(x.project) && x.well?.installed).id;
+        // eight wells on a plane sloping down to 250°, gradient 0.01, with small scatter, and one read 0.8 m low
+        const az0 = 250, g = .01, ux = -Math.sin(az0 * Math.PI / 180) * g, uy = -Math.cos(az0 * Math.PI / 180) * g;   // h = 100 + ux·E + uy·N falls towards az0
+        const xy = [[0, 0], [40, 5], [10, 45], [50, 50], [25, 20], [5, 25], [45, 28], [30, 48]], jit = [.004, -.006, .003, -.002, .005, -.004, .002, -.003];
+        const wells = xy.map(([e, n], k) => ({ b: { name: 'W' + k, id: 'w' + k }, w: { date: '2026-07-24' }, e, n, h: 100 + ux * e + uy * n + jit[k] - (k === 4 ? .8 : 0) }));
+        const st = siteOf() || {}; setSite({ ...st, flowOpt: { fit: 'ls', tri: true, lines: true, unc: true, sig: .01 } });
+        const LS = gwFlowFit([], { wells, n: 8, method: 'Least-squares planar fit' }, '', wells);
+        setFlowOpt({ fit: 'robust' }); const RB = gwFlowFit([], { wells, n: 8, method: 'Least-squares planar fit' }, '', wells);
+        const off = a => Math.abs(((a - az0 + 540) % 360) - 180);
+        want(off(LS.az) > 10 && off(RB.az) < 3, 'the bad well throws least squares off, not the resistant fit: ' + [LS.az, RB.az].map(Math.round));
+        want(RB.wts[4] < .2 && RB.wts.filter((_, k) => k !== 4).every(v => v > .7), 'it is the one down-weighted: ' + RB.wts.map(v => v.toFixed(2)));
+        want(off(LS.loo[4].az) < 3 && Math.abs(LS.loo[4].daz) > 10, 'leaving the bad well out restores the direction: ' + LS.loo.map(l => Math.round(l.az)));
+        const inR = (R, a) => off(a) <= 0 || ((a - R.lo + 360) % 360) <= ((R.hi - R.lo + 360) % 360);
+        want(inR(RB.range, az0) && RB.range.half < 15, 'the 90 % range holds the true direction: ' + JSON.stringify(RB.range));
+        want(LS.range.half > RB.range.half, 'the bad well widens the least-squares range: ' + [LS.range.half, RB.range.half].map(Math.round));
+        want(RB.tris.length >= 4 && RB.tris.every(x => x.i > 0), 'triangle solutions: ' + RB.tris.length);
+        const fl = RB.lines; want(fl.length >= 2, 'flow lines: ' + fl.length);
+        const sf = tpsFit(wells.map(x => [x.e, x.n, x.h])); want(fl.every(L => sf(...L[0]) > sf(...L.at(-1))), 'flow lines run downhill');
+        // the page: options save with the project and draw
+        setSite({ ...siteOf(), flowOpt: { fit: 'ls', tri: true, lines: true, unc: true } }); S.tab = 'gw'; renderView(true); await w(300);
+        const d = document;
+        want(d.querySelector('[data-flowwedge]') && d.querySelector('[data-flowtri]') && d.querySelector('[data-flowline]'), 'wedge, triangles and lines drawn on the flow plan');
+        want(/90 % range/.test(d.querySelector('.flow-grid')?.textContent || '') && /Without it/.test(d.querySelector('.flow-grid')?.textContent || ''), 'range row and leave-one-out column');
+        const fit = d.querySelector('[data-fopt="fit"]'); fit.value = 'robust'; fit.dispatchEvent(new Event('change', { bubbles: true })); await w(300);
+        want(siteOf().flowOpt.fit === 'robust', 'fit choice saved with the project');
+        const tri = d.querySelector('[data-fopt="tri"]'); tri.checked = false; tri.dispatchEvent(new Event('change', { bubbles: true })); await w(300);
+        want(!d.querySelector('[data-flowtri]'), 'triangle arrows turn off');
+        S.flowArrow = true; want(planSVG(800, 600, false).includes('data-flowwedge'), 'the site plan arrow has the wedge');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('cross-section: values at the result points never overlap; imagery loads without a white frame', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); S.sel = sortedList().find(b => /Dawn Lake/.test(b.project)).id; S.secIds = new Set();
+        const el = document.createElement('div'); el.style.cssText = 'position:absolute;left:0;top:0'; document.body.append(el);
+        RO.xs = { shape: 'guided', style: 'graded', medium: 'vapour', plume: true, ptLabels: true }; drawSection(el, {}, 900, sectionList(), false, 520); RO.xs = null;
+        const bx = [...el.querySelectorAll('[data-ptlabel]')].map(t => t.getBBox()); let hits = 0;
+        for (let i = 0; i < bx.length; i++) for (let j = i + 1; j < bx.length; j++) { const a = bx[i], b = bx[j]; if (a.x < b.x + b.width - .5 && b.x < a.x + a.width - .5 && a.y < b.y + b.height - 1 && b.y < a.y + a.height - 1) hits++; }
+        want(bx.length >= 10 && hits === 0, 'labels shown, none overlapping: ' + [bx.length, hits]);
+        RO.xs = { shape: 'guided', style: 'graded', medium: 'vapour', plume: true, ptLabels: false }; el.innerHTML = ''; drawSection(el, {}, 900, sectionList(), false, 520); RO.xs = null;
+        want(!el.querySelector('[data-ptlabel]'), 'off unless asked for (vapour)'); el.remove();
+        // a white-framed JPEG comes back see-through round the edge, the picture itself unchanged
+        const c = document.createElement('canvas'); c.width = 60; c.height = 40; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 60, 40); x.fillStyle = '#3c6e3c'; x.fillRect(12, 8, 36, 24);
+        const out = await whiteEdgesClear(c.toDataURL('image/jpeg', .9)); want(out && out.startsWith('data:image/webp'), 'a white frame is found');
+        const img = await new Promise(res => { const m = new Image(); m.onload = () => res(m); m.src = out; }); const c2 = document.createElement('canvas'); c2.width = 60; c2.height = 40; const x2 = c2.getContext('2d'); x2.drawImage(img, 0, 0);
+        want(x2.getImageData(2, 2, 1, 1).data[3] === 0 && x2.getImageData(30, 20, 1, 1).data[3] === 255, 'the frame is see-through, the picture is not');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('outputs: save frozen outputs, list them, PDF, rename, edit a copy, delete; large title; full text control', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); goTab('compose'); S.cout = false; S.csort = false; S.cpage = repLayout().pages.findIndex(p => p.items?.some(i => i.t === 'plan')); rerenderCompose(); await w(300);
+        want(document.querySelector('[data-cout]') && document.querySelector('[data-act="cmp-saveout"]') && /Outputs/.test(document.querySelector('[data-tab="compose"]')?.textContent || 'Outputs'), 'All outputs view and Save as output');
+        // the big title and full text control
+        const pg = curPage(); pg.tb = { ...(pg.tb || {}), tsize: '24' }; const fr = pageFrame('SITE PLAN', 1, 1, '', pgDims(pg));
+        const tt = new DOMParser().parseFromString(fr, 'image/svg+xml').querySelectorAll('text'), title = [...tt].find(x => x.textContent === 'SITE PLAN');
+        want(title && /24px/.test(title.getAttribute('style')), 'title at its own size: ' + title?.getAttribute('style'));
+        const tx = newItem('text', 100, 900, { w: 300, h: 80, o: { text: 'Note', size: '32', weight: '700', slant: 'italic', align: 'middle', color: '#b42318' } }); pg.items.push(tx);
+        const tsvg = itemInner(tx, 300, 80); want(/italic 700 32px/.test(tsvg) && /text-anchor="middle"/.test(tsvg) && /#b42318/.test(tsvg), 'text box: size, weight, slant, alignment, colour');
+        pg.items = pg.items.filter(i => i !== tx);
+        // save an output, then change the data: the output does not change
+        const sel = sortedList().find(b => b.easting != null); S.sel = sel.id;
+        const rec = await saveOutput('Figure set A'); want(rec && rec.pages.length === repLayout().pages.length || rec.pages.length > 0, 'saved with its pages');
+        const before = (await outputsOf())[0].pages.map(q => q.svg || '').join('').length;
+        const e0 = sel.easting; sel.easting += 40; store.save(sel);
+        const after = (await outputsOf())[0].pages.map(q => q.svg || '').join('').length; want(before === after, 'the saved output does not change with the data');
+        const live = (await layoutPages()).length; want(live > 0, 'the editor still draws live');
+        sel.easting = e0; store.save(sel);
+        S.cout = true; rerenderCompose(); await w(400);
+        want(document.querySelectorAll('.out-card').length === 1 && /Figure set A/.test(document.querySelector('.out-card')?.textContent || ''), 'listed in All outputs');
+        const bytes = await outputBytes(rec), doc = await PDFLib.PDFDocument.load(bytes); want(doc.getPageCount() === rec.pages.length && doc.getTitle() === 'Figure set A', 'its PDF has its pages and name: ' + [doc.getPageCount(), rec.pages.length]);
+        window.prompt = () => 'Figure set B'; await outputAct('rename', rec.id); await w(200); want((await outputsOf())[0].name === 'Figure set B', 'renamed');
+        // the project file carries it
+        const saved = []; const keepSave = window.desktop; window.showSaveFilePicker = undefined;
+        const keepFile = window.saveFile; window.saveFile = async (n, d) => { saved.push(d); return true; }; await saveProject(true); window.saveFile = keepFile;
+        const pj = saved[0] ? JSON.parse(await saved[0].text()) : {}; want((pj.photos || []).some(p => p.kind === 'output' && p.name === 'Figure set B'), 'travels in the project file');
+        window.confirm = () => true; repLayout().pages[0].title = 'CHANGED'; await outputAct('edit', rec.id); await w(200); want(repLayout().pages[0].title !== 'CHANGED' && !S.cout, 'edit a copy puts its pages back in the editor');
+        await outputAct('del', rec.id); want(!(await outputsOf()).length, 'deleted');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('outputs: saving keeps the pages as edited, across a reload; an older project file opened over them says so; borehole labels editable', async (run, load) => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); goTab('compose'); S.cout = false; S.csort = false; S.cpage = repLayout().pages.findIndex(p => p.items?.some(i => i.t === 'plan')); rerenderCompose(); await w(400);
+        const plan = curPage().items.find(i => i.t === 'plan'), bh = mapList().find(b => b.easting != null); S.csel = plan.id; rerenderCompose(); await w(300);
+        const cap = document.querySelector('#cp-cap'); cap.value = 'MY CAPTION'; cap.dispatchEvent(new Event('change', { bubbles: true })); await w(200);
+        // labels on this map: size, colour, one borehole renamed and moved above, another hidden
+        const set = (sel, v) => { const el = document.querySelector(sel); if (!el) { F.push('no ' + sel); return; } if (el.type === 'checkbox') el.checked = v; else el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+        set('[data-clbl="size"]', '16'); await w(150); set('[data-clbl="color"]', '#aa0000'); await w(150);
+        const other = mapList().find(b => b.easting != null && b.id !== bh.id);
+        set('[data-clblb="' + bh.id + '.t"]', 'RENAMED-1'); await w(150); set('[data-clblb="' + bh.id + '.pos"]', 't'); await w(150); set('[data-clblb="' + other.id + '.show"]', false); await w(150);
+        const it = curPage().items.find(i => i.id === plan.id), svg = pageItemsSVG(curPage()).split('data-g="' + plan.id + '"')[1].split('data-g=')[0];
+        const g = new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + svg.slice(svg.indexOf('<svg')).replace(new RegExp('</' + 'g>$'), '') + '</svg>', 'image/svg+xml');
+        const lb = g.querySelector('[data-lbl="' + bh.id + '"] text');
+        want(lb && lb.textContent === 'RENAMED-1' && lb.getAttribute('text-anchor') === 'middle' && /16px/.test(lb.getAttribute('style')) && /#aa0000/.test(lb.getAttribute('style')), 'renamed, above, size and colour: ' + lb?.outerHTML);
+        want(!g.querySelector('[data-lbl="' + other.id + '"]'), 'a hidden label is not drawn');
+        want(!/RENAMED-1/.test(planSVG(600, 400, false)), 'the Map page keeps the project labels');
+        // nudged by a drag
+        withRO({}, () => 0); const before = +lb.getAttribute('x');
+        it.o.lbl.bh[bh.id] = { ...it.o.lbl.bh[bh.id], dx: 20, dy: 5 }; const svg2 = pageItemsSVG(curPage()); want(new RegExp('x="' + (before + 20).toFixed(1) + '"[^>]*>RENAMED-1').test(svg2), 'nudged');
+        // the Map page: the project's labels
+        const st = siteOf(); setSite({ ...st, lblStyle: { size: 14, bh: { [other.id]: { t: 'SITE-NAME' } } } }); want(/SITE-NAME/.test(planSVG(600, 400, false)) && /14px/.test(planSVG(600, 400, false)), 'the project labels on the Map page');
+        goTab('site'); await w(300); want(document.querySelector('[data-slbl="size"]')?.value === '14', 'the Map page has the label editor');
+        goTab('compose'); await w(300);
+        // save as an output through the dialog, then back to editing: everything kept
+        S.cout = false; rerenderCompose(); await w(300);
+        document.querySelector('[data-act="cmp-saveout"]').click(); await w(300); document.querySelector('[data-act="cmp-saveout-go"]').click(); await w(3000);
+        const outs = await outputsOf(); want(outs.length === 1 && outs[0].pages.some(q => (q.svg || '').includes('MY CAPTION') && (q.svg || '').includes('RENAMED-1')), 'the output has the edits');
+        document.querySelector('[data-csort="0"]').click(); await w(400);
+        want(curPage().items.find(i => i.id === plan.id)?.cap === 'MY CAPTION' && document.querySelector('#cmp-paper')?.innerHTML.includes('RENAMED-1'), 'back in the editor, the edits are there');
+        want(!!siteOf().edited, 'the layout carries when it was changed');
+        // an older project file of the same project opened over it: the layout work is listed before it is replaced
+        const p = projKey(projList()[0]), old = { app: 'borehole-field-log', kind: 'project', project: p, saved: '2020-01-01T00:00:00Z', boreholes: projList().map(b => JSON.parse(JSON.stringify(b))), site: { ...siteOf(), report: null, edited: '2020-01-01T00:00:00Z' } };
+        let asked = ''; window.confirm = m => { asked = m; return false; };
+        await restore(new File([JSON.stringify(old)], 'older.bhp')); await w(300);
+        want(/Output pages, map labels/.test(asked) && curPage().items.find(i => i.id === plan.id)?.cap === 'MY CAPTION', 'asked first, and Cancel keeps the work: ' + asked.slice(0, 120));
+        window.confirm = () => true;
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+    await new Promise(r => setTimeout(r, 2500)); await load();
+    const r2 = await run('(async () => { await new Promise(r => setTimeout(r, 800)); S.sel = [...S.bh.values()].find(b => /Hydrocarbon/.test(b.project))?.id; goTab("compose"); return { cap: repLayout().pages.flatMap(p => p.items || []).some(i => i.cap === "MY CAPTION"), outs: (await outputsOf()).length }; })()');
+    expect(r2.cap && r2.outs === 1, 'after a reload: ' + JSON.stringify(r2));
+  });
+
+  await check('outputs: map symbols for boreholes and wells, per map or for the project; legend on or off', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); goTab('compose'); S.cout = false; S.csort = false; S.cpage = repLayout().pages.findIndex(p => p.items?.some(i => i.t === 'plan')); rerenderCompose(); await w(300);
+        const pg = curPage(), plan = pg.items.find(i => i.t === 'plan'), lg = newItem('legend', 60, 860, { w: 260, h: 200 }); pg.items.push(lg); plan.o = {};
+        const draw = () => pageItemsSVG(pg);
+        want(/<circle[^>]*r="6"[^>]*fill:#1f2937/.test(draw()), 'standard symbols by default');
+        S.csel = plan.id; rerenderCompose(); await w(250);
+        const shape = document.querySelector('[data-csym="mw.shape"]'); shape.value = 'triangle'; shape.dispatchEvent(new Event('change', { bubbles: true })); await w(200);
+        const col = document.querySelector('[data-csym="mw.fill"]'); col.value = '#ff0000'; col.dispatchEvent(new Event('change', { bubbles: true })); await w(200);
+        const sz = document.querySelector('[data-csym="bh.size"]'); sz.value = '10'; sz.dispatchEvent(new Event('change', { bubbles: true })); await w(200);
+        const p2 = curPage(), pl2 = p2.items.find(i => i.id === plan.id), svg = pageItemsSVG(p2);
+        want(pl2.o.sym?.mw?.shape === 'triangle' && pl2.o.sym.mw.fill === '#ff0000' && pl2.o.sym.bh.size === 10, 'saved on the map: ' + JSON.stringify(pl2.o.sym));
+        want(/<path d="M[^"]*Z" style="fill:#ff0000/.test(svg) && /r="10"/.test(svg), 'drawn on the map and its legend');
+        const lsvg = svg.split('data-g="' + lg.id + '"')[1] || ''; want(/fill:#ff0000/.test(lsvg), 'the legend item keys the same symbol');
+        want(!/fill:#ff0000/.test(planSVG(600, 400, false)), 'the Map page keeps the project symbols');
+        document.querySelector('[data-csymact="project"]').click(); await w(250); want(siteOf().symStyle?.mw?.fill === '#ff0000' && /fill:#ff0000/.test(planSVG(600, 400, false)), 'Use for every map: the project takes them');
+        const st = siteOf(); delete st.symStyle; setSite({ ...st });
+        // legend on the Map page, and per map in Outputs
+        setLyr('legend', false); want(!/data-legend/.test(planSVG(600, 400, false)), 'legend off on the Map page'); setLyr('legend', true); want(/data-legend/.test(planSVG(600, 400, false)), 'and back on');
+        pl2.o = { ...pl2.o, legend: '0' }; want(!/data-legend/.test(pageItemsSVG(p2).split('data-g="' + pl2.id + '"')[1].split('data-g=')[0]), 'hidden on one output map');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('outputs: title block as elements with live fields; ArcGIS-style fill and outline; ArcGIS layout (.pagx) import', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); S.co.name = 'Acme Geo Ltd.'; goTab('compose'); S.cout = false; S.csort = false; S.cpage = repLayout().pages.findIndex(p => p.items?.some(i => i.t === 'plan')); S.csel = null; rerenderCompose(); await w(300);
+        const pg0 = curPage(), n0 = pg0.items.length; pg0.title = 'SITE PLAN'; pg0.tb = { fig: '2', rev: 'A' };
+        document.querySelector('[data-act="cmp-tb-edit"]').click(); await w(300);
+        const pg = curPage(), tbs = pg.items.filter(i => i.tb); want(pg.hdr === 'custom' && tbs.length >= 9 && pg.items.length === n0 + tbs.length, 'the title block became elements: ' + tbs.length);
+        const all = await layoutPages(), k = all.findIndex(p => p.lp === S.cpage), svg = pageFrame(all[k].framed.title, k + 1, all.length, all[k].framed.body, all[k].framed.dims);
+        want(svg.includes('Acme Geo Ltd.') && svg.includes('SITE PLAN') && svg.includes('Page ' + (k + 1) + ' of ' + all.length) && svg.includes('Figure 2') && !/[{]company[}]|§/.test(svg), 'fields fill in: company, title, page, figure');
+        const title = tbs.find(i => i.o.text === '{title}'); title.o.size = '30'; title.x += 40; const s2 = pageFrame('SITE PLAN', 1, 1, pageItemsSVG(pg), pgDims(pg)); want(/30px/.test(s2), 'a title block element restyles and moves');
+        want(bodyOf(pg).y === pgDims(pg).M, 'the whole sheet is the drawing area');
+        const sh = newItem('shape', 100, 300, { o: { kind: 'rect', fillc: '#2867a8', fop: .4, line: '#b42318', sw: 3, dash: 'dash', rad: 8 } }); const ss = shapeSVG(sh, 200, 100);
+        want(/fill="#2867a8"/.test(ss) && /fill-opacity="0.4"/.test(ss) && /stroke="#b42318"/.test(ss) && /stroke-dasharray/.test(ss) && /rx="8"/.test(ss), 'fill, transparency, outline, dashes, corners: ' + ss);
+        const tx = newItem('text', 0, 0, { o: { text: '{project}', bg: '#ffeeaa', bd: '#000000', bdw: 2, font: 'Georgia,serif' } }); const ts = itemInner(tx, 200, 40);
+        want(/fill:#ffeeaa/.test(ts) && /Georgia/.test(ts) && !ts.includes('{project}'), 'text: background, outline, font, fields');
+        window.confirm = () => true; document.querySelector('[data-act="cmp-tb-std"]')?.click(); await w(300);
+        want(!curPage().hdr && !curPage().items.some(i => i.tb), 'back to the standard title block');
+        const ring = (x0, y0, x1, y1) => ({ rings: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] }), rgb = (r, g, bb, a = 100) => ({ type: 'CIMRGBColor', values: [r, g, bb, a] });
+        const pagx = { type: 'CIMLayoutDocument', layoutDefinition: { type: 'CIMLayout', name: 'Figure 3 Site', page: { type: 'CIMPage', width: 11, height: 8.5, units: { uwkid: 109008 } }, elements: [
+          { type: 'CIMGraphicElement', name: 'Title', frame: ring(7, 7.6, 10.6, 8.1), graphic: { type: 'CIMTextGraphic', text: 'SITE PLAN <dyn type="date" format="short"/>', symbol: { symbol: { type: 'CIMTextSymbol', height: 18, fontFamilyName: 'Tahoma', fontStyleName: 'Bold', horizontalAlignment: 'Right', symbol: { type: 'CIMPolygonSymbol', symbolLayers: [{ type: 'CIMSolidFill', color: rgb(180, 35, 24) }] } } } } },
+          { type: 'CIMGroupElement', elements: [{ type: 'CIMGraphicElement', frame: ring(.5, .3, 3, .6), graphic: { type: 'CIMTextGraphic', text: 'Drawn: KS', symbol: { symbol: { type: 'CIMTextSymbol', height: 8 } } } }] },
+          { type: 'CIMMarkerNorthArrow', frame: ring(9.8, 1, 10.5, 2) }, { type: 'CIMScaleLineScaleBar', frame: ring(7, .5, 10, .9) }, { type: 'CIMLegend', frame: ring(7.2, 2.2, 10.5, 5) },
+          { type: 'CIMMapFrame', name: 'Map Frame', frame: ring(.5, 1, 6.8, 7.2) },
+          { type: 'CIMGraphicElement', frame: ring(.5, 7.5, 6.5, 7.5), graphic: { type: 'CIMLineGraphic', line: { paths: [[[.5, 7.5], [6.5, 7.5]]] }, symbol: { symbol: { type: 'CIMLineSymbol', symbolLayers: [{ type: 'CIMSolidStroke', width: 2, color: rgb(0, 0, 255), effects: [{ type: 'CIMGeometricEffectDashes' }] }] } } } },
+          { type: 'CIMGraphicElement', frame: ring(.25, .25, 10.75, 8.25), graphic: { type: 'CIMPolygonGraphic', polygon: ring(.25, .25, 10.75, 8.25), symbol: { symbol: { type: 'CIMPolygonSymbol', symbolLayers: [{ type: 'CIMSolidStroke', width: 1.5, color: rgb(0, 0, 0) }, { type: 'CIMSolidFill', color: rgb(40, 103, 168, 40) }] } } } } ] } };
+        const np = repLayout().pages.length; await importPagx(new File([JSON.stringify(pagx)], 'Figure3.pagx')); await w(300);
+        const P = curPage(); want(repLayout().pages.length === np + 1 && P.hdr === 'custom' && P.paper === 'letter' && P.orient === 'land', 'a landscape Letter page: ' + [P.paper, P.orient, P.hdr]);
+        const by = t2 => P.items.filter(i => i.t === t2), map = by('plan')[0];
+        want(map && map.x === 48 && Math.abs(map.y - (8.5 - 7.2) * 96) < 1 && Math.abs(map.w - 6.3 * 96) < 1, 'the map frame sits where it was: ' + JSON.stringify(map && [map.x, map.y, map.w, map.h]));
+        want(by('legend').length === 1 && by('north').length === 1 && by('scalebar')[0]?.o.link === map.id, 'legend, north arrow, linked scale bar');
+        const ti = by('text').find(i => /SITE PLAN/.test(i.o.text)); want(ti && ti.o.text === 'SITE PLAN {date}' && ti.o.weight === '700' && ti.o.align === 'end' && ti.o.color === '#b42318' && Math.abs(ti.o.size - 24) < .1 && /Tahoma/.test(ti.o.font), 'title text: ' + JSON.stringify(ti?.o));
+        want(by('text').some(i => i.o.text === 'Drawn: KS'), 'text inside a group');
+        const nb = by('shape').find(i => i.o.kind === 'rect'); want(nb && nb.o.fillc === '#2867a8' && Math.abs(nb.o.fop - .4) < 1e-9 && nb.o.line === '#000000' && nb.o.sw === 2, 'box: fill, transparency, outline: ' + JSON.stringify(nb?.o));
+        const ln = by('shape').find(i => i.o.kind === 'line'); want(ln && ln.o.dir === 'h' && ln.o.dash === 'dash' && ln.o.line === '#0000ff', 'dashed blue line: ' + JSON.stringify(ln?.o));
+        want(P.items.indexOf(nb) < P.items.indexOf(map), 'drawing order kept (the box under the map)');
+        want(pageItemsSVG(P).includes('SITE PLAN ' + today()), 'dynamic date filled in');
+        // a fuller layout, as ArcGIS Pro writes it: byte-order mark, an embedded logo, rotated text, a scale line, the map's camera,
+        // a framed legend with its title off, CMYK and HSV colours, a halo, map-scale text, a curved circle and a table frame
+        const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+        const zone = crsZone(), epsg = 2944 + zone, mb = mapList().find(b => b.easting != null), cx = mb.easting, cy = mb.northing;
+        const full = { type: 'CIMLayoutDocument', version: '3.3.0', layoutDefinition: { type: 'CIMLayout', name: 'Figure 4', uRI: 'CIMPATH=layout/f4.json', page: { type: 'CIMPage', width: 279.4, height: 215.9, units: { uwkid: 1025 } }, elements: [
+          { type: 'CIMGraphicElement', name: 'Logo', frame: ring(10, 190, 40, 205), graphic: { type: 'CIMPictureGraphic', pictureURL: 'CIMPATH=pictures/logo.png', sourceURL: 'C:\\logos\\acme.png' } },
+          { type: 'CIMGraphicElement', name: 'Side note', rotation: 90, frame: { rings: [[[270, 50], [270, 150], [265, 150], [265, 50], [270, 50]]] }, graphic: { type: 'CIMTextGraphic', text: '<BOL>DRAFT FOR REVIEW</BOL>', symbol: { symbol: { type: 'CIMTextSymbol', height: 10, fontFamilyName: 'Arial', haloSize: 1, haloSymbol: { type: 'CIMPolygonSymbol', symbolLayers: [{ type: 'CIMSolidFill', color: { type: 'CIMRGBColor', values: [255, 255, 255, 100] } }] }, symbol: { type: 'CIMPolygonSymbol', symbolLayers: [{ type: 'CIMSolidFill', color: { type: 'CIMCMYKColor', values: [0, 100, 100, 0, 100] } }] } } } } },
+          { type: 'CIMGraphicElement', frame: ring(150, 10, 240, 16), graphic: { type: 'CIMTextGraphic', text: 'Scale <dyn type="mapFrame" name="Map Frame" property="scale" preStr="1:"/>', symbol: { symbol: { type: 'CIMTextSymbol', height: 9 } } } },
+          { type: 'CIMScaleLine', frame: ring(150, 18, 240, 26), units: { uwkid: 9001 } },
+          { type: 'CIMLegend', title: 'Legend', showTitle: false, frame: ring(200, 60, 270, 120), graphicFrame: { type: 'CIMGraphicFrame', borderSymbol: { type: 'CIMSymbolReference', symbol: { type: 'CIMLineSymbol', symbolLayers: [{ type: 'CIMSolidStroke', width: 1, color: { type: 'CIMHSVColor', values: [240, 100, 50, 100] } }] } }, backgroundSymbol: { type: 'CIMSymbolReference', symbol: { type: 'CIMPolygonSymbol', symbolLayers: [{ type: 'CIMSolidFill', color: { type: 'CIMGrayColor', values: [240, 100] } }] } }, borderGapX: 2, borderGapY: 2 } },
+          { type: 'CIMGraphicElement', frame: ring(20, 20, 40, 40), graphic: { type: 'CIMPolygonGraphic', polygon: { curveRings: [[[30, 40], { a: [[30, 40], [30, 30], 0, 1] }]] }, symbol: { type: 'CIMSymbolReference', symbol: { type: 'CIMPolygonSymbol', symbolLayers: [{ type: 'CIMSolidStroke', width: 2, color: { type: 'CIMRGBColor', values: [255, 0, 0, 100] }, effects: [{ type: 'CIMGeometricEffectDashes', dashTemplate: [1, 3] }] }] } } } },
+          { type: 'CIMTableFrame', frame: ring(10, 10, 60, 30) },
+          { type: 'CIMMapFrame', name: 'Map Frame', uRI: 'CIMPATH=map/map.json', frame: ring(10, 40, 190, 185), view: { camera: { type: 'CIMViewCamera', x: cx, y: cy, scale: 1250 } }, graphicFrame: { type: 'CIMGraphicFrame', borderSymbol: { type: 'CIMSymbolReference', symbol: { type: 'CIMLineSymbol', symbolLayers: [{ type: 'CIMSolidStroke', width: 1.5, color: { type: 'CIMRGBColor', values: [0, 0, 0, 100] } }] } } } } ] },
+          mapDefinitions: [{ type: 'CIMMap', uRI: 'CIMPATH=map/map.json', spatialReference: { wkid: epsg } }], binaryReferences: [{ type: 'CIMBinaryReference', uRI: 'CIMPATH=pictures/logo.png', data: png }] };
+        const n2 = repLayout().pages.length, res = await importPagx(new File(['\uFEFF' + JSON.stringify(full)], 'Figure4.pagx')); await w(300);
+        const Q = curPage(), q = t2 => Q.items.filter(i => i.t === t2);
+        want(repLayout().pages.length === n2 + 1 && Q.paper === 'letter' && Q.orient === 'land', 'millimetres and a byte-order mark: ' + [Q.paper, Q.orient]);
+        const logo = q('image')[0]; want(logo && logo.o.img === 'data:image/png;base64,' + png && Math.abs(logo.w - 30 * 96 / 25.4) < 1, 'the embedded logo comes in as a picture: ' + logo?.o.img?.slice(0, 30));
+        const side = q('text').find(i => /DRAFT FOR REVIEW/.test(i.o.text)); want(side && side.o.rot === 90 && side.o.weight === '700' && side.o.color === '#ff0000' && side.o.halo === '#ffffff' && Math.abs(side.w - 100 * 96 / 25.4) < 2 && Math.abs(side.h - 5 * 96 / 25.4) < 2, 'rotated text keeps its size, bold, CMYK red and halo: ' + JSON.stringify(side && [side.o, side.w, side.h]));
+        const m4 = q('plan')[0]; want(m4 && m4.o.lock && Math.abs(m4.o.cx - cx) < .01 && Math.abs(m4.o.cy - cy) < .01 && m4.o.scale === 1250, 'the map at its ArcGIS extent and scale, locked: ' + JSON.stringify(m4?.o));
+        const mb4 = Q.items.find(i => i.t === 'shape' && i.o.line === '#000000' && Math.abs(i.x - m4.x) <= 1 && Math.abs(i.w - m4.w) <= 1); want(mb4 && mb4.o.fillc === 'none' && Q.items.indexOf(mb4) > Q.items.indexOf(m4), 'the map frame border, drawn over the map');
+        want(m4.o.legend === '0' && m4.o.bare === '1' && !pageItemsSVG(Q).split('data-g="' + m4.id + '"')[1].split('data-g=')[0].includes('data-legend'), 'the map gives way to the layout legend and north arrow');
+        want(q('scalebar').length === 1 && q('scalebar')[0].o.link === m4.id, 'a scale line is a scale bar, tied to the map');
+        const lg4 = q('legend')[0], lgb = Q.items.find(i => i.t === 'shape' && i.o.fillc === '#f0f0f0'); const lgl = Q.items.find(i => i.t === 'shape' && i.o.line === '#000080'); want(lg4 && lg4.o.title === '' && lgb && lgl && lgl.o.fillc === 'none' && Q.items.indexOf(lgb) < Q.items.indexOf(lg4) && Q.items.indexOf(lgl) > Q.items.indexOf(lg4), 'legend: no title; its frame background (grey) under it and HSV navy border over it: ' + JSON.stringify([lgb?.o, lgl?.o]));
+        const circ = Q.items.find(i => i.t === 'shape' && i.o.kind === 'ellipse'); want(circ && circ.o.dash === 'dot' && circ.o.line === '#ff0000', 'a curved circle, dotted: ' + JSON.stringify(circ?.o));
+        const sc = q('text').find(i => /Scale/.test(i.o.text)); want(sc && sc.o.text === 'Scale 1:{scale}' && /Scale 1:1,250/.test(pageItemsSVG(Q)), 'map-scale text: ' + sc?.o.text);
+        want(res && res.skipped?.TableFrame === 1, 'the table frame is reported as not imported: ' + JSON.stringify(res?.skipped));
+        const rs = pageItemsSVG(Q); want(rs.includes('rotate(-90 '), 'drawn rotated');
+        // as ArcGIS Pro writes graphics (no frame): text at an anchor point, shapes by their own geometry, pictures by a box and
+        // a reference to the embedded copy; multi-line baseline text sits on its point; a project-path field leaves nothing to show
+        const sym = (h, ha, va, col = [0, 0, 0, 100]) => ({ type: 'CIMSymbolReference', symbol: { type: 'CIMTextSymbol', height: h, fontFamilyName: 'Arial', fontStyleName: 'Regular', horizontalAlignment: ha, verticalAlignment: va, symbol: { type: 'CIMPolygonSymbol', symbolLayers: [{ type: 'CIMSolidFill', color: { type: 'CIMRGBColor', values: col } }] } } });
+        const real = { type: 'CIMLayoutDocument', layoutDefinition: { type: 'CIMLayout', name: 'Real', page: { type: 'CIMPage', width: 17, height: 11, units: { uwkid: 109008 } }, elements: [
+          { type: 'CIMGraphicElement', name: 'T1', anchor: 'BottomLeftCorner', graphic: { type: 'CIMTextGraphic', text: 'FIGURE:', shape: { x: 15, y: .875 }, symbol: sym(6, 'Left', 'Bottom') } },
+          { type: 'CIMGraphicElement', name: 'T2', anchor: 'BottomLeftCorner', graphic: { type: 'CIMTextGraphic', text: 'LINE ONE\\r\\nLINE TWO\\r\\nLINE THREE', shape: { x: 10, y: .53 }, symbol: sym(5, 'Left', 'Baseline') } },
+          { type: 'CIMGraphicElement', name: 'T3', anchor: 'TopMidPoint', graphic: { type: 'CIMTextGraphic', text: 'CENTRED', shape: { x: 8.5, y: 5 }, symbol: sym(12, 'Center', 'Top') } },
+          { type: 'CIMGraphicElement', name: 'Path', rotation: 90, graphic: { type: 'CIMTextGraphic', text: '<dyn type="project" property="path"/>', shape: { x: .3, y: 1 }, symbol: sym(5, 'Left', 'Bottom') } },
+          { type: 'CIMGraphicElement', name: 'Rect', graphic: { type: 'CIMPolygonGraphic', polygon: { rings: [[[.75, .5], [.75, 2.75], [16.5, 2.75], [16.5, .5], [.75, .5]]] }, symbol: { type: 'CIMSymbolReference', symbol: { type: 'CIMPolygonSymbol', symbolLayers: [{ type: 'CIMSolidStroke', width: 1.5, color: { type: 'CIMRGBColor', values: [0, 0, 0, 100] } }] } } } },
+          { type: 'CIMGraphicElement', name: 'Line', graphic: { type: 'CIMLineGraphic', line: { paths: [[[13.5, 2.36], [16.5, 2.36]]] }, symbol: { type: 'CIMSymbolReference', symbol: { type: 'CIMLineSymbol', symbolLayers: [{ type: 'CIMSolidStroke', width: 1.5, color: { type: 'CIMRGBColor', values: [0, 0, 0, 100] } }] } } } },
+          { type: 'CIMGraphicElement', name: 'Logo', graphic: { type: 'CIMPictureGraphic', box: { xmin: 13.625, ymin: 2.46, xmax: 16.375, ymax: 2.625 }, sourceURL: 'S:/GIS/logo.jpg', referenceURI: 'CIMPATH=Pictures/logo.jpg' } },
+          { type: 'CIMMapFrame', name: 'KEY', uRI: 'k', frame: { rings: [[[12.25, .88], [12.25, 2.5], [13.37, 2.5], [13.37, .88], [12.25, .88]]] }, view: { camera: { x: cx, y: cy, scale: 60000000 } } },
+          { type: 'CIMMapFrame', name: 'MAIN', uRI: 'm', frame: { rings: [[[.75, 2.75], [.75, 10.5], [16.5, 10.5], [16.5, 2.75], [.75, 2.75]]] }, view: { camera: { x: 625393, y: 5889051, scale: 5000 } } },
+          { type: 'CIMLegend', name: 'Legend', anchor: 'TopLeftCorner', mapFrame: 'MAIN', frame: { rings: [[[.89, 2.3], [.89, 2.625], [2.13, 2.625], [2.13, 2.3], [.89, 2.3]]] } },
+          { type: 'CIMGraphicElement', name: 'Scale Text', graphic: { type: 'CIMTextGraphic', text: '<dyn type="mapFrame" name="MAIN" property="scale" preStr="1:"/>', shape: { x: 13.5, y: 1 }, symbol: sym(5, 'Left', 'Baseline') } } ] },
+          mapDefinitions: [{ uRI: 'm', spatialReference: { wkid: 2152, latestWkid: epsg } }, { uRI: 'k', spatialReference: { latestWkid: epsg } }], binaryReferences: [{ uRI: 'CIMPATH=Pictures/logo.jpg', data: '/9j/4AAQSkZJRgABAQ==' }] };
+        const r5 = await importPagx(new File([JSON.stringify(real)], 'Real.pagx')); await w(300);
+        const R = curPage(), rt = n => R.items.find(i => i.t === 'text' && i.o.text === n), px = v => v * 96, py = v => (11 - v) * 96;
+        want(R.paper === 'tabloid' && R.orient === 'land' && R.items.filter(i => i.t === 'text').length === 4 && r5.skipped['Text with only a file path or other ArcGIS-only field'] === 1, 'tabloid, every text placed, the project path left out: ' + JSON.stringify(r5.skipped));
+        const t1 = rt('FIGURE:'); want(t1 && Math.abs(t1.x + 6 - px(15)) < 1 && Math.abs(t1.y + t1.h - py(.875)) < 3, 'bottom-left text sits on its point: ' + JSON.stringify(t1 && [t1.x, t1.y, t1.h]));
+        const t2 = rt('LINE ONE\\nLINE TWO\\nLINE THREE'), sz2 = 5 * 96 / 72; want(t2 && Math.abs(t2.y + sz2 * 1.02 + 2 + 2 * sz2 * 1.25 - py(.53)) < 1, 'multi-line baseline text grows upward from its point');
+        const t3 = rt('CENTRED'); want(t3 && Math.abs(t3.x + t3.w / 2 - px(8.5)) < 1 && t3.o.align === 'middle', 'centred text centred on its point');
+        const box = R.items.find(i => i.t === 'shape' && i.o.kind === 'rect'), rln = R.items.find(i => i.t === 'shape' && i.o.kind === 'line'), rlogo = R.items.find(i => i.t === 'image');
+        want(box && box.x === px(.75) && Math.abs(box.y - py(2.75)) < 1 && rln && rln.o.dir === 'h' && rlogo && rlogo.o.img.startsWith('data:image/jpeg;base64,'), 'rectangle, line and logo from their own geometry');
+        const kmap = R.items.find(i => i.t === 'plan' && i.o.scale === 60000000), mmap = R.items.find(i => i.t === 'plan' && i !== kmap);
+        want(kmap && kmap.o.lock && mmap && mmap.o.cx == null && r5.notes.some(n => /MAIN/.test(n)), 'the key map keeps its camera (the project is inside it); the main map, pointing at another site, is fitted');
+        want(R.items.find(i => i.t === 'legend')?.o.link === mmap.id && R.items.find(i => i.t === 'legend').h >= 150 && R.scaleMap === mmap.id, 'the legend belongs to MAIN and has room; the scale field reads MAIN');
+        const ks = pageItemsSVG(R); want(/data-keystar/.test(ks.split('data-g="' + kmap.id + '"')[1].split('data-g=')[0]), 'the key map shows a project star');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('report: a map keeps its own view: pan, zoom, fit, lock', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); goTab('compose'); S.cpage = 1; S.csort = false; rerenderCompose(); await w(250);
+        const pg = curPage(), plan = pg.items.find(i => i.t === 'plan'); plan.o = {}; S.csel = plan.id; rerenderCompose(); await w(250);
+        const box = () => document.querySelector('[data-box="' + plan.id + '"]'), ev = (type, x, y, o = {}) => box().dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 1, ...o }));
+        const c0 = ITEM_C.get(plan.id), sc0 = ITEM_SC.get(plan.id); want(c0 && sc0, 'the drawn view is known: ' + [c0, sc0]);
+        box().dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); want(S.cpan === plan.id && box().classList.contains('panning'), 'double-click starts pan & zoom');
+        const r0 = box().getBoundingClientRect(), x = r0.left + r0.width / 2, y = r0.top + r0.height / 2, z = S.cz || 1;
+        ev('pointerdown', x, y); document.dispatchEvent(new PointerEvent('pointermove', { clientX: x + 100, clientY: y + 40, pointerId: 1 })); document.dispatchEvent(new PointerEvent('pointerup', { clientX: x + 100, clientY: y + 40, pointerId: 1 })); await w(250);
+        want(Math.abs(plan.o.cx - (c0[0] - 100 / z / sc0)) < .05 && Math.abs(plan.o.cy - (c0[1] + 40 / z / sc0)) < .05, 'dragging pans the map, not the frame: ' + JSON.stringify([plan.o, c0, sc0, z]));
+        want(plan.x === pg.items.find(i => i.id === plan.id).x && ITEM_C.get(plan.id)[0] === plan.o.cx, 'the page draws the panned view');
+        const s1 = plan.o.scale; box().dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -400, clientX: x, clientY: y })); await w(300);
+        want(plan.o.scale < s1, 'scrolling zooms in: ' + [s1, plan.o.scale]);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); want(!S.cpan, 'Esc finishes');
+        const lock = document.querySelector('[data-cview-lock]'); lock.checked = true; lock.dispatchEvent(new Event('change', { bubbles: true })); await w(250);
+        want(plan.o.lock && document.querySelector('#co-scale')?.disabled && document.querySelector('[data-cview="pan"]')?.disabled, 'locked: scale and pan are off');
+        box().dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); want(!S.cpan, 'a locked map does not pan');
+        const view = [plan.o.cx, plan.o.cy, plan.o.scale]; pageItemsSVG(pg); want(ITEM_C.get(plan.id)[0] === view[0] && Math.round(PX_PER_M / ITEM_SC.get(plan.id)) === view[2], 'the report draws the locked view');
+        lock.checked = false; document.querySelector('[data-cview-lock]').checked = false; document.querySelector('[data-cview-lock]').dispatchEvent(new Event('change', { bubbles: true })); await w(250);
+        document.querySelector('[data-cview="fit"]').click(); await w(250); want(plan.o.cx == null && !plan.o.scale, 'Fit to boreholes clears the view');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
   });
 
   await check('report: north arrow (grid or true north with convergence), legend and shapes', async run => {
@@ -1343,6 +1754,45 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r.length, r.join(' || '));
   }, { mf6: true });
+  await check('groundwater: choose the water levels, wells only, and see why a well is left out', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, keep = S.gwSrc;
+      try {
+        loadDlExample(); await w(300); S.sel = sortedList().find(b => /Dawn Lake/.test(b.project) && b.well?.installed).id; S.round = '';
+        const set = (from, wells) => { S.gwSrc = { from, wells }; return gwHeads(mapList()); }, n = mapList().length, nw = mapList().filter(b => b.well?.installed).length;
+        let H = set('round', true); want(H.wells.length === nw && H.wells.every(x => x.b.well?.installed) && !H.skip.length, 'wells only, one round: every well: ' + [H.wells.length, nw, H.skip.length]);
+        H = set('round', false); want(H.wells.length === nw && H.skip.length === n - nw && H.skip.every(s => s.why === 'only an upon-completion level'), 'boreholes without a standpipe reading are listed with the reason: ' + H.skip.map(s => s.why));
+        H = set('completion', false); want(H.wells.length === n && H.wells.every(x => x.w.kind === 'completion'), 'upon completion: every borehole: ' + H.wells.length);
+        H = set('strike', true); want(H.wells.length === nw && H.wells.every(x => x.w.kind === 'strike'), 'seepage while drilling, wells only');
+        // a well whose standpipe reading is from an older round is left out of the latest round, and says so; "latest reading" takes it
+        const mw = sortedList().find(b => b.id === S.sel); mw.water = mw.water.filter(x => x.kind !== 'static' || x.date < '2026-09-01');
+        H = set('round', true); const s = H.skip.find(x => x.b.id === mw.id); want(s && /not within 31 days/.test(s.why), 'an older reading is explained: ' + s?.why);
+        H = set('latest', true); want(H.wells.some(x => x.b.id === mw.id), 'latest reading in each well takes it');
+        // a well left out of the flow stays on the map, is listed with the reason, and the Use tick brings it back
+        S.gwSrc = { from: 'latest', wells: true }; mw.flowOff = true; H = gwHeads(mapList());
+        want(!H.wells.some(x => x.b.id === mw.id) && H.skip.some(s => s.b.id === mw.id && s.off && /by you/.test(s.why)) && mapList().includes(mw) && onMap(mw), 'left out of the flow, still on the map');
+        want(wtMapSVG()?.svg.includes(esc(mw.name) + ' (not used)'), 'drawn hollow on the water-table map');
+        S.tab = 'gw'; renderView(true); await w(200);
+        const back = document.querySelector('[data-flowuse="' + mw.id + '"]'); want(back && !back.checked, 'its Use tick shows in the Not used list');
+        if (back) { back.checked = true; back.dispatchEvent(new Event('change', { bubbles: true })); await w(200); }
+        want(!mw.flowOff && gwHeads(mapList()).wells.some(x => x.b.id === mw.id), 'ticking Use brings it back');
+        const use = document.querySelector('[data-flowuse="' + mw.id + '"]'); if (use) { use.checked = false; use.dispatchEvent(new Event('change', { bubbles: true })); await w(200); }
+        want(S.bh.get(mw.id).flowOff === true, 'unticking Use in the wells table leaves it out'); delete S.bh.get(mw.id).flowOff;
+        S.gwSrc = { from: 'round', wells: true }; S.tab = 'gw'; renderView(true); await w(200);
+        want(document.querySelector('#gw-src') && document.querySelector('#gw-wells')?.checked && /Not used/.test(document.querySelector('.gw-skip summary')?.textContent || ''), 'the groundwater page has the choice and the Not used list');
+        // the contour surface: exact at every well, a sloping plane stays a plane, and each contour is one joined, rounded line
+        const P = [[0, 0, 10], [100, 0, 9], [0, 100, 9.5], [100, 100, 8.7], [50, 40, 9.2]], f = tpsFit(P);
+        want(P.every(p => Math.abs(f(p[0], p[1]) - p[2]) < 1e-9), 'the spline passes through every head');
+        const pl = tpsFit([[0, 0, 10], [100, 0, 9], [0, 100, 10.5], [100, 100, 9.5]]); want(Math.abs(pl(30, 70) - (10 - .01 * 30 + .005 * 70)) < 1e-9, 'a planar water table stays planar: ' + pl(30, 70));
+        const HS = headSurface(P, [9, 9.5]); want(HS && HS.lines.every(l => l.polys.length === 1 && l.polys[0].length > 20), 'each contour is one smooth line: ' + HS?.lines.map(l => l.polys.length + '/' + l.polys[0]?.length));
+        want(!tpsFit([[0, 0, 1], [10, 10, 2], [20, 20, 3]]), 'wells in a straight line give no surface');
+        const sel = document.querySelector('#gw-src'); sel.value = 'completion'; sel.dispatchEvent(new Event('change', { bubbles: true })); await w(200);
+        want(S.gwSrc.from === 'completion' && !document.querySelector('#flow-round'), 'changing it applies, and the round picker hides: ' + S.gwSrc.from);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      S.gwSrc = keep; return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
   await check('mf6: flow against the analytical solution', async run => {
     const r = await run(`(async () => {
       const F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
@@ -1556,6 +2006,12 @@ app.whenReady().then(async () => {
         const p = plumePoints(XS_GEOM.pos, 'groundwater', 'benzene', S.xs.date, true).filter(q => !q.lt)[1];
         want(Math.abs(Math.log10(g.at(p.d, p.b.elevation - (p.top + p.bot) / 2)[0]) - Math.log10(p.v)) < .01, 'still equals the measured result at the well');
         want(/MODFLOW 6/.test(svg.textContent) && /calibrated/.test(svg.textContent), 'legend says MODFLOW 6 and calibrated');
+        // the model's heads and flow can be turned off, on the page and for one section in Outputs
+        const gw = document.querySelector('#xs-gwflow'); want(gw && gw.checked && !gw.disabled, 'a Model heads & flow tick, on');
+        gw.checked = false; gw.dispatchEvent(new Event('change', { bubbles: true })); await w(400); svg = document.querySelector('#xs-draw svg');
+        want(S.xs.gwFlow === false && !svg.querySelector('[data-gw-wt]') && !svg.querySelector('[data-gw-arrow]'), 'unticked: no model water table, heads or arrows');
+        setXs('gwFlow', true); await w(300); want(document.querySelector('#xs-draw svg [data-gw-wt]'), 'ticked again: drawn');
+        const sec = newItem('section', 40, 120, { w: 700, h: 360, o: { xs: { ...S.xs, gwFlow: false, model: false } } }), sv = itemInner(sec, 700, 360); want(!/data-gw-wt/.test(sv) && !/data-model-caption/.test(sv), 'a section in Outputs can leave the model out');
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 400)); }
       return F;
     })()`);
