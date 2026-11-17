@@ -269,10 +269,12 @@ table.sum .r { text-align: right; }
 .seg button[aria-pressed="true"] { background: var(--sel); color: var(--ink); font-weight: 600; }
 .lay-ctl { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sec-tools { display: grid; gap: 10px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--rule, var(--grid)); }
+.sec-lines { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; }
 .sec-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .sec-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; border: 1px solid var(--control, var(--line)); border-radius: var(--r-sm); background: var(--surface, #fff); font: 500 13px var(--f-body); color: var(--ink); cursor: pointer; }
-.sec-chip[aria-pressed="true"] { border-color: var(--ink); background: var(--raised); font-weight: 600; }
-.sec-chip .n { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 11.5px; }
+.sec-chip[aria-pressed="true"] { border-color: var(--ink); background: var(--raised); box-shadow: inset 0 0 0 1px var(--ink); }
+.sec-chip .n.off { background: transparent; box-shadow: inset 0 0 0 1.5px var(--control, var(--line)); }
+.sec-chip .n { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 11.5px; }
 .sec-opts { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; }
 .sec-opts .check { font-size: 13px; }
 .rep-cols .seg button { padding: 5px 12px; font-size: 13px; min-height: 30px; }
@@ -418,6 +420,8 @@ rect.hz[data-ed^="add"]:hover { fill: rgba(29, 95, 158, .04); }
 body.drawer-open .main { padding-right: min(420px, 100vw); }
 @media (max-width: 860px) { body.drawer-open .main { padding-right: 0; } .drawer { top: auto; height: 62vh; width: 100vw; border-left: 0; border-top: 1px solid var(--line); } }
 .cmp.outputs { display: block; } .cmp.outputs .cmp-main { width: 100%; }
+.out-editing { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; margin: 0 0 8px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); } .out-editing .sp { flex: 1; }
+.out-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; } .out-bar .sp { flex: 1; } .out-card.sel { outline: 2px solid var(--accent); } .out-pick { font-size: 12px; }
 .out-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; padding: 6px 0; } .out-card { border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--panel); display: grid; gap: 8px; }
 .out-th { display: block; width: 100%; aspect-ratio: 8.5 / 11; border: 1px solid var(--line); background: #fff; padding: 0; cursor: pointer; overflow: hidden; } .out-th img { width: 100%; height: 100%; object-fit: contain; } .out-meta { display: grid; gap: 2px; }
 .out-view { display: grid; gap: 14px; max-height: 70vh; overflow: auto; margin-top: 10px; } .out-view img { width: 100%; border: 1px solid var(--line); background: #fff; } .out-view figure { margin: 0; } .empty-out { padding: 30px; text-align: center; }
@@ -5721,8 +5725,9 @@ async function v3dBuild() {
   S.v3d = { ok: true, renderer, scene, camera, groups, ve, span, target: new THREE.Vector3(0, (zTop - Z0) * ve / 2, 0), orbit: prev?.orbit && prev.ok && prev.span === span ? prev.orbit : null };
   S.v3d.plume = plume;
   { // the section line's direction: the picked boreholes' ends, else the best-fit line through all (principal axis)
-    const pk = [...S.secIds].map(id => list.find(b => b.id === id)).filter(Boolean); let ux, uy;
-    if (pk.length >= 2) { const a = pk[0], b = pk[pk.length - 1], L = Math.hypot(b.easting - a.easting, b.northing - a.northing) || 1; ux = (b.easting - a.easting) / L; uy = (b.northing - a.northing) / L; }
+    const pk = [...S.secIds].map(id => list.find(b => b.id === id)).filter(Boolean), SL3 = secLineOf(); let ux, uy;
+    if (SL3) { const a = SL3.pts[0], b = SL3.pts.at(-1), L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; ux = (b[0] - a[0]) / L; uy = (b[1] - a[1]) / L; }
+    else if (pk.length >= 2) { const a = pk[0], b = pk[pk.length - 1], L = Math.hypot(b.easting - a.easting, b.northing - a.northing) || 1; ux = (b.easting - a.easting) / L; uy = (b.northing - a.northing) / L; }
     else { let sxx = 0, syy = 0, sxy = 0; for (const b of list) { const x = b.easting - E0, y = b.northing - N0; sxx += x * x; syy += y * y; sxy += x * y; } const th = .5 * Math.atan2(2 * sxy, sxx - syy); ux = Math.cos(th); uy = Math.sin(th); }
     const nx = -uy, ny = ux, s = list.map(b => (b.easting - E0) * ux + (b.northing - N0) * uy), o = list.map(b => (b.easting - E0) * nx + (b.northing - N0) * ny);
     S.v3d.cut = { ux, uy, nx, ny, s0: Math.min(...s) - 6, s1: Math.max(...s) + 6, o0: Math.min(...o) - 3, o1: Math.max(...o) + 3, z0: zBot, z1: zTop, PF, lvP, E0, N0, Z0, ve }; }
@@ -6134,6 +6139,13 @@ function drawHydro(el = $('#hydro'), list = projList().filter(b => !S.hidden.has
    looking along it) for a best-fit line, 0 when the line runs through the picked boreholes; dir = compass side of the line */
 function secPos(bhs) {
   const located = bhs.every(b => b.easting != null && b.northing != null);
+  const SL = secLineOf();
+  if (located && SL) {
+    const pr = bhs.map(b => { const q = plProject(SL.pts, b.easting, b.northing), az = (Math.atan2(b.easting - q.px, b.northing - q.py) * 180 / Math.PI + 360) % 360;
+      return { b, c: q.d, off: q.dist < .05 ? 0 : q.off, dir: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(az / 45) % 8] }; }).sort((a, c) => a.c - c.c);
+    const c0 = pr[0].c, out = pr.map(x => ({ b: x.b, d: x.c - c0, off: x.off, dir: x.dir }));
+    out.at = dd => plAt(SL.pts, dd + c0); out.line = true; return out;
+  }
   if (located && S.secIds.size >= 2 && bhs.every(b => S.secIds.has(b.id))) { let d = 0; const out = bhs.map((b, i) => { if (i) d += Math.hypot(b.easting - bhs[i - 1].easting, b.northing - bhs[i - 1].northing); return { b, d, off: 0 }; });
     out.at = dd => { for (let i = 1; i < out.length; i++) if (dd <= out[i].d || i === out.length - 1) { const a = out[i - 1], c = out[i], t = c.d > a.d ? (dd - a.d) / (c.d - a.d) : 0; return [a.b.easting + t * (c.b.easting - a.b.easting), a.b.northing + t * (c.b.northing - a.b.northing)]; } return [out[0].b.easting, out[0].b.northing]; };
     return out; }
@@ -6154,7 +6166,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const xs = RO.xs || (el.id === 'xs-draw' ? S.xs : null), wOf = b => xs ? waterAt(b, xs.date || null) : readingFor(b);
   if (bhs.length < 2) { el.innerHTML = `<p class="note">Log at least two boreholes to draw a cross-section.</p>`; note.textContent = ''; return; }
   const located = bhs.every(b => b.easting != null && b.northing != null);
-  const ordered = located && S.secIds.size >= 2 && bhs.every(b => S.secIds.has(b.id));
+  const ordered = located && !secLineOf() && S.secIds.size >= 2 && bhs.every(b => S.secIds.has(b.id));
   const pos = secPos(bhs);
   const noElev = bhs.some(b => b.elevation == null);
   const top = b => b.elevation ?? 0;
@@ -6270,7 +6282,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   o.push('</svg>');
   el.innerHTML = o.join('');
   const missing = pos.filter(p => !wOf(p.b)).map(p => p.b.name);
-  note.textContent = [located ? (ordered ? `Section through ${pos.map(p => p.b.name).join(' → ')}; distances are measured along that line.` : 'Best-fit line through all boreholes; each is projected onto it.') : 'Some boreholes have no coordinates, so all are spaced evenly.', noElev ? 'Some boreholes have no ground elevation; all are drawn from 0.' : '',
+  note.textContent = [located ? (secLineOf() ? `Section along the line drawn on the map: ${pos.map(p => p.b.name).join(' → ')}, each placed where it falls along the line${pos.some(p => p.off) ? ', with its distance off the line below' : ''}.` : ordered ? `Section through ${pos.map(p => p.b.name).join(' → ')}; distances are measured along that line.` : 'Best-fit line through all boreholes; each is projected onto it.') : 'Some boreholes have no coordinates, so all are spaced evenly.', noElev ? 'Some boreholes have no ground elevation; all are drawn from 0.' : '',
     missing.length ? `No ${xs?.date ? `water reading on or before ${xs.date}` : S.round ? 'reading near this date' : 'reading'} for ${missing.join(', ')}.` : '', xs ? 'Water: solid ticks are measured levels, hollow triangles are seepage or strikes while drilling; dashed lines join static readings of the same round (interpolated).' : ''].filter(Boolean).join(' ');
 }
 
@@ -8688,12 +8700,13 @@ function legendRows(kind, pts, MR) {
     if (wells) R.push({ k: 'mw', t: 'Monitoring well', sym: (x, y) => BH_SYMBOL(x, y, true) });
   }
   if (kind === 'plan') {
-    if (lyrOn('sec') && S.secIds?.size >= 2) R.push({ k: 'sec', t: 'Cross-section line', sym: sym('dash', 'var(--accent)') });
+    if (lyrOn('sec') && (S.secIds?.size >= 2 || secLineOf())) R.push({ k: 'sec', t: 'Cross-section line', sym: sym('dash', 'var(--accent)') });
     if (lyrOn('wl') && pts.some(b => b.well?.installed && readingFor(b))) R.push({ k: 'wl', t: `Water elevation (${LEN()})`, sym: (x, y) => `<text x="${x}" y="${y + 4}" text-anchor="middle" class="wl" style="font-size:10px">.42</text>` });
     if (S.contours && H.wells.length >= 3) R.push({ k: 'contours', t: `Water-table contour (${LEN()})`, sym: sym('line', 'var(--water)') });
     if (lyrOn('flow') && !gwFlow().error) R.push({ k: 'flow', t: 'Inferred groundwater flow', sym: sym('arrow', 'var(--water)') });
   }
   if (kind === 'wt') R.push({ k: 'contours', t: `Water-table contour (${LEN()})`, sym: sym('line', 'var(--water)') }, { k: 'bands', t: 'Lower to higher head', sym: (x, y) => `<rect x="${x - 10}" y="${y - 5}" width="10" height="10" fill="rgb(232,241,250)"/><rect x="${x}" y="${y - 5}" width="10" height="10" fill="rgb(92,141,190)"/>` });
+  if (kind === 'wt' && (RO.farrow ?? '') !== '0' && !gwFlow().error && !gwFlow().flat) { R.push({ k: 'farrow', t: 'Groundwater flow direction', sym: sym('arrow', 'var(--accent-2)') }); if ((RO.farrow ?? '') !== 'arrow' && gwFlow().range) R.push({ k: 'wedge', t: 'Flow direction, 90 % range', sym: (x, y) => `<path d="M${x - 10} ${y + 5}L${x + 10} ${y - 6}L${x + 10} ${y + 6}Z" style="fill:var(--water)" fill-opacity=".2"/>` }); }
   if (kind === 'flow') R.push({ k: 'equi', t: `Fitted equipotential (${LEN()})`, sym: sym('dash', 'var(--water)') });
   const fo = flowOpt(), fl = !gwFlow().error;
   if (fl && (kind === 'flow' || (kind === 'plan' && lyrOn('flow')))) { if (fo.unc) R.push({ k: 'wedge', t: 'Flow direction, 90 % range', sym: (x, y) => `<path d="M${x - 10} ${y + 5}L${x + 10} ${y - 6}L${x + 10} ${y + 6}Z" style="fill:var(--water)" fill-opacity=".2"/>` }); if (fo.lines) R.push({ k: 'flines', t: 'Flow line (from the contours)', sym: sym('line', 'var(--water)') }); }
@@ -8751,7 +8764,7 @@ addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; });
 document.addEventListener('pointerdown', e => {
   if (!e.target.closest?.('#plan svg') || !S._plan) return;
   const onThing = e.target.closest('[data-secpick], [data-bhpt], [data-feat]');
-  const drawing = S.mapEdit && S.mapTool !== 'select';
+  const drawing = (S.mapEdit && S.mapTool !== 'select') || !!S.secDraw;
   if (!(e.button === 1 || spaceDown || (!onThing && !drawing && e.button === 0))) return;
   mPan = { x: e.clientX, y: e.clientY, v: { cx: S._plan.cx, cy: S._plan.cy, sc: S._plan.sc }, moved: false };
   e.stopImmediatePropagation(); e.preventDefault();
@@ -9010,7 +9023,7 @@ function siteHTML() {
     ${S.mapEdit ? `<section class="sec" style="grid-column:1/-1"><header><h3>Map editor</h3><span class="note">Shapes and locations are saved as you go</span></header><div class="body" id="map-ed-wrap">${mapEditorHTML()}</div></section>` : ''}
     <section class="sec" style="grid-column:1/-1" ${S.mapEdit ? 'hidden' : ''}><header><h3>Site plan</h3><span class="note">Drag to move · scroll to zoom · click boreholes to build the section line</span></header><div class="body">${S.mapEdit ? '' : `<div id="plan" class="map-canvas"></div>`}
       ${pts.length < projList().length ? `<p class="note" style="margin-top:6px">${projList().length - pts.length} borehole${projList().length - pts.length > 1 ? 's have' : ' has'} no coordinates and ${projList().length - pts.length > 1 ? 'are' : 'is'} not shown.</p>` : ''}</div></section>
-    <section class="sec" style="grid-column:1/-1"><header><h3>Cross-section A–A′</h3><span class="note">${S.secIds.size >= 2 ? `Runs through ${S.secIds.size} boreholes picked on the plan` : 'Best-fit line through all boreholes'}</span><span class="sp"></span><button class="btn link" data-tab="xsec">Open cross-section</button></header></section>
+    <section class="sec" style="grid-column:1/-1"><header><h3>Cross-section ${esc(secLetters())}</h3><span class="note">${secLineOf() ? `Along the line drawn on the map, ${sectionList().length} boreholes` : S.secIds.size >= 2 ? `Runs through ${S.secIds.size} boreholes picked on the plan` : 'Best-fit line through all boreholes'}</span><span class="sp"></span><button class="btn link" data-tab="xsec">Open cross-section</button></header></section>
     <section class="sec"><header><h3>Plasticity chart</h3><span class="note">CFEM / Modified USCS</span></header><div class="body"><div id="pchart" class="scroll-x"></div></div></section>
     <section class="sec"><header><h3>Grain size distribution</h3><span class="note">CFEM size limits</span></header><div class="body scroll-x">${gsdSVG()}</div></section>
     <section class="sec"><header><h3>Soil texture triangle</h3><span class="note">CSSC (Canadian System of Soil Classification)</span></header><div class="body scroll-x">${textureTriSVG()}</div></section>
@@ -9019,7 +9032,52 @@ function siteHTML() {
 }
 /* cross-section: boreholes picked in order (the line runs through them in that order), else a best-fit line through all.
    Its look (height, vertical exaggeration, column width, what is drawn) is shared by the screen and the report page. */
-const sectionList = () => S.secIds.size >= 2 ? [...S.secIds].map(id => S.bh.get(id)).filter(b => b && onMap(b) && projKey(b) === projKey(projList()[0])) : mapList();
+/* a section line drawn on the map (site.secLine: its points, the boreholes shown on it and the reach used to choose them). The
+   boreholes are placed by where they fall along the line, whatever order they were ticked in, with their distance off it */
+/* the project's section lines: site.secLines [{ id, name, pts, ids, buf }], the one in use is site.secActive (none: picked boreholes).
+   An older project's single site.secLine becomes line A */
+function secLinesOf() { const st = siteOf() || {}; return st.secLines || (st.secLine?.pts?.length >= 2 ? [{ ...st.secLine, id: 'ln-a', name: 'A' }] : []); }
+function secActiveLine() { const st = siteOf() || {}, ls = secLinesOf(), id = st.secActive === undefined ? ls[0]?.id : st.secActive; return ls.find(l => l.id === id) || null; }
+const secLineOf = () => { const l = RO.secDef ? RO.secDef.line : secActiveLine(); return l?.pts?.length >= 2 ? l : null; };
+const secLetter = () => secLineOf()?.name || 'A';
+const secLetters = (n = secLetter()) => n + '–' + n + '′';
+function saveSecLines(ls, active) { const st = { ...(siteOf() || {}) }; delete st.secLine; st.secLines = ls; st.secActive = active ?? null; setSite(st); }
+function nextSecName() { const used = new Set(secLinesOf().map(l => l.name)); for (let i = 0; i < 702; i++) { const n = i < 26 ? String.fromCharCode(65 + i) : String.fromCharCode(64 + Math.floor(i / 26)) + String.fromCharCode(65 + i % 26); if (!used.has(n)) return n; } return 'X'; }
+Object.defineProperty(S, 'secIds', {
+  configurable: true,
+  get() {
+    if (RO.secDef) return (RO._secPick ||= new Set(RO.secDef.pick || []));
+    const p = projKey(projList()[0]); if (S._secP !== p) { S._secP = p; S._secSet = new Set((siteOf()?.secPick || []).filter(id => S.bh.has(id))); }
+    return S._secSet;
+  },
+  // clearing on a project change reloads the project's own pick; a new order is kept (secPickSave writes it to the project)
+  set(v) { if (!v?.size) { S._secP = null; return; } S._secSet = v; S._secP = projKey(projList()[0]); },
+});
+function secPickSave() { if (S.readOnly) return; const st = { ...(siteOf() || {}) }, ids = [...S.secIds]; if (ids.length) st.secPick = ids; else delete st.secPick; setSite(st); }
+/* the section as it is now, to keep with an output page's section */
+const secDefNow = () => withRO({}, () => ({ line: secLineOf() ? structuredClone(secLineOf()) : null, pick: [...S.secIds] }));
+const plLen = pts => pts.reduce((s, p, i) => i ? s + Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) : 0, 0);
+function plProject(pts, e, n) {   // chainage along the line, signed offset (+ left looking along it), and the foot on the line
+  let best = null, acc = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i], dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1e-9, t0 = ((e - ax) * dx + (n - ay) * dy) / (L * L);
+    const tt = i === 1 && t0 < 0 ? t0 : i === pts.length - 1 && t0 > 1 ? t0 : Math.max(0, Math.min(1, t0));   // beyond the ends, the end segments carry on
+    const px = ax + tt * dx, py = ay + tt * dy, dist = Math.hypot(e - px, n - py), side = Math.sign(dx * (n - ay) - dy * (e - ax)) || 1;
+    if (!best || dist < best.dist - 1e-9) best = { d: acc + tt * L, off: side * dist, dist, px, py };
+    acc += L;
+  }
+  return best;
+}
+function plAt(pts, d) {
+  let acc = 0;
+  for (let i = 1; i < pts.length; i++) { const [ax, ay] = pts[i - 1], [bx, by] = pts[i], L = Math.hypot(bx - ax, by - ay) || 1e-9; if (d <= acc + L || i === pts.length - 1) { const t = (d - acc) / L; return [ax + t * (bx - ax), ay + t * (by - ay)]; } acc += L; }
+  return pts[0];
+}
+const secCandidates = () => mapList().filter(b => b.easting != null && b.northing != null && ((b.layers || []).some(l => l.bottom > l.top) || b.water?.length));
+const secWithin = (pts, buf) => secCandidates().filter(b => plProject(pts, b.easting, b.northing).dist <= buf).map(b => b.id);
+// changes the line in use (null: use picked boreholes instead; the lines stay)
+function setSecLine(l) { const ls = secLinesOf(), a = secActiveLine(); if (!l) { saveSecLines(ls, null); return; } if (a) saveSecLines(ls.map(x => x.id === a.id ? { ...a, ...l, id: a.id, name: a.name } : x), a.id); else { const n = { id: uid('ln'), name: nextSecName(), ...l }; saveSecLines([...ls, n], n.id); } }
+const sectionList = () => secLineOf() ? (() => { const L = secLineOf(), ids = new Set(L.ids || []); return mapList().filter(b => ids.has(b.id)); })() : S.secIds.size >= 2 ? [...S.secIds].map(id => S.bh.get(id)).filter(b => b && onMap(b) && projKey(b) === projKey(projList()[0])) : mapList();
 const SEC_OPTS = {
   h: { label: 'Height', opts: { s: ['Small', 320], m: ['Medium', 420], l: ['Large', 560] } },
   ve: { label: 'Vertical exaggeration', opts: { auto: ['Auto', 0], 1: ['×1', 1], 2: ['×2', 2], 5: ['×5', 5], 10: ['×10', 10], 20: ['×20', 20] } },
@@ -9027,23 +9085,74 @@ const SEC_OPTS = {
 };
 S.sec = { h: 'm', ve: 'auto', bw: 'm', units: true, water: true, wells: true, ...jsonLS('bhlog.sec', {}) };
 const secOpt = k => { if (RO[k] != null) return RO[k]; const o = SEC_OPTS[k].opts; return (o[S.sec[k]] || Object.values(o)[k === 've' ? 0 : 1])[1]; };
+document.addEventListener('click', e => { const b = e.target.closest?.('[data-secuse]'); if (!b || S.readOnly) return; saveSecLines(secLinesOf(), b.dataset.secuse || null); renderView(true); });
+document.addEventListener('change', e => { if (e.target.id !== 'sec-name' || S.readOnly) return; const a = secActiveLine(), v = e.target.value.trim().toUpperCase().slice(0, 4); if (!a || !v) return; if (secLinesOf().some(l => l.id !== a.id && l.name === v)) { toast('There is already a line ' + secLetters(v) + '.'); e.target.value = a.name; return; } saveSecLines(secLinesOf().map(l => l.id === a.id ? { ...l, name: v } : l), a.id); renderView(true); });
+const secChooserHTML = () => { const ls = secLinesOf(), a = secActiveLine(); if (!ls.length) return ''; return '<div class="sec-lines" role="group" aria-label="Section lines"><span class="note">Section lines:</span>' + ls.map(l => '<button class="sec-chip" data-secuse="' + l.id + '" aria-pressed="' + (a?.id === l.id) + '">' + esc(secLetters(l.name)) + '</button>').join('') + '<button class="sec-chip" data-secuse="" aria-pressed="' + !a + '">Picked boreholes</button><button class="btn link" data-act="sec-draw" ' + (S.readOnly ? 'disabled' : '') + '>+ New line (' + esc(secLetters(nextSecName())) + ')</button></div>'; };
+function secToggle(id) { const L = secLineOf(); if (!L || S.readOnly) return; const ids = new Set(L.ids || []); ids.has(id) ? ids.delete(id) : ids.add(id); setSecLine({ ...L, ids: [...ids] }); redrawSec(); if ($('#sec-tools')) $('#sec-tools').outerHTML = secToolsHTML(); if (S.tab === 'site') drawPlan(); }
+document.addEventListener('click', e => { const c = e.target.closest?.('[data-secline]'); if (c) secToggle(c.dataset.secline); });
+document.addEventListener('change', e => {
+  if (e.target.id !== 'sec-buf' || S.readOnly) return; const L = secLineOf(); if (!L) return;
+  const v = e.target.value === '' ? null : fromD(Math.max(0, +e.target.value || 0)); setSecLine({ ...L, buf: v, ids: v == null ? L.ids : secWithin(L.pts, v) }); renderView(true);
+});
+/* drawing the line on the map */
+function secDraftDraw(cursor) {
+  const svg = $('#plan svg'), t = S._plan; if (!svg || !t || !S.secDraw) return;
+  const X = e => t.W / 2 + (e - t.cx) * t.sc, Y = n => t.H / 2 - (n - t.cy) * t.sc, pts = cursor ? [...S.secDraw.pts, cursor] : S.secDraw.pts;
+  let p = svg.querySelector('#sec-draft'); if (!p) { p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.id = 'sec-draft'; p.setAttribute('style', 'fill:none;stroke:var(--accent);stroke-width:2.5;stroke-dasharray:8 4'); svg.appendChild(p); }
+  p.setAttribute('d', pts.map((q, i) => (i ? 'L' : 'M') + X(q[0]) + ' ' + Y(q[1])).join(''));
+}
+function finishSecLine() {
+  const d = S.secDraw; S.secDraw = null; if (!d) return;
+  const pts = d.pts.filter((p, i) => !i || Math.hypot(p[0] - d.pts[i - 1][0], p[1] - d.pts[i - 1][1]) > .01);
+  if (pts.length < 2) { toast('A section line needs two points or more.'); renderView(true); return; }
+  const len = plLen(pts), buf = Math.max(5, Math.round(len * .15)), near = secWithin(pts, buf);
+  const ids = near.length >= 2 ? near : secCandidates().map(b => ({ id: b.id, q: plProject(pts, b.easting, b.northing).dist })).sort((a, c) => a.q - c.q).slice(0, 3).map(x => x.id);
+  const cur = d.redo && secActiveLine(), name = cur ? cur.name : nextSecName();
+  if (cur) setSecLine({ pts, ids, buf: near.length >= 2 ? buf : null }); else { const n = { id: uid('ln'), name, pts, ids, buf: near.length >= 2 ? buf : null }; saveSecLines([...secLinesOf(), n], n.id); }
+  renderView(true);
+  toast('Section line ' + secLetters(name) + ' drawn: ' + ids.length + ' borehole' + (ids.length === 1 ? '' : 's') + (near.length >= 2 ? ' within ' + fu(buf) + ' of it' : ', the nearest') + '. Tick or untick boreholes in the panel.');
+}
+document.addEventListener('pointerdown', e => {
+  if (!S.secDraw || e.button !== 0 || !e.target.closest?.('#plan svg')) return;
+  const g = e.target.closest('[data-secpick]'), b = g && S.bh.get(g.dataset.secpick), w = b && b.easting != null ? [b.easting, b.northing] : planWorld(e); if (!w) return;
+  S.secDraw.pts.push([+w[0].toFixed(2), +w[1].toFixed(2)]); secDraftDraw(); const st = $('#sec-tools'); if (st) st.outerHTML = secToolsHTML(); e.preventDefault();
+});
+document.addEventListener('pointermove', e => { if (S.secDraw && e.target.closest?.('#plan')) { const w = planWorld(e); if (w) secDraftDraw(w); } });
+document.addEventListener('dblclick', e => { if (S.secDraw && e.target.closest?.('#plan')) { S.secDraw.pts.pop(); finishSecLine(); } });
+document.addEventListener('keydown', e => { if (!S.secDraw || e.target.closest?.('input, textarea, select')) return; if (e.key === 'Enter') { e.preventDefault(); finishSecLine(); } else if (e.key === 'Escape') { e.preventDefault(); S.secDraw = null; renderView(true); } }, true);
 function setSec(k, v) { S.sec = { ...S.sec, [k]: v }; lsSet('bhlog.sec', JSON.stringify(S.sec)); if (k === 'units') S.showUnits = v; redrawSec(); if ($('#sec-tools')) $('#sec-tools').outerHTML = secToolsHTML(); }
+function secLineHTML() {
+  const L = secLineOf(), ro = S.readOnly ? 'disabled' : '';
+  if (S.secDraw) return '<div class="sec-pick sec-drawing"><span class="note"><b>Drawing section line ' + esc(secLetters(S.secDraw.redo && secActiveLine() ? secActiveLine().name : nextSecName())) + ':</b> click on the map to add points (click a borehole to go through it). Double-click or press Enter to finish; Esc cancels. ' + (S.secDraw.pts.length ? S.secDraw.pts.length + ' point' + (S.secDraw.pts.length === 1 ? '' : 's') + ' so far.' : '') + '</span><div class="actions" style="margin:0"><button class="btn primary" data-act="sec-draw-done" ' + (S.secDraw.pts.length >= 2 ? '' : 'disabled') + '>Finish line</button><button class="btn" data-act="sec-draw-cancel">Cancel</button></div></div>';
+  if (!L) return '';
+  const pos = secCandidates().map(b => ({ b, q: plProject(L.pts, b.easting, b.northing) })).sort((a, c) => (a.b.name || '').localeCompare(c.b.name || '', undefined, { numeric: true })), ids = new Set(L.ids || []);
+  return '<div class="sec-pick"><span class="note"><label for="sec-name">Section</label> <input id="sec-name" value="' + esc(L.name || 'A') + '" style="width:44px" ' + ro + ' title="The letter of this line"> along the line drawn on the map (' + fu(plLen(L.pts)) + ' long). Boreholes are placed where they fall along it; tick the ones to show:</span>'
+    + '<div class="sec-chips">' + pos.map(({ b, q }) => '<button class="sec-chip" data-secline="' + esc(b.id) + '" aria-pressed="' + ids.has(b.id) + '" title="' + esc(fu(q.dist)) + ' off the line">' + '<span class="n' + (ids.has(b.id) ? '' : ' off') + '">' + (ids.has(b.id) ? '✓' : '') + '</span>' + esc(b.name) + '<small class="note"> ' + esc(fu(q.dist)) + ' off</small></button>').join('') + '</div>'
+    + '<div class="actions" style="margin:0;align-items:center"><label class="note" for="sec-buf">Show boreholes within</label><input id="sec-buf" type="number" min="0" step="any" style="width:80px" value="' + (L.buf != null ? +toD(L.buf).toFixed(1) : '') + '" ' + ro + '><span class="note">' + LEN() + ' of the line</span></div>'
+    + '<div class="actions" style="margin:0"><button class="btn link" data-act="sec-draw-redo" ' + ro + '>Redraw ' + esc(secLetters(L.name)) + '</button><button class="btn link" data-act="sec-line-rev" ' + ro + '>Reverse (' + esc(L.name) + ' ↔ ' + esc(L.name) + '′)</button><button class="btn link danger-text" data-act="sec-line-delete" ' + ro + '>Delete ' + esc(secLetters(L.name)) + '</button>' + (S.tab !== 'xsec' ? '<button class="btn link" data-tab="xsec">Open the cross-section</button>' : '') + '</div></div>';
+}
 function secToolsHTML() {
-  const all = mapList().filter(b => (b.layers || []).some(l => l.bottom > l.top)), picked = [...S.secIds].filter(id => all.some(b => b.id === id));
+  if (S.secDraw || secLineOf()) return '<div id="sec-tools" class="sec-tools">' + (S.secDraw ? '' : secChooserHTML()) + secLineHTML() + secOptsHTML() + '</div>';
+  const all = mapList().filter(b => (b.layers || []).some(l => l.bottom > l.top)).sort((a, c) => (a.name || '').localeCompare(c.name || '', undefined, { numeric: true })), picked = [...S.secIds].filter(id => all.some(b => b.id === id));
   const seg = k => `<span class="lay-ctl"><span class="note">${SEC_OPTS[k].label}</span><span class="seg" role="group" aria-label="${SEC_OPTS[k].label}">${Object.entries(SEC_OPTS[k].opts).map(([v, [t]]) => `<button data-secopt="${k}:${v}" aria-pressed="${String(S.sec[k]) === v}">${t}</button>`).join('')}</span></span>`;
   const chk = (k, t) => `<label class="check"><input type="checkbox" data-secshow="${k}" ${S.sec[k] !== false ? 'checked' : ''}> ${t}</label>`;
-  return `<div id="sec-tools" class="sec-tools">
+  return `<div id="sec-tools" class="sec-tools">${secChooserHTML()}
     <div class="sec-pick"><span class="note">${picked.length >= 2 ? 'Section runs through, in this order:' : 'Click boreholes in the order the section should run (here or on the site plan). Until you pick two, the section follows a best-fit line through all.'}</span>
-      <div class="sec-chips">${all.map(b => { const i = picked.indexOf(b.id); return `<button class="sec-chip" data-secpick="${esc(b.id)}" aria-pressed="${i >= 0}">${i >= 0 ? `<span class="n">${i + 1}</span>` : ''}${esc(b.name)}</button>`; }).join('')}</div>
-      ${picked.length ? `<div class="actions" style="margin:0"><button class="btn link" data-act="sec-rev">Reverse</button><button class="btn link" data-act="sec-clear">Clear and use the best-fit line</button></div>` : ''}</div>
-    <div class="sec-opts">${seg('h')}${seg('ve')}${seg('bw')}<span class="lay-ctl"><span class="note">Show</span>${chk('units', 'Interpreted units')}${chk('water', 'Water table')}${chk('wells', 'Wells')}</span></div>
+      <div class="sec-chips">${all.map(b => { const i = picked.indexOf(b.id); return `<button class="sec-chip" data-secpick="${esc(b.id)}" aria-pressed="${i >= 0}"><span class="n${i >= 0 ? '' : ' off'}">${i >= 0 ? i + 1 : ''}</span>${esc(b.name)}</button>`; }).join('')}</div>
+      <div class="actions" style="margin:0"><button class="btn" data-act="sec-draw" ${S.readOnly ? 'disabled' : ''} title="Draw the section line on the map; the boreholes are ordered by where they fall along it">Draw a section line on the map</button>${picked.length ? `<button class="btn link" data-act="sec-rev">Reverse</button><button class="btn link" data-act="sec-clear">Clear and use the best-fit line</button>` : ''}</div></div>
+    ${secOptsHTML()}
   </div>`;
+}
+function secOptsHTML() {
+  const seg = k => `<span class="lay-ctl"><span class="note">${SEC_OPTS[k].label}</span><span class="seg" role="group" aria-label="${SEC_OPTS[k].label}">${Object.entries(SEC_OPTS[k].opts).map(([v, [t]]) => `<button data-secopt="${k}:${v}" aria-pressed="${String(S.sec[k]) === v}">${t}</button>`).join('')}</span></span>`;
+  const chk = (k, t) => `<label class="check"><input type="checkbox" data-secshow="${k}" ${S.sec[k] !== false ? 'checked' : ''}> ${t}</label>`;
+  return `<div class="sec-opts">${seg('h')}${seg('ve')}${seg('bw')}<span class="lay-ctl"><span class="note">Show</span>${chk('units', 'Interpreted units')}${chk('water', 'Water table')}${chk('wells', 'Wells')}</span></div>`;
 }
 function drawSite() { drawPlan(); drawPlasticity(); }
 /* the Cross-section page: the section line, the drawing and everything drawn on it */
 function xsecHTML() {
   return `<div class="xs-page">
-    <section class="sec"><header><h3>Cross-section A–A′</h3><button class="btn link" data-act="tut-xsec">Tutorial</button><span class="sp"></span>${xsDateCtl()}<label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">
+    <section class="sec"><header><h3>Cross-section ${esc(secLetters())}</h3><button class="btn link" data-act="tut-xsec">Tutorial</button><span class="sp"></span>${xsDateCtl()}<label class="note" for="xs-asof">As of</label><input type="date" id="xs-asof" style="width:auto" value="${esc(S.xs.date || '')}" title="Water levels and results as they stood on this date; empty = latest"></header><div class="body">
       <div class="scroll-x" id="xs-draw"></div>
       <div class="legend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--earth)" stroke-width="2" stroke-dasharray="6 3"/></svg>Ground surface (measured at boreholes, interpolated between)</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5h20" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="6 3"/></svg>Water table (interpolated)</span><span><svg width="22" height="12" aria-hidden="true"><rect x="7" y="0" width="8" height="12" style="fill:var(--panel);stroke:var(--ink)"/><path d="M9 6h4M9 9h4" style="stroke:var(--ink)"/></svg>Slotted interval</span><span><svg width="22" height="12" aria-hidden="true"><rect x="1" y="1" width="20" height="10" style="fill:var(--s-clay);stroke:var(--muted)" fill-opacity=".38" stroke-dasharray="4 2"/></svg>Interpreted between boreholes</span></div>
       <p class="note" id="xs-note" style="margin-top:6px"></p><p class="note">Units between boreholes are an interpretation (layer “Cross-section unit”, else origin). Conditions between boreholes are not known.</p></div></section>
@@ -9188,8 +9297,14 @@ function planSVG(W, H, interactive) {
       for (const yr of [1, 5, 10, 25]) { const q = path.find(p => p.t >= yr * 365.25); if (!q) break; o.push(`<g data-gw-tt="${yr}"><circle cx="${X(q.E).toFixed(1)}" cy="${Y(q.N).toFixed(1)}" r="2.6" fill="#fff" stroke="#3f007d"/><text x="${(X(q.E) + 4).toFixed(1)}" y="${(Y(q.N) - 4).toFixed(1)}" style="font:9px Arial,sans-serif;fill:#3f007d;paint-order:stroke;stroke:#fff;stroke-width:2.5px">${yr} yr</text></g>`); }
     }
   }
-  const chosen = sectionList().filter(b => b.easting != null);
-  if (chosen.length > 1 && S.lyr.sec !== false && !keyMap) {
+  const chosen = sectionList().filter(b => b.easting != null), SLn = secLineOf();
+  const lineSVG = (L, on) => { const P = L.pts.map(p => [X(p[0]), Y(p[1])]), a0 = P[0], a1 = P[1], z0 = P.at(-1), z1 = P.at(-2), ua = Math.hypot(a0[0] - a1[0], a0[1] - a1[1]) || 1, uz = Math.hypot(z0[0] - z1[0], z0[1] - z1[1]) || 1, n = esc(L.name || 'A'), col = on ? 'var(--accent)' : '#6b7785';
+    const ea = [(a0[0] - a1[0]) / ua, (a0[1] - a1[1]) / ua], ez = [(z0[0] - z1[0]) / uz, (z0[1] - z1[1]) / uz], lab = (x, y, s) => '<text x="' + x.toFixed(1) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="middle" style="font:700 ' + (on ? 13 : 12) + 'px var(--f-label);fill:' + col + ';paint-order:stroke;stroke:#fff;stroke-width:3">' + s + '</text>';
+    return '<g data-secpath="' + n + '"><path d="' + P.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('') + '" fill="none" style="stroke:' + col + '" stroke-width="' + (on ? 2 : 1.5) + '" stroke-dasharray="8 4" stroke-linejoin="round"/>' + lab(a0[0] + ea[0] * 14, a0[1] + ea[1] * 14, n) + lab(z0[0] + ez[0] * 14, z0[1] + ez[1] * 14, n + '′') + '</g>'; };
+  if (S.lyr.sec !== false && !keyMap) for (const L of secLinesOf()) if (L.pts?.length >= 2 && L.id !== SLn?.id) o.push(lineSVG(L, false));
+  if (SLn && S.lyr.sec !== false && !keyMap) {
+    o.push(lineSVG(SLn, true));
+  } else if (chosen.length > 1 && S.lyr.sec !== false && !keyMap) {
     const mx = chosen.reduce((s, b) => s + b.easting, 0) / chosen.length, my = chosen.reduce((s, b) => s + b.northing, 0) / chosen.length;
     let sxx = 0, syy = 0, sxy = 0; for (const b of chosen) { const dx = b.easting - mx, dy = b.northing - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
     const ang = .5 * Math.atan2(2 * sxy, sxx - syy), ux = Math.cos(ang), uy = Math.sin(ang);
@@ -9205,9 +9320,9 @@ function planSVG(W, H, interactive) {
   if (!keyMap && (RO.mres ? MR.p && MR.p !== 'none' : lyrOn('res'))) o.push(resultsLayerSVG(pts, X, Y, MR));
   for (const b of keyMap ? [] : pts) {
     // water elevations are labelled at wells only, from a standpipe or completion reading (never seepage while drilling)
-    const on = S.secIds.size ? S.secIds.has(b.id) : true, lw0 = b.well?.installed ? readingFor(b) : null, lw = lw0 && lw0.kind !== 'strike' ? lw0 : null;
+    const SI = secLineOf() ? new Set(secLineOf().ids || []) : S.secIds, on = SI.size ? SI.has(b.id) : true, lw0 = b.well?.installed ? readingFor(b) : null, lw = lw0 && lw0.kind !== 'strike' ? lw0 : null;
     o.push(`<g ${interactive && S.mapEdit ? `data-bhpt="${esc(b.id)}" style="cursor:${S.mapTool === 'move' ? 'grab' : 'default'}"` : interactive ? `data-secpick="${esc(b.id)}" style="cursor:pointer"` : ''}><title>${esc(`${b.name}${wellId(b) ? ' / ' + wellId(b) : ''}${lw && b.elevation != null ? ` · water el. ${fu(b.elevation - lw.depth)}` : ''}`)}</title>
-      <circle cx="${X(b.easting)}" cy="${Y(b.northing)}" r="12" fill="transparent"/>${S.secIds.size && on ? `<circle cx="${X(b.easting)}" cy="${Y(b.northing)}" r="10.5" style="fill:none;stroke:var(--accent)" stroke-width="2"/>` : ''}
+      <circle cx="${X(b.easting)}" cy="${Y(b.northing)}" r="12" fill="transparent"/>${SI.size && on ? `<circle cx="${X(b.easting)}" cy="${Y(b.northing)}" r="10.5" style="fill:none;stroke:var(--accent)" stroke-width="2"/>` : ''}
       ${BH_SYMBOL(X(b.easting), Y(b.northing), !!b.well?.installed)}
       ${bhLabelSVG(b, X(b.easting), Y(b.northing), S.lyr.wl !== false && lw && b.elevation != null ? fx(b.elevation - lw.depth) : null, 'box', S.lyr.labels !== false)}</g>`);
   }
@@ -9457,8 +9572,8 @@ function flowTrianglesSVG(tris, X, Y) {
       <text x="${cx + 6}" y="${cy - 6}" style="font:600 10px Arial,sans-serif;fill:#5b3e94;paint-order:stroke;stroke:#fff;stroke-width:3">${Math.round(T.az)}°</text></g>`; }).join('');
 }
 /* the wedge: the 90 % range of the direction, drawn as a sector behind the arrow at (mx, my), r px long */
-function flowWedgeSVG(F, mx, my, r) {
-  if (!F.range || !flowOpt().unc) return '';
+function flowWedgeSVG(F, mx, my, r, force) {
+  if (!F.range || !(force || flowOpt().unc)) return '';
   const pt = a => [mx + r * Math.sin(a * Math.PI / 180), my - r * Math.cos(a * Math.PI / 180)], [ax, ay] = pt(F.range.lo), [bx, by] = pt(F.range.hi), span = ((F.range.hi - F.range.lo + 360) % 360);
   return `<path data-flowwedge="1" d="M${mx} ${my}L${ax.toFixed(1)} ${ay.toFixed(1)}A${r} ${r} 0 ${span > 180 ? 1 : 0} 1 ${bx.toFixed(1)} ${by.toFixed(1)}Z" style="fill:var(--water);stroke:var(--water)" fill-opacity=".14" stroke-opacity=".5" stroke-width=".8"><title>${esc(`Direction, 90 % range: ${Math.round(F.range.lo)}° to ${Math.round(F.range.hi)}°`)}</title></path>`;
 }
@@ -9529,6 +9644,16 @@ function wtMapSVG(W = 620, Hh = 440) {
   o.push(headContoursSVG(P, lv, X, Y, col));
   if (flowOpt().lines) o.push(flowLinesSVG(flowLines(H.wells), X, Y));
   o.push(flowOffMarks(H.skip, X, Y));
+  const fa = RO.farrow ?? '', FF = fa === '0' ? null : gwFlow();
+  if (FF && !FF.error && !FF.flat) {
+    const ux = FF.bx / FF.i, uy = FF.by / FF.i, mx = X(FF.E0), my = Y(FF.N0), fx2 = -ux, fy2 = uy, len = Math.min(W, Hh) * .2;
+    if (fa !== 'arrow') o.push(flowWedgeSVG(FF, mx, my, len * .5 + 26, true));
+    const l1 = 'Flow ' + Math.round(FF.az) + '° (' + FF.dir + ')', l2 = (FF.range && fa !== 'arrow' ? '±' + Math.round(FF.range.half) + '° (90 %) · ' : '') + 'i = ' + FF.i.toFixed(4), bw = Math.max(l1.length * 7.4, l2.length * 6.2) + 14;
+    o.push('<g data-wtarrow="1"><title>' + esc('Groundwater flow ' + Math.round(FF.az) + '° (' + FF.dir + '), i = ' + FF.i.toFixed(4) + (FF.range ? ', 90 % range ' + Math.round(FF.range.lo) + '° to ' + Math.round(FF.range.hi) + '°' : '') + ', ' + FF.method.toLowerCase() + ' on ' + FF.n + ' wells') + '</title>'
+      + '<line x1="' + (mx - fx2 * len * .5).toFixed(1) + '" y1="' + (my - fy2 * len * .5).toFixed(1) + '" x2="' + (mx + fx2 * len * .5).toFixed(1) + '" y2="' + (my + fy2 * len * .5).toFixed(1) + '" style="stroke:var(--accent-2)" stroke-width="4" stroke-linecap="round"/>'
+      + '<path d="M' + (mx + fx2 * len * .5 + fx2 * 14).toFixed(1) + ' ' + (my + fy2 * len * .5 + fy2 * 14).toFixed(1) + 'l' + (-fx2 * 18 - fy2 * 9).toFixed(1) + ' ' + (-fy2 * 18 + fx2 * 9).toFixed(1) + 'l' + (fy2 * 18).toFixed(1) + ' ' + (-fx2 * 18).toFixed(1) + 'z" style="fill:var(--accent-2)"/>'
+      + '<rect x="' + (mx + 12).toFixed(1) + '" y="' + (my + 10).toFixed(1) + '" width="' + bw.toFixed(0) + '" height="34" rx="4" style="fill:var(--panel)" opacity=".92"/><text x="' + (mx + 18).toFixed(1) + '" y="' + (my + 25).toFixed(1) + '" style="font:700 12px Arial,Helvetica,sans-serif;fill:var(--accent-2)">' + esc(l1) + '</text><text x="' + (mx + 18).toFixed(1) + '" y="' + (my + 39).toFixed(1) + '" style="font:11px Arial,Helvetica,sans-serif;fill:var(--ink)">' + esc(l2) + '</text></g>');
+  }
   for (const w of H.wells) o.push(`<g><title>${esc(`${gwName(w.b)}: head ${fu(w.h)} (${w.w.date || ''})`)}</title>${BH_SYMBOL(X(w.e), Y(w.n), true)}${bhLabelSVG(w.b, X(w.e), Y(w.n), fx(w.h), 'halo')}</g>`);
   o.push(...F.tail);
   return { svg: o.join(''), iv, round: H.round, wells: H.wells };
@@ -10010,11 +10135,12 @@ function fitToBody(pg, old) {
 }
 const bodyOf = pg => { const d = pgDims(pg); return pg?.hdr === 'custom' ? { x: d.M, y: d.M, w: d.W - 2 * d.M, h: d.H - 2 * d.M } : { x: d.M, y: d.M + 80, w: d.W - 2 * d.M, h: d.H - 2 * d.M - 104 }; };
 const LB = bodyOf({ orient: 'land' });
-const xsecPage = () => newPage('free', { orient: 'land', title: 'CROSS-SECTION A–A′', items: [newItem('section', LB.x, LB.y, { w: LB.w, h: LB.h - 64 }), newItem('text', LB.x, LB.y + LB.h - 52, { w: LB.w, h: 52, o: { size: 9, text: 'Units between boreholes are an interpretation; conditions between boreholes are not known. The water table is interpolated between readings.' } })] });
+const xsecPage = () => newPage('free', { orient: 'land', title: 'CROSS-SECTION ' + secLetters(), items: [newItem('section', LB.x, LB.y, { w: LB.w, h: LB.h - 64 }), newItem('text', LB.x, LB.y + LB.h - 52, { w: LB.w, h: 52, o: { size: 9, text: 'Units between boreholes are an interpretation; conditions between boreholes are not known. The water table is interpolated between readings.' } })] });
 const RITEMS = {
   soilmap: ['Soil map', BODY.w, 560], soilgraph: ['Soil graph', BODY.w, 360], soiltable: ['Soil results table', BODY.w, 420], plan: ['Site plan', BODY.w, 560], section: ['Cross-section', BODY.w, 440], wt: ['Water-table map', BODY.w, 520], vap: ['Vapour map', BODY.w, 520],
   flow: ['Groundwater flow', BODY.w, 460], hydro: ['Hydrograph', BODY.w, 320], text: ['Text box', 360, 110], image: ['Picture', 360, 260],
   gwsum: ['Model summary', BODY.w, BODY.h], gwcal: ['Model calibration plot', BODY.w, 560], gwpar: ['Model parameters', BODY.w, 300], gwlim: ['Model limits', BODY.w, 300],
+  secmap: ['Section location map', 260, 200], extent: ['Extent map', 240, 180],
   scalebar: ['Scale bar', 300, 56], north: ['North arrow', 80, 96], legend: ['Legend', 220, 110], shape: ['Shape', 160, 100],
 };
 const RPAGES = { pdf: 'Imported page', free: 'Free page', xsec: 'Cross-section page (landscape)', key: 'Key to symbols', logs: 'Borehole logs', lab: 'Summary of tests', chem: 'Soil analytical results', gw: 'Groundwater observations', photos: 'Photographs' };
@@ -10024,14 +10150,16 @@ const ROPTS = {
   plan: [['scale', 'Scale', SCALES], ['legend', 'Legend on the map', [['', 'As on the Map page'], ['1', 'Show'], ['0', 'Hide']]], ['bare', 'North arrow and caption on the map', [['', 'Show'], ['1', 'Hide (the page has its own)']]], ['grid', 'Grid interval', [['', 'Auto'], ...[5, 10, 20, 25, 50, 100, 250].map(v => [v, v + ' m'])]]],
   section: [['ve', 'Vertical exaggeration', [['', 'As on the site page'], [1, '×1 (true scale)'], [2, '×2'], [5, '×5'], [10, '×10'], [20, '×20'], [50, '×50']]],
     ['tick', 'Elevation interval', [['', 'Auto'], [.1, '0.1'], [.25, '0.25'], [.5, '0.5'], [1, '1'], [2, '2'], [5, '5']]], ['bw', 'Borehole width', [['', 'As on the site page'], [12, 'Narrow'], [18, 'Normal'], [28, 'Wide'], [40, 'Extra wide']]]],
-  wt: [['scale', 'Scale', SCALES], ['iv', 'Contour interval', [['', 'Auto'], [.02, '0.02'], [.05, '0.05'], [.1, '0.1'], [.25, '0.25'], [.5, '0.5'], [1, '1']]]],
+  wt: [['farrow', 'Flow arrow', [['', 'With its 90 % range'], ['arrow', 'Arrow only'], ['0', 'None']]], ['scale', 'Scale', SCALES], ['iv', 'Contour interval', [['', 'Auto'], [.02, '0.02'], [.05, '0.05'], [.1, '0.1'], [.25, '0.25'], [.5, '0.5'], [1, '1']]]],
   vap: [['scale', 'Scale', SCALES]],
+  secmap: [['fit', 'Area shown', [['', 'The whole site'], ['section', 'The section and its boreholes']]], ['base', 'Background', [['', 'Plain'], ['1', 'Basemap']]], ['bare', 'North arrow', [['', 'Show'], ['1', 'Hide']]], ['scale', 'Scale', SCALES]],
+  extent: [['zoom', 'Area around the map', [['', '×5'], [3, '×3'], [10, '×10'], [25, '×25'], [100, '×100'], [1000, '×1000']]], ['base', 'Background', [['', 'Basemap'], ['0', 'Plain']]], ['bare', 'North arrow', [['', 'Show'], ['1', 'Hide']]], ['scale', 'Scale', SCALES]],
   hydro: [['mode', 'Plot', [['elev', 'Water elevation'], ['depth', 'Depth to water']]]],
   north: [['mode', 'Points to', [['grid', 'Grid north (the map is drawn grid-north up)'], ['true', 'True north (turned by the meridian convergence)']]]],
   shape: [['kind', 'Shape', [['rect', 'Rectangle'], ['ellipse', 'Ellipse'], ['line', 'Line'], ['arrow', 'Arrow']]], ['dir', 'Direction (lines)', [['down', 'Top-left to bottom-right'], ['up', 'Bottom-left to top-right'], ['h', 'Across'], ['v', 'Down']]]],
 };
 const mm = px => Math.round(px * 25.4 / 96), pxOf = v => v * 96 / 25.4;
-const newItem = (t, x = BODY.x, y = BODY.y, extra = {}) => ({ id: uid('it'), t, x, y, w: RITEMS[t][1], h: RITEMS[t][2], cap: '', frame: !['text', 'scalebar', 'north', 'shape'].includes(t), o: {}, ...extra });
+const newItem = (t, x = BODY.x, y = BODY.y, extra = {}) => ({ id: uid('it'), t, x, y, w: RITEMS[t][1], h: RITEMS[t][2], cap: '', frame: !['text', 'scalebar', 'north', 'shape'].includes(t), o: t === 'section' || t === 'secmap' ? { secDef: secDefNow() } : {}, ...extra });
 const newPage = (kind, extra = {}) => ({ id: uid('pg'), kind, title: kind === 'free' ? 'FIGURE' : RTITLES[kind], items: [], bh: [], ...extra });
 const fullBody = t => newItem(t, BODY.x, BODY.y, { w: BODY.w, h: BODY.h });
 /* ready-made layouts; the company's own templates are listed after these */
@@ -10138,7 +10266,9 @@ function itemInner(it, w, h) {
   if (MAP_ITEMS.has(it.t) && o.cx != null && o.cy != null) { ro.cx = +o.cx; ro.cy = +o.cy; }
   if (MAP_ITEMS.has(it.t) && o.sym) ro.sym = o.sym;
   if (MAP_ITEMS.has(it.t) && o.lbl) ro.lbl = o.lbl;
-  if (it.t === 'plan' && o.bare) ro.bare = true;
+  if (it.t === 'wt' && o.farrow) ro.farrow = o.farrow;
+  if (it.t === 'secmap' || it.t === 'extent') for (const k of ['fit', 'base', 'link', 'zoom']) if (o[k] != null && o[k] !== '') ro[k] = o[k];
+  if (['plan', 'secmap', 'extent'].includes(it.t) && o.bare) ro.bare = true;
   if (it.t === 'plan' && (o.legend === '1' || o.legend === '0')) ro.legend = o.legend === '1';
   if (it.t === 'plan' && o.rp) ro.mres = { p: o.rp, d0: o.rd0 !== '' && o.rd0 != null ? fromD(+o.rd0) : null, d1: o.rd1 !== '' && o.rd1 != null ? fromD(+o.rd1) : null };
   const msg = t => (delete ro.sc, `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#f6f8fa"/><text x="12" y="24" style="font:12px Arial,sans-serif;fill:#5d6a75">${esc(t)}</text></svg>`);
@@ -10151,7 +10281,9 @@ function itemInner(it, w, h) {
   const out = withRO(ro, () => {
     if (it.t.startsWith('soil')) return soilItem(it.t, o, w, h);
     if (it.t === 'plan') { const r = planSVG(w, h, false); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
-    if (it.t === 'section') return fromEl(el => { RO.xs = { shape: 'guided', style: 'graded', ...(o.xs || S.xs) }; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
+    if (it.t === 'section') return fromEl(el => { RO.xs = { shape: 'guided', style: 'graded', ...(o.xs || S.xs) }; if (o.secDef) RO.secDef = o.secDef; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
+    if (it.t === 'secmap') { if (o.secDef) RO.secDef = o.secDef; return secmapSVG(w, h) || msg('Needs a section through two or more located boreholes.'); }
+    if (it.t === 'extent') return extentSVG(w, h) || msg(o.link ? 'The chosen map has no extent yet.' : 'Choose the map whose extent this shows.');
     if (it.t === 'wt') return wtMapSVG(w, h)?.svg || msg('Needs water levels in at least 3 wells with coordinates and ground elevations.');
     if (it.t === 'vap') { const r = vapourMapSVG(w, h); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'flow') { const F = gwFlow(); return F.error ? msg(F.error) : flowPlanSVG(F, w, h); }
@@ -10165,13 +10297,86 @@ function itemInner(it, w, h) {
   if (ro.cxd != null) ITEM_C.set(it.id, [ro.cxd, ro.cyd]); else ITEM_C.delete(it.id);
   return out;
 }
+/* small maps for a figure: where the section runs (secmap), and where another map on the page sits (extent). Few things on them,
+   and labels set where they overlap nothing else */
+function miniLabelsSVG(lbls, W, H, avoid) {
+  const boxes = [...avoid], out = [], ov = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+  for (const l of lbls) {
+    const w = textW(l.text, '600 ' + l.fs + 'px Arial,Helvetica,sans-serif') + 4, h = l.fs * 1.2 + 1;
+    // next to the borehole first, then further out on a short leader; the spot that covers least of anything else wins
+    let best = null;
+    for (const g of [5, 12, 20, 30]) {
+      for (const [ux, uy] of [[1, 0], [-1, 0], [0, -1], [0, 1], [.75, -.75], [-.75, -.75], [.75, .75], [-.75, .75]]) {
+        const cx = l.x + ux * (g + (ux ? w / 2 : 0)), cy = l.y + uy * (g + (uy ? h / 2 : 0)), b = { x: cx - w / 2, y: cy - h / 2, w, h };
+        let s = boxes.reduce((t, q) => t + ov(b, q), 0) + (g - 5) * 2; if (b.x < 1 || b.y < 1 || b.x + w > W - 1 || b.y + h > H - 1) s += 5000;
+        if (!best || s < best.s - .01) best = { s, b, g, ux, uy };
+      }
+      if (best.s - (best.g - 5) * 2 < .5) break;
+    }
+    boxes.push(best.b);
+    if (best.g > 5) { const ex = best.b.x + best.b.w / 2 - best.ux * best.b.w / 2, ey = best.b.y + best.b.h / 2 - best.uy * best.b.h / 2; out.push('<line data-minilead="1" x1="' + l.x.toFixed(1) + '" y1="' + l.y.toFixed(1) + '" x2="' + ex.toFixed(1) + '" y2="' + ey.toFixed(1) + '" style="stroke:#7b8794" stroke-width=".6"/>'); }
+    out.push('<text data-minilbl="1" x="' + (best.b.x + best.b.w / 2).toFixed(1) + '" y="' + (best.b.y + h * .8).toFixed(1) + '" text-anchor="middle" style="font:600 ' + l.fs + 'px Arial,Helvetica,sans-serif;fill:' + (l.color || 'var(--ink)') + ';paint-order:stroke;stroke:#fff;stroke-width:2.6;stroke-linejoin:round">' + esc(l.text) + '</text>');
+  }
+  return out.join('');
+}
+const miniNorth = W => RO.bare ? '' : '<g transform="translate(' + (W - 14) + ' 18)"><path d="M0 -11l5 13-5-3.5-5 3.5z" style="fill:var(--ink)"/><text y="12" text-anchor="middle" style="font:700 8px Arial,Helvetica,sans-serif;fill:var(--ink)">N</text></g>';
+function miniView(W, H, ext, pad) {
+  const xs = ext.map(p => p[0]), ys = ext.map(p => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  let cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, sc = RO.scale ? PX_PER_M / RO.scale : Math.min((W - 2 * pad) / Math.max(x1 - x0, 10), (H - 2 * pad) / Math.max(y1 - y0, 10));
+  if (RO.cx != null) { cx = RO.cx; cy = RO.cy; }
+  RO.sc = sc; RO.cxd = cx; RO.cyd = cy;
+  return { sc, cx, cy, X: e => W / 2 + (e - cx) * sc, Y: n => H / 2 - (n - cy) * sc };
+}
+/* the line the section runs along, in ground coordinates: the drawn line, the picked boreholes in order, or the best-fit line */
+function secPathPts(sec) {
+  const SL = secLineOf(); if (SL) return SL.pts;
+  const pos = secPos(sec); if (pos.length < 2) return null;
+  if (S.secIds.size >= 2 && sec.every(b => S.secIds.has(b.id))) return pos.map(p => [p.b.easting, p.b.northing]);
+  const d1 = pos[pos.length - 1].d; return [pos.at(0), pos.at(d1)];
+}
+function secmapSVG(W, H) {
+  const all = mapList().filter(b => b.easting != null && b.northing != null), sec = sectionList().filter(b => b.easting != null && b.northing != null && ((b.layers || []).some(l => l.bottom > l.top) || b.water?.length));
+  if (sec.length < 2) return null;
+  const line = secPathPts(sec); if (!line) return null;
+  const on = new Set(sec.map(b => b.id)), ext = [...line, ...(RO.fit === 'section' ? sec : all).map(b => [b.easting, b.northing])];
+  const { X, Y, sc, cx, cy } = miniView(W, H, ext, Math.max(18, Math.min(W, H) * .12));
+  const o = ['<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Section location"><rect width="' + W + '" height="' + H + '" fill="#f7f9fb"/>'];
+  if (RO.base === '1' && basemapKey() !== 'none') o.push(basemapSVG(W, H, cx, cy, sc, .85));
+  for (const b of all) if (!on.has(b.id)) o.push('<circle data-minioff="1" cx="' + X(b.easting).toFixed(1) + '" cy="' + Y(b.northing).toFixed(1) + '" r="2.2" style="fill:#9aa5b1"/>');
+  const P = line.map(p => [X(p[0]), Y(p[1])]);
+  o.push('<path data-minisec="1" d="' + P.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('') + '" fill="none" style="stroke:var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>');
+  for (const b of sec) { const k = b.well?.installed ? 'mw' : 'bh', s = symStyle(k); o.push(symShape(X(b.easting), Y(b.northing), { ...s, size: Math.max(2.5, s.size * .7) }, k)); }
+  // A and A′ beyond the ends, then the names of the section's boreholes where they clash with nothing
+  const end = (p, q, t) => { const L = Math.hypot(p[0] - q[0], p[1] - q[1]) || 1, x = p[0] + (p[0] - q[0]) / L * 9, y = p[1] + (p[1] - q[1]) / L * 9; return { x, y, t }; };
+  const nm = secLineOf()?.name || 'A', ends = [end(P[0], P[1], nm), end(P[P.length - 1], P[P.length - 2], nm + '′')];
+  for (const e of ends) o.push('<text data-miniend="1" x="' + e.x.toFixed(1) + '" y="' + (e.y + 4).toFixed(1) + '" text-anchor="middle" style="font:700 11px Arial,Helvetica,sans-serif;fill:var(--accent);paint-order:stroke;stroke:#fff;stroke-width:3">' + e.t + '</text>');
+  const c = lblCfg(), fs = RO.lbl?.size ? +RO.lbl.size : Math.min(9.5, Math.max(7, W / 32));
+  const avoid = [...all.map(b => ({ x: X(b.easting) - 4, y: Y(b.northing) - 4, w: 8, h: 8 })), ...ends.map(e => ({ x: e.x - 7, y: e.y - 7, w: 14, h: 14 }))];
+  o.push(miniLabelsSVG(sec.filter(b => !c.bh[b.id]?.hide).map(b => ({ x: X(b.easting), y: Y(b.northing), text: c.bh[b.id]?.t || gwName(b), fs, color: c.color || '' })), W, H, avoid));
+  o.push(miniNorth(W), '</svg>');
+  return o.join('');
+}
+function extentSVG(W, H) {
+  const map = PAGE_CTX?.items.find(x => x.id === RO.link), sc0 = map && ITEM_SC.get(map.id), c0 = map && ITEM_C.get(map.id);
+  if (!map || !sc0 || !c0) return null;
+  const ih = Math.max(20, map.h - (map.cap ? 18 : 0)), hw = map.w / 2 / sc0, hh = ih / 2 / sc0, zoom = +RO.zoom || 5;
+  const { X, Y, sc, cx, cy } = miniView(W, H, [[c0[0] - hw * zoom, c0[1] - hh * zoom], [c0[0] + hw * zoom, c0[1] + hh * zoom]], 4);
+  const o = ['<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Extent of the map"><rect width="' + W + '" height="' + H + '" fill="#f7f9fb"/>'];
+  if (RO.base !== '0' && basemapKey() !== 'none') o.push(basemapSVG(W, H, cx, cy, sc, .9));
+  for (const b of mapList()) if (b.easting != null && b.northing != null) o.push('<circle cx="' + X(b.easting).toFixed(1) + '" cy="' + Y(b.northing).toFixed(1) + '" r="1.6" style="fill:#5d6a75"/>');
+  const rx = X(c0[0] - hw), ry = Y(c0[1] + hh), rw = 2 * hw * sc, rh = 2 * hh * sc;
+  o.push('<rect data-extent="1" x="' + rx.toFixed(1) + '" y="' + ry.toFixed(1) + '" width="' + Math.max(1, rw).toFixed(1) + '" height="' + Math.max(1, rh).toFixed(1) + '" style="fill:#d4533f;stroke:#d4533f" fill-opacity=".1" stroke-width="1.8"/>');
+  if (rw < 8 || rh < 8) { const mx = rx + rw / 2, my = ry + rh / 2; o.push('<path d="M' + (mx - 9) + ' ' + my + 'h18M' + mx + ' ' + (my - 9) + 'v18" style="stroke:#d4533f" stroke-width="1.6"/>'); }
+  o.push(miniNorth(W), '</svg>');
+  return o.join('');
+}
 /* a page's items in their stacking order; maps are drawn first so a scale bar can read the scale they were drawn at */
 const ITEM_SC = new Map(), ITEM_C = new Map(); let PAGE_CTX = null;
 /* report items that are maps: each keeps its own view (centre o.cx/o.cy, scale o.scale), set by pan & zoom and lockable */
-const MAP_ITEMS = new Set(['plan', 'wt', 'vap', 'flow']);
+const MAP_ITEMS = new Set(['plan', 'wt', 'vap', 'flow', 'secmap', 'extent']);
 function pageItemsSVG(pg) {
   PAGE_CTX = pg;
-  const late = it => it.t === 'scalebar' || (it.t === 'text' && /\{scale\}/i.test(it.o?.text || ''));
+  const late = it => it.t === 'scalebar' || it.t === 'extent' || (it.t === 'text' && /\{scale\}/i.test(it.o?.text || ''));
   try { const first = pg.items.map(it => late(it) ? null : itemSVG(it)); return pg.items.map((it, i) => first[i] ?? itemSVG(it)).join(''); }
   finally { PAGE_CTX = null; }
 }
@@ -10268,22 +10473,27 @@ function titleBlockItems(pg) {
 const SHAPE_INK = { ink: '#1f2937', accent: '#245b78', red: '#b42318', water: '#2867a8' };
 function shapeSVG(it, w, h) {
   const o = it.o || {}, c0 = SHAPE_INK[o.stroke] || SHAPE_INK.ink, c = o.line && o.line !== 'none' ? o.line : o.line === 'none' ? 'none' : c0, sw = o.line === 'none' ? 0 : +o.sw || 1.8;
-  const fill = o.fillc ? o.fillc : o.fill === 'tint' ? c0 : 'none', fop = o.fillc ? (o.fop != null && o.fop !== '' ? +o.fop : 1) : .12, p = sw / 2 + (o.fillc || o.line ? 0 : 1), kind = o.kind || 'rect', dash = o.dash === 'dash' ? ` stroke-dasharray="${sw * 4} ${sw * 2.5}"` : o.dash === 'dot' ? ` stroke-dasharray="${sw} ${sw * 2}" stroke-linecap="round"` : '', rad = +o.rad || 0;
+  const fill = o.fillc ? o.fillc : o.fill === 'tint' ? c0 : 'none', fop = o.fillc ? (o.fop != null && o.fop !== '' ? +o.fop : 1) : .12, p = 0, kind = o.kind || 'rect', dash = o.dash === 'dash' ? ` stroke-dasharray="${sw * 4} ${sw * 2.5}"` : o.dash === 'dot' ? ` stroke-dasharray="${sw} ${sw * 2}" stroke-linecap="round"` : '', rad = +o.rad || 0;
   let body;
-  if (kind === 'rect') body = `<rect x="${p}" y="${p}" width="${Math.max(0, w - 2 * p)}" height="${Math.max(0, h - 2 * p)}" rx="${rad}" fill="${fill}" fill-opacity="${fop}" stroke="${c}" stroke-width="${sw}"${dash}/>`;
+  if (kind === 'rect') body = `<rect x="${p}" y="${p}" width="${Math.max(0, w - 2 * p)}" height="${Math.max(0, h - 2 * p)}" rx="${rad}" fill="${fill}" fill-opacity="${fop}" stroke="${c}" stroke-width="${sw}" stroke-linejoin="miter"${dash}/>`;
   else if (kind === 'ellipse') body = `<ellipse cx="${w / 2}" cy="${h / 2}" rx="${Math.max(0, w / 2 - p)}" ry="${Math.max(0, h / 2 - p)}" fill="${fill}" fill-opacity="${fop}" stroke="${c}" stroke-width="${sw}"${dash}/>`;
   else {
     const [x1, y1, x2, y2] = o.dir === 'up' ? [p, h - p, w - p, p] : o.dir === 'h' ? [p, h / 2, w - p, h / 2] : o.dir === 'v' ? [w / 2, p, w / 2, h - p] : [p, p, w - p, h - p];
     const a = Math.atan2(y2 - y1, x2 - x1), L = 8 + sw * 3, ex = x2 - Math.cos(a) * L * .7, ey = y2 - Math.sin(a) * L * .7;
-    body = `<line x1="${x1}" y1="${y1}" x2="${kind === 'arrow' ? ex : x2}" y2="${kind === 'arrow' ? ey : y2}" stroke="${c}" stroke-width="${sw}" stroke-linecap="${dash ? 'butt' : 'round'}"${dash}/>`
+    body = `<line x1="${x1}" y1="${y1}" x2="${kind === 'arrow' ? ex : x2}" y2="${kind === 'arrow' ? ey : y2}" stroke="${c}" stroke-width="${sw}" stroke-linecap="${dash ? 'butt' : kind === 'arrow' ? 'round' : 'square'}"${dash}/>`
       + (kind === 'arrow' ? `<path data-head="1" d="M${x2} ${y2}L${x2 - Math.cos(a - .42) * L} ${y2 - Math.sin(a - .42) * L}L${x2 - Math.cos(a + .42) * L} ${y2 - Math.sin(a + .42) * L}Z" fill="${c}"/>` : '');
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" overflow="visible">${body}</svg>`;
+}
+/* an item's frame: on the item's edge, in its own colour, width and line (solid, dashed, dotted) */
+function frameSVG(it, x, y, w, h) {
+  const sw = +it.fw > 0 ? +it.fw : .8, c = it.fc || 'var(--ink)', dash = it.fd === 'dash' ? ' stroke-dasharray="' + sw * 4 + ' ' + sw * 2.5 + '"' : it.fd === 'dot' ? ' stroke-dasharray="' + sw + ' ' + sw * 2 + '"' : '';
+  return '<rect data-frame="1" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="none" style="stroke:' + c + '" stroke-width="' + sw + '" stroke-linejoin="miter"' + dash + '/>';
 }
 function itemSVG(it) {
   const cap = it.cap ? 18 : 0, ih = Math.max(['text', 'shape', 'image'].includes(it.t) ? 2 : 20, it.h - cap), body = itemInner(it, it.w, ih).replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
   if (+it.o?.rot) return `<g data-g="${it.id}"><g transform="rotate(${-+it.o.rot} ${it.x + it.w / 2} ${it.y + it.h / 2})"><svg x="${it.x}" y="${it.y}" width="${it.w}" height="${it.h}" viewBox="0 0 ${it.w} ${it.h}" overflow="visible">${body}</svg></g></g>`;
-  return `<g data-g="${it.id}">${cap ? `<text x="${it.x + 2}" y="${it.y + 12}" style="font:700 10.5px Arial,Helvetica,sans-serif;fill:var(--ink)">${esc(it.cap)}</text>` : ''}<svg x="${it.x}" y="${it.y + cap}" width="${it.w}" height="${ih}" viewBox="0 0 ${it.w} ${ih}" overflow="hidden">${body}</svg>${it.frame !== false ? `<rect x="${it.x}" y="${it.y + cap}" width="${it.w}" height="${ih}" fill="none" style="stroke:var(--ink)" stroke-width=".8"/>` : ''}</g>`;
+  return `<g data-g="${it.id}">${cap ? `<text x="${it.x + 2}" y="${it.y + 12}" style="font:700 10.5px Arial,Helvetica,sans-serif;fill:var(--ink)">${esc(it.cap)}</text>` : ''}<svg x="${it.x}" y="${it.y + cap}" width="${it.w}" height="${ih}" viewBox="0 0 ${it.w} ${ih}" overflow="${it.t === 'shape' ? 'visible' : 'hidden'}">${body}</svg>${it.frame !== false ? frameSVG(it, it.x, it.y + cap, it.w, ih) : ''}</g>`;
 }
 /* every page of the finished report, in order: {svg} for a log page, {framed:{title, body}} for the others */
 async function layoutPages(L = repLayout()) {
@@ -10343,24 +10553,52 @@ function addOutline(doc, L, all) {
 /* outputs: the pages as they are when saved (maps, data, imagery and styles frozen into each page), under a name, kept with the
    project (stored like photos, so they travel in project files). An output never changes when the map or data change */
 const OUT_KEY = p => 'outputs:' + p;
-async function saveOutput(name) {
-  const L = repLayout(), p = projKey(projList()[0]);
+async function freezePages(L) {
+  let stamped = false; for (const pg of L.pages) for (const it of pg.items || []) { if (it.t === 'secmap' && !it.o?.secDef) { it.o = { ...(it.o || {}), secDef: secDefNow() }; stamped = true; }
+    if (it.t === 'section' && (!it.o?.secDef || !it.o?.xs)) { it.o = { ...(it.o || {}), secDef: it.o?.secDef || secDefNow(), xs: it.o?.xs || structuredClone(S.xs) }; stamped = true; } }
+  if (stamped && L === siteOf()?.report) saveLayout(L);
   if (gwWantedBy(L)) { gwModel(); if (!S.gwm.run) await gwEnsure(true); }
   if (basemapKey() !== 'none') { await layoutPages(L); await basemapIdle(); }
-  const all = await layoutPages(L); if (!all.length) { toast('There are no pages to save.'); return null; }
-  const pages = all.map((q, i) => { if (q.pdf) return { pdf: q.pdf, lp: q.lp }; const svg = standaloneSVG(q.svg || pageFrame(q.framed.title, i + 1, all.length, q.framed.body, q.framed.dims)), m = /width="([\d.]+)" height="([\d.]+)"/.exec(svg); return { svg, W: +m?.[1] || 816, H: +m?.[2] || 1056, lp: q.lp }; });
-  const rec = { id: uid('out'), bhId: OUT_KEY(p), kind: 'output', name: name || 'Output', takenAt: new Date().toISOString(), by: S.me || '', pages, marks: L.pages.map(pageLabel), layout: structuredClone(L) };
+  const all = await layoutPages(L); if (!all.length) return null;
+  return all.map((q, i) => { if (q.pdf) return { pdf: q.pdf, lp: q.lp }; const svg = standaloneSVG(q.svg || pageFrame(q.framed.title, i + 1, all.length, q.framed.body, q.framed.dims)), m = /width="([\d.]+)" height="([\d.]+)"/.exec(svg); return { svg, W: +m?.[1] || 816, H: +m?.[2] || 1056, lp: q.lp }; });
+}
+function outputLayout(r) {
+  const L = structuredClone(r.layout), byName = new Map(projList().map(b => [b.name, b.id]));
+  L.pages.forEach((pg, lp) => { for (const it of pg.items || []) {
+    if (it.t !== 'section' || it.o?.secDef) continue;
+    const svg = (r.pages || []).filter(q => q.lp === lp && q.svg).map(q => q.svg).join(''), g = svg.split('data-g="' + it.id + '"')[1]?.split('data-g="')[0] || '';
+    const ids = [...g.matchAll(/data-bhname="1"[^>]*><title>([^<]+)</g)].map(m => byName.get(m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'"))).filter(Boolean);
+    if (ids.length >= 2) it.o = { ...(it.o || {}), secDef: { line: null, pick: [...new Set(ids)] } };
+  } });
+  return L;
+}
+/* the output being edited, updated in place with the pages as they are now (its name and first-saved date stay) */
+async function updateOutput() {
+  const E = S.outEdit; if (!E) return null; const r = (await outputsOf()).find(x => x.id === E.id); if (!r) { toast('That output is no longer there; save these pages as a new output.'); return null; }
+  const L = repLayout(), pages = await freezePages(L); if (!pages) { toast('There are no pages to save.'); return null; }
+  const rec = { ...r, pages, marks: L.pages.map(pageLabel), layout: structuredClone(L), updatedAt: new Date().toISOString(), by: S.me || r.by || '' };
+  await photoStore.put(rec); autosaveSoon(projKey(projList()[0])); return rec;
+}
+/* stop editing an output: the pages that were in the editor before come back */
+function closeOutputEdit() { const E = S.outEdit; if (!E) return; S.outEdit = null; if (E.keep) saveLayout(E.keep); S.cpage = 0; S.csel = null; S.cmulti = new Set(); S.cout = true; rerenderCompose(); }
+async function saveOutput(name, fig = false) {
+  const all = repLayout(), p = projKey(projList()[0]), L = fig ? { ...all, pages: [curPage()].filter(Boolean) } : all;
+  const pages = await freezePages(L); if (!pages) { toast('There are no pages to save.'); return null; }
+  if (fig && !S.readOnly) saveLayout(all);   // the page's sections now keep their own section
+  const rec = { id: uid('out'), bhId: OUT_KEY(p), kind: 'output', fig: fig || undefined, name: name || 'Output', takenAt: new Date().toISOString(), by: S.me || '', pages, marks: L.pages.map(pageLabel), layout: structuredClone(L) };
   await photoStore.put(rec); autosaveSoon(p); return rec;
 }
-const outputsOf = async () => { try { return (await photoStore.all(OUT_KEY(projKey(projList()[0])))).filter(r => r.kind === 'output').sort((a, c) => (c.takenAt || '').localeCompare(a.takenAt || '')); } catch { return []; } };
+const outputsOf = async () => { try { return (await photoStore.all(OUT_KEY(projKey(projList()[0])))).filter(r => r.kind === 'output').sort((a, c) => S.outSort === 'new' ? (c.updatedAt || c.takenAt || '').localeCompare(a.updatedAt || a.takenAt || '') : (a.name || '').localeCompare(c.name || '', undefined, { numeric: true }) || (c.takenAt || '').localeCompare(a.takenAt || '')); } catch { return []; } };
+S.outSel = new Set();
 const svgUrl = svg => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 async function fillOutputs() {
-  const el = $('#out-list'); if (!el) return; const list = await outputsOf();
+  const el = $('#out-list'); if (!el) return; const list = await outputsOf(); for (const id of [...S.outSel]) if (!list.some(r => r.id === id)) S.outSel.delete(id);
+  const bar = $('#out-bar'); if (bar) bar.innerHTML = list.length ? `<label class="check"><input type="checkbox" id="out-selall" ${S.outSel.size && S.outSel.size === list.length ? 'checked' : ''}> Select all</label><span class="note">${S.outSel.size ? S.outSel.size + ' selected' : list.length + ' output' + (list.length === 1 ? '' : 's')}</span><span class="sp"></span><label class="note" for="out-sort">Sort</label><select id="out-sort" style="width:auto"><option value="name" ${S.outSort !== 'new' ? 'selected' : ''}>By name</option><option value="new" ${S.outSort === 'new' ? 'selected' : ''}>Newest first</option></select><button class="btn" data-act="out-export-sel" ${S.outSel.size ? '' : 'disabled'}>Export selected (PDF)</button><button class="btn primary" data-act="out-export-all">Export all (PDF)</button>` : '';
   el.innerHTML = list.length ? list.map(r => { const first = r.pages.find(q => q.svg), when = new Date(r.takenAt);
-    return `<div class="out-card"><button class="out-th" data-outact="open" data-out="${r.id}" title="Open">${first ? `<img src="${svgUrl(first.svg)}" alt="">` : '<span class="note">Imported pages</span>'}</button>
-      <div class="out-meta"><b>${esc(r.name)}</b><span class="note">${r.pages.length} page${r.pages.length === 1 ? '' : 's'} · saved ${when.toLocaleDateString('en-CA')} ${when.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}${r.by ? ' by ' + esc(r.by) : ''}</span></div>
-      <div class="cmp-row"><button class="btn primary" data-outact="pdf" data-out="${r.id}">PDF</button><button class="btn" data-outact="open" data-out="${r.id}">Open</button><button class="btn" data-outact="rename" data-out="${r.id}" ${S.readOnly ? 'disabled' : ''}>Rename</button><button class="btn" data-outact="edit" data-out="${r.id}" ${S.readOnly ? 'disabled' : ''} title="Put a copy of its pages in the editor to change and save as a new output">Edit a copy</button><button class="btn danger-text" data-outact="del" data-out="${r.id}" ${S.readOnly ? 'disabled' : ''}>Delete</button></div></div>`; }).join('')
-    : '<div class="empty-out"><p><b>No outputs yet.</b></p><p class="note">Lay out pages under Edit page, then <b>Save as output…</b> to keep them exactly as they are. Saved outputs do not change when the map or data change.</p></div>';
+    return `<div class="out-card${S.outSel.has(r.id) ? ' sel' : ''}"><label class="check out-pick"><input type="checkbox" data-outsel="${r.id}" ${S.outSel.has(r.id) ? 'checked' : ''}> ${r.fig || r.pages.length === 1 ? 'Figure' : 'Set of ' + r.pages.length + ' pages'}</label><button class="out-th" data-outact="open" data-out="${r.id}" title="Open">${first ? `<img src="${svgUrl(first.svg)}" alt="">` : '<span class="note">Imported pages</span>'}</button>
+      <div class="out-meta"><b>${esc(r.name)}</b><span class="note">${r.pages.length} page${r.pages.length === 1 ? '' : 's'} · saved ${when.toLocaleDateString('en-CA')} ${when.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}${r.updatedAt ? ' · updated ' + new Date(r.updatedAt).toLocaleDateString('en-CA') + ' ' + new Date(r.updatedAt).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' }) : ''}${r.by ? ' by ' + esc(r.by) : ''}${S.outEdit?.id === r.id ? ' · <b>open in the editor</b>' : ''}</span></div>
+      <div class="cmp-row"><button class="btn primary" data-outact="pdf" data-out="${r.id}">PDF</button><button class="btn" data-outact="open" data-out="${r.id}">Open</button><button class="btn" data-outact="open-edit" data-out="${r.id}" ${S.readOnly ? 'disabled' : ''} title="Open its pages in the editor; Update output saves the changes to this output">Edit</button><button class="btn" data-outact="dup" data-out="${r.id}" ${S.readOnly ? 'disabled' : ''} title="Make a copy of this output">Duplicate</button><button class="btn" data-outact="rename" data-out="${r.id}" ${S.readOnly ? 'disabled' : ''}>Rename</button><button class="btn" data-outact="edit" data-out="${r.id}" ${S.readOnly ? 'disabled' : ''} title="Put a copy of its pages in the editor, replacing the pages there, to save as a new output">Edit a copy</button><button class="btn danger-text" data-outact="del" data-out="${r.id}" ${S.readOnly ? 'disabled' : ''}>Delete</button></div></div>`; }).join('')
+    : '<div class="empty-out"><p><b>No outputs yet.</b></p><p class="note">Make a figure under Edit page (a cross-section, a site plan…), then <b>Save figure to All outputs</b> to keep it exactly as it is; make the next figure the same way. Saved outputs do not change when the map or data change.</p></div>';
 }
 /* an output's PDF: its frozen pages printed as vector, its imported pages copied in as they are, with bookmarks */
 async function outputBytes(r) {
@@ -10371,14 +10609,30 @@ async function outputBytes(r) {
   out.setTitle(r.name); out.setCreator(S.co.name || 'Borehole Field Log'); out.setProducer('Borehole Field Log');
   return out.save();
 }
+async function exportOutputs(which) {
+  const list = (await outputsOf()).filter(r => which === 'all' || S.outSel.has(r.id)); if (!list.length) { toast('Nothing selected to export.'); return; }
+  toast('Creating PDF of ' + list.length + ' output' + (list.length === 1 ? '' : 's') + '…');
+  try {
+    const { PDFDocument } = PDFLib, out = await PDFDocument.create();
+    for (const r of list) { const d = await PDFDocument.load(await outputBytes(r)); for (const pg of await out.copyPages(d, d.getPageIndices())) out.addPage(pg); }
+    out.setTitle(list.length === 1 ? list[0].name : 'Figures'); out.setCreator(S.co.name || 'Borehole Field Log'); out.setProducer('Borehole Field Log');
+    const no = [...new Set(projList().map(b => b.projNo).filter(Boolean))];
+    await saveFile((list.length === 1 ? fileSlug(list[0].name) || 'output' : (no.length === 1 ? no[0] : 'project') + '-figures-' + today()) + '.pdf', pdfBlob(await out.save()));
+  } catch (e) { console.error(e); toast(e.message || 'The PDF could not be created.'); }
+}
 async function outputAct(act, id) {
   const r = (await outputsOf()).find(x => x.id === id); if (!r) return;
   if (act === 'pdf') { toast('Creating PDF…'); try { await saveFile(`${fileSlug(r.name) || 'output'}.pdf`, pdfBlob(await outputBytes(r))); } catch (e) { toast(e.message || 'The PDF could not be created.'); } return; }
   if (act === 'open') { dialog(esc(r.name), `<p class="note" style="margin:0">Saved ${new Date(r.takenAt).toLocaleString('en-CA')}. These pages stay as they were saved.</p><div class="out-view">${r.pages.map((q, i) => q.svg ? `<figure><img src="${svgUrl(q.svg)}" alt="Page ${i + 1}"><figcaption class="note">Page ${i + 1}</figcaption></figure>` : `<figure class="out-pdfpg"><span class="note">Page ${i + 1}: imported PDF page (${esc(q.pdf.title || '')})</span></figure>`).join('')}</div>`, `<button class="btn" data-act="close">Close</button><button class="btn primary" data-outact="pdf" data-out="${r.id}">PDF</button>`); return; }
   if (act === 'rename') { const n = prompt('Name of this output', r.name); if (!n || !n.trim()) return; await photoStore.put({ ...r, name: n.trim() }); autosaveSoon(projKey(projList()[0])); fillOutputs(); return; }
-  if (act === 'del') { if (!confirm(`Delete the output “${r.name}”? This cannot be undone.`)) return; await photoStore.remove(r.id); autosaveSoon(projKey(projList()[0])); fillOutputs(); return; }
+  if (act === 'del') { if (!confirm(`Delete the output “${r.name}”? This cannot be undone.`)) return; if (S.outEdit?.id === r.id) S.outEdit = { ...S.outEdit, id: null }; await photoStore.remove(r.id); autosaveSoon(projKey(projList()[0])); fillOutputs(); return; }
   if (act === 'edit') { if (!confirm(`Put a copy of “${r.name}” in the editor? It replaces the pages being edited now (save those as an output first to keep them). The copy draws from the current map and data.`)) return;
-    saveLayout(structuredClone(r.layout)); S.cout = false; S.csort = false; S.cpage = 0; S.csel = null; rerenderCompose(); toast(`A copy of ${r.name} is in the editor.`); }
+    saveLayout(outputLayout(r)); S.outEdit = null; S.cout = false; S.csort = false; S.cpage = 0; S.csel = null; rerenderCompose(); toast(`A copy of ${r.name} is in the editor.`); }
+  if (act === 'open-edit') { if (!r.layout?.pages?.length) { toast('This output has no pages to edit.'); return; }
+    // the pages being edited now are kept, and come back when editing the output is closed
+    const keep = S.outEdit ? S.outEdit.keep : structuredClone(repLayout());
+    saveLayout(outputLayout(r)); S.outEdit = { id: r.id, name: r.name, keep }; S.cout = false; S.csort = false; S.cpage = 0; S.csel = null; S.cmulti = new Set(); rerenderCompose(); toast(`Editing ${r.name}. Update output saves your changes to it.`); return; }
+  if (act === 'dup') { const n = { ...structuredClone(r), id: uid('out'), name: r.name + ' (copy)', takenAt: new Date().toISOString(), by: S.me || r.by || '' }; delete n.updatedAt; await photoStore.put(n); autosaveSoon(projKey(projList()[0])); fillOutputs(); toast(`Made ${n.name}.`); return; }
 }
 async function buildReport() {
   if (!window.PDFLib) { toast('The PDF library did not load.'); return; }
@@ -10408,7 +10662,8 @@ function composeHTML() {
   const pages = L.pages.map((p, i) => `<li data-pgi="${i}" draggable="${!S.readOnly}"><button class="cmp-pg" data-cpage="${i}" aria-current="${i === S.cpage}"><span class="n">${i + 1}</span><span class="th" data-th="${p.id}" data-w="52"></span><span class="tx"><b>${esc(pageLabel(p))}</b><small>${esc(pageSub(p))}</small></span></button></li>`).join('');
   const side = `<aside class="cmp-side">
     <div class="cmp-head"><h3>Output pages</h3><button class="btn primary" id="cmp-pdf" data-act="cmp-pdf">Create PDF</button></div>
-    <button class="btn" data-act="cmp-saveout" ${S.readOnly ? 'disabled' : ''} title="Keep these pages exactly as they are now, under a name, in All outputs; they will not change when the map or data change">Save as output…</button>
+    <button class="btn primary" data-act="cmp-savefig" ${S.readOnly ? 'disabled' : ''} title="Keep this page exactly as it is now, as one figure in All outputs; it will not change when the map, data or cross-section change">Save figure to All outputs</button>
+    <button class="btn" data-act="cmp-saveout" ${S.readOnly ? 'disabled' : ''} title="Keep all these pages together, exactly as they are now, in All outputs">Save all pages as a set…</button>
     <ol class="cmp-pages">${pages}</ol>
     <div class="cmp-row"><button class="btn" data-act="cmp-up" ${S.cpage === 0 ? 'disabled' : ''} title="Move this page up">Up</button><button class="btn" data-act="cmp-down" ${S.cpage >= n - 1 ? 'disabled' : ''} title="Move this page down">Down</button><button class="btn" data-act="cmp-dup" title="Duplicate this page">Duplicate</button><button class="btn" data-act="cmp-delpage" ${n < 2 ? 'disabled' : ''} title="Remove this page">Remove</button><button class="btn" data-act="cmp-rot-l" title="Turn left (imported pages) or switch portrait and landscape">Rotate left</button><button class="btn" data-act="cmp-rot-r" title="Turn right (imported pages) or switch portrait and landscape">Rotate right</button></div>
     <button class="btn" data-act="cmp-import" ${S.readOnly ? 'disabled' : ''} title="Insert the pages of a PDF (an ArcGIS map, a lab certificate) or a picture after the current page">Add PDF or image…</button>
@@ -10419,7 +10674,7 @@ function composeHTML() {
   if (pg.kind === 'free') {
     const d = pgDims(pg), bd = bodyOf(pg);
     stage = `<div class="cmp-tools">      <label class="cmp-zoom"><span class="note">Zoom</span><select id="cmp-zoom" aria-label="Zoom">${[['fit', 'Fit page'], ['width', 'Fit width'], ...[0.5, 0.75, 1, 1.5, 2, 4].map(v => [v, Math.round(v * 100) + ' %'])].map(([v, t]) => `<option value="${v}" ${String(S.czoom) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <span class="cmp-addwrap"><button class="btn primary" data-act="cmp-addmenu" aria-haspopup="true" ${S.readOnly ? 'disabled' : ''}>Add item ▾</button><div class="cmp-addmenu" role="menu" hidden>${(() => { const G = [['Maps and drawings', ['plan', 'section', 'wt', 'vap', 'flow', 'hydro']], ['Soil survey', ['soilmap', 'soilgraph', 'soiltable']], ['Groundwater model', ['gwsum', 'gwcal', 'gwpar', 'gwlim']], ['Text and pictures', ['text', 'image']], ['Map parts', ['scalebar', 'north', 'legend', 'shape']]], seen = new Set(G.flatMap(g => g[1])), rest = Object.keys(RITEMS).filter(k => !seen.has(k)); return [...G, ...(rest.length ? [['Other', rest]] : [])].map(([t, ks]) => `<div class="cmp-addg"><b>${t}</b>${ks.filter(k => RITEMS[k]).map(k => `<button type="button" class="cmp-addi" role="menuitem" data-cadd="${k}">${esc(RITEMS[k][0])}</button>`).join('')}</div>`).join(''); })()}</div></span></div>
+      <span class="cmp-addwrap"><button class="btn primary" data-act="cmp-addmenu" aria-haspopup="true" ${S.readOnly ? 'disabled' : ''}>Add item ▾</button><div class="cmp-addmenu" role="menu" hidden>${(() => { const G = [['Maps and drawings', ['plan', 'section', 'secmap', 'extent', 'wt', 'vap', 'flow', 'hydro']], ['Soil survey', ['soilmap', 'soilgraph', 'soiltable']], ['Groundwater model', ['gwsum', 'gwcal', 'gwpar', 'gwlim']], ['Text and pictures', ['text', 'image']], ['Map parts', ['scalebar', 'north', 'legend', 'shape']]], seen = new Set(G.flatMap(g => g[1])), rest = Object.keys(RITEMS).filter(k => !seen.has(k)); return [...G, ...(rest.length ? [['Other', rest]] : [])].map(([t, ks]) => `<div class="cmp-addg"><b>${t}</b>${ks.filter(k => RITEMS[k]).map(k => `<button type="button" class="cmp-addi" role="menuitem" data-cadd="${k}">${esc(RITEMS[k][0])}</button>`).join('')}</div>`).join(''); })()}</div></span></div>
       <div class="cmp-canvas"><span class="rl-c" aria-hidden="true"></span><svg class="rl-x" id="rl-x" aria-hidden="true"></svg><svg class="rl-y" id="rl-y" aria-hidden="true"></svg>
       <div class="cmp-stage cmp-scroll" id="cmp-stage"><div class="cmp-sizer" id="cmp-sizer"><div class="cmp-paper" id="cmp-paper" style="width:${d.W}px;height:${d.H}px">${pageFrame(pg.title || '', S.cpage + 1, n, pageItemsSVG(pg), d)}
         <div class="cmp-body" style="left:${bd.x}px;top:${bd.y}px;width:${bd.w}px;height:${bd.h}px" aria-hidden="true"></div>
@@ -10435,9 +10690,10 @@ function composeHTML() {
   }
   const sel = S.csortSel || new Set();
   const mode = `<div class="cmp-mode"><span class="seg" role="group" aria-label="View"><button data-csort="0" aria-pressed="${!S.csort && !S.cout}">Edit page</button><button data-csort="1" aria-pressed="${!!S.csort && !S.cout}">All pages</button><button data-cout="1" aria-pressed="${!!S.cout}">All outputs</button></span>${S.csort ? `<span class="note">${sel.size ? `${sel.size} selected` : 'Click to select; Shift or Ctrl/⌘ for several; drag to reorder; double-click to open'}</span><span class="sp"></span><button class="btn" data-act="cmp-rot-l" ${sel.size ? '' : 'disabled'}>Rotate left</button><button class="btn" data-act="cmp-rot-r" ${sel.size ? '' : 'disabled'}>Rotate right</button><button class="btn" data-act="cmp-dup" ${sel.size ? '' : 'disabled'}>Duplicate</button><button class="btn danger" data-act="cmp-delpage" ${sel.size && sel.size < n ? '' : 'disabled'}>Delete</button>` : ''}</div>`;
-  if (S.cout) return `<div class="cmp outputs"><div class="cmp-main">${mode}<div id="out-list" class="out-list"><p class="note">Loading…</p></div></div></div>`;
+  const oe = S.outEdit && !S.cout ? `<div class="out-editing" role="status"><span>Editing the output <b>${esc(S.outEdit.name)}</b></span><span class="sp"></span><button class="btn primary" data-act="out-update" ${S.readOnly ? 'disabled' : ''}>Update output</button><button class="btn" data-act="out-savecopy" ${S.readOnly ? 'disabled' : ''}>Save as new copy</button><button class="btn" data-act="out-close" title="Stop editing this output; the pages you had before come back">Close</button></div>` : '';
+  if (S.cout) return `<div class="cmp outputs"><div class="cmp-main">${mode}<div id="out-bar" class="out-bar"></div><div id="out-list" class="out-list"><p class="note">Loading…</p></div></div></div>`;
   if (S.csort) stage = `<div class="cmp-sorter" role="listbox" aria-multiselectable="true" aria-label="All pages">${L.pages.map((p, i) => `<button type="button" class="tile" role="option" data-tile="${i}" data-pgi="${i}" draggable="${!S.readOnly}" aria-selected="${sel.has(p.id)}"><span class="th" data-th="${p.id}" data-w="150"></span><span class="cap"><b>${i + 1}</b> ${esc(pageLabel(p))}</span></button>`).join('')}</div>`;
-  return `<div class="cmp${S.csort ? ' sorting' : ''}">${side}<div class="cmp-main">${mode}${stage}</div></div>`;
+  return `<div class="cmp${S.csort ? ' sorting' : ''}">${side}<div class="cmp-main">${mode}${oe}${stage}</div></div>`;
 }
 /* several selected: align to the selection's edges or centres, or space them evenly */
 const selItems = () => (curPage()?.items || []).filter(i => S.cmulti?.has(i.id));
@@ -10485,13 +10741,16 @@ function propsHTML() {
   return `<h3>${esc(RITEMS[it.t][0])}</h3>
     <label class="cmp-lbl" for="cp-cap">Caption</label><input id="cp-cap" data-cprop="cap" value="${esc(it.cap || '')}" placeholder="Figure 1 – Site plan">
     <label class="check"><input type="checkbox" data-cprop="frame" ${it.frame !== false ? 'checked' : ''}> Frame around it</label>
+    ${it.frame !== false ? `<div class="cmp-geos"><label class="cmp-geo"><span>Colour</span><input type="color" data-cprop="fc" value="${esc(it.fc || '#1f2937')}"></label><label class="cmp-geo"><span>Width</span><input type="number" min="0.25" max="20" step="0.25" data-cprop="fw" value="${esc(it.fw || 0.8)}"><span class="note">pt</span></label><label class="cmp-geo"><span>Line</span><select data-cprop="fd">${[['', 'Solid'], ['dash', 'Dashed'], ['dot', 'Dotted']].map(([v, l]) => `<option value="${v}" ${(it.fd || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>` : ''}
     ${(ROPTS[it.t] || []).map(([k, l, list]) => sel(k, l, list)).join('')}
     ${it.t === 'plan' ? `<label class="cmp-lbl" for="co-rp">Results shown</label><select id="co-rp" data-copt="rp"><option value="">As on the Map page${lyrOn('res') ? ': ' + esc(resLabel(S.mres.p)) : ' (none)'}</option><option value="none" ${it.o?.rp === 'none' ? 'selected' : ''}>None</option>${resultParams().map(([k, l]) => `<option value="${k}" ${it.o?.rp === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
       ${it.o?.rp && it.o.rp !== 'none' ? `<div class="cmp-geos"><label class="cmp-geo"><span>From</span><input type="number" step="any" min="0" data-copt="rd0" value="${esc(it.o.rd0 ?? '')}" placeholder="top"><span class="note">${LEN()}</span></label><label class="cmp-geo"><span>To</span><input type="number" step="any" min="0" data-copt="rd1" value="${esc(it.o.rd1 ?? '')}" placeholder="bottom"><span class="note">${LEN()}</span></label></div>` : ''}` : ''}
     ${MAP_ITEMS.has(it.t) ? mapViewHTML(it) + symbolsHTML(it) + withRO({ lbl: it.o?.lbl }, () => labelsHTML('c')) : ''}
     ${it.t === 'legend' ? legendPanelHTML(it, pg) : ''}
-    ${it.t === 'section' ? `<p class="note">Follows the section line chosen on the <button class="btn link" data-tab="xsec">Cross-section</button> page.${it.o?.xs ? ` Shows ${esc(it.o.xs.date ? 'the date ' + it.o.xs.date : 'the latest data')}${it.o.xs.plume !== false && (it.o.xs.param || it.o.xs.medium === 'vapour') ? ` with the ${esc(it.o.xs.medium === 'vapour' ? 'vapour' : (LAB_PARAMS[it.o.xs.param]?.label || '') + ' ' + it.o.xs.medium)} plume` : ''}.` : ' Shows that page\'s current view: date, plume and model results.'}</p><button class="btn" data-act="cmp-xs-use" ${S.readOnly ? 'disabled' : ''}>Use the Cross-section page's current view</button>
+    ${it.t === 'section' ? `<p class="note">${it.o?.secDef ? `Shows the section saved with it (${it.o.secDef.line ? "the line drawn on the map" : it.o.secDef.pick?.length >= 2 ? it.o.secDef.pick.length + " boreholes picked in order" : "best-fit line"}); changes on the <button class="btn link" data-tab="xsec">Cross-section</button> page do not move it.` : `Follows the section line chosen on the <button class="btn link" data-tab="xsec">Cross-section</button> page.`}${it.o?.xs ? ` Shows ${esc(it.o.xs.date ? 'the date ' + it.o.xs.date : 'the latest data')}${it.o.xs.plume !== false && (it.o.xs.param || it.o.xs.medium === 'vapour') ? ` with the ${esc(it.o.xs.medium === 'vapour' ? 'vapour' : (LAB_PARAMS[it.o.xs.param]?.label || '') + ' ' + it.o.xs.medium)} plume` : ''}.` : ' Shows that page\'s current view: date, plume and model results.'}</p><button class="btn" data-act="cmp-xs-use" ${S.readOnly ? 'disabled' : ''}>Use the Cross-section page's current view</button>
       <h4>Layers</h4>${(() => { const x = it.o?.xs || S.xs, ro = S.readOnly ? 'disabled' : ''; return [['plume', 'Measured plume', x.plume !== false], ['model', 'Forecast (model)', !!x.model], ['gwFlow', 'Model heads & flow (MODFLOW 6)', x.gwFlow !== false], ['ptLabels', 'Values at the points', !!x.ptLabels]].map(([k, l, on]) => `<label class="check"><input type="checkbox" data-cxs="${k}" ${on ? 'checked' : ''} ${ro}> ${esc(l)}</label>`).join(''); })()}` : ''}
+    ${it.t === 'extent' ? (() => { const maps = pg.items.filter(x => MAP_ITEMS.has(x.t) && x.t !== 'extent'); return '<label class="cmp-lbl" for="co-link">Shows the extent of</label><select id="co-link" data-copt="link"><option value="">Choose a map…</option>' + maps.map(m => '<option value="' + m.id + '" ' + (it.o?.link === m.id ? 'selected' : '') + '>' + esc(m.cap || RITEMS[m.t][0]) + '</option>').join('') + '</select><p class="note">The red box is the area the chosen map shows; it follows that map when it is panned or zoomed.</p>'; })() : ''}
+    ${it.t === 'secmap' ? '<p class="note">' + (it.o?.secDef ? 'Shows the section saved with it; changes on the Cross-section page do not move it.' : 'Follows the section line on the Cross-section page.') + ' Only the section’s boreholes are named; the others are grey dots.</p><button class="btn" data-act="cmp-xs-use" ' + (S.readOnly ? 'disabled' : '') + '>Use the Cross-section page’s current section</button>' : ''}
     ${it.t === 'plan' || it.t === 'wt' || it.t === 'vap' ? '<p class="note">A fixed scale is true on the printed Letter page; resize the frame to show more or less of the site.</p>' : ''}
     ${it.t === 'soilgraph' ? `<label class="cmp-lbl" for="co-kind">Graph</label><select id="co-kind" data-copt="kind">${SOIL_GRAPHS.map(g => `<option value="${g[0]}" ${(it.o?.kind || 'texture') === g[0] ? 'selected' : ''}>${esc(g[1])}</option>`).join('')}</select>` : ''}
     ${it.t === 'scalebar' ? (() => { const maps = pg.items.filter(x => ['plan', 'wt', 'vap', 'flow'].includes(x.t)); return `<label class="cmp-lbl" for="co-link">Measures</label><select id="co-link" data-copt="link"><option value="">Choose a map…</option>${maps.map(m => `<option value="${m.id}" ${it.o?.link === m.id ? 'selected' : ''}>${esc(m.cap || RITEMS[m.t][0])}</option>`).join('')}</select>
@@ -10553,15 +10812,15 @@ function drawCompose() {
   if (paper.dataset.auto) layoutPages({ pages: [curPage()] }).then(ps => { const p = ps[0]; if (p?.pdf) { pdfPageImage(p.pdf, Math.min(1600, stage.clientWidth * 2)).then(r => { const z = Math.min(1, (stage.clientWidth - 2) / r.w); Object.assign(paper.style, { width: r.w + 'px', height: r.h + 'px' }); paper.style.setProperty('--z', z); stage.style.height = r.h * z + 'px'; paper.innerHTML = `<img src="${r.url}" alt="${esc(curPage().title || 'Imported page')}" style="display:block;width:100%;height:100%">`; }).catch(() => { paper.innerHTML = '<p class="note" style="padding:20px">This imported page could not be shown. The file may be missing from this computer.</p>'; }); return; }
     paper.innerHTML = p ? (p.svg || pageFrame(p.framed.title, S.cpage + 1, repLayout().pages.length, p.framed.body)) : '<p class="note" style="padding:20px">Nothing to show yet for this page.</p>'; });
 }
-function saveOutputDialog() {
-  const L = repLayout(), first = L.pages.find(p => p.title)?.title || 'Output';
-  dialog('Save as output', `<p class="note" style="margin:0">The pages are kept exactly as they are now, in All outputs. They will not change when the map, data or these pages change.</p><div class="fld"><label for="out-name">Name</label><input id="out-name" value="${esc(first.charAt(0) + first.slice(1).toLowerCase())} – ${today()}"></div>`,
-    '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="cmp-saveout-go">Save output</button>');
+function saveOutputDialog(suggest, fig = false) {
+  const L = repLayout(), first = (fig ? curPage()?.title : null) || L.pages.find(p => p.title)?.title || 'Output'; S.outFig = fig;
+  dialog(fig ? 'Save figure to All outputs' : 'Save all pages as a set', `<p class="note" style="margin:0">${fig ? 'This page is kept exactly as it is now, as one figure in All outputs.' : `All ${L.pages.length} pages are kept exactly as they are now, together, in All outputs.`} It will not change when the map, data, cross-section or these pages change.</p><div class="fld"><label for="out-name">Name</label><input id="out-name" value="${esc(suggest || first.charAt(0) + first.slice(1).toLowerCase() + ' – ' + today())}"></div>`,
+    '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="cmp-saveout-go">' + (fig ? 'Save figure' : 'Save set') + '</button>');
   setTimeout(() => $('#out-name')?.select(), 30);
 }
 async function saveOutputGo() {
   const n = $('#out-name')?.value.trim() || 'Output'; $('[data-act="cmp-saveout-go"]')?.setAttribute('disabled', ''); toast('Saving the output…');
-  try { const r = await saveOutput(n); closeOverlay(); if (r) { S.cout = true; rerenderCompose(); toast(`Saved “${r.name}” to All outputs.`); } } catch (e) { console.error(e); toast('The output could not be saved.'); $('[data-act="cmp-saveout-go"]')?.removeAttribute('disabled'); }
+  try { const r = await saveOutput(n, !!S.outFig); closeOverlay(); if (r) { if (S.outEdit) { S.outEdit = { ...S.outEdit, id: r.id, name: r.name }; rerenderCompose(); toast(`Saved “${r.name}” as a new output; you are now editing it.`); } else { S.cout = true; rerenderCompose(); toast(`Saved “${r.name}” to All outputs.`); } } } catch (e) { console.error(e); toast('The output could not be saved.'); $('[data-act="cmp-saveout-go"]')?.removeAttribute('disabled'); }
 }
 function rerenderCompose() { if (S.tab !== 'compose') return; ctlLayout(); const v = $('#view'); v.innerHTML = hiddenNote() + composeHTML(); ctlRender(); if (S.cout) { fillOutputs(); return; } drawCompose(); fillThumbs(); gwComposeEnsure(); }
 function commit(L = repLayout()) { saveLayout(L); rerenderCompose(); }
@@ -10589,7 +10848,8 @@ function composeAct(act, el) {
     if (p.kind === 'pdf') p.rot = ((p.rot || 0) + (act === 'cmp-rot-r' ? 90 : 270)) % 360;
     else if (p.kind === 'free') { p.orient = p.orient === 'land' ? undefined : 'land'; for (const x of p.items || []) clampIt(x, p); }
   }
-  if (act === 'cmp-xs-use' && it?.t === 'section') { it.o = { ...it.o, xs: structuredClone(S.xs) }; }
+  if (act === 'cmp-xs-use' && it?.t === 'secmap') { it.o = { ...it.o, secDef: secDefNow() }; }
+  if (act === 'cmp-xs-use' && it?.t === 'section') { it.o = { ...it.o, xs: structuredClone(S.xs), secDef: secDefNow() }; }
   if (act === 'cmp-del' && (it || S.cmulti?.size)) { const gone = S.cmulti?.size > 1 && (!it || S.cmulti.has(it.id)) ? S.cmulti : new Set([it?.id ?? [...S.cmulti][0]]); pg.items = pg.items.filter(x => !gone.has(x.id)); S.csel = null; S.cmulti = new Set(); }
   if (act === 'cmp-front' && it) { pg.items = [...pg.items.filter(x => x !== it), it]; }
   if (act === 'cmp-copy' && it) { const c = { ...structuredClone(it), id: uid('it'), x: it.x + 18, y: it.y + 18 }; clampIt(c); pg.items.push(c); S.csel = c.id; }
@@ -10637,9 +10897,12 @@ function addGuide(pg, axis, v) { (pg.guides ||= { x: [], y: [] })[axis].push(Mat
 function snapBox(pg, box, ignore = [], resize = false) {
   const tol = 6 / (S.cz || 1), d = pgDims(pg), bd = bodyOf(pg), out = { ...box, lines: [] };
   const T = { x: [...(pg.guides?.x || []), bd.x, bd.x + bd.w, bd.x + bd.w / 2, d.W / 2], y: [...(pg.guides?.y || []), bd.y, bd.y + bd.h, bd.y + bd.h / 2, d.H / 2] };
-  for (const it of pg.items || []) if (!ignore.includes(it.id)) { T.x.push(it.x, it.x + it.w, it.x + it.w / 2); T.y.push(it.y, it.y + it.h, it.y + it.h / 2); }
+  const across = q => q.t === 'shape' && ['line', 'arrow'].includes(q.o?.kind) ? (q.o?.dir === 'h' ? 'y' : q.o?.dir === 'v' ? 'x' : '') : '';
+  for (const it of pg.items || []) if (!ignore.includes(it.id)) { const ac = across(it); if (ac === 'x') T.x.push(it.x + it.w / 2); else T.x.push(it.x, it.x + it.w, it.x + it.w / 2); if (ac === 'y') T.y.push(it.y + it.h / 2); else T.y.push(it.y, it.y + it.h, it.y + it.h / 2); }
+  const self = across(box);
   for (const [a, pos, len] of [['x', 'x', 'w'], ['y', 'y', 'h']]) {
-    const edges = resize ? [[box[pos] + box[len], 1]] : [[box[pos], 0], [box[pos] + box[len] / 2, .5], [box[pos] + box[len], 1]];
+    if (resize && self === a) continue;
+    const edges = self === a ? [[box[pos] + box[len] / 2, .5]] : resize ? [[box[pos] + box[len], 1]] : [[box[pos], 0], [box[pos] + box[len] / 2, .5], [box[pos] + box[len], 1]];
     let best = null; for (const [e, k] of edges) for (const t of T[a]) { const dlt = t - e; if (Math.abs(dlt) <= tol && (!best || Math.abs(dlt) < Math.abs(best.dlt))) best = { dlt, t, k }; }
     if (best) { if (resize) out[len] = box[len] + best.dlt; else out[pos] = box[pos] + best.dlt; out.lines.push({ axis: a, v: best.t }); }
   }
@@ -10733,6 +10996,7 @@ document.addEventListener('dblclick', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.cpan) endPan(); });
 /* the results style editor (Map page and VOC map): every change saves with the project and redraws */
 const resEdP = el => el.closest('.res-pick') ? S.mres.p : S.mapParam && LAB_PARAMS[S.mapParam] ? S.mapParam : 'cvc';
+document.addEventListener('change', e => { if (e.target.id === 'out-sort') { S.outSort = e.target.value; fillOutputs(); } });
 document.addEventListener('change', e => {
   const el = e.target, box = el.closest?.('.res-style'); if (!box || S.readOnly) return;
   const p = resEdP(box), s = resStyle(p);
@@ -10794,6 +11058,12 @@ document.addEventListener('change', e => {
   commit();
 });
 document.addEventListener('pointerdown', e => {
+  // a click on the page or around it, off every item, clears the selection
+  if (S.tab === 'compose' && !e.shiftKey && !e.ctrlKey && !e.metaKey && e.target.closest?.('#cmp-stage') && !e.target.closest('.cmp-box, .cmp-guide, [data-guide], [data-gaxis], button, input, select, textarea') && (S.csel || S.cmulti?.size)) {
+    S.csel = null; S.cmulti = new Set(); if (S.cpan) S.cpan = null;
+    document.querySelectorAll('.cmp-box').forEach(b => { b.setAttribute('aria-selected', 'false'); b.classList.remove('panning'); }); const pp = $('#cmp-props'); if (pp) pp.innerHTML = propsHTML();
+    return;
+  }
   const box = e.target.closest('.cmp-box'); if (!box) return;
   if (e.target.closest('.cmp-bar')) { S.csel = box.dataset.box; if (!S.cmulti?.has(S.csel)) S.cmulti = new Set(); return; }   // the buttons act on the item they sit on
   const it = curPage().items.find(x => x.id === box.dataset.box); if (!it) return;
@@ -10809,8 +11079,9 @@ document.addEventListener('pointermove', e => {
   const z = S.cz || 1, dx = (e.clientX - cDrag.sx) / z, dy = (e.clientY - cDrag.sy) / z, it = cDrag.it;
   if (Math.abs(dx) + Math.abs(dy) > 2) cDrag.moved = true;
   const raw = cDrag.rz ? { x: cDrag.x, y: cDrag.y, w: cDrag.w + dx, h: cDrag.h + dy } : { x: cDrag.x + dx, y: cDrag.y + dy, w: cDrag.w, h: cDrag.h };
+  raw.t = it.t; raw.o = it.o;
   const sn = e.altKey ? { ...raw, lines: [] } : snapBox(curPage(), raw, [it.id, ...cDrag.group.map(g => g.x.id)], cDrag.rz);   // Alt/Option turns snapping off
-  Object.assign(it, { x: Math.round(sn.x), y: Math.round(sn.y), w: Math.round(sn.w), h: Math.round(sn.h) }); showSnaps(sn.lines);
+  const r2 = v => Math.round(v * 2) / 2; Object.assign(it, { x: r2(sn.x), y: r2(sn.y), w: r2(sn.w), h: r2(sn.h) }); showSnaps(sn.lines);
   if (cDrag.group.length) {   // the selection moves as one box, so its spacing holds at the page edge
     const d = pgDims(curPage()), all = [{ ox: cDrag.x, oy: cDrag.y, x: it }, ...cDrag.group];
     let mx = it.x - cDrag.x, my = it.y - cDrag.y;
@@ -10906,7 +11177,7 @@ async function importPagx(file) {
     const cx = x0 + w / 2 - px, cy = y0 + h / 2 - py, th = -rot * Math.PI / 180, rx = px + cx * Math.cos(th) - cy * Math.sin(th), ry = py + cx * Math.sin(th) + cy * Math.cos(th);
     return { x: rx - w / 2, y: ry - h / 2, w, h, rot };
   };
-  const geomBox = pts => { if (!pts.length) return null; const xs = pts.map(p => p[0] * per), ys = pts.map(p => H - p[1] * per), x = Math.min(...xs), y = Math.min(...ys); return { x, y, w: Math.max(2, Math.max(...xs) - x), h: Math.max(2, Math.max(...ys) - y), rot: 0 }; };
+  const geomBox = pts => { if (!pts.length) return null; const xs = pts.map(p => p[0] * per), ys = pts.map(p => H - p[1] * per), x = Math.min(...xs), y = Math.min(...ys), w0 = Math.max(...xs) - x, h0 = Math.max(...ys) - y; return { x: w0 < 2 ? x - (2 - w0) / 2 : x, y: h0 < 2 ? y - (2 - h0) / 2 : y, w: Math.max(2, w0), h: Math.max(2, h0), rot: 0 }; };
   const put = (ty, b, o = {}, extra = {}) => { const it = { id: uid('it'), t: ty, x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h), cap: '', frame: false, o: { ...o, ...(b.rot ? { rot: b.rot } : {}) }, ...extra }; items.push(it); return it; };
   // a frame's border and background (map frames, legends, north arrows, scale bars) as a box under the element
   // a frame's background goes under its element and its border over it, as ArcGIS draws them (frameBox before, frameLine after)
@@ -12017,7 +12288,9 @@ document.addEventListener('click', e => {
   const qt = e.target.closest('[data-qtype]'); if (qt) { S._qtype = qt.dataset.qtype; document.querySelectorAll('[data-qtype]').forEach(x => x.setAttribute('aria-pressed', String(x === qt))); return; }
   const sl = e.target.closest('[data-slug]'); if (sl) { openSlug(+sl.dataset.slug); return; }
   const sp = e.target.closest('[data-secpick]');
-  if (sp) { const id = sp.dataset.secpick; S.secIds.has(id) ? S.secIds.delete(id) : S.secIds.add(id); redrawSec(); if ($('#sec-tools')) $('#sec-tools').outerHTML = secToolsHTML(); return; }
+  if (sp && S.secDraw) return;
+  if (sp && secLineOf()) { secToggle(sp.dataset.secpick); return; }
+  if (sp) { const id = sp.dataset.secpick; S.secIds.has(id) ? S.secIds.delete(id) : S.secIds.add(id); secPickSave(); redrawSec(); if ($('#sec-tools')) $('#sec-tools').outerHTML = secToolsHTML(); return; }
   const mz = e.target.closest('[data-mz]'); if (mz) { const t = S._plan; if (mz.dataset.mz === 'fit') { S.mv = null; drawPlan(); } else if (t) { zoomAt(t.W / 2, t.H / 2, mz.dataset.mz === 'in' ? 1.6 : 1 / 1.6); clearTimeout(mvT); drawPlan(); } return; }
   const imb = e.target.closest('[data-imzoom], [data-imdel], [data-imclear]'); if (imb) { imageryAct(imb); return; }
   const mt = e.target.closest('[data-mtool]'); if (mt) { S.mapTool = mt.dataset.mtool; S.draft = null; S.mapSel = null; if (S.mapTool === 'place' && !S.bh.has(S.placeId)) S.placeId = nextToPlace(); refreshMapEd(); return; }
@@ -12025,6 +12298,8 @@ document.addEventListener('click', e => {
   const cs = e.target.closest('[data-csort]'); if (cs) { S.cout = false; S.csort = cs.dataset.csort === '1'; S.csortSel = new Set(); rerenderCompose(); return; }
   if (e.target.closest('[data-cout]')) { S.cout = true; rerenderCompose(); return; }
   const ob = e.target.closest('[data-outact]'); if (ob) { outputAct(ob.dataset.outact, ob.dataset.out); return; }
+  const os = e.target.closest('[data-outsel]'); if (os) { os.checked ? S.outSel.add(os.dataset.outsel) : S.outSel.delete(os.dataset.outsel); fillOutputs(); return; }
+  if (e.target.id === 'out-selall') { if (e.target.checked) outputsOf().then(l => { S.outSel = new Set(l.map(r => r.id)); fillOutputs(); }); else { S.outSel = new Set(); fillOutputs(); } return; }
   const tl = e.target.closest('[data-tile]'); if (tl) {
     const L = repLayout(), i = +tl.dataset.tile, id = L.pages[i]?.id, sel = S.csortSel ||= new Set();
     if (e.shiftKey && S.csortLast != null) { const [a, b] = [Math.min(S.csortLast, i), Math.max(S.csortLast, i)]; for (let k = a; k <= b; k++) sel.add(L.pages[k].id); }
@@ -12081,6 +12356,12 @@ document.addEventListener('click', e => {
     case 'cmp-xs-use': case 'cmp-pdf': case 'cmp-up': case 'cmp-down': case 'cmp-dup': case 'cmp-delpage': case 'cmp-del': case 'cmp-front': case 'cmp-copy': case 'cmp-img':
     case 'cmp-tpl-apply': case 'cmp-tpl-save': case 'cmp-tpl-save-go': case 'cmp-tpl-del': case 'cmp-tpl-del-go': composeAct(act); break;
     case 'cmp-saveout': saveOutputDialog(); break;
+    case 'out-update': { const b = $('[data-act="out-update"]'); if (b) b.disabled = true; toast('Updating the output…'); updateOutput().then(r => { if (r) toast(`Updated ${r.name}.`); if (b) b.disabled = false; }).catch(e => { console.error(e); toast('The output could not be updated.'); if (b) b.disabled = false; }); break; }
+    case 'out-savecopy': saveOutputDialog(S.outEdit ? S.outEdit.name + ' (copy)' : null, repLayout().pages.length === 1); break;
+    case 'out-close': closeOutputEdit(); break;
+    case 'out-export-sel': exportOutputs('sel'); break;
+    case 'out-export-all': exportOutputs('all'); break;
+    case 'cmp-savefig': saveOutputDialog(null, true); break;
     case 'cmp-tb-edit': { const pg = curPage(); if (pg?.kind !== 'free' || pg.hdr === 'custom') break; const old = bodyOf(pg); pg.hdr = 'custom'; pg.items = [...titleBlockItems(pg), ...pg.items]; void old; commit(); toast('The title block is now elements: click any part to change it.'); break; }
     case 'cmp-tb-std': { const pg = curPage(); if (!pg || pg.hdr !== 'custom' || !confirm('Go back to the standard title block? Its elements are removed; other items stay.')) break; pg.items = pg.items.filter(i => !i.tb); delete pg.hdr; fitToBody(pg); commit(); break; }
     case 'cmp-pagx': $('#cmp-pagx-file')?.click(); break;
@@ -12164,8 +12445,14 @@ document.addEventListener('click', e => {
     case 'go-compose': goTab('compose'); break;
     case 'go-gw': S.tab = 'gw'; lsSet('bhlog.tab', S.tab); S.formStale = true; renderMain(); break;
     case 'go-report': S.tab = 'report'; lsSet('bhlog.tab', S.tab); S.formStale = true; renderMain(); break;
-    case 'sec-clear': S.secIds.clear(); renderView(true); break;
-    case 'sec-rev': S.secIds = new Set([...S.secIds].reverse()); renderView(true); break;
+    case 'sec-clear': S.secIds.clear(); secPickSave(); renderView(true); break;
+    case 'sec-draw': case 'sec-draw-redo': S.secDraw = { pts: [], redo: act === 'sec-draw-redo' }; if (S.tab !== 'site') goTab('site'); else renderView(true); toast('Click on the map to draw the section line; double-click or Enter to finish.'); break;
+    case 'sec-draw-done': finishSecLine(); break;
+    case 'sec-draw-cancel': S.secDraw = null; renderView(true); break;
+    case 'sec-line-rev': { const L = secLineOf(); if (L) { setSecLine({ ...L, pts: [...L.pts].reverse() }); renderView(true); } break; }
+    case 'sec-line-del': setSecLine(null); renderView(true); break;
+    case 'sec-line-delete': { const a = secActiveLine(); if (a && confirm('Delete section line ' + secLetters(a.name) + '? Outputs made with it keep it.')) { const ls = secLinesOf().filter(l => l.id !== a.id); saveSecLines(ls, ls.at(-1)?.id ?? null); renderView(true); } break; }
+    case 'sec-rev': S.secIds = new Set([...S.secIds].reverse()); secPickSave(); renderView(true); break;
     case 's-renum': if (editable(b)) { b.samples.sort((x, y) => (x.depth ?? 0) - (y.depth ?? 0)).forEach((s, i) => s.no = i + 1); store.save(b); renderView(true); } break;
     case 'suggest': suggestState(); break;
     case 'show-issues': if (b) { if (S.tab !== 'edit') { S.dtab = 'details'; lsSet('bhlog.dtab', 'details'); goTab('edit'); } else if (S.dtab !== 'details') { S.dtab = 'details'; renderView(true); } $('#check-out')?.scrollIntoView({ block: 'center' }); } // falls through

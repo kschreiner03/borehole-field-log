@@ -919,6 +919,274 @@ app.whenReady().then(async () => {
     expect(r2.cap && r2.outs === 1, 'after a reload: ' + JSON.stringify(r2));
   });
 
+  await check('outputs: outlines sit on the edge so shared edges draw one line; lines snap by their middle; frames editable', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); goTab('compose'); S.cout = false; S.csort = false; S.cpage = repLayout().pages.findIndex(p => p.items?.some(i => i.t === 'plan')); rerenderCompose(); await w(300);
+        const pg = curPage();
+        const a = newItem('shape', 100, 700, { w: 200, h: 100, frame: false, o: { kind: 'rect', fillc: 'none', line: '#000000', sw: 2 } });
+        const b = newItem('shape', 300, 700, { w: 150, h: 100, frame: false, o: { kind: 'rect', fillc: 'none', line: '#000000', sw: 2 } });
+        const ln = newItem('shape', 100, 760, { w: 200, h: 10, frame: false, o: { kind: 'line', dir: 'h', line: '#000000', sw: 2 } });
+        pg.items.push(a, b, ln);
+        const doc = new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + pageItemsSVG(pg) + '</svg>', 'image/svg+xml');
+        const ra = doc.querySelector('[data-g="' + a.id + '"] rect'), rb = doc.querySelector('[data-g="' + b.id + '"] rect'), l = doc.querySelector('[data-g="' + ln.id + '"] line');
+        want(ra.getAttribute('x') === '0' && ra.getAttribute('width') === '200' && rb.getAttribute('x') === '0', 'rectangle outlines run along the box edge, so a shared edge is one line');
+        want(doc.querySelector('[data-g="' + a.id + '"] svg').getAttribute('overflow') === 'visible', 'the outline is not clipped');
+        want(l.getAttribute('x1') === '0' && l.getAttribute('x2') === '200' && l.getAttribute('stroke-linecap') === 'square', 'lines run the full length with square ends: ' + l.outerHTML);
+        // a line dragged near the rectangle's bottom edge snaps by its middle onto that edge
+        const sn = snapBox(pg, { x: 103, y: 793, w: 200, h: 10, t: 'shape', o: ln.o }, [ln.id]);
+        want(sn.y + 5 === 800 && sn.x === 100, 'the line itself lands on the edge: ' + JSON.stringify([sn.x, sn.y]));
+        const s2 = snapBox(pg, { x: 500, y: 768, w: 20, h: 20 }, []); want(s2.y === 765, 'others snap to the line, not its box: ' + s2.y);
+        pg.items = pg.items.filter(i => ![a, b, ln].includes(i));
+        // a frame's colour, width and line
+        const plan = pg.items.find(i => i.t === 'plan'); S.csel = plan.id; rerenderCompose(); await w(250);
+        const set = (sel, v) => { const el = document.querySelector(sel); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+        set('[data-cprop="fc"]', '#ff0000'); await w(150); set('[data-cprop="fw"]', '2.5'); await w(150); set('[data-cprop="fd"]', 'dash'); await w(150);
+        const fr = new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + pageItemsSVG(curPage()) + '</svg>', 'image/svg+xml').querySelector('[data-g="' + plan.id + '"] [data-frame]');
+        want(fr && /#ff0000/.test(fr.getAttribute('style')) && fr.getAttribute('stroke-width') === '2.5' && fr.getAttribute('stroke-dasharray'), 'frame colour, width and line: ' + fr?.outerHTML);
+        // a click off every item clears the selection
+        document.querySelector('#cmp-paper').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 5, clientY: 5 })); await w(100);
+        want(!S.csel && !document.querySelector('.cmp-box[aria-selected="true"]') && !document.querySelector('#cmp-props [data-cprop="fc"]'), 'clicking off unselects');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('outputs: edit a saved output and update it in place, duplicate it, save as a new copy, close back to the pages before', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); goTab('compose'); S.cout = false; S.csort = false; S.cpage = 0; rerenderCompose(); await w(300);
+        repLayout().pages[0].title = 'WORKING PAGES'; commit();
+        const rec = await saveOutput('Fig set'); repLayout().pages[0].title = 'MY OWN PAGES'; commit();
+        S.cout = true; rerenderCompose(); await w(400);
+        document.querySelector('[data-outact="open-edit"][data-out="' + rec.id + '"]').click(); await w(400);
+        want(S.outEdit?.id === rec.id && !S.cout && repLayout().pages[0].title === 'WORKING PAGES' && /Editing the output/.test(document.querySelector('.out-editing')?.textContent || ''), 'Edit opens the output in the editor');
+        repLayout().pages[0].title = 'CHANGED IN OUTPUT'; commit(); await w(200);
+        document.querySelector('[data-act="out-update"]').click(); await w(3000);
+        let outs = await outputsOf(); const u = outs.find(o => o.id === rec.id);
+        want(outs.length === 1 && u?.name === 'Fig set' && u.updatedAt && u.pages.some(q => (q.svg || '').includes('CHANGED IN OUTPUT')) && u.layout.pages[0].title === 'CHANGED IN OUTPUT', 'Update output saves into the same output: ' + outs.length);
+        // save as a new copy: a second output, and the editor now edits the copy
+        document.querySelector('[data-act="out-savecopy"]').click(); await w(300);
+        want((document.querySelector('#out-name')?.value || '').includes('Fig set (copy)'), 'the copy is named after it: ' + document.querySelector('#out-name')?.value);
+        document.querySelector('[data-act="cmp-saveout-go"]').click(); await w(3000);
+        outs = await outputsOf(); want(outs.length === 2 && S.outEdit && S.outEdit.id !== rec.id && /\(copy\)/.test(S.outEdit.name), 'Save as new copy makes a second output and keeps editing the copy');
+        // close: the pages from before come back
+        document.querySelector('[data-act="out-close"]').click(); await w(400);
+        want(!S.outEdit && S.cout && repLayout().pages[0].title === 'MY OWN PAGES', 'Close brings back the pages that were in the editor: ' + repLayout().pages[0].title);
+        // duplicate from the card
+        await outputAct('dup', rec.id); await w(200); outs = await outputsOf(); want(outs.length === 3 && outs.some(o => o.name === 'Fig set (copy)' && o.id !== rec.id), 'Duplicate');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('cross-section: draw the section line on the map; boreholes ordered along it, ticked on or off, reach, reverse, remove', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); goTab('site'); await w(500);
+        const bs = secCandidates(); want(bs.length >= 3, 'example has boreholes: ' + bs.length);
+        // a line from the westmost to the eastmost borehole, drawn by clicks on the map
+        const sorted = [...bs].sort((a, c) => a.easting - c.easting), A = sorted[0], Z = sorted.at(-1);
+        document.querySelector('[data-act="sec-draw"]').click(); await w(400);
+        want(!!S.secDraw && /Drawing section line A/.test(document.querySelector('#sec-tools')?.textContent || ''), 'drawing mode');
+        const at = (e, n) => { const svg = document.querySelector('#plan svg'), t = S._plan, r = svg.getBoundingClientRect(); return { clientX: r.left + (t.W / 2 + (e - t.cx) * t.sc) * r.width / t.W, clientY: r.top + (t.H / 2 - (n - t.cy) * t.sc) * r.height / t.H }; };
+        const click = (e, n) => { const p = at(e, n), el = document.elementFromPoint(p.clientX, p.clientY) || document.querySelector('#plan svg'); el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, ...p })); };
+        click(A.easting - 5, A.northing - 3); await w(50); click(Z.easting + 5, Z.northing + 3); await w(50);
+        want(S.secDraw?.pts.length === 2, 'two points: ' + S.secDraw?.pts.length);
+        document.querySelector('[data-act="sec-draw-done"]').click(); await w(400);
+        const L = secLineOf(); want(L && L.pts.length === 2 && L.ids.length >= 2, 'the line is saved with its boreholes: ' + JSON.stringify(L && { n: L.pts.length, ids: L.ids.length, buf: L.buf }));
+        want(/data-secpath/.test(planSVG(600, 400, false)), 'drawn on the map');
+        // order: along the line, whatever the ticking order
+        const pos = secPos(sectionList()), ch = pos.map(p => plProject(L.pts, p.b.easting, p.b.northing).d);
+        want(ch.every((c, i) => !i || c >= ch[i - 1]) && pos[0].d === 0, 'ordered along the line');
+        want(pos.some(p => Math.abs(p.off) > 0), 'distances off the line kept');
+        // tick one off from the panel
+        const chip = document.querySelector('[data-secline="' + L.ids[0] + '"]'); chip.click(); await w(200);
+        want(!secLineOf().ids.includes(L.ids[0]) && !sectionList().some(b => b.id === L.ids[0]), 'unticked boreholes leave the section');
+        // reach: everything within a big distance
+        const buf = document.querySelector('#sec-buf'); buf.value = '100000'; buf.dispatchEvent(new Event('change', { bubbles: true })); await w(200);
+        want(secLineOf().ids.length === bs.length, 'within the reach: all ' + secLineOf().ids.length + '/' + bs.length);
+        // reverse: A and A′ swap, the order flips
+        const first = secPos(sectionList())[0].b.id; document.querySelector('[data-act="sec-line-rev"]').click(); await w(200);
+        { const pp = secPos(sectionList()); want(pp[pp.length - 1].b.id === first, 'reversed'); }
+        // the cross-section page draws it and says so
+        goTab('xsec'); await w(600); want(/Section along the line drawn on the map/.test(document.querySelector('#xs-note')?.textContent || ''), 'the section page follows the line: ' + document.querySelector('#xs-note')?.textContent.slice(0, 80));
+        // remove: back to picking
+        window.confirm = () => true; document.querySelector('[data-act="sec-line-delete"]').click(); await w(300); want(!secLineOf() && document.querySelector('[data-act="sec-draw"]'), 'deleted');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('cross-section: the picked boreholes are kept with the project across a restart; an output keeps its own section when the page changes or it is edited later', async (run, load) => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); goTab('xsec'); await w(500);
+        const chips = [...document.querySelectorAll('[data-secpick]')].slice(0, 3).map(c => c.dataset.secpick);
+        for (const id of [chips[2], chips[0], chips[1]]) { document.querySelector('[data-secpick="' + id + '"]').click(); await w(150); }
+        want(JSON.stringify(siteOf().secPick) === JSON.stringify([chips[2], chips[0], chips[1]]), 'the pick is saved with the project');
+        // an output section takes the section as it is, and keeps it when the page's pick changes
+        goTab('compose'); S.cout = false; S.csort = false; await w(300);
+        const pg = newPage('free'); pg.items.push(newItem('section', 60, 120, { w: 700, h: 400 })); repLayout().pages.push(pg); S.cpage = repLayout().pages.length - 1; commit(); await w(300);
+        const it = curPage().items[0], names = () => pageItemsSVG(curPage()).replace(/data-g=.[^ ]+/g, '').replace(/id=.[a-z0-9]+.|url[(]#[a-z0-9]+[)]/g, '');
+        want(JSON.stringify(it.o.secDef?.pick) === JSON.stringify([chips[2], chips[0], chips[1]]), 'the new section item keeps the section');
+        const before = names(); S.secIds.clear(); secPickSave(); await w(100);
+        want(names() === before && before, 'clearing the page pick does not move the output section: ' + (() => { const a = before, b = names(); let i = 0; while (i < a.length && a[i] === b[i]) i++; return a.length + '/' + b.length + ' at ' + i + ': ' + a.slice(i - 80, i + 80) + ' ||| ' + b.slice(i - 80, i + 80); })());
+        const rec = await saveOutput('Sect'); await outputAct('open-edit', rec.id); await w(300);
+        want(repLayout().pages.flatMap(p => p.items || []).find(i => i.t === 'section')?.o?.secDef?.pick?.length === 3, 'editing the output later: the same section');
+        want(!!repLayout().pages.flatMap(p => p.items || []).find(i => i.t === 'section')?.o?.xs, 'the section keeps its view (date, plume, layers) too');
+        // an output saved before sections kept their own: opening it takes the boreholes, in order, from its saved pages
+        const old = (await outputsOf()).find(o => o.id === rec.id), legacy = structuredClone(old); for (const p of legacy.layout.pages) for (const i of p.items || []) if (i.t === 'section') { delete i.o.secDef; delete i.o.xs; }
+        legacy.id = 'out-legacy'; legacy.name = 'Legacy'; await photoStore.put(legacy); 
+        closeOutputEdit(); S.secIds = new Set([chips[1], chips[0]]); secPickSave();
+        await outputAct('open-edit', 'out-legacy'); await w(300);
+        const sec = repLayout().pages.flatMap(p => p.items || []).find(i => i.t === 'section');
+        want(JSON.stringify(sec?.o?.secDef?.pick) === JSON.stringify([chips[2], chips[0], chips[1]].filter(id => sec.o.secDef.pick.includes(id))) && sec.o.secDef.pick.length === 3, 'the old output opens with its own boreholes, not the page: ' + JSON.stringify(sec?.o?.secDef));
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+    // pick again on the page, then restart: still picked, in order
+    await run('(async () => { closeOutputEdit(); S.secIds.clear(); secPickSave(); goTab("xsec"); await new Promise(r => setTimeout(r, 300)); const c = [...document.querySelectorAll("[data-secpick]")].slice(0, 2).map(x => x.dataset.secpick); for (const id of [c[1], c[0]]) document.querySelector("[data-secpick=\\"" + id + "\\"]").click(); window.__want = [c[1], c[0]]; localStorage.setItem("__want", JSON.stringify(window.__want)); return 1; })()');
+    await new Promise(r => setTimeout(r, 2500)); await load();
+    const r2 = await run('(async () => { await new Promise(r => setTimeout(r, 800)); S.sel = [...S.bh.values()].find(b => /Hydrocarbon/.test(b.project))?.id; return { got: [...S.secIds], want: JSON.parse(localStorage.getItem("__want")) }; })()');
+    expect(JSON.stringify(r2.got) === JSON.stringify(r2.want), 'after a restart: ' + JSON.stringify(r2));
+  });
+
+  await check('outputs: the groundwater elevation map has the main flow arrow with its 90 % range, or arrow only, or none', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); S.sel = [...S.bh.values()].find(b => b.well?.installed && /Dawn/i.test(b.project || ''))?.id || S.sel; goTab('compose'); await w(300);
+        const fl = gwFlow(); if (fl.error || fl.flat) { F.push('no flow in the example: ' + fl.error); return F; }
+        const pg = newPage('free'), it = newItem('wt', 60, 120, { w: 700, h: 500 }); pg.items.push(it, newItem('legend', 60, 640, { w: 300, h: 200, o: { link: it.id } }));
+        const svg = () => pageItemsSVG(pg);
+        want(/data-wtarrow/.test(svg()) && /data-flowwedge/.test(svg()) && svg().includes('Flow ' + Math.round(fl.az) + '°'), 'arrow and its 90 % wedge by default');
+        want(/Groundwater flow direction/.test(svg()) && /90 % range/.test(svg()), 'the legend keys them');
+        it.o = { farrow: 'arrow' }; want(/data-wtarrow/.test(svg()) && !/data-flowwedge/.test(svg()), 'arrow only');
+        it.o = { farrow: '0' }; want(!/data-wtarrow/.test(svg()), 'none');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('outputs: save single figures (two different cross-sections), they stay as saved, export selected or all', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); goTab('xsec'); await w(400);
+        const ids = [...document.querySelectorAll('[data-secpick]')].map(c => c.dataset.secpick);
+        const pick = async list => { S.secIds.clear(); for (const id of list) S.secIds.add(id); secPickSave(); };
+        goTab('compose'); S.cout = false; S.csort = false; await w(300);
+        const pg = newPage('free', { title: 'FIGURE 5 - SECTION A' }); repLayout().pages.push(pg); S.cpage = repLayout().pages.length - 1; commit(); await w(200);
+        // figure 1: section through the first three
+        await pick(ids.slice(0, 3)); curPage().items = [newItem('section', 60, 120, { w: 700, h: 400 })]; commit(); await w(200);
+        document.querySelector('[data-act="cmp-savefig"]').click(); await w(300);
+        want(/FIGURE 5/i.test(document.querySelector('#out-name')?.value || ''), 'named from the page: ' + document.querySelector('#out-name')?.value);
+        document.querySelector('#out-name').value = 'Figure 5 - Section A'; document.querySelector('[data-act="cmp-saveout-go"]').click(); await w(2500);
+        // figure 2: a different section on the same page
+        S.cout = false; rerenderCompose(); await w(200); await pick(ids.slice(-3).reverse()); curPage().items = [newItem('section', 60, 120, { w: 700, h: 400 })]; curPage().title = 'FIGURE 6 - SECTION B'; commit(); await w(200);
+        const fig2 = await saveOutput('Figure 6 - Section B', true);
+        let outs = await outputsOf(); want(outs.length === 2 && outs.every(o => o.fig && o.pages.length === 1), 'two single-page figures: ' + outs.map(o => o.name + ':' + o.pages.length));
+        const a = outs.find(o => /Section A/.test(o.name)), b = outs.find(o => /Section B/.test(o.name));
+        want(JSON.stringify(a.layout.pages[0].items[0].o.secDef.pick) !== JSON.stringify(b.layout.pages[0].items[0].o.secDef.pick), 'each figure keeps its own section');
+        const before = a.pages[0].svg; await pick(ids.slice(1, 4)); outs = await outputsOf(); want(outs.find(o => o.id === a.id).pages[0].svg === before, 'changing the cross-section does not change a saved figure');
+        // the list: sorted by name, ticks, export selected and all
+        S.cout = true; rerenderCompose(); await w(500);
+        want([...document.querySelectorAll('.out-card b')].map(x => x.textContent).join('|') === 'Figure 5 - Section A|Figure 6 - Section B', 'in name order');
+        const got = []; const keep = window.saveFile; window.saveFile = async (n, d) => { got.push([n, d]); return true; };
+        want(document.querySelector('[data-act="out-export-sel"]').disabled, 'nothing selected: export selected is off');
+        document.querySelector('[data-outsel="' + b.id + '"]').click(); await w(300);
+        document.querySelector('[data-act="out-export-sel"]').click(); await w(2500);
+        document.querySelector('[data-act="out-export-all"]').click(); await w(3500);
+        window.saveFile = keep;
+        const n = async d => (await PDFLib.PDFDocument.load(await d.arrayBuffer())).getPageCount();
+        want(got.length === 2 && await n(got[0][1]) === 1 && await n(got[1][1]) === 2, 'export selected gives 1 page, export all gives 2: ' + got.map(g => g[0]));
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('outputs: section location map (the line, its boreholes named without overlaps, others as dots) and extent map of another map', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); S.sel = [...S.bh.values()].find(b => /Dawn/i.test(b.project || '') && b.easting != null)?.id || S.sel; goTab('xsec'); await w(400);
+        const ids = [...document.querySelectorAll('[data-secpick]')].map(c => c.dataset.secpick); S.secIds.clear(); for (const id of ids.slice(0, 4)) S.secIds.add(id); secPickSave();
+        goTab('compose'); S.cout = false; S.csort = false; await w(300);
+        const pg = newPage('free', { title: 'SECTION A' }), sec = newItem('section', 40, 120, { w: 720, h: 420 }), sm = newItem('secmap', 560, 130, { w: 200, h: 160 });
+        const plan = newItem('plan', 40, 580, { w: 460, h: 380 }), ex = newItem('extent', 520, 600, { w: 220, h: 170, o: { link: plan.id } });
+        pg.items.push(sec, sm, plan, ex); repLayout().pages.push(pg); S.cpage = repLayout().pages.length - 1; commit(); await w(400);
+        const svg = pageItemsSVG(curPage()), part = id => { const s = svg.split('data-g="' + id + '"')[1]; if (s == null) throw new Error('no item ' + id + ' in ' + svg.length + ' / ' + curPage().items.map(i => i.t + ':' + i.id).join(',') + ' / ' + [sm.id, ex.id].join(',')); return s.split('data-g=')[0]; };
+        const m = part(sm.id), names = [...m.matchAll(/data-minilbl="1"[^>]*>([^<]+)</g)].map(x => x[1]);
+        want(/data-minisec/.test(m) && (m.match(/data-miniend/g) || []).length === 2, 'the section line with A and A′');
+        want(names.length === 4, 'only the section boreholes are named: ' + names);
+        want((m.match(/data-minioff/g) || []).length === mapList().filter(b => b.easting != null).length - 4, 'the others are dots');
+        // no two labels overlap
+        const doc = new DOMParser().parseFromString(svg.replace(/^/, '<svg xmlns="http://www.w3.org/2000/svg">') + '</svg>', 'image/svg+xml');
+        document.body.insertAdjacentHTML('beforeend', '<svg id="__t" xmlns="http://www.w3.org/2000/svg" width="900" height="1100">' + svg + '</svg>'); await w(50);
+        const bx = [...document.querySelectorAll('#__t [data-g="' + sm.id + '"] [data-minilbl]')].map(e => e.getBBox()), hit = bx.some((a, i) => bx.some((b, j) => j > i && a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height));
+        want(!hit, 'labels do not overlap'); document.querySelector('#__t').remove();
+        // the section map keeps its section
+        S.secIds.clear(); secPickSave(); want(part(sm.id) === pageItemsSVG(curPage()).split('data-g="' + sm.id + '"')[1].split('data-g=')[0], 'keeps the section saved with it');
+        // extent: the red box is the plan's area, and follows it
+        const e = part(ex.id); want(/data-extent/.test(e), 'the extent box: ' + e.slice(0, 200));
+        const box = s => +/data-extent="1" x="([-0-9.]+)"/.exec(s)?.[1];
+        const x0 = ITEM_C.get(ex.id)[0]; plan.o = { ...plan.o, cx: ITEM_C.get(plan.id)[0] + 40, cy: ITEM_C.get(plan.id)[1] }; pageItemsSVG(curPage()); const x1 = ITEM_C.get(ex.id)[0];
+        want(x1 > x0, 'the extent map follows the map: ' + x0 + ' → ' + x1);
+        ex.o = {}; want(/Choose the map/.test(pageItemsSVG(curPage())), 'asks for its map');
+        ex.o = { link: plan.id }; commit(); await w(300);
+        S.csel = sm.id; rerenderCompose(); await w(300); want(document.querySelector('#cmp-props [data-act="cmp-xs-use"]') && document.querySelector('[data-copt="fit"]'), 'its panel');
+        S.csel = ex.id; rerenderCompose(); await w(300); want(document.querySelector('#co-link')?.value === plan.id, 'extent panel names its map');
+        S.csel = null; rerenderCompose(); await w(600);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('cross-section: several lines A–A′, B–B′ … each kept; outputs keep the line they were made with', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); goTab('site'); await w(500);
+        const bs = secCandidates(), byE = [...bs].sort((a, c) => a.easting - c.easting), byN = [...bs].sort((a, c) => a.northing - c.northing);
+        const at = (e, n) => { const svg = document.querySelector('#plan svg'), t = S._plan, r = svg.getBoundingClientRect(); return { clientX: r.left + (t.W / 2 + (e - t.cx) * t.sc) * r.width / t.W, clientY: r.top + (t.H / 2 - (n - t.cy) * t.sc) * r.height / t.H }; };
+        const click = (e, n) => { const p = at(e, n); document.querySelector('#plan svg').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, ...p })); };
+        const draw = async (a, z) => { document.querySelector('[data-act="sec-draw"]').click(); await w(300); click(a.easting - 3, a.northing); click(z.easting + 3, z.northing); await w(50); document.querySelector('[data-act="sec-draw-done"]').click(); await w(400); };
+        await draw(byE[0], byE.at(-1)); want(secLinesOf().length === 1 && secLineOf().name === 'A', 'first line is A');
+        // a figure with line A
+        goTab('compose'); S.cout = false; S.csort = false; await w(300); const p1 = xsecPage(); repLayout().pages.push(p1); S.cpage = repLayout().pages.length - 1; commit(); await w(300);
+        want(/CROSS-SECTION A–A′/.test(p1.title), 'the page is titled for A: ' + p1.title);
+        const fA = await saveOutput('Section A', true);
+        // the next line is B, and A stays
+        goTab('site'); await w(400); want((document.querySelector('#sec-tools')?.textContent || '').includes('New line (B–B′)'), 'offers B next');
+        await draw(byN[0], byN.at(-1)); want(secLinesOf().map(l => l.name).join() === 'A,B' && secLineOf().name === 'B', 'B added, A kept: ' + secLinesOf().map(l => l.name));
+        want(/data-secpath="A"/.test(planSVG(600, 400, false)) && /data-secpath="B"/.test(planSVG(600, 400, false)), 'both lines on the map');
+        goTab('xsec'); await w(400); want(/Cross-section B–B′/.test(document.querySelector('.xs-page h3')?.textContent || ''), 'the page shows B');
+        goTab('compose'); await w(300); const p2 = xsecPage(); repLayout().pages.push(p2); S.cpage = repLayout().pages.length - 1; commit(); await w(300);
+        const fB = await saveOutput('Section B', true);
+        const outs = await outputsOf(), lineOf = o => o.layout.pages[0].items.find(i => i.t === 'section').o.secDef.line;
+        want(lineOf(outs.find(o => o.id === fA.id)).name === 'A' && lineOf(outs.find(o => o.id === fB.id)).name === 'B', 'each figure keeps its own line');
+        // back to A from the chooser; the B figure does not change
+        goTab('xsec'); await w(300); const aId = secLinesOf().find(l => l.name === 'A').id; document.querySelector('[data-secuse="' + aId + '"]').click(); await w(300);
+        want(secLineOf().name === 'A', 'A chosen again');
+        await outputAct('open-edit', fB.id); await w(300); want(repLayout().pages[0].items.find(i => i.t === 'section').o.secDef.line.name === 'B', 'editing the B figure still shows B');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
   await check('outputs: map symbols for boreholes and wells, per map or for the project; legend on or off', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
