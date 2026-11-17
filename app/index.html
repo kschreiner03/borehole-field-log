@@ -5,6 +5,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js" integrity="sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="lib/ol.css">
+<script src="lib/ol.js"></script>
+<script src="lib/proj4.js"></script>
 <script src="lib/soilstats.js"></script>
 <script src="lib/soilsurvey.js"></script>
 <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -1356,6 +1359,140 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
   .titlebar h1, .titlebar .co { display: none; }
   #statusbar .sb-opt { display: none; }
 }
+/* ================= Ribbon workspace (2026-11-13) =================
+   One ribbon under the title bar, as in desktop GIS and engineering software: File opens the start window; each tab is a
+   kind of work with its pages and tools in labelled groups. It replaces the rail and the per-page toolbar. */
+.prail { display: none !important; }
+.shell { grid-template-columns: 0 var(--sidebar-width) minmax(0, 1fr) var(--ctl-w, 0px); }
+#pg-tools { display: none; }
+.titlebar .tb-actions [data-act="new"], .titlebar #tb-qlog, .titlebar .tb-actions [data-act="pdf-one"], .titlebar .tb-actions .tb-sep:nth-of-type(3) { display: none; }
+.rbar { background: var(--surface); }
+.rtabs2 { display: flex; align-items: stretch; height: 28px; padding: 0 8px; gap: 1px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.rtabs2 button { border: 0; background: none; padding: 0 12px; font: 400 13px var(--f-body); color: var(--ink); cursor: pointer; white-space: nowrap; border-radius: 0; }
+.rtabs2 button:hover:not(:disabled) { background: var(--hover); }
+.rtabs2 button[aria-selected="true"] { color: var(--accent); font-weight: 600; box-shadow: inset 0 -2px var(--accent); }
+.rtabs2 button:disabled { color: var(--muted); opacity: .55; cursor: default; }
+.rtabs2 .rfile { background: var(--accent); color: #fff; margin-right: 6px; padding: 0 16px; }
+.rtabs2 .rfile:hover:not(:disabled) { background: var(--accent-2); }
+.rtabs2 .rfile[aria-selected="true"] { background: var(--accent-2); color: #fff; box-shadow: none; }
+.rpanel { display: flex; align-items: stretch; height: 82px; background: var(--raised); border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; padding: 0 2px; }
+.rgrp { display: flex; flex-direction: column; flex: none; padding: 3px 4px 1px; border-right: 1px solid var(--rule); }
+.rgrp-b { display: flex; align-items: flex-start; gap: 1px; flex: 1; }
+.rgrp-l { text-align: center; font-size: 11px; color: var(--muted); line-height: 16px; white-space: nowrap; }
+.rcol { display: flex; flex-direction: column; gap: 1px; }
+.rbig, .rsm { border: 1px solid transparent; background: none; color: var(--ink); font: 400 12px/1.15 var(--f-body); cursor: pointer; border-radius: var(--r-sm); }
+.rbig { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px; min-width: 50px; max-width: 78px; height: 60px; padding: 5px 5px 2px; text-align: center; }
+.rbig svg { width: 26px; height: 26px; flex: none; color: var(--accent-2); }
+.rsm { display: flex; align-items: center; gap: 5px; height: 19px; padding: 0 6px 0 4px; white-space: nowrap; text-align: left; }
+.rsm svg { width: 15px; height: 15px; flex: none; color: var(--accent-2); }
+.rbig:hover:not(:disabled), .rsm:hover:not(:disabled) { background: var(--hover); border-color: var(--border); }
+.rbig[aria-pressed="true"], .rsm[aria-pressed="true"] { background: var(--active); border-color: var(--btn-line); }
+.rbig:disabled, .rsm:disabled { opacity: .4; cursor: default; }
+.rbig.hl, .rsm.hl { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+body.field .rbig { min-width: 64px; height: 64px; font-size: 13px; } body.field .rsm { height: 22px; font-size: 13px; }
+@media (max-width: 860px) { .shell { grid-template-columns: minmax(0, 1fr); } .rpanel { height: 76px; } .rbig { height: 56px; } }
+
+/* the start window */
+.sw { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr); gap: 48px; max-width: 1180px; margin: 0 auto; padding: 24px 28px 40px; }
+.sw-brand { font: 300 24px var(--f-body); color: var(--ink); margin: 0 0 18px; }
+.sw h2 { font: 600 14px var(--f-body); margin: 0 0 8px; }
+.sw h3 { font: 600 14px var(--f-body); margin: 0 0 8px; }
+.sw-search { display: flex; align-items: center; gap: 6px; border: 1px solid var(--btn-line); background: var(--surface); border-radius: var(--r-sm); padding: 0 8px; margin-bottom: 6px; }
+.sw-search svg { width: 14px; height: 14px; color: var(--muted); flex: none; }
+.sw-search input { border: 0; outline: 0; background: none; min-height: 28px; flex: 1; font: 13px var(--f-body); box-shadow: none; padding: 0; }
+.sw-grp { font: 600 12px var(--f-body); color: var(--muted); margin: 12px 0 2px; }
+.sw-row { display: flex; align-items: center; gap: 4px; border-radius: var(--r-sm); }
+.sw-row:hover { background: var(--hover); }
+.sw-open { flex: 1; min-width: 0; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 7px 8px; border: 0; background: none; text-align: left; font: 13px var(--f-body); color: var(--ink); cursor: pointer; border-radius: var(--r-sm); }
+.sw-open svg { width: 20px; height: 20px; color: var(--accent-2); margin-top: 1px; }
+.sw-txt { display: grid; min-width: 0; } .sw-txt small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sw-when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.sw-menu { flex: none; } .sw-menu summary { min-height: 26px; padding: 0 8px; border-color: transparent; background: none; } .sw-menu .lmenu-pop { right: 0; left: auto; }
+.sw-empty { color: var(--muted); max-width: 520px; }
+.sw-r { display: flex; flex-direction: column; gap: 6px; padding-top: 52px; }
+.sw-gs { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--r-sm); text-align: left; font: 13px var(--f-body); color: var(--ink); cursor: pointer; }
+.sw-gs:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.sw-gs svg { width: 24px; height: 24px; color: var(--accent); }
+.sw-gs span { display: grid; } .sw-gs small { color: var(--muted); font-size: 12px; }
+.sw-r h3 + .sw-gs { margin-top: 0; } .sw-r h3:not(:first-child) { margin-top: 14px; }
+.sw-ex { display: grid; justify-items: start; gap: 2px; } .sw-ex .btn.link { font-size: 13px; }
+.sw-ver { margin-top: auto; padding-top: 24px; color: var(--muted); font-size: 12px; } .sw-ver .btn.link { font-size: 12px; }
+body.on-sites .main { background: var(--surface); }
+@media (max-width: 860px) { .sw { grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 16px; } .sw-r { padding-top: 0; } }
+
+/* Soil & observations in three panes: log, layer grid under it, the selected layer's fields on the right */
+.ws.ws3 { grid-template-columns: minmax(0, 1fr) minmax(340px, 420px); grid-template-rows: auto minmax(360px, 1fr) auto; grid-template-areas: "tabs props" "log props" "data props"; column-gap: 12px; align-items: stretch;
+  height: calc(100vh - var(--appbar-h, 68px) - var(--status-h) - 28px); min-height: 640px; }
+.ws.ws3 > nav.dtabs { grid-area: tabs; position: static; margin: 0; }
+.ws.ws3 > .ws-split { display: none; }
+.ws.ws3 > .ws-log { grid-area: log; position: static; height: auto; min-height: 0; }
+.ws.ws3 > .ws-data { grid-area: data; min-height: 0; max-height: 38vh; overflow: auto; border: 1px solid var(--border); border-top: 0; background: var(--surface); }
+.ws.ws3 > .ws-data .edit { gap: 0; }
+.ws.ws3 > .ws-data .sec { border: 0; margin: 0; box-shadow: none; }
+.ws.ws3 > .ws-data .sec > header { position: sticky; top: 0; z-index: 2; background: var(--raised); }
+.ws.ws3 > .ws-data .sec + .sec { border-top: 1px solid var(--border); }
+.ws.ws3 > .ws3-props { grid-area: props; display: block; min-height: 0; overflow: auto; border: 1px solid var(--border); background: var(--surface); }
+.ws.ws3 > .ws3-props #ldetail { margin: 0; border: 0; background: none; }
+
+/* the site overview: panels in a grid */
+.dash-bar { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; } .dash-bar .note { margin: 0 auto 0 0; }
+.dash { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-flow: dense; gap: 10px; }
+.dp { background: var(--surface); border: 1px solid var(--border); min-width: 0; display: flex; flex-direction: column; }
+.dp > header { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px; background: var(--raised); border-bottom: 1px solid var(--border); }
+.dp > header h3 { margin: 0 auto 0 0; font: 600 13px var(--f-body); } .dp > header .note { margin: 0; font-size: 12px; } .dp > header .btn.link { font-size: 12px; }
+.dp-b { padding: 8px 10px 10px; min-width: 0; } .dp-b h4 { margin: 12px 0 6px; font: 600 12px var(--f-body); color: var(--muted); }
+.dp.wide { grid-column: span 2; } .dp.full { grid-column: 1 / -1; } .dp.tall { grid-row: span 2; }
+.dp .map-box { margin: 0; } .dp .map-box svg { width: 100%; height: auto; display: block; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: -8px -10px -10px; }
+.kpis > div { display: grid; padding: 10px 12px; border-right: 1px solid var(--rule); } .kpis > div:last-child { border: 0; }
+.kpis span { color: var(--muted); font-size: 12px; } .kpis b { font: 300 26px/1.15 var(--f-body); color: var(--ink); } .kpis small { color: var(--muted); font-size: 12px; }
+.dp table.dash-t { width: 100%; min-width: 0; } .dp table.dash-t td, .dp table.dash-t th { white-space: normal; padding-left: 6px; padding-right: 6px; } .dp table.dash-t td.r, .dp table.dash-t th.r { white-space: nowrap; } .dp-b { overflow-x: auto; } .dash-t td.x { color: var(--negative); font-weight: 600; } .dash-t td.m, .dash-t .m { color: var(--muted); }
+.tasks td.ck { width: 24px; } .tasks tr.done td:nth-child(2) { text-decoration: line-through; color: var(--muted); }
+.task-new { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto auto; gap: 6px; margin-top: 8px; }
+.dash-pick { display: grid; gap: 6px; }
+.dp .steps-list { margin: 0; }
+@media (max-width: 1100px) { .dash { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .dp.tall { grid-row: auto; } }
+@media (max-width: 760px) { .dash { grid-template-columns: minmax(0, 1fr); } .dp.wide { grid-column: auto; } .kpis { grid-template-columns: 1fr 1fr; } .task-new { grid-template-columns: 1fr; } }
+
+/* the GIS map page: Contents on the left, the map filling the rest */
+body.on-gis .main { padding: 0; } body.on-gis .main > .crumbs, body.on-gis .main > .head, body.on-gis .main > .tabs, body.on-gis .main > .note { display: none; }
+.gis { display: grid; grid-template-columns: 250px minmax(0, 1fr); height: calc(100vh - var(--appbar-h, 68px) - var(--status-h)); }
+.gis-toc { border-right: 1px solid var(--border); background: var(--surface); overflow: auto; font-size: 13px; }
+.gis-toc > header { font: 600 13px var(--f-body); padding: 6px 10px; background: var(--raised); border-bottom: 1px solid var(--border); }
+.gis-tb { display: grid; gap: 4px; padding: 8px 10px; border-bottom: 1px solid var(--rule); } .gis-tb label { font-size: 12px; color: var(--muted); } .gis-tb select { min-height: 26px; font-size: 12.5px; }
+.gis-layers { list-style: none; margin: 0; padding: 6px 4px; } .gis-layers li label { display: flex; align-items: center; gap: 8px; padding: 3px 6px; cursor: pointer; } .gis-layers li label:hover { background: var(--hover); }
+.gis-legend { padding: 6px 10px 12px; border-top: 1px solid var(--rule); } .gis-legend h4 { margin: 4px 0 6px; font: 600 12px var(--f-body); color: var(--muted); }
+.gis-legend > div { display: flex; align-items: center; gap: 8px; padding: 2px 0; } .gis-legend .note { font-size: 12px; margin: 6px 0 0; }
+.lg-bh { width: 9px; height: 9px; border-radius: 50%; background: #1f1f1f; margin: 0 3px; } .lg-mw { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #1f1f1f; background: #fff; margin: 0 2px; box-sizing: border-box; } .lg-wt { width: 16px; border-top: 2px solid var(--water); }
+.gis-map { position: relative; min-width: 0; background: #e9ece6; }
+.gis-map .ol-scale-line, .gis-map .ol-scale-bar { left: 10px; bottom: 30px; }
+.gis-xy { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; height: 22px; padding: 0 10px; font: 12px/22px var(--f-body); color: var(--ink); background: rgba(255, 255, 255, .86); border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; pointer-events: none; }
+.gis-map .ol-attribution { bottom: 26px; }
+.gis-pop { position: absolute; z-index: 4; right: 12px; top: 12px; width: 260px; display: grid; gap: 3px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 4px 14px rgba(16, 24, 40, .14); font-size: 13px; }
+.gis-pop span { color: var(--muted); } .gis-pop div { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+
+.gis-sub { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px 2px; font: 600 12px var(--f-body); color: var(--muted); } .gis-sub .btn.link { font-size: 12px; }
+.gis-user li { position: relative; } .gis-user li > label { padding-right: 34px; } .gl-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gis-user .gl-menu { position: absolute !important; right: 2px; top: 1px; margin: 0; } .gl-menu summary { min-height: 22px; padding: 0 6px; border-color: transparent; background: none; } .gl-menu .lmenu-pop { right: 0; left: auto; z-index: 30; }
+.gl-sw { width: 14px; height: 10px; flex: none; background: color-mix(in srgb, var(--c) 35%, transparent); border: 1.5px solid var(--c); } .gl-sw.gl-point { width: 9px; height: 9px; border-radius: 50%; background: var(--c); border-color: #fff; outline: 1px solid var(--c); margin: 0 2px; } .gl-sw.gl-line { height: 0; border-width: 2px 0 0; background: none; } .gl-sw.gl-svc { background: repeating-linear-gradient(45deg, #c4c7ca 0 3px, #eef0f2 3px 6px); border-color: #9aa0a6; }
+.gl-classes { padding: 0 8px 4px 34px; font-size: 12px; } .gl-classes div { display: flex; align-items: center; gap: 6px; } .gl-classes i { width: 12px; height: 9px; flex: none; border: 1px solid rgba(0,0,0,.2); }
+.gl-empty { padding: 2px 10px 6px; font-size: 12px; }
+.gis-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; } .gis-main .gis-map { flex: 1 1 auto; min-height: 200px; }
+.gis-table { flex: none; height: 34%; display: flex; flex-direction: column; border-top: 1px solid var(--border); background: var(--surface); }
+.gis-table > header { display: flex; align-items: center; gap: 10px; min-height: 28px; padding: 0 10px; background: var(--raised); border-bottom: 1px solid var(--border); } .gis-table > header .note { margin: 0; font-size: 12px; } .gis-table .sp { flex: 1; }
+.gis-tw { flex: 1; overflow: auto; } .gis-tw table { min-width: 100%; } .gis-tw td, .gis-tw th { white-space: nowrap !important; } .gis-tw tr[data-gis-row] { cursor: pointer; } .gis-tw tr[data-gis-row]:hover td { background: var(--hover); } .gis-tw tr.cur td { background: var(--active); }
+.gp-attr { max-height: 260px; overflow: auto; } .gp-attr table { border-collapse: collapse; width: 100%; font-size: 12px; } .gp-attr th { text-align: left; color: var(--muted); font-weight: 400; padding: 2px 8px 2px 0; vertical-align: top; } .gp-attr td { padding: 2px 0; word-break: break-word; }
+
+.gis.has-tool { grid-template-columns: 250px minmax(0, 1fr) 300px; }
+.gis-tool { border-left: 1px solid var(--border); background: var(--surface); overflow: auto; font-size: 13px; }
+.gis-tool > header { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: var(--raised); border-bottom: 1px solid var(--border); } .gis-tool > header .btn.link { font-size: 12px; }
+.gis-tool .gt-what { margin: 8px 10px 6px; font-size: 12px; }
+.gis-tool .gp { display: grid; gap: 3px; padding: 4px 10px; } .gis-tool .gp > label { font-size: 12px; color: var(--muted); } .gis-tool .gp select, .gis-tool .gp input[type=text], .gis-tool .gp input[type=number] { min-height: 28px; font-size: 13px; width: 100%; }
+.gis-tool .gp.ck2 .check { font-size: 13px; color: var(--ink); }
+.gis-tool .gpr { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px; margin-top: 6px; border-top: 1px solid var(--rule); position: sticky; bottom: 0; background: var(--surface); } .gis-tool .gpr .note { margin: 0; font-size: 12px; color: var(--negative); }
+.gl-sw.gl-grid { background: var(--r); border: 1px solid rgba(0,0,0,.2); }
+.gl-ramp { display: grid; grid-template-columns: 1fr 1fr; padding: 0 8px 2px 34px; font-size: 11.5px; color: var(--muted); } .gl-ramp i { grid-column: 1 / -1; height: 8px; border: 1px solid rgba(0,0,0,.15); } .gl-ramp span:last-child { text-align: right; }
+.gl-note { padding: 0 8px 6px 34px; font-size: 11.5px; color: var(--muted); line-height: 1.3; }
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="pat-defs"></defs></svg>
@@ -1383,6 +1520,7 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
     <button class="tb" data-act="tut" title="Step-by-step tutorial: the one for this page, or choose one"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5l9-3.5 9 3.5-9 3.5z"/><path d="M7 8.5v5c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-5M21 6.5v6"/></svg><span class="lbl">Tutorial</span></button>
     <button class="tb" data-act="prefs" aria-label="Settings" title="Units, symbols, page depth, log columns, company and logo"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Settings</span></button>
   </div>
+  <div class="rbar" id="rbar"></div>
   <div class="rtabs" role="tablist" aria-label="Tool categories" id="rtabs"></div>
   <div class="ribbon" role="toolbar" aria-label="Tools">
     <div class="tbox"><div class="tools"><button class="rb" data-act="new" id="btn-new" title="Create a new borehole"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="1"/><path d="M7 8h10M7 14h10M12 17v3"/><circle cx="19" cy="5" r="3.5" fill="#fff"/><path d="M19 3.5v3M17.5 5h3"/></svg><span>New</span></button><button class="rb" data-act="duplicate" id="btn-dup" title="New borehole with the same project and drilling details"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="11" height="14" rx="1"/><path d="M8 7V3h13v14h-7"/></svg><span>Duplicate</span></button><button class="rb" data-act="bh-tpl" title="Save this borehole's drilling details, well design or soil layers as a template for new boreholes"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="1"/><path d="M9 7h6M9 11h6M9 15h3"/><path d="M15 15l1.5 1.5L19 14"/></svg><span>Save as template</span></button><button class="rb" data-act="delete" id="rb-del" title="Delete one or more boreholes"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16M9.5 6.5V4h5v2.5M6.5 6.5l1 14h9l1-14M10 10.5v6.5M14 10.5v6.5"/></svg><span>Delete</span></button><button class="rb" data-act="check-log" id="rb-check" title="List missing information and depth problems"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg><span>Check log</span></button></div><div class="cap">Borehole</div></div>
@@ -2136,7 +2274,7 @@ function treeGroup(key, label, count, kids, extra = '') {
   return `<li class="tg${open ? ' open' : ''}"><div class="tr">${extra}<button class="tw" data-fold="${key}" aria-expanded="${open}" title="${open ? 'Collapse' : 'Expand'} ${esc(label)}">${TW}<span>${esc(label)}</span></button>${count != null ? `<span class="tc">${count}</span>` : ''}</div>${open ? `<ul class="tk">${kids}</ul>` : ''}</li>`;
 }
 const BH_TABS = ['log', 'edit', 'report'];
-const NAV_LABEL = { sites: 'Sites', v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
+const NAV_LABEL = { gis: 'Map', sites: 'Sites', v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Reports', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
 const NAV_ICON = { soil: '<path d="M3 9l9-5 9 5-9 5z"/><path d="M3 14l9 5 9-5"/>', v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 /* ---------- the Settings panel: each page with view settings lists its groups in CTL; the shell draws them on the right.
@@ -2145,7 +2283,7 @@ const CTL = {}, CTL_ICON = '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18
 S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {}, ...jsonLS('bhlog.ui', {}) };
 const uiSave = () => lsSet('bhlog.ui', JSON.stringify(S.ui));
 const ctlClamp = w => Math.round(Math.min(480, Math.max(240, +w || 300)));
-function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); document.body.classList.toggle('side-off', S.tab === 'compose'); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
+function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); document.body.classList.toggle('side-off', S.tab === 'compose' || S.tab === 'gis'); document.body.classList.toggle('on-gis', S.tab === 'gis'); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
 /* the panel's column is set before a page draws, so drawings measure the work area they will really have */
 function ctlLayout() {
   const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
@@ -2186,6 +2324,94 @@ const RAIL_PAGES = [['sites', 'Sites'], ['edit', 'Boreholes'], ['site', 'Map & d
 /* Map & data: the map and every page of a site's data, one click apart */
 const MD_TABS = [['home', 'Overview'], ['site', 'Map'], ['gw', 'Water'], ['contam', 'Lab'], ['soil', 'Soil survey'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['table', 'Tables']];
 const mdTabsHTML = () => `<nav class="dtabs mdtabs" aria-label="Map and data">${MD_TABS.map(([k, t]) => `<button type="button" data-tab="${k}" aria-current="${S.tab === k ? 'page' : 'false'}">${t}</button>`).join('')}</nav>`;
+/* ---------- the ribbon: File opens the start window; each tab is one kind of work, holding its pages and its tools in groups.
+   Every button runs an existing command (data-act) or opens a page (data-tab), so menus, Find and the ribbon stay one set. ---------- */
+const RI = {
+  open: '<path d="M2 5h5l1.5 1.5H14V13H2z"/>', save: '<path d="M3 2h8l2 2v10H3z"/><path d="M5 2v4h5V2M5 14v-4h6v4"/>', saveas: '<path d="M3 2h8l2 2v4M3 2v12h5"/><path d="M5 2v4h5V2"/><path d="M10 14l4-4-1.5-1.5-4 4V14z"/>',
+  bh: '<rect x="6" y="2" width="4" height="12" rx="1"/><path d="M6 6h4M6 9h4"/>', newbh: '<rect x="4" y="2" width="4" height="12" rx="1"/><path d="M4 6h4M4 9h4M12 4v5M9.5 6.5h5"/>',
+  well: '<circle cx="8" cy="8" r="4.5"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/>', map: '<path d="M2 4l4-1.5 4 1.5 4-1.5v10l-4 1.5-4-1.5-4 1.5z"/><path d="M6 2.5v10M10 4v10"/>',
+  layer: '<path d="M8 2l6 3.5L8 9 2 5.5z"/><path d="M2 8.5L8 12l6-3.5"/>', table: '<rect x="2" y="3" width="12" height="10"/><path d="M2 6.5h12M2 10h12M6 3v10"/>', chart: '<path d="M2 13h12M4 11V7M7 11V4M10 11V8M13 11V6"/>',
+  pdf: '<path d="M4 2h6l3 3v9H4z"/><path d="M10 2v3h3"/><path d="M6 9h4M6 11h3"/>', pdfs: '<path d="M6 1.5h5l2.5 2.5v8.5H6z"/><path d="M3.5 4v10.5H11"/>', contour: '<path d="M2 11c3-4 9-4 12 0M4 8c2-3 6-3 8 0M6 5c1-1.5 3-1.5 4 0"/>',
+  plume: '<ellipse cx="8" cy="8" rx="6" ry="4"/><ellipse cx="8" cy="8" rx="3" ry="2"/>', arrow: '<path d="M3 12L13 4M13 4H8M13 4v5"/>', select: '<path d="M3 2l9 5-4 1.5L6 13z"/>',
+  grid: '<path d="M2 2h12v12H2zM6 2v12M10 2v12M2 6h12M2 10h12"/>', lab: '<path d="M6 2v4l-3 7h10l-3-7V2M5 2h6"/>', water: '<path d="M8 2c3 4 4.5 6 4.5 8A4.5 4.5 0 013.5 10C3.5 8 5 6 8 2z"/>',
+  add: '<path d="M8 3v10M3 8h10"/>', gear: '<circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/>', search: '<circle cx="7" cy="7" r="4"/><path d="M10 10l4 4"/>',
+  section: '<path d="M2 12l4-6 3 3 5-6"/><path d="M2 14h12"/>', model: '<path d="M2 11c2-2 4 0 6-2s4 0 6-2M2 7c2-2 4 0 6-2s4 0 6-2"/>', cube: '<path d="M8 2l5.5 3v6L8 14l-5.5-3V5z"/><path d="M2.5 5L8 8l5.5-3M8 8v6"/>',
+  sites: '<path d="M2.5 7L8 2.5 13.5 7v6.5h-11z"/>', log: '<rect x="3" y="2" width="10" height="12"/><path d="M5 5h6M5 8h6M5 11h4"/>', out: '<path d="M4 2h6l3 3v9H4z"/><path d="M6 9h4M8 7v4"/>',
+  imp: '<path d="M3 10v4h10v-4M8 2v8M5 7l3 3 3-3"/>', exp: '<path d="M3 10v4h10v-4M8 10V2M5 5l3-3 3 3"/>', ruler: '<path d="M2 11l9-9 3 3-9 9z"/><path d="M5 8l1 1M7 6l1 1M9 4l1 1"/>',
+  edit: '<path d="M3 13l1-3.5L11 2.5l2.5 2.5L6.5 12z"/><path d="M9.5 4l2.5 2.5"/>', note: '<path d="M3 2h10v9l-3 3H3z"/><path d="M10 14v-3h3M5.5 5.5h5M5.5 8h3"/>', field: '<rect x="4" y="1.5" width="8" height="13" rx="1.5"/><path d="M7 12.5h2"/>',
+  check: '<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3.5 3.5M5 7l1.5 1.5L9 6"/>', send: '<path d="M2 8l12-5-4 11-2-4.5z"/>', lock: '<rect x="3.5" y="7" width="9" height="7" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/>',
+  unlock: '<rect x="3.5" y="7" width="9" height="7" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 014.8-1"/>', chat: '<path d="M2.5 3h11v8H7l-3 2.5V11H2.5z"/>', clock: '<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.5"/>',
+  copy: '<rect x="5" y="5" width="8.5" height="8.5"/><path d="M11 5V2.5H2.5V11H5"/>', tpl: '<rect x="2.5" y="2.5" width="11" height="11"/><path d="M2.5 6h11M6 6v7.5"/>', del: '<path d="M3 4.5h10M6.5 4.5V2.5h3v2M4.5 4.5l.7 9h5.6l.7-9"/>',
+  img: '<rect x="2" y="3" width="12" height="10"/><path d="M2 11l3.5-3.5 3 3 2-2L14 12"/><circle cx="10.5" cy="6" r="1"/>', shape: '<path d="M3 13l2-9 7 2 1.5 6z"/>', pin: '<path d="M8 14s4.5-4.2 4.5-7.5a4.5 4.5 0 00-9 0C3.5 9.8 8 14 8 14z"/><circle cx="8" cy="6.5" r="1.6"/>',
+  round: '<path d="M8 2c3 4 4.5 6 4.5 8A4.5 4.5 0 013.5 10C3.5 8 5 6 8 2z"/><path d="M6 10.5h4"/>', slug: '<path d="M5 2v12M11 2v12M5 9h6"/><path d="M7 5l1-1 1 1"/>', home: '<rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="3"/><rect x="9" y="7" width="5" height="7"/><rect x="2" y="9" width="5" height="5"/>',
+  copyto: '<rect x="1.5" y="3" width="5.5" height="4"/><rect x="9" y="2" width="5.5" height="3.5"/><rect x="9" y="9" width="5.5" height="3.5"/><path d="M7 5h2M7 5l2 5.5"/>', co: '<path d="M3 14V4l5-2 5 2v10"/><path d="M6 6h1M9 6h1M6 9h1M9 9h1M7 14v-2.5h2V14"/>',
+  cols: '<rect x="2" y="2.5" width="12" height="11"/><path d="M6 2.5v11M10 2.5v11"/>', pkg: '<path d="M2.5 5L8 2l5.5 3v6L8 14l-5.5-3z"/><path d="M2.5 5L8 8l5.5-3M8 8v6"/>', soil: '<path d="M2 6l6-3.5L14 6 8 9.5z"/><path d="M2 10l6 3.5 6-3.5"/>',
+};
+const ri = k => `<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linejoin="round" stroke-linecap="round">${RI[k] || ''}</svg>`;
+/* each tab: [key, label, its first page, groups]; a group is [label, items]; an item is [command, label, icon, big?]; 'tab:x' opens page x */
+const RIB = [
+  ['project', 'Project', 'home', [
+    ['Site', [['tab:home', 'Overview', 'home', 1], ['dash-panels', 'Choose panels', 'grid'], ['new-site', 'New site', 'sites'], ['apply-project', 'Copy details to all', 'copyto'], ['settings', 'Company & logo', 'co']]],
+    ['Import', [['import', 'Excel', 'table', 1], ['imp-bh', 'Borehole (.bh)', 'bh'], ['imp-lab', 'Lab results', 'lab'], ['imp-loc', 'Locations', 'pin']]],
+    ['Field work', [['round', 'Monitoring round', 'round', 1]]],
+    ['Save', [['save-proj', 'Save', 'save', 1], ['save-proj-as', 'Save as…', 'saveas'], ['backup', 'Save workspace', 'pkg']]]]],
+  ['boreholes', 'Boreholes', 'edit', [
+    ['Borehole', [['new', 'New borehole', 'newbh', 1], ['imp-bh', 'Open .bh', 'open'], ['save-bh', 'Save .bh', 'save'], ['duplicate', 'Duplicate', 'copy']]],
+    ['Log', [['qlog', 'Log step by step', 'edit', 1], ['quick', 'Add sample', 'lab'], ['quick-note', 'Drilling note', 'note'], ['field', 'Field mode', 'field']]],
+    ['View', [['tab:edit', 'Log & data', 'layer', 1], ['tab:log', 'Full log', 'log', 1], ['tab:report', 'PDF preview', 'pdf', 1]]],
+    ['Review', [['check-log', 'Check log', 'check', 1], ['to-review', 'For review', 'send'], ['issue', 'Issue', 'lock'], ['revise', 'Revise', 'unlock'], ['comments', 'Comments', 'chat'], ['history', 'History', 'clock']]],
+    ['Manage', [['bh-tpl', 'Save as template', 'tpl'], ['delete', 'Delete', 'del']]],
+    ['Output', [['pdf-one', 'Log PDF', 'pdf', 1], ['pdf-all', 'All logs', 'pdfs']]]]],
+  ['map', 'Map', 'gis', [
+    ['Views', [['tab:gis', 'Map', 'map', 1], ['tab:site', 'Site plan', 'pin', 1], ['tab:xsec', 'Section', 'section', 1], ['tab:v3d', '3D', 'cube', 1], ['tab:soil', 'Soil survey', 'soil', 1]]],
+    ['Layers', [['gis-add', 'Add data', 'add', 1], ['gis-table', 'Attribute table', 'table']]],
+    ['Site plan', [['map-edit', 'Edit plan', 'edit'], ['imp-loc', 'Locations', 'pin'], ['imp-shp', 'Shapes', 'shape'], ['imp-img', 'Imagery', 'img'], ['site-img', 'Site drawing', 'img']]],
+    ['Output', [['plan-pdf', 'Location plan', 'pdf', 1], ['gis', 'GIS / CSV', 'exp']]]]],
+  ['analysis', 'Analysis', 'gw', [
+    ['Interpolate', [['gtool-surface', 'Surface', 'grid', 1], ['gtool-contour', 'Contours', 'contour', 1], ['gtool-plume', 'Plume', 'plume', 1]]],
+    ['Groundwater', [['tab:gw', 'Water levels', 'water', 1], ['tab:gwm', 'Model', 'model', 1], ['gtool-change', 'Change between rounds', 'chart'], ['round', 'Monitoring round', 'round'], ['go-slug', 'Slug tests', 'slug']]],
+    ['Lab', [['tab:contam', 'Lab results', 'lab', 1], ['imp-lab', 'Import lab', 'imp'], ['go-lab', 'Add results', 'add']]],
+    ['Geoprocessing', [['gtool-buffer', 'Buffer', 'plume'], ['gtool-select', 'Select by location', 'select']]],
+    ['Charts', [['graphs', 'Graphs on logs', 'chart', 1]]]]],
+  ['data', 'Data', 'table', [
+    ['Tables', [['tab:table', 'Tables', 'table', 1]]],
+    ['Import', [['import', 'Excel', 'imp', 1], ['imp-lab', 'Lab results', 'lab'], ['imp-bh', 'Borehole (.bh)', 'bh']]],
+    ['Export', [['export-data', 'All data', 'exp', 1], ['export', 'Excel report', 'table'], ['ags', 'AGS 4', 'out'], ['gis', 'GIS / CSV', 'map']]]]],
+  ['layout', 'Layout', 'compose', [
+    ['Report', [['tab:compose', 'Report editor', 'pdf', 1]]],
+    ['Export', [['appendix', 'Report package', 'pkg', 1], ['pdf-all', 'All logs', 'pdfs'], ['plan-pdf', 'Location plan', 'map']]],
+    ['Settings', [['log-cols', 'Log columns', 'cols'], ['graphs', 'Graphs', 'chart'], ['settings', 'Company & logo', 'co']]]]],
+];
+const RIB_OF = { gis: 'map', home: 'project', edit: 'boreholes', log: 'boreholes', report: 'boreholes', site: 'map', xsec: 'map', v3d: 'map', soil: 'map', gw: 'analysis', gwm: 'analysis', contam: 'analysis', table: 'data', compose: 'layout', reports: 'layout' };
+S.ribLast = jsonLS('bhlog.ribLast', {});
+const BH_NEED = new Set(['tab:edit', 'tab:log', 'tab:report', 'duplicate', 'save-bh', 'qlog', 'quick', 'quick-note', 'check-log', 'to-review', 'issue', 'revise', 'comments', 'history', 'bh-tpl', 'pdf-one']);
+function ribItem([a, label, icon, big]) {
+  const tab = a.startsWith('tab:') ? a.slice(4) : null, b = cur(), st = b?.status || 'draft';
+  const legacy = tab ? null : document.querySelector(`.ribbon [data-act="${a}"]`);
+  const off = (BH_NEED.has(a) && !b) || !!legacy?.disabled || (a === 'to-review' && st !== 'draft') || (a === 'issue' && st === 'issued') || (a === 'revise' && st !== 'issued');
+  const on = tab ? (S.tab === 'reports' ? 'compose' : S.tab) === tab : a === 'map-edit' ? !!S.mapEdit : a === 'field' ? document.body.classList.contains('field') : null;
+  const lb = a === 'map-edit' && S.mapEdit ? 'Done editing' : label, tip = legacy?.title || (tab ? NAV_LABEL[tab] : lb);
+  return `<button type="button" class="${big ? 'rbig' : 'rsm'}${S.hlAct === a ? ' hl' : ''}" ${tab ? `data-tab="${tab}"` : `data-act="${a}"`} ${on != null ? `aria-pressed="${on}"` : ''} ${off ? 'disabled' : ''} title="${esc(tip)}">${ri(icon)}<span>${esc(lb)}</span></button>`;
+}
+function ribGroup([g, items]) {   // big buttons stand alone; small ones stack three to a column
+  const cols = []; let col = null;
+  for (const it of items) { if (it[3]) { cols.push(ribItem(it)); col = null; } else { if (!col || col.length === 3) cols.push(col = []); col.push(ribItem(it)); } }
+  return `<div class="rgrp" role="group" aria-label="${esc(g)}"><div class="rgrp-b">${cols.map(c => Array.isArray(c) ? `<div class="rcol">${c.join('')}</div>` : c).join('')}</div><div class="rgrp-l">${esc(g)}</div></div>`;
+}
+function renderRibbon() {
+  const el = $('#rbar'); if (!el) return;
+  const tab = S.tab === 'reports' ? 'compose' : S.tab, on = tab === 'sites' ? 'file' : RIB_OF[tab] || 'project', site = !!cur() || tab === 'soil';
+  if (on !== 'file' && S.ribLast[on] !== tab) { S.ribLast[on] = tab; lsSet('bhlog.ribLast', JSON.stringify(S.ribLast)); }
+  const t = RIB.find(x => x[0] === on);
+  el.innerHTML = `<div class="rtabs2" role="tablist" aria-label="Ribbon"><button type="button" class="rfile" data-tab="sites" role="tab" aria-selected="${on === 'file'}" title="Start window: your sites, new, open and import">File</button>${RIB.map(([k, l]) => `<button type="button" role="tab" data-rib="${k}" aria-selected="${on === k}" ${site ? '' : 'disabled'}>${l}</button>`).join('')}</div>`
+    + (t ? `<div class="rpanel" role="toolbar" aria-label="${esc(t[1])} tools">${t[3].map(ribGroup).join('')}</div>` : '');
+}
+document.addEventListener('click', e => {
+  const r = e.target.closest?.('[data-rib]'); if (!r || r.disabled) return;
+  const t = RIB.find(x => x[0] === r.dataset.rib); if (!t) return;
+  const last = S.ribLast[t[0]], ok = k => k && (!['edit', 'log', 'report'].includes(k) || cur());
+  goTab(ok(last) ? last : t[2]);
+});
 const BH_ICON = '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M8 9h8M8 14h8"/>';
 S.bl = { q: '', st: lsGet('bhlog.blSt') || 'all', sort: lsGet('bhlog.blSort') || 'name' };
 const blMeta = b => { const w = latestWater(b), v = vapourMax(b, null, null); return { d: depthOf(b), w: w ? w.depth : null, v: v ? v.cvc : null }; };
@@ -2195,7 +2421,8 @@ function renderList(list) {
   foot.hidden = !ex || S.readOnly;
   foot.innerHTML = ex ? `${ex} example borehole${ex > 1 ? 's' : ''} · <button class="btn link" data-act="clear-examples">Remove examples</button>` : '';
   const tab = S.tab === 'reports' ? 'compose' : S.tab, onBh = BH_TABS.includes(tab), b0 = cur();
-  $('#prail').innerHTML = RAIL_PAGES.map(([k, t]) => {
+  renderRibbon();
+  if ($('#prail')) $('#prail').innerHTML = RAIL_PAGES.map(([k, t]) => {
     const on = k === 'edit' ? onBh : k === 'site' ? MD_TABS.some(([x]) => x === tab) : tab === k, off = k === 'edit' && !b0;
     return `<button type="button" data-tab="${k}" aria-current="${on ? 'page' : 'false'}" ${off ? 'disabled' : ''} title="${esc(k === 'edit' ? (b0 ? `${b0.name}: log and data` : 'Open a site first') : k === 'site' ? 'Map, water, lab, soil survey, sections, model and tables' : k === 'compose' ? 'Logs, reports and exports' : NAV_LABEL[k])}">${svgI(k === 'edit' ? BH_ICON : k === 'sites' ? NAV_ICON.home : NAV_ICON[k])}<span>${t}</span></button>`;
   }).join('');
@@ -2215,6 +2442,10 @@ function renderList(list) {
     return `<li><button type="button" class="bl-row" data-pick="${esc(b.id)}" aria-current="${sel ? 'true' : 'false'}" title="${esc(`${b.name || 'Untitled'} · ${b.well?.installed ? 'monitoring well' : 'borehole'}`)}">${bhGlyph(b.well?.installed)}<span class="nm">${esc(b.name || 'Untitled')}</span><span class="st st-${s2}">${s2 === 'issued' ? `Rev ${b.issued?.rev ?? b.rev ?? 0}` : s2 === 'review' ? 'Review' : 'Draft'}</span><span class="meta">${esc(meta)}</span></button></li>`;
   }).join('') || `<li class="note bl-empty">${ps.length ? 'No boreholes match.' : 'No boreholes yet.'}</li>`;
 }
+document.addEventListener('input', e => {   // searching the start window keeps the caret where it was
+  if (e.target.id !== 'site-q') return; S.siteQ = e.target.value; const at = e.target.selectionStart;
+  renderView(true); const q = $('#site-q'); if (q) { q.focus(); q.setSelectionRange(at, at); }
+});
 document.addEventListener('click', e => {
   const o = e.target.closest('[data-site-open]'); if (o) { openSite(o.dataset.siteOpen); return; }
   const r = e.target.closest('[data-site-rename]'); if (r) { openRenameSite(r.dataset.siteRename); return; }
@@ -2370,7 +2601,7 @@ function renderBar(b) {
   if (onBh) parts.push([b?.name || 'Untitled', 'log'], [tab === 'report' ? 'PDF' : NAV_LABEL[tab], null]); else parts.push([NAV_LABEL[tab], null]);   // every page has the same trail, so titles sit in the same place
   cr.hidden = false;
   cr.innerHTML = parts.map(([t, go], i) => (i ? '<span class="sep" aria-hidden="true">›</span>' : '') + (go && i < parts.length - 1 ? `<button class="btn link" data-tab="${go}">${esc(t)}</button>` : `<span aria-current="${i === parts.length - 1 ? 'page' : 'false'}">${esc(t)}</span>`)).join('');
-  updateRibbon();
+  updateRibbon(); renderRibbon();
   // the three views of a borehole, one click apart and always in the same place
   const views = onBh ? `<span class="seg bh-views" role="group" aria-label="Borehole view">${[['edit', 'Log & data', 'Ctrl+1'], ['log', 'Full log', 'Ctrl+2'], ['report', 'PDF preview', 'Ctrl+3']].map(([k, t, key]) => `<button type="button" data-tab="${k}" aria-pressed="${tab === k}" title="${t} (${key})">${t}</button>`).join('')}</span>` : '';
   tl.innerHTML = views + (PAGE_TOOLS[tab] || []).filter(([a]) => a === 'revise' ? st === 'issued' : a === 'to-review' ? st === 'draft' : a === 'issue' ? st !== 'issued' : true).map(([a, label, primary]) => {
@@ -2448,7 +2679,7 @@ const RAIL = [
   ['log', 'Log', '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="1.5"/><path d="M7 8h10M7 13h10M7 17h10"/></svg>'],
   ['edit', 'Data', '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16M9 6v12"/></svg>'],
   ['report', 'PDF preview', '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 13h6M9 17h6"/></svg>']];
-const PROJECT_TABS = ['home', 'site', 'table', 'gw', 'contam', 'soil', 'reports', 'compose'];
+const PROJECT_TABS = ['home', 'gis', 'site', 'table', 'gw', 'contam', 'soil', 'reports', 'compose'];
 function renderRail() {
   const el = $('#rail'); if (!el) return; el.hidden = true; return; const b = cur();
   el.innerHTML = RAIL.map(x => typeof x === 'string' ? `<span class="rl">${x === 'Borehole' && b ? esc(b.name) : x}</span>` : `<button data-tab="${x[0]}" aria-current="${S.tab === x[0] ? 'page' : 'false'}" ${b ? '' : 'disabled'}>${x[2]}<span>${x[1]}</span></button>`).join('')
@@ -2740,6 +2971,15 @@ function wsHTML(b) {
 const WS_MORE = { layers: 'Selected layer: pick lists and full description', samples: 'Selected sample: lab results, grain size and photos', water: 'Selected reading: details' };
 /* put a grid at the top of the Soil, Samples and Water sections, and fold the one-at-a-time editors under it */
 function wsDecorate(b) {
+  /* Soil & observations: the log in the middle, the layers as a grid under it, the selected layer's fields on the right, as in the
+     ribbon workspace. The same elements, moved: the side panel is an .edit form so typing in it saves as before. */
+  const ws = $('.ws'), soil = ws?.querySelector('.edit[data-dtab]')?.dataset.dtab === 'soil';
+  if (ws && soil) {
+    ws.classList.add('ws3');
+    const nav = ws.querySelector('.ws-data nav.dtabs'); if (nav) ws.prepend(nav);
+    const d = $('#ldetail');
+    if (d) { const p = document.createElement('aside'); p.className = 'edit ws3-props'; p.setAttribute('aria-label', 'Selected layer'); ws.append(p); p.append(d); }
+  }
   const fold = (sec, key, el) => {
     if (!sec || !el) return; const d = document.createElement('details'); d.className = 'ws-more'; d.dataset.more = key; d.open = !!S.wsMore?.[key];
     d.innerHTML = `<summary>${WS_MORE[key]}<span class="ws-which" data-which="${key}"></span></summary>`; el.before(d); d.append(el);
@@ -2972,7 +3212,7 @@ function siteList() {
 }
 function openSite(key) {
   const b = sortedList().find(x => projKey(x) === key);
-  if (b) { S.sel = b.id; S.layer = 0; S.secIds = new Set(); goTab('edit'); } else { S.sel = null; goTab('soil'); }
+  if (b) { S.sel = b.id; S.layer = 0; S.secIds = new Set(); goTab('home'); } else { S.sel = null; goTab('soil'); }
 }
 /* a site's name is on every one of its logs: an issued log keeps the name it was issued under until it is revised */
 const siteIssued = key => sortedList().filter(b => projKey(b) === key && b.status === 'issued');
@@ -3002,23 +3242,29 @@ function openRenameSite(key) {
     '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="site-rename-go">Rename</button>');
   $('#site-name').select();
 }
-function sitesHTML() {
-  const list = siteList(), ro = S.readOnly ? 'disabled' : '';
-  const tools = `<div class="sites-tools"><button class="btn primary" data-act="new-site" ${ro}>New site</button><button class="btn" data-act="open-file" ${ro}>Open project file…</button><button class="btn" data-act="imp-bh" ${ro}>Import a borehole (.bh)…</button></div>`;
-  const status = x => [x.draft && `${x.draft} draft`, x.review && `${x.review} for review`, x.issued && `${x.issued} issued`].filter(Boolean).join(' · ') || '—';
-  const when = iso => iso ? new Date(iso).toLocaleDateString('en-CA') : '—';
-  const body = list.length ? `<section class="sec"><header><h3>${list.length} site${list.length === 1 ? '' : 's'}</h3><span class="note">Open a site to log its boreholes; its map, water, lab results and reports all use the same data.</span></header>
-    <div class="body flush"><table class="sum sites-t"><thead><tr><th>Site</th><th>${esc(S.co.projLabel || 'Project No.')}</th><th>Client</th><th>Location</th><th class="r">Boreholes</th><th>Logs</th><th>Last change</th><th></th></tr></thead><tbody>
-    ${list.map(x => `<tr data-site-row="${esc(x.key)}"><td><button type="button" class="btn link site-nm" data-site-open="${esc(x.key)}">${esc(x.name)}</button>${x.example ? ' <span class="tag">Example</span>' : ''}</td><td>${esc(x.projNo || '—')}</td><td>${esc(x.client || '—')}</td><td>${esc(x.location || '—')}</td>
-      <td class="r">${x.n}${x.wells ? ` <span class="note">(${x.wells} well${x.wells === 1 ? '' : 's'})</span>` : ''}</td><td>${status(x)}</td><td>${when(x.updated)}</td>
-      <td class="r site-acts">${S.readOnly ? '' : `<details class="lmenu"><summary class="btn" aria-label="More for ${esc(x.name)}" title="Rename or remove this site">⋯</summary><span class="lmenu-pop"><button type="button" data-site-rename="${esc(x.key)}">Rename…</button><button type="button" class="danger-text" data-site-del="${esc(x.key)}">Remove…</button></span></details>`}</td></tr>`).join('')}
-    </tbody></table></div></section>`
-    : `<div class="start sites-empty"><p>No sites on this computer yet. A site holds a project's boreholes, map, water levels, lab results and reports.</p>
-      <div class="steps"><div class="step"><span class="n">1</span><h3>Start a site</h3><p>Name it and add the project number, client and location; every borehole copies them.</p><button class="btn primary" data-act="new-site" ${ro}>New site</button></div>
-      <div class="step"><span class="n">2</span><h3>Log boreholes</h3><p>Log borehole walks you through soil, samples, water and well; the log draws as you go.</p></div>
-      <div class="step"><span class="n">3</span><h3>Map and report</h3><p>The site's map, water levels, lab results and sections come from the same data, ready for PDFs and reports.</p></div></div>
-      <div class="actions"><button class="btn" data-act="load-lloyd" ${ro}>Example: oil lease delineation</button><button class="btn" data-act="load-sk" ${ro}>Example: service-station plume</button><button class="btn" data-act="load-dl" ${ro}>Example: excavation and monitoring</button></div></div>`;
-  return `<div class="sites-page" data-view="sites"><div class="sites-head"><h2>Sites</h2>${tools}</div>${body}</div>`;
+function sitesHTML() {   // the start window: recent sites on the left, grouped by when they last changed; how to start on the right
+  const list = siteList(), ro = S.readOnly ? 'disabled' : '', q = (S.siteQ || '').trim().toLowerCase();
+  const status = x => [x.draft && `${x.draft} draft`, x.review && `${x.review} for review`, x.issued && `${x.issued} issued`].filter(Boolean).join(', ');
+  const day = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : d; }, now = new Date(), d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const grp = x => { const d = day(x.updated); if (!d) return 'Older'; const days = (d0 - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5; return days <= 0 ? 'Today' : days < 7 ? 'This week' : days < 31 ? 'This month' : 'Older'; };
+  const when = x => { const d = day(x.updated); if (!d) return ''; return grp(x) === 'Today' ? d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' }) : d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' }); };
+  const shown = list.filter(x => !q || [x.name, x.projNo, x.client, x.location].join(' ').toLowerCase().includes(q));
+  const groups = ['Today', 'This week', 'This month', 'Older'].map(g => [g, shown.filter(x => grp(x) === g)]).filter(([, xs]) => xs.length);
+  const row = x => `<div class="sw-row" data-site-row="${esc(x.key)}"><button type="button" class="sw-open" data-site-open="${esc(x.key)}" title="Open ${esc(x.name)}">${ri('sites')}<span class="sw-txt"><b>${esc(x.name)}</b>${x.example ? ' <span class="tag">Example</span>' : ''}<small>${esc([x.projNo, x.client, x.location].filter(Boolean).join(' · ') || 'No project details')}</small><small>${x.n} borehole${x.n === 1 ? '' : 's'}${x.wells ? `, ${x.wells} well${x.wells === 1 ? '' : 's'}` : ''}${status(x) ? ` · ${esc(status(x))}` : ''}</small></span><span class="sw-when">${esc(when(x))}</span></button>
+    ${S.readOnly ? '' : `<details class="lmenu sw-menu"><summary class="btn" aria-label="More for ${esc(x.name)}" title="Rename or remove this site">⋯</summary><span class="lmenu-pop"><button type="button" data-site-rename="${esc(x.key)}">Rename…</button><button type="button" class="danger-text" data-site-del="${esc(x.key)}">Remove…</button></span></details>`}</div>`;
+  const left = list.length ? `<div class="sw-search">${ri('search')}<input type="search" id="site-q" placeholder="Search sites" aria-label="Search sites" value="${esc(S.siteQ || '')}" autocomplete="off"></div>
+      ${groups.map(([g, xs]) => `<div class="sw-grp">${g}</div>${xs.map(row).join('')}`).join('') || '<p class="note">No site matches.</p>'}`
+    : `<p class="sw-empty">No sites on this computer yet. A site holds a project's boreholes, maps, water levels, lab results and reports. Start one on the right, or open an example to look around.</p>`;
+  const gs = (act, icon, t, sub) => `<button type="button" class="sw-gs" data-act="${act}" ${ro}>${ri(icon)}<span><b>${t}</b><small>${sub}</small></span></button>`;
+  const ver = window.desktop?.version || '';
+  return `<div class="sites-page sw" data-view="sites"><div class="sw-l"><div class="sw-brand">Borehole Field Log</div><h2>Open a recent site</h2>${left}</div>
+    <div class="sw-r"><h3>Get started</h3>
+      ${gs('new-site', 'add', 'New site', 'Name, project number, client and location')}
+      ${gs('open-file', 'open', 'Open a site', 'A .bhp project or .bhlog workspace file')}
+      ${gs('imp-bh', 'bh', 'Import a borehole', 'A .bh file saved from another project')}
+      ${gs('import', 'table', 'Import from Excel', 'Boreholes, layers, samples, wells and water levels')}
+      <h3>Examples</h3><div class="sw-ex">${[['load-dl', 'Excavation and monitoring wells'], ['load-sk', 'Service-station plume'], ['load-lloyd', 'Oil lease delineation'], ['load-xs', 'Cross-section and plume']].map(([a, t]) => `<button type="button" class="btn link" data-act="${a}" ${ro}>${t}</button>`).join('')}</div>
+      <p class="sw-ver">${ver ? `Version ${esc(ver)} · ` : ''}<button type="button" class="btn link" data-act="upd-check">Check for updates</button></p></div></div>`;
 }
 function renderView(full) {
   const v = $('#view'); if (!v) return; ctlLayout();
@@ -3030,6 +3276,7 @@ function renderView(full) {
     checkLayers(b); refreshCalc(b); wsLog();
   } else if (S.tab === 'gw') { v.innerHTML = gwHTML(); drawGW(); }
   else if (S.tab === 'report') { v.innerHTML = reportHTML(b); }
+  else if (S.tab === 'gis') { v.innerHTML = gisHTML(); requestAnimationFrame(gisMount); }
   else if (S.tab === 'site') { v.innerHTML = siteHTML(); drawSite(); }
   else if (S.tab === 'xsec') { v.innerHTML = xsecHTML(); drawXsec(); }
   else if (S.tab === 'gwm') { v.innerHTML = gwmHTML(); gwEnsure(); }
@@ -3042,7 +3289,6 @@ function renderView(full) {
   else if (S.tab === 'compose') { v.innerHTML = composeHTML(); requestAnimationFrame(() => { drawCompose(); fillThumbs(); gwComposeEnsure(); }); }
   else { v.innerHTML = nextSteps(b) + (editable(b) ? '<div class="lt-new"><label for="lt-new">Add a layer by typing</label><input id="lt-new" autocomplete="off" spellcheck="false" placeholder="e.g. 2.4-3.1 CL silty clay, stiff, moist, brown (depths optional: it starts at the bottom of the log)"><span class="note" id="lt-new-read"></span></div>' : '') + (editable(b) ? '<p class="log-hint">Click any layer, sample, water level or the standpipe on the log to edit it. Click empty space in a column to add one at that depth.</p>' : '') + sheetHTML(b) + logLegendHTML(b); const el = $('#log'); el.innerHTML = logSVG(b, Math.max(el.clientWidth, 900)); }
   if (MAP_TABS.includes(S.tab)) v.insertAdjacentHTML('afterbegin', hiddenNote());
-  if (MD_TABS.some(([k]) => k === S.tab)) v.insertAdjacentHTML('afterbegin', mdTabsHTML());
   if (BH_TABS.includes(S.tab)) markIssues(b);
   ctlRender();
 }
@@ -8800,6 +9046,531 @@ function tilesSVG(key, W, H, cx, cy, sc, op) {
   return o.join('');
 }
 
+/* ---------- the GIS map: OpenLayers in the site's own UTM zone (NAD83(CSRS), via proj4), basemap tiles reprojected to it and
+   cached on this computer, and the site's data as layers you can switch on and off. Analyses add their own layers here. ---------- */
+S.gl = { basemap: true, bh: true, labels: true, wt: true, wtfill: false, flow: true, ...jsonLS('bhlog.gl', {}) };
+const GIS_LAYERS = [['bh', 'Boreholes and wells'], ['labels', 'Labels'], ['wt', 'Water-table contours'], ['wtfill', 'Water-table shading'], ['flow', 'Flow direction'], ['basemap', 'Basemap']];
+const gisCode = () => `SITE:UTM${crsZone()}`;
+function gisProj() {
+  const code = gisCode();
+  if (!window.ol || !window.proj4) return null;
+  if (!proj4.defs(code)) { proj4.defs(code, `+proj=utm +zone=${crsZone()} +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs`); ol.proj.proj4.register(proj4); }
+  const p = ol.proj.get(code); if (p && !p.getExtent()) p.setExtent([166021, 0, 833979, 9329006]); return p;
+}
+/* a borehole's position in the site zone: UTM coordinates as typed, or latitude and longitude converted */
+function gisXY(b) {
+  if (b.easting == null || b.northing == null) return null;
+  if (/lat|long/i.test(b.crs || '')) return proj4('EPSG:4326', gisCode(), [+b.easting, +b.northing]);
+  return [+b.easting, +b.northing];
+}
+function gisTileLoad(tile, src) {   // tiles come from the same cache as the site plan's, so places already viewed show offline
+  const img = tile.getImage();
+  tileStore.get(src).catch(() => null).then(d => d || fetch(src, { mode: 'cors' }).then(r => r.ok ? r.blob() : Promise.reject(r.status))
+    .then(bl => new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(bl); }))
+    .then(d => { tileStore.put(src, d).catch(() => {}); return d; }))
+    .then(d => { img.src = d; }).catch(() => tile.setState(3));   // 3: the tile failed, a coarser one stands in
+}
+function gisHTML() {
+  if (!window.ol || !window.proj4) return '<p class="note">The map library did not load.</p>';
+  const bm = basemapKey() === 'apple' ? 'imagery' : basemapKey();
+  return `<div class="gis" data-view="gis"><aside class="gis-toc" aria-label="Contents"><header>Contents</header>
+    <div class="gis-tb"><label for="gis-basemap">Basemap</label><select id="gis-basemap">${Object.entries(BASEMAPS).filter(([k]) => k !== 'apple').map(([k, [t]]) => `<option value="${k}" ${bm === k ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+    <div class="gis-sub"><span>Layers</span><button type="button" class="btn link" data-act="gis-add">Add data…</button></div>
+    <ul class="gis-layers gis-user">${gisUser().map((L, i, a) => `<li data-gl-id="${L.id}"><label><input type="checkbox" data-glu="${L.id}" ${L.vis !== false ? 'checked' : ''}><span class="gl-sw gl-${L.kind === 'vector' ? L.geom : L.kind === 'grid' ? 'grid' : 'svc'}" style="--c:${esc(L.sym?.color || '#9aa0a6')}${L.kind === 'grid' ? `;--r:linear-gradient(90deg,${(GIS_RAMPS[L.ramp] || GIS_RAMPS['Yellow to red']).join(',')})` : ''}"></span><span class="gl-nm" title="${esc(L.name + (L.note ? ' — ' + L.note : ''))}">${esc(L.name)}</span></label>
+      <details class="lmenu gl-menu"><summary class="btn" aria-label="Layer options for ${esc(L.name)}">⋯</summary><span class="lmenu-pop">${L.kind === 'grid' ? `<button type="button" data-gla="zoom" data-gid="${L.id}">Zoom to layer</button>` : ''}${L.kind === 'vector' ? `<button type="button" data-gla="zoom" data-gid="${L.id}">Zoom to layer</button><button type="button" data-gla="table" data-gid="${L.id}">Attribute table</button><button type="button" data-gla="sym" data-gid="${L.id}">Symbology and labels…</button>` : ''}${i ? `<button type="button" data-gla="up" data-gid="${L.id}">Move up</button>` : ''}${i < a.length - 1 ? `<button type="button" data-gla="down" data-gid="${L.id}">Move down</button>` : ''}<button type="button" data-gla="rename" data-gid="${L.id}">Rename…</button>${L.kind === 'vector' ? `<button type="button" data-gla="export" data-gid="${L.id}">Export GeoJSON…</button>` : ''}<button type="button" class="danger-text" data-gla="remove" data-gid="${L.id}">Remove</button></span></details>
+      ${L.kind === 'vector' && L.sym?.mode !== 'single' && L.sym?.classes?.length ? `<div class="gl-classes">${L.sym.classes.slice(0, 12).map(c => `<div><i style="background:${esc(c.color)}"></i>${esc(c.v != null ? (c.v === '' ? '(empty)' : c.v) : `${fmtCell(+(+c.min).toPrecision(4))} – ${fmtCell(+(+c.max).toPrecision(4))}`)}</div>`).join('')}${L.sym.classes.length > 12 ? `<div class="note">and ${L.sym.classes.length - 12} more</div>` : ''}</div>` : ''}${L.kind === 'grid' ? `<div class="gl-ramp"><i style="background:linear-gradient(90deg,${(GIS_RAMPS[L.ramp] || GIS_RAMPS['Yellow to red']).join(',')})"></i><span>${esc(fmtCell(+(+L.lo).toPrecision(3)))}</span><span>${esc(fmtCell(+(+L.hi).toPrecision(3)))}${L.log ? ' (log)' : ''}</span></div>` : ''}${L.note ? `<div class="gl-note">${esc(L.note)}</div>` : ''}</li>`).join('') || '<li class="note gl-empty">Shapefiles, GeoJSON, KML, DXF, tables or map services.</li>'}</ul>
+    <div class="gis-sub"><span>Site data</span></div>
+    <ul class="gis-layers">${GIS_LAYERS.map(([k, t]) => `<li><label><input type="checkbox" data-gl="${k}" ${S.gl[k] !== false ? 'checked' : ''}> ${t}</label></li>`).join('')}</ul>
+    <div class="gis-legend" id="gis-legend"></div></aside>
+    <div class="gis-main"><div class="gis-map" id="gis-map"><div class="gis-xy" id="gis-xy" aria-live="off"></div><div class="gis-pop" id="gis-pop" hidden></div></div><section class="gis-table" id="gis-table" hidden></section></div><aside class="gis-tool" id="gis-tool" aria-label="Tool" hidden></aside></div>`;
+}
+function gisData() {
+  const list = mapList(), pts = list.map(b => ({ b, xy: gisXY(b) })).filter(x => x.xy);
+  const H = gwHeads(list), P = H.wells.map(w => { const xy = gisXY(w.b); return xy ? [xy[0], xy[1], w.h] : null; }).filter(Boolean);
+  let wt = null;
+  if (P.length >= 3) {
+    const tris = delaunay(P), zs = P.map(p => p[2]), zmin = Math.min(...zs), zmax = Math.max(...zs), iv = Math.max(.02, niceStep(toD(zmax - zmin) || .1, 6)), lv = [];
+    for (let v = Math.ceil(toD(zmin) / iv) * iv; v <= toD(zmax) + 1e-9; v += iv) lv.push(+v.toFixed(3));
+    wt = { round: H.round, iv, lv, lines: lv.map(v => ({ v, segs: tinLine(P, tris, fromD(v)) })).filter(x => x.segs.length), bands: tinBands(P, tris, lv.map(fromD)), n: P.length };
+  }
+  const F = gwFlow(list);
+  return { pts, wt, flow: !F.error && !F.flat && F.E0 != null ? F : null };
+}
+function gisMount() {
+  const el = $('#gis-map'); if (!el || !window.ol) return;
+  S.gisMap?.setTarget(null);
+  const proj = gisProj(), D = gisData(), bm = basemapKey() === 'apple' ? 'imagery' : basemapKey(), [, url, zmax, attr] = BASEMAPS[bm];
+  const css = getComputedStyle(document.documentElement), water = css.getPropertyValue('--water').trim() || '#2867a8';
+  const F = (geom, props = {}) => { const f = new ol.Feature({ geometry: geom, ...props }); return f; };
+  const base = new ol.layer.Tile({ visible: S.gl.basemap !== false, source: new ol.source.XYZ({ url, maxZoom: zmax, crossOrigin: 'anonymous', attributions: attr, tileLoadFunction: gisTileLoad }), properties: { key: 'basemap' } });
+  const bands = new ol.layer.Vector({ visible: S.gl.wtfill !== false, properties: { key: 'wtfill' }, opacity: .45, source: new ol.source.Vector({ features: (D.wt?.bands || []).flatMap((polys, k) => polys.map(pg => F(new ol.geom.Polygon([pg.map(p => [p[0], p[1]])]), { k, nb: D.wt.lv.length + 1 }))) }),
+    style: f => { const t = f.get('nb') > 1 ? f.get('k') / (f.get('nb') - 1) : 0; return new ol.style.Style({ fill: new ol.style.Fill({ color: `rgb(${Math.round(232 - 140 * t)},${Math.round(241 - 100 * t)},${Math.round(250 - 60 * t)})` }) }); } });
+  const lines = new ol.layer.Vector({ visible: S.gl.wt !== false, declutter: true, properties: { key: 'wt' }, source: new ol.source.Vector({ features: (D.wt?.lines || []).map(({ v, segs }) => F(new ol.geom.MultiLineString(segs.map(([p, q]) => [[p[0], p[1]], [q[0], q[1]]])), { v })) }),
+    style: f => new ol.style.Style({ stroke: new ol.style.Stroke({ color: water, width: 1.4 }), text: S.gl.labels !== false ? new ol.style.Text({ text: (+f.get('v')).toFixed(2), placement: 'line', font: '600 11px Arial, sans-serif', fill: new ol.style.Fill({ color: water }), stroke: new ol.style.Stroke({ color: '#fff', width: 3 }) }) : undefined }) });
+  const flow = new ol.layer.Vector({ visible: S.gl.flow !== false && !!D.flow, properties: { key: 'flow' }, source: new ol.source.Vector({ features: D.flow ? [(() => {
+      const ext = D.pts.length ? ol.extent.boundingExtent(D.pts.map(x => x.xy)) : null, L = ext ? Math.max(8, Math.max(ol.extent.getWidth(ext), ol.extent.getHeight(ext)) * .12) : 20, a = D.flow.az * Math.PI / 180;
+      const c = ext ? ol.extent.getCenter(ext) : [D.flow.E0, D.flow.N0], tip = [c[0] + Math.sin(a) * L / 2, c[1] + Math.cos(a) * L / 2], tail = [c[0] - Math.sin(a) * L / 2, c[1] - Math.cos(a) * L / 2];
+      return F(new ol.geom.LineString([tail, tip]), { az: D.flow.az, dir: D.flow.dir, i: D.flow.i }); })()] : [] }),
+    style: f => { const g = f.getGeometry().getCoordinates(), [p, q] = g, ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
+      return [new ol.style.Style({ stroke: new ol.style.Stroke({ color: water, width: 3 }) }), new ol.style.Style({ geometry: new ol.geom.Point(q), image: new ol.style.RegularShape({ points: 3, radius: 9, fill: new ol.style.Fill({ color: water }), rotation: Math.PI / 2 - ang }) }),
+        new ol.style.Style({ geometry: new ol.geom.Point(p), text: S.gl.labels !== false ? new ol.style.Text({ text: `Flow ${Math.round(f.get('az'))}° ${f.get('dir')}`, offsetY: 14, font: '600 11px Arial, sans-serif', fill: new ol.style.Fill({ color: water }), stroke: new ol.style.Stroke({ color: '#fff', width: 3 }) }) : undefined })]; } });
+  const st = {}, bhStyle = f => {
+    const b = f.get('b'), well = !!b.well?.installed, sel = b.id === S.sel, k = `${well}${sel}${S.gl.labels !== false}${b.name}`;
+    return st[k] ||= new ol.style.Style({ image: well ? new ol.style.Circle({ radius: sel ? 7 : 6, fill: new ol.style.Fill({ color: '#fff' }), stroke: new ol.style.Stroke({ color: sel ? '#d0611b' : '#1f1f1f', width: 2 }) })
+        : new ol.style.Circle({ radius: sel ? 6 : 5, fill: new ol.style.Fill({ color: sel ? '#d0611b' : '#1f1f1f' }), stroke: new ol.style.Stroke({ color: '#fff', width: 1.5 }) }),
+      text: S.gl.labels !== false ? new ol.style.Text({ text: b.name || '', offsetX: 9, offsetY: -8, textAlign: 'left', font: '600 11px Arial, sans-serif', fill: new ol.style.Fill({ color: '#1f1f1f' }), stroke: new ol.style.Stroke({ color: '#fff', width: 3 }) }) : undefined });
+  };
+  const bh = new ol.layer.Vector({ visible: S.gl.bh !== false, declutter: true, properties: { key: 'bh' }, source: new ol.source.Vector({ features: D.pts.map(({ b, xy }) => F(new ol.geom.Point(xy), { b })) }), style: bhStyle, zIndex: 10 });
+  const ext = D.pts.length ? ol.extent.buffer(ol.extent.boundingExtent(D.pts.map(x => x.xy)), 25) : null;
+  const user = gisUser().map(L => gisOLLayer(L)).filter(Boolean).reverse();
+  const map = S.gisMap = new ol.Map({ target: el, layers: [base, ...user.filter(l => !(l instanceof ol.layer.Vector)), bands, lines, ...user.filter(l => l instanceof ol.layer.Vector), flow, bh],
+    view: new ol.View({ projection: proj, center: ext ? ol.extent.getCenter(ext) : [500000, 5900000], zoom: 16, maxZoom: 23, constrainResolution: false }),
+    controls: ol.control.defaults.defaults({ attributionOptions: { collapsible: false } }).extend([new ol.control.ScaleLine({ units: 'metric', bar: true, steps: 2, text: false, minWidth: 110 }), new ol.control.ZoomToExtent({ extent: ext || undefined, label: '⤢', tipLabel: 'Zoom to the site' })]) });
+  if (ext) map.getView().fit(ext, { padding: [40, 40, 40, 40], maxZoom: 20 });
+  S.gisLayers = { basemap: base, wtfill: bands, wt: lines, flow, bh };
+  for (const l of user) S.gisLayers[l.get('key')] = l;
+  if (S.gisTableId) gisTable(S.gisTableId);
+  if (S.gtool) { const tl = $('#gis-tool'); tl.innerHTML = gtoolHTML(S.gtool); tl.hidden = false; $('.gis')?.classList.add('has-tool'); gtoolFields(); requestAnimationFrame(() => map.updateSize()); }
+  const xy = $('#gis-xy'), pop = $('#gis-pop'), zone = crsZone();
+  map.on('pointermove', e => { const [E, N] = e.coordinate; xy.textContent = `${E.toLocaleString('en-CA', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} E  ${N.toLocaleString('en-CA', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} N · UTM ${zone} NAD83(CSRS)`;
+    el.style.cursor = map.hasFeatureAtPixel(e.pixel, { layerFilter: l => l === bh }) ? 'pointer' : ''; });
+  map.on('singleclick', e => {
+    const f = map.forEachFeatureAtPixel(e.pixel, x => x, { layerFilter: l => l === bh, hitTolerance: 4 });
+    if (!f) {
+      let hit = null; map.forEachFeatureAtPixel(e.pixel, (x, l) => { if (!hit && l?.get('user')) hit = [x, l]; }, { hitTolerance: 4 });
+      if (!hit) { pop.hidden = true; return; }
+      const [uf, ul] = hit, L = gisUser().find(x => x.id === ul.get('key')), props = Object.entries(uf.getProperties()).filter(([k, v]) => k !== 'geometry' && (v == null || typeof v !== 'object'));
+      pop.innerHTML = `<b>${esc(L?.name || 'Feature')}</b><div class="gp-attr"><table>${props.slice(0, 40).map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(fmtCell(v))}</td></tr>`).join('') || '<tr><td class="note">No attributes</td></tr>'}</table></div><div><button class="btn link" data-gis-close>Close</button></div>`;
+      pop.hidden = false; return;
+    }
+    const b = f.get('b'), w = latestWater(b), v = vapourMax(b, null, null);
+    S.sel = b.id; S.layer = 0; bh.changed(); renderList(sortedList()); renderStatus();
+    pop.innerHTML = `<b>${esc(b.name || 'Untitled')}</b><span>${b.well?.installed ? 'Monitoring well' : 'Borehole'} · ${fx(depthOf(b))} ${LEN()} deep${b.elevation != null ? ` · ground el. ${fu(b.elevation)}` : ''}</span>${w ? `<span>Water ${fu(w.depth)} (${esc(w.date || 'undated')})</span>` : ''}${v ? `<span>Highest vapour ${v.cvc.toLocaleString('en-CA')} ppm</span>` : ''}<div><button class="btn" data-pick="${esc(b.id)}" data-goto="edit">Open log</button><button class="btn link" data-gis-close>Close</button></div>`;
+    pop.hidden = false;
+  });
+  const lg = $('#gis-legend');
+  if (lg) lg.innerHTML = `<h4>Legend</h4><div><i class="lg-bh"></i>Borehole</div><div><i class="lg-mw"></i>Monitoring well</div>${D.wt ? `<div><i class="lg-wt"></i>Water table, ${esc(D.wt.round || 'latest')} (${LEN()})</div><p class="note">Contours every ${+D.wt.iv.toFixed(3)} ${LEN()} from ${D.wt.n} wells; nothing beyond the outer wells.</p>` : '<p class="note">Water-table contours need water levels in 3 wells with coordinates and ground elevations.</p>'}${D.flow ? `<p class="note">Flow ${Math.round(D.flow.az)}° (${esc(D.flow.dir)}), i = ${D.flow.i.toFixed(4)}</p>` : ''}${D.pts.length < mapList().length ? `<p class="note">${mapList().length - D.pts.length} borehole${mapList().length - D.pts.length === 1 ? ' has' : 's have'} no coordinates.</p>` : ''}`;
+}
+document.addEventListener('change', e => {
+  const g = e.target.closest?.('[data-gl]'); if (g) { S.gl[g.dataset.gl] = g.checked; lsSet('bhlog.gl', JSON.stringify(S.gl)); const L = S.gisLayers?.[g.dataset.gl]; if (L) L.setVisible(g.checked); else if (g.dataset.gl === 'labels') gisMount(); if (g.dataset.gl === 'labels') gisMount(); return; }
+  if (e.target.id === 'gis-basemap') { setSite({ ...(siteOf() || {}), basemap: e.target.value }); gisMount(); }
+});
+document.addEventListener('click', e => { if (e.target.closest?.('[data-gis-close]')) $('#gis-pop').hidden = true; });
+document.addEventListener('change', e => { const u = e.target.closest?.('[data-glu]'); if (!u) return; gisSave(gisUser().map(x => x.id === u.dataset.glu ? { ...x, vis: u.checked } : x)); S.gisLayers?.[u.dataset.glu]?.setVisible(u.checked); });
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-gla]'); if (a) { a.closest('details')?.removeAttribute('open'); gisLayerAct(a.dataset.gla, a.dataset.gid); return; }
+  const r = e.target.closest?.('[data-gis-row]'); if (r && S.gisTableId) { const L = gisUser().find(x => x.id === S.gisTableId), f = L && GIS_FMT().readFeature(L.fc.features[+r.dataset.gisRow]); const ex = f?.getGeometry()?.getExtent(); if (ex) S.gisMap.getView().fit(ol.extent.buffer(ex, 15), { maxZoom: 20, duration: 250 }); document.querySelectorAll('#gis-table tr.cur').forEach(x => x.classList.remove('cur')); r.classList.add('cur'); }
+});
+const gisFileIn = Object.assign(document.createElement('input'), { type: 'file', multiple: true, hidden: true, accept: '.zip,.shp,.dbf,.prj,.cpg,.shx,.geojson,.json,.kml,.kmz,.dxf,.csv,.txt,.xlsx,.xls' });
+gisFileIn.addEventListener('change', () => { const fs = [...gisFileIn.files]; gisFileIn.value = ''; closeOverlay(); if (fs.length) gisAddFiles(fs); });
+document.body.append(gisFileIn);
+/* ---------- GIS layers: files and map services added to the map, kept with the site. Vector layers are stored as GeoJSON in the
+   site's UTM zone with every attribute, reprojected from the file's own coordinate system (its .prj, its CRS member or EPSG code). ---------- */
+/* a zip file's entries (shapefile .zip, KMZ), read with the browser's own inflate */
+async function unzipFile(buf) {
+  const dv = new DataView(buf), u8 = new Uint8Array(buf), out = {};
+  let e = buf.byteLength - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--; if (e < 0) throw new Error('not a zip file');
+  let p = dv.getUint32(e + 16, true); const n = dv.getUint16(e + 10, true);
+  for (let i = 0; i < n; i++) {
+    const meth = dv.getUint16(p + 10, true), csz = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nl)); p += 46 + nl + xl + cl;
+    if (name.endsWith('/')) continue;
+    const ds = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true), raw = u8.slice(ds, ds + csz);
+    out[name] = meth === 0 ? raw.buffer : meth === 8 ? await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer() : null;
+  }
+  return out;
+}
+/* shapefile geometry (.shp) to GeoJSON geometries; polygons: clockwise rings are outer rings, the others holes */
+function readShp(buf) {
+  const dv = new DataView(buf), out = []; let o = 100;
+  const ringArea = r => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j][0] - r[i][0]) * (r[j][1] + r[i][1]); return a / 2; };   // > 0: clockwise
+  while (o + 12 <= buf.byteLength) {
+    const len = dv.getInt32(o + 4, false) * 2, r = o + 8, t = dv.getInt32(r, true); let g = null;
+    if (t === 1 || t === 11 || t === 21) g = { type: 'Point', coordinates: [dv.getFloat64(r + 4, true), dv.getFloat64(r + 12, true)] };
+    else if (t === 8 || t === 18 || t === 28) { const n = dv.getInt32(r + 36, true), c = []; for (let k = 0; k < n; k++) c.push([dv.getFloat64(r + 40 + k * 16, true), dv.getFloat64(r + 48 + k * 16, true)]); g = { type: 'MultiPoint', coordinates: c }; }
+    else if ([3, 13, 23, 5, 15, 25].includes(t)) {
+      const np = dv.getInt32(r + 36, true), n = dv.getInt32(r + 40, true), P = r + 44 + 4 * np, parts = [];
+      for (let k = 0; k < np; k++) { const a = dv.getInt32(r + 44 + 4 * k, true), b = k + 1 < np ? dv.getInt32(r + 48 + 4 * k, true) : n, ring = []; for (let q = a; q < b; q++) ring.push([dv.getFloat64(P + q * 16, true), dv.getFloat64(P + q * 16 + 8, true)]); parts.push(ring); }
+      if (t === 3 || t === 13 || t === 23) g = { type: 'MultiLineString', coordinates: parts };
+      else { const polys = []; for (const ring of parts) { if (ringArea(ring) >= 0 || !polys.length) polys.push([ring]); else polys.at(-1).push(ring); } g = { type: 'MultiPolygon', coordinates: polys }; }
+    }
+    out.push(g); o = r + len;
+  }
+  return out;
+}
+/* attributes (.dbf); text in the .cpg's encoding, else UTF-8, else Windows Latin-1 */
+function readDbf(buf, cpg) {
+  const dv = new DataView(buf), u8 = new Uint8Array(buf), n = dv.getUint32(4, true), hl = dv.getUint16(8, true), rl = dv.getUint16(10, true), F = [];
+  for (let o = 32; o + 32 <= hl && u8[o] !== 0x0d; o += 32) F.push({ name: String.fromCharCode(...u8.subarray(o, o + 11)).replace(/\0.*$/, '').trim(), type: String.fromCharCode(u8[o + 11]), len: u8[o + 16] });
+  let dec; try { dec = new TextDecoder((cpg || '').trim() || 'utf-8', { fatal: !cpg }); dec.decode(u8.subarray(hl, Math.min(buf.byteLength, hl + rl * Math.min(n, 200)))); } catch { dec = new TextDecoder('windows-1252'); }
+  const rows = [];
+  for (let i = 0; i < n; i++) {
+    const s = hl + i * rl; if (s + rl > buf.byteLength) break; let o = s + 1; const row = {};
+    for (const f of F) { const v = dec.decode(u8.subarray(o, o + f.len)).trim(); o += f.len;
+      row[f.name] = f.type === 'N' || f.type === 'F' ? (v === '' || isNaN(+v) ? null : +v) : f.type === 'L' ? (/^[YyTt]/.test(v) ? true : /^[NnFf]/.test(v) ? false : null) : f.type === 'D' && /^\d{8}$/.test(v) ? `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6)}` : v; }
+    rows.push(row);
+  }
+  return rows;
+}
+/* coordinate systems: EPSG codes common on Canadian sites, or WKT (a .prj), registered with proj4 for OpenLayers */
+const CSRS_UTM = { 3154: 7, 3155: 8, 3156: 9, 3157: 10, 2955: 11, 2956: 12, 2957: 13, 3158: 14, 3159: 15, 3160: 16, 2958: 17, 2959: 18, 2960: 19, 2961: 20, 2962: 21, 22207: 7, 22208: 8, 22209: 9, 22210: 10, 22211: 11, 22212: 12, 22213: 13, 22214: 14, 22215: 15, 22216: 16, 22217: 17, 22218: 18, 22219: 19, 22220: 20, 22221: 21, 22222: 22 };
+function epsgDef(c) {
+  c = +c;
+  if (c === 4326 || c === 4269 || c === 4617 || c === 4954 || c === 4140) return '+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs';
+  if (c >= 32601 && c <= 32660) return `+proj=utm +zone=${c - 32600} +datum=WGS84 +units=m +no_defs +type=crs`;
+  if (c >= 26901 && c <= 26923) return `+proj=utm +zone=${c - 26900} +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs`;
+  if (CSRS_UTM[c]) return `+proj=utm +zone=${CSRS_UTM[c]} +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs`;
+  if (c === 3400 || c === 3401) return `+proj=tmerc +lat_0=0 +lon_0=-115 +k=0.9992 +x_0=500000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs`;   // Alberta 10-TM
+  return null;
+}
+function gisSrc(hint) {   // a projection code OpenLayers can transform from
+  if (!hint) return null;
+  if (/^EPSG:3857$|^EPSG:900913$/i.test(hint)) return 'EPSG:3857';
+  const m = /EPSG:{1,2}(\d{4,5})/i.exec(hint) || /^(\d{4,5})$/.exec(hint);
+  if (m) { const code = 'EPSG:' + m[1], d = epsgDef(m[1]); if (!d) return null; if (!proj4.defs(code)) { proj4.defs(code, d); ol.proj.proj4.register(proj4); } return code; }
+  if (/^\s*(PROJCS|GEOGCS|PROJCRS|GEOGCRS)\[/i.test(hint)) {
+    const code = 'WKT:' + [...hint].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7).toString(36);
+    if (!proj4.defs(code)) { try { proj4.defs(code, hint); ol.proj.proj4.register(proj4); } catch { return null; } }
+    return code;
+  }
+  return null;
+}
+const GIS_FMT = () => new ol.format.GeoJSON();
+/* read one file (or one shapefile's parts) into OpenLayers features in the site zone, plus how it was read */
+async function gisRead(files) {
+  const site = gisCode(), main = files.find(f => /\.(shp|zip|geojson|json|kml|kmz|dxf|csv|txt|xlsx|xls)$/i.test(f.name)); if (!main) throw new Error('No map data file among the files chosen.');
+  const nm = main.name.toLowerCase(), base = main.name.replace(/\.[^.]+$/, '');
+  const fromGeo = (gj, src) => GIS_FMT().readFeatures(gj, { dataProjection: src, featureProjection: site });
+  const guess = xy => xy && Math.abs(xy[0]) <= 180 && Math.abs(xy[1]) <= 90 ? 'EPSG:4326' : site;   // no stated system: degrees, else the site's own zone
+  if (/\.(geojson|json)$/.test(nm)) {
+    const gj = JSON.parse(await main.text()), named = gj.crs?.properties?.name;
+    const first = GIS_FMT().readFeatures(gj)[0]?.getGeometry()?.getFirstCoordinate?.();
+    const src = named ? gisSrc(named) : guess(first); if (!src) throw new Error(`The coordinate system ${named} is not one this app knows.`);
+    return { name: base, feats: fromGeo(gj, src), how: named ? `from ${named}` : src === 'EPSG:4326' ? 'from latitude and longitude' : 'in this site’s UTM zone' };
+  }
+  if (/\.kmz?$/.test(nm)) {
+    let txt; if (nm.endsWith('.kmz')) { const z = await unzipFile(await main.arrayBuffer()), k = Object.keys(z).find(x => /\.kml$/i.test(x)); if (!k) throw new Error('No KML inside the KMZ.'); txt = new TextDecoder().decode(z[k]); } else txt = await main.text();
+    const feats = new ol.format.KML({ extractStyles: false, showPointNames: false }).readFeatures(txt, { dataProjection: 'EPSG:4326', featureProjection: site });
+    for (const f of feats) { f.unset('styleUrl'); f.unset('styleMap'); }
+    return { name: base, feats, how: 'from latitude and longitude (KML)' };
+  }
+  if (/\.(shp|zip)$/.test(nm)) {
+    let parts = {};
+    if (nm.endsWith('.zip')) { const z = await unzipFile(await main.arrayBuffer()), shp = Object.keys(z).find(x => /\.shp$/i.test(x)); if (!shp) throw new Error('No .shp inside the zip.'); const stem = shp.replace(/\.shp$/i, ''); for (const ext of ['shp', 'dbf', 'prj', 'cpg']) { const k = Object.keys(z).find(x => x.toLowerCase() === (stem + '.' + ext).toLowerCase()); if (k) parts[ext] = z[k]; } }
+    else for (const f of files) { const ext = f.name.split('.').pop().toLowerCase(); if (f.name.replace(/\.[^.]+$/, '') === base && ['shp', 'dbf', 'prj', 'cpg'].includes(ext)) parts[ext] = await f.arrayBuffer(); }
+    const geoms = readShp(parts.shp), rows = parts.dbf ? readDbf(parts.dbf, parts.cpg ? new TextDecoder().decode(parts.cpg) : '') : [];
+    const prj = parts.prj ? new TextDecoder().decode(parts.prj) : '', first = geoms.find(Boolean);
+    const firstXY = first ? (first.type === 'Point' ? first.coordinates : first.type === 'MultiPoint' ? first.coordinates[0] : first.type === 'MultiLineString' ? first.coordinates[0][0] : first.coordinates[0][0][0]) : null;
+    const src = prj ? gisSrc(prj) : guess(firstXY); if (!src) throw new Error('The shapefile’s coordinate system (.prj) could not be read.');
+    const gj = { type: 'FeatureCollection', features: geoms.map((g, i) => g && { type: 'Feature', geometry: g, properties: rows[i] || {} }).filter(Boolean) };
+    return { name: base, feats: fromGeo(gj, src), how: prj ? `from ${(/^\w+\["([^"]+)"/.exec(prj) || [])[1] || 'its .prj'}` : 'no .prj: assumed ' + (src === 'EPSG:4326' ? 'latitude and longitude' : 'this site’s UTM zone') };
+  }
+  if (/\.dxf$/.test(nm)) {
+    const sh = parseDXF(await main.text()), g = s => s.type === 'point' ? { type: 'Point', coordinates: s.pts[0] } : s.type === 'line' ? { type: 'LineString', coordinates: s.pts } : { type: 'Polygon', coordinates: [[...s.pts, s.pts[0]]] };
+    return { name: base, feats: fromGeo({ type: 'FeatureCollection', features: sh.map(s => ({ type: 'Feature', geometry: g(s), properties: { layer: s.layer || '', text: s.label ? s.name : '' } })) }, site), how: 'drawing units taken as this site’s UTM metres' };
+  }
+  const rows = await readTable(main), head = (rows[0] || []).map(h => String(h ?? '').trim()), c = tableCols(rows[0] || []);
+  const ll = c.lat != null && c.lon != null, xi = ll ? c.lon : c.e, yi = ll ? c.lat : c.n; if (xi == null || yi == null) throw new Error('The table needs easting and northing, or latitude and longitude, columns.');
+  const feats = rows.slice(1).map(r => { const x = numv(r[xi]), y = numv(r[yi]); if (x == null || y == null) return null; return { type: 'Feature', geometry: { type: 'Point', coordinates: [x, y] }, properties: Object.fromEntries(head.map((h, i) => [h || `col${i + 1}`, r[i] ?? null])) }; }).filter(Boolean);
+  return { name: base, feats: fromGeo({ type: 'FeatureCollection', features: feats }, ll ? 'EPSG:4326' : site), how: ll ? 'from latitude and longitude columns' : 'easting and northing in this site’s UTM zone' };
+}
+/* layers kept with the site: [{ id, name, kind: 'vector' | 'xyz' | 'wms' | 'arcgis', fc, url, layers, vis, op, sym, lab }]; the first draws on top */
+const gisUser = () => siteOf()?.gis || [];
+function gisSave(list) { setSite({ ...(siteOf() || {}), gis: list }); }
+const GEOM_OF = fs => { const t = new Set(fs.map(f => f.getGeometry()?.getType().replace('Multi', ''))); return t.size === 1 ? { Point: 'point', LineString: 'line', Polygon: 'polygon' }[[...t][0]] || 'mixed' : 'mixed'; };
+const GIS_PAL = ['#1a62b4', '#d0611b', '#2e7d4f', '#8e44ad', '#c9a227', '#00838f', '#b42318', '#5d4037', '#546e7a', '#ad1457'];
+const GIS_RAMPS = { 'Yellow to red': ['#ffffb2', '#fecc5c', '#fd8d3c', '#f03b20', '#bd0026'], Blues: ['#eff3ff', '#bdd7e7', '#6baed6', '#3182bd', '#08519c'], Greens: ['#edf8e9', '#bae4b3', '#74c476', '#31a354', '#006d2c'], Greys: ['#f7f7f7', '#cccccc', '#969696', '#636363', '#252525'], Change: ['#b2182b', '#ef8a62', '#f7f7f7', '#67a9cf', '#2166ac'] };
+async function gisAddFiles(files) {
+  const groups = new Map(); for (const f of files) { const k = f.name.replace(/\.[^.]+$/, '').toLowerCase(); (groups.get(k) || groups.set(k, []).get(k)).push(f); }
+  const add = [], notes = [];
+  for (const fs of groups.values()) {
+    if (!fs.some(f => /\.(shp|zip|geojson|json|kml|kmz|dxf|csv|txt|xlsx|xls)$/i.test(f.name))) continue;
+    try {
+      const r = await gisRead(fs); if (!r.feats.length) { notes.push(`${r.name}: no features`); continue; }
+      const fc = GIS_FMT().writeFeaturesObject(r.feats, { decimals: 3 }), geom = GEOM_OF(r.feats), color = GIS_PAL[(gisUser().length + add.length) % GIS_PAL.length];
+      add.push({ id: uid('gl'), name: r.name, kind: 'vector', geom, fc, vis: true, op: 1, sym: { mode: 'single', color, width: geom === 'line' ? 2 : 1.5, size: 5, fill: .3 }, lab: { field: '', size: 11 } });
+      notes.push(`${r.name}: ${r.feats.length} feature${r.feats.length === 1 ? '' : 's'}, ${r.how}`);
+    } catch (e) { notes.push(`${fs[0].name}: ${e.message || 'could not be read'}`); }
+  }
+  if (add.length) { gisSave([...add, ...gisUser()]); if (S.tab === 'gis') { renderView(true); requestAnimationFrame(() => gisZoomTo(add[0].id)); } }
+  toast(notes.join(' · ') || 'No map data in the files chosen. Supported: shapefile (.zip, or .shp with .dbf and .prj), GeoJSON, KML/KMZ, DXF and CSV/Excel tables with coordinates.');
+}
+function gisAddDialog() {
+  dialog('Add data', `<p class="note" style="margin:0 0 10px">Shapefiles (a .zip, or the .shp with its .dbf and .prj), GeoJSON, KML or KMZ, DXF drawings and CSV or Excel tables with coordinates. Each is reprojected from its own coordinate system into this site’s UTM zone and keeps every attribute.</p>
+    <div class="actions" style="justify-content:flex-start;margin:0 0 14px"><button class="btn primary" data-act="gis-files">Choose files…</button></div>
+    <h4 style="margin:0 0 6px">Or a map service</h4>
+    <div class="fields" style="grid-template-columns:1fr 1fr"><div class="fld"><label for="gs-kind">Type</label><select id="gs-kind"><option value="arcgis">ArcGIS REST map service</option><option value="wms">WMS</option><option value="xyz">XYZ tiles</option></select></div>
+    <div class="fld"><label for="gs-name">Name</label><input id="gs-name" type="text" placeholder="e.g. Provincial wells"></div>
+    <div class="fld wide" style="grid-column:1/-1"><label for="gs-url">Address</label><input id="gs-url" type="url" placeholder="https://…/MapServer, https://…/wms or https://…/{z}/{x}/{y}.png"></div>
+    <div class="fld wide" style="grid-column:1/-1"><label for="gs-layers">WMS layer names (comma-separated)</label><input id="gs-layers" type="text" placeholder="Only for WMS"></div></div>
+    <p class="note" style="margin:6px 0 0">Map services draw over the internet and are not available offline. The provider sees the area you view.</p>`,
+    '<button class="btn" data-act="close">Cancel</button><button class="btn" data-act="gis-svc-go">Add service</button>');
+}
+function gisAddService() {
+  const kind = $('#gs-kind').value, url = $('#gs-url').value.trim(), name = $('#gs-name').value.trim(), layers = $('#gs-layers').value.trim();
+  if (!/^https:\/\//i.test(url)) { toast('Enter the service address, starting with https://'); return; }
+  if (kind === 'wms' && !layers) { toast('Enter the WMS layer names.'); return; }
+  gisSave([{ id: uid('gl'), name: name || url.replace(/^https:\/\/([^/]+).*/, '$1'), kind, url, layers, vis: true, op: .85 }, ...gisUser()]); closeOverlay(); if (S.tab === 'gis') renderView(true);
+}
+function gisHex(c, a) { const h = c.replace('#', ''), v = h.length === 3 ? h.split('').map(x => x + x).join('') : h; return `rgba(${parseInt(v.slice(0, 2), 16)},${parseInt(v.slice(2, 4), 16)},${parseInt(v.slice(4, 6), 16)},${a})`; }
+function gisColorOf(L, f) {
+  const sy = L.sym || {}, v = sy.field ? f.get(sy.field) : null;
+  if (sy.mode === 'cat' && sy.field) return (sy.classes || []).find(c => String(c.v) === String(v ?? ''))?.color || '#9aa0a6';
+  if (sy.mode === 'grad' && sy.field) { const n = +v; if (v == null || v === '' || !isFinite(n)) return '#c4c7ca'; return (sy.classes || []).find((c, i, a) => n >= c.min && (n < c.max || i === a.length - 1 && n <= c.max))?.color || '#c4c7ca'; }
+  return sy.color || '#1a62b4';
+}
+function gisStyleFn(L) {
+  const cache = new Map();
+  return f => {
+    const sy = L.sym || {}, col = gisColorOf(L, f), t = f.getGeometry()?.getType() || '', lab = L.lab?.field ? f.get(L.lab.field) : null, txt = lab != null && lab !== '' ? String(lab) : '';
+    const k = col + t + txt; if (cache.has(k)) return cache.get(k);
+    const poly = /Polygon/.test(t), line = /LineString/.test(t), pt = /Point/.test(t);
+    const s = new ol.style.Style({
+      image: pt ? new ol.style.Circle({ radius: sy.size || 5, fill: new ol.style.Fill({ color: col }), stroke: new ol.style.Stroke({ color: '#fff', width: 1.2 }) }) : undefined,
+      stroke: line || poly ? new ol.style.Stroke({ color: poly ? (sy.mode === 'single' ? col : '#3c4043') : col, width: sy.width || (line ? 2 : 1.2) }) : undefined,
+      fill: poly ? new ol.style.Fill({ color: gisHex(col, sy.fill ?? .3) }) : undefined,
+      text: txt ? new ol.style.Text({ text: txt, font: `600 ${L.lab.size || 11}px Arial, sans-serif`, offsetX: pt ? 8 : 0, offsetY: pt ? -7 : 0, textAlign: pt ? 'left' : 'center', placement: line ? 'line' : 'point', overflow: poly, fill: new ol.style.Fill({ color: '#1f1f1f' }), stroke: new ol.style.Stroke({ color: '#fff', width: 3 }) }) : undefined,
+    });
+    cache.set(k, s); return s;
+  };
+}
+function gisOLLayer(L) {
+  const common = { visible: L.vis !== false, opacity: L.op ?? 1, properties: { key: L.id, user: true } };
+  if (L.kind === 'vector') return new ol.layer.Vector({ ...common, declutter: !!L.lab?.field, source: new ol.source.Vector({ features: GIS_FMT().readFeatures(L.fc) }), style: gisStyleFn(L) });
+  if (L.kind === 'grid') { const g = L.g; return new ol.layer.Image({ ...common, source: new ol.source.ImageStatic({ url: gridImage(L), imageExtent: [g.x0, g.y0, g.x0 + g.nx * g.cell, g.y0 + g.ny * g.cell], projection: gisCode(), interpolate: true }) }); }
+  if (L.kind === 'xyz') return new ol.layer.Tile({ ...common, source: new ol.source.XYZ({ url: L.url, crossOrigin: 'anonymous' }) });
+  if (L.kind === 'wms') return new ol.layer.Image({ ...common, source: new ol.source.ImageWMS({ url: L.url, params: { LAYERS: L.layers, TRANSPARENT: true }, crossOrigin: 'anonymous', projection: 'EPSG:3857' }) });
+  if (L.kind === 'arcgis') return new ol.layer.Image({ ...common, source: new ol.source.ImageArcGISRest({ url: L.url, crossOrigin: 'anonymous', projection: 'EPSG:3857', params: { TRANSPARENT: true } }) });
+  return null;
+}
+function gisZoomTo(id) {
+  const L = S.gisMap?.getLayers().getArray().find(l => l.get('key') === id), src = L?.getSource?.();
+  const G = gisUser().find(x => x.id === id); if (G?.kind === 'grid') { const g = G.g; S.gisMap.getView().fit([g.x0, g.y0, g.x0 + g.nx * g.cell, g.y0 + g.ny * g.cell], { padding: [30, 30, 30, 30], duration: 250 }); return; }
+  if (src?.getExtent) { const e = src.getExtent(); if (e && isFinite(e[0])) S.gisMap.getView().fit(ol.extent.buffer(e, Math.max(5, ol.extent.getWidth(e) * .05)), { padding: [30, 30, 30, 30], maxZoom: 20, duration: 250 }); }
+}
+function gisFields(L) { const s = new Set(); for (const f of L.fc?.features || []) for (const k of Object.keys(f.properties || {})) s.add(k); return [...s]; }
+function gisSymDialog(id) {
+  const L = gisUser().find(x => x.id === id); if (!L || L.kind !== 'vector') return;
+  S._symId = id; const sy = L.sym || {}, fs = gisFields(L), opt = (v, cur) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(v)}</option>`;
+  dialog(`Symbology: ${esc(L.name)}`, `<div class="fields" style="grid-template-columns:1fr 1fr">
+    <div class="fld"><label for="sy-mode">Draw</label><select id="sy-mode"><option value="single" ${sy.mode === 'single' ? 'selected' : ''}>One colour</option><option value="cat" ${sy.mode === 'cat' ? 'selected' : ''}>By category (unique values)</option><option value="grad" ${sy.mode === 'grad' ? 'selected' : ''}>By value (classes)</option></select></div>
+    <div class="fld"><label for="sy-field">Field</label><select id="sy-field"><option value="">—</option>${fs.map(f => opt(f, sy.field)).join('')}</select></div>
+    <div class="fld"><label for="sy-color">Colour (one colour)</label><input id="sy-color" type="color" value="${esc(sy.color || '#1a62b4')}"></div>
+    <div class="fld"><label for="sy-ramp">Colour ramp (by value)</label><select id="sy-ramp">${Object.keys(GIS_RAMPS).map(k => opt(k, sy.ramp || 'Yellow to red')).join('')}</select></div>
+    <div class="fld"><label for="sy-n">Classes (by value)</label><select id="sy-n">${[3, 4, 5].map(n => `<option ${+(sy.n || 5) === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    <div class="fld"><label for="sy-method">Class breaks</label><select id="sy-method"><option value="eq" ${sy.method !== 'q' ? 'selected' : ''}>Equal interval</option><option value="q" ${sy.method === 'q' ? 'selected' : ''}>Quantile</option></select></div>
+    <div class="fld"><label for="sy-width">Line width</label><input id="sy-width" type="number" min="0.5" max="8" step="0.5" value="${sy.width ?? 1.5}"></div>
+    <div class="fld"><label for="sy-size">Point size</label><input id="sy-size" type="number" min="2" max="14" step="1" value="${sy.size ?? 5}"></div>
+    <div class="fld"><label for="sy-fill">Area fill opacity</label><input id="sy-fill" type="number" min="0" max="1" step="0.05" value="${sy.fill ?? .3}"></div>
+    <div class="fld"><label for="sy-op">Layer transparency (opacity)</label><input id="sy-op" type="number" min="0.1" max="1" step="0.05" value="${L.op ?? 1}"></div>
+    <div class="fld"><label for="sy-lab">Label with field</label><select id="sy-lab"><option value="">No labels</option>${fs.map(f => opt(f, L.lab?.field)).join('')}</select></div>
+    <div class="fld"><label for="sy-labsize">Label size</label><input id="sy-labsize" type="number" min="7" max="20" step="1" value="${L.lab?.size ?? 11}"></div></div>`,
+    '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="gis-sym-go">Apply</button>');
+}
+function gisSymApply() {
+  const list = gisUser().map(x => ({ ...x })), L = list.find(x => x.id === S._symId); if (!L) return;
+  const mode = $('#sy-mode').value, field = $('#sy-field').value, vals = (L.fc.features || []).map(f => f.properties?.[field]);
+  const sy = { mode: field || mode === 'single' ? mode : 'single', field, color: $('#sy-color').value, ramp: $('#sy-ramp').value, n: +$('#sy-n').value, method: $('#sy-method').value, width: +$('#sy-width').value, size: +$('#sy-size').value, fill: +$('#sy-fill').value };
+  if (sy.mode === 'cat') { const u = [...new Set(vals.map(v => String(v ?? '')))].sort().slice(0, 40); sy.classes = u.map((v, i) => ({ v, color: GIS_PAL[i % GIS_PAL.length] })); }
+  if (sy.mode === 'grad') {
+    const nums = vals.map(Number).filter((v, i) => vals[i] != null && vals[i] !== '' && isFinite(v)).sort((a, b) => a - b), ramp = GIS_RAMPS[sy.ramp] || GIS_RAMPS['Yellow to red'], n = sy.n;
+    if (!nums.length) { toast(`${field} has no numbers to class.`); return; }
+    const lo = nums[0], hi = nums.at(-1), cuts = Array.from({ length: n + 1 }, (_, k) => sy.method === 'q' ? nums[Math.min(nums.length - 1, Math.round(k / n * (nums.length - 1)))] : lo + (hi - lo) * k / n);
+    const pick = k => ramp[Math.round(k / Math.max(1, n - 1) * (ramp.length - 1))];
+    sy.classes = Array.from({ length: n }, (_, k) => ({ min: cuts[k], max: cuts[k + 1], color: pick(k) }));
+  }
+  L.sym = sy; L.op = Math.min(1, Math.max(.1, +$('#sy-op').value || 1)); L.lab = { field: $('#sy-lab').value, size: +$('#sy-labsize').value || 11 };
+  gisSave(list); closeOverlay(); if (S.tab === 'gis') renderView(true);
+}
+const fmtCell = v => v == null ? '' : typeof v === 'number' ? (+v.toPrecision(10)).toLocaleString('en-CA', { maximumFractionDigits: 6 }) : String(v);
+function gisTable(id) {
+  const L = gisUser().find(x => x.id === id), el = $('#gis-table'); if (!el) return;
+  if (!L || L.kind !== 'vector') { el.hidden = true; S.gisTableId = null; S.gisMap?.updateSize(); return; }
+  S.gisTableId = id; const fs = gisFields(L), feats = L.fc.features || [];
+  el.innerHTML = `<header><b>${esc(L.name)}</b><span class="note">${feats.length} feature${feats.length === 1 ? '' : 's'}${feats.length > 1000 ? ', first 1000 shown' : ''}</span><span class="sp"></span><button class="btn link" data-act="gis-table-close">Close</button></header>
+    <div class="gis-tw"><table class="sum dash-t"><thead><tr><th>#</th>${fs.map(f => `<th>${esc(f)}</th>`).join('')}</tr></thead><tbody>${feats.slice(0, 1000).map((f, i) => `<tr data-gis-row="${i}"><td class="m">${i + 1}</td>${fs.map(k => `<td class="${typeof f.properties?.[k] === 'number' ? 'r' : ''}">${esc(fmtCell(f.properties?.[k]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  el.hidden = false; requestAnimationFrame(() => S.gisMap?.updateSize());
+}
+function gisLayerAct(act, id) {
+  const list = gisUser().map(x => ({ ...x })), i = list.findIndex(x => x.id === id); if (i < 0) return;
+  if (act === 'zoom') { gisZoomTo(id); return; }
+  if (act === 'table') { gisTable(id); return; }
+  if (act === 'sym') { gisSymDialog(id); return; }
+  if (act === 'up' && i > 0) [list[i - 1], list[i]] = [list[i], list[i - 1]];
+  else if (act === 'down' && i < list.length - 1) [list[i + 1], list[i]] = [list[i], list[i + 1]];
+  else if (act === 'rename') { S._renId = id; dialog('Rename layer', `<div class="fld"><label for="gl-name">Layer name</label><input id="gl-name" type="text" value="${esc(list[i].name)}"></div>`, '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="gis-ren-go">Rename</button>'); $('#gl-name').select(); return; }
+  else if (act === 'remove') { if (!confirm(`Remove the layer ${list[i].name} from this site's map?`)) return; list.splice(i, 1); if (S.gisTableId === id) S.gisTableId = null; }
+  else if (act === 'export') { const L = list[i]; if (L.kind !== 'vector') return; saveFile(`${L.name.replace(/[^\w .-]+/g, '-')}.geojson`, new Blob([JSON.stringify({ ...L.fc, crs: { type: 'name', properties: { name: `urn:ogc:def:crs:EPSG::${Object.entries(CSRS_UTM).find(([c, z]) => z === crsZone() && +c < 22000)?.[0] || 26900 + crsZone()}` } } })], { type: 'application/geo+json' })); return; }
+  else return;
+  gisSave(list); renderView(true);
+}
+function gisRename() { const n = $('#gl-name')?.value.trim(); if (!n) return; gisSave(gisUser().map(x => x.id === S._renId ? { ...x, name: n } : x)); closeOverlay(); if (S.tab === 'gis') renderView(true); }
+/* ---------- geoprocessing: tools that turn points into surfaces, contours and plumes, and work on any layer (buffer, select by
+   location). Each run adds a layer to the map, with what it did written on it, ready to style and put on a figure. ---------- */
+/* point data a tool can use: imported point layers with number fields, and the site's own lab results, vapour and water levels */
+function gisSources() {
+  const out = [], list = mapList();
+  for (const L of gisUser()) if (L.kind === 'vector' && L.geom === 'point') {
+    const fs = gisFields(L).filter(f => L.fc.features.some(x => { const v = x.properties?.[f]; return v != null && v !== '' && isFinite(+v); }));
+    if (fs.length) out.push({ id: L.id, label: L.name, fields: fs.map(f => [f, f]), pts: f => L.fc.features.map(x => { const v = x.properties?.[f], c = x.geometry?.type === 'Point' ? x.geometry.coordinates : x.geometry?.coordinates?.[0]; return c && v != null && v !== '' && isFinite(+v) ? { x: c[0], y: c[1], v: +v } : null; }).filter(Boolean) });
+  }
+  const params = [...new Set(list.flatMap(b => (b.samples || []).flatMap(sm => [...Object.keys(sm.lab || {}), 'f1b'].filter(p => labVal(sm, p)))))];
+  if (params.length) out.push({ id: 'site:lab', label: 'Lab results, highest in each borehole', fields: params.map(p => [p, `${LAB_PARAMS[p]?.label || p}${LAB_PARAMS[p]?.unit ? ` (${LAB_PARAMS[p].unit})` : ''}`]),
+    pts: p => list.map(b => { const xy = gisXY(b), rs = (b.samples || []).map(sm => labVal(sm, p)).filter(Boolean); if (!xy || !rs.length) return null; const m = rs.reduce((a, r) => (r.lt ? r.v / 2 : r.v) > (a.lt ? a.v / 2 : a.v) ? r : a); return { x: xy[0], y: xy[1], v: m.lt ? m.v / 2 : m.v, lt: m.lt }; }).filter(Boolean) });
+  if (list.some(b => vapourMax(b, null, null))) out.push({ id: 'site:voc', label: 'Vapour (headspace), highest in each borehole', fields: [['cvc', 'VOC (ppm)']], pts: () => list.map(b => { const xy = gisXY(b), v = vapourMax(b, null, null); return xy && v ? { x: xy[0], y: xy[1], v: v.cvc } : null; }).filter(Boolean) });
+  const H = gwHeads(list); if (H.wells.length >= 3) out.push({ id: 'site:wt', label: `Water levels${H.round ? `, ${H.round}` : ''}`, fields: [['head', `Water elevation (${LEN()})`]], pts: () => H.wells.map(w => { const xy = gisXY(w.b); return xy ? { x: xy[0], y: xy[1], v: w.h } : null; }).filter(Boolean) });
+  return out;
+}
+/* a surface from points: kriging when there are enough points and the variogram fits, else inverse distance; log scale for skewed positive data */
+function gisSurface(raw, { method = 'auto', cell = 0, log = 'auto' } = {}) {
+  const SS = window.SoilStats; if (!SS) throw new Error('The statistics library did not load.');
+  const P = SS.merge(raw.map(p => ({ x: p.x, y: p.y, v: p.v }))).pts; if (P.length < 3) throw new Error(`Needs at least 3 points with values (${P.length} found).`);
+  const sp = SS.spacing(P).median || 10, lg = log === 'yes' || (log === 'auto' && P.every(p => p.v > 0) && SS.logT(P.map(p => p.v)).on);
+  const ext = [Math.min(...P.map(p => p.x)), Math.min(...P.map(p => p.y)), Math.max(...P.map(p => p.x)), Math.max(...P.map(p => p.y))], span = Math.max(ext[2] - ext[0], ext[3] - ext[1], 1);
+  const pad = sp * 2; let c = +cell || Math.max(.25, +niceStep((span + 2 * pad) / 120, 1).toPrecision(1));
+  while (((span + 2 * pad) / c) ** 2 > 22000) c *= 1.5;
+  let pick = method === 'auto' ? SS.chooseMethod(P.length, 'num').method : method; if (pick === 'none') pick = 'idw';
+  const T = lg ? SS.logT(P.map(p => p.v)) : null, tp = T ? P.map(p => ({ ...p, v: T.fwd(p.v) })) : P;
+  let vg = null; if (pick === 'krige') { vg = SS.fitVariogram(SS.empirical(tp)); if (!vg?.ok) pick = 'idw'; }
+  const s = SS.surface(P, { method: pick, cell: c, pad, spacing: sp, log: lg, vg });
+  const pred = pick === 'krige' ? (rest, p) => { const q = SS.krige(T ? rest.map(r => ({ ...r, v: T.fwd(r.v) })) : rest, vg, p.x, p.y); return T ? T.inv(q.v) : q.v; } : (rest, p) => { const v = SS.idw(T ? rest.map(r => ({ ...r, v: T.fwd(r.v) })) : rest, p.x, p.y); return T ? T.inv(v) : v; };
+  const loo = P.length <= 300 ? SS.loo(P, pred) : null;
+  return { s, method: pick, log: lg, vg, n: P.length, cell: c, rmse: loo?.rmse ?? null, lo: Math.min(...P.map(p => p.v)), hi: Math.max(...P.map(p => p.v)) };
+}
+const gisNodes = s => { const { g, val } = s, mask = Float32Array.from(s.mask);   // the grid's border counts as outside, so every outline closes
+  for (let r = 0; r < g.ny; r++) for (let c = 0; c < g.nx; c++) if (!r || !c || r === g.ny - 1 || c === g.nx - 1) mask[r * g.nx + c] = 0;
+  return { nx: g.nx - 1, ny: g.ny - 1, c: val, a: mask, x0: g.x0 + g.cell / 2, x1: g.x0 + g.cell / 2 + (g.nx - 1) * g.cell, y0: g.y0 + g.cell / 2, y1: g.y0 + g.cell / 2 + (g.ny - 1) * g.cell }; };
+const ringClosed = l => l.length > 3 && Math.hypot(l[0][0] - l.at(-1)[0], l[0][1] - l.at(-1)[1]) < .02;   // the tracer rejoins its start to within rounding
+const ringArea = r => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1]); return Math.abs(a / 2); };
+function gisLevels(lo, hi, log, n = 6) {
+  if (log && lo > 0) { const out = []; for (let e = Math.floor(Math.log10(lo)); e <= Math.ceil(Math.log10(hi)); e++) for (const m of [1, 2, 5]) { const v = m * 10 ** e; if (v > lo && v < hi) out.push(+v.toPrecision(3)); } return out.length > 9 ? out.filter((_, i) => i % 2 === 0) : out; }
+  const st = niceStep(hi - lo || 1, n), out = []; for (let v = Math.ceil(lo / st) * st; v <= hi + 1e-9; v += st) out.push(+v.toFixed(6)); return out;
+}
+function gisAddLayer(L) { gisSave([L, ...gisUser()]); if (S.tab === 'gis') renderView(true); }
+const gisVec = (name, features, geom, sym, lab, note) => ({ id: uid('gl'), name, kind: 'vector', geom, fc: { type: 'FeatureCollection', features }, vis: true, op: 1, sym, lab: lab || { field: '', size: 11 }, note });
+/* the tools: each a form, and what Run does with it */
+const GTOOLS = {
+  surface: ['Interpolate surface', 'A coloured surface from point values: ordinary kriging when the points support it, otherwise inverse distance weighting. Concentrations are interpolated on a log scale.'],
+  contour: ['Contours', 'Contour lines from point values, labelled, as a line layer.'],
+  plume: ['Plume at guideline', 'The area where the interpolated value is above a guideline, as polygons with their areas.'],
+  change: ['Change between rounds', 'The change in water elevation between two monitoring rounds, as a surface and contours.'],
+  buffer: ['Buffer', 'Areas within a distance of the features of a layer, merged where they overlap.'],
+  select: ['Select by location', 'The features of one layer that fall inside the areas of another, as a new layer.'],
+};
+function gtoolHTML(k) {
+  const src = gisSources(), vec = gisUser().filter(L => L.kind === 'vector'), polys = vec.filter(L => L.geom === 'polygon' || L.geom === 'mixed'), rounds = roundDates();
+  const sel = (id, opts, cur) => `<select id="${id}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+  const fld = (label, html) => `<div class="gp"><label>${label}</label>${html}</div>`;
+  const srcF = () => src.length ? fld('Input points', sel('gt-src', src.map(s => [s.id, s.label]), S.gtSrc)) + fld('Value', `<select id="gt-field"></select>`) : '<p class="note">No point data with numbers yet: add a point layer (Add data), lab results, vapour readings or water levels.</p>';
+  const interp = fld('Method', sel('gt-method', [['auto', 'Automatic (kriging if it fits)'], ['krige', 'Ordinary kriging'], ['idw', 'Inverse distance']], 'auto')) + fld('Scale', sel('gt-log', [['auto', 'Automatic'], ['yes', 'Logarithmic (concentrations)'], ['no', 'Linear']], 'auto')) + fld('Cell size (m, blank for automatic)', '<input id="gt-cell" type="number" min="0.1" step="any">');
+  const body = {
+    surface: srcF() + interp + fld('Colours', sel('gt-ramp', Object.keys(GIS_RAMPS).map(r => [r, r]), 'Yellow to red')) + `<div class="gp ck2"><label class="check"><input type="checkbox" id="gt-lines" checked> Add contour lines too</label></div>`,
+    contour: srcF() + interp + fld('Contour interval (blank for automatic)', '<input id="gt-iv" type="number" min="0" step="any">'),
+    plume: srcF() + interp + fld('Guideline (same units as the value)', `<input id="gt-guide" type="number" min="0" step="any" value="">`),
+    change: rounds.length >= 2 ? fld('From round', sel('gt-r0', rounds.map(d => [d, d]), rounds[1])) + fld('To round', sel('gt-r1', rounds.map(d => [d, d]), rounds[0])) + fld('Method', sel('gt-method', [['auto', 'Automatic'], ['krige', 'Ordinary kriging'], ['idw', 'Inverse distance']], 'auto')) : '<p class="note">Needs at least two monitoring rounds.</p>',
+    buffer: vec.length || mapList().some(gisXY) ? fld('Layer', sel('gt-lyr', [...(mapList().some(gisXY) ? [['site:bh', 'Boreholes and wells']] : []), ...vec.map(L => [L.id, L.name])])) + fld('Distance (m)', '<input id="gt-dist" type="number" min="0.1" step="any" value="10">') : '<p class="note">Add a layer first.</p>',
+    select: vec.length && polys.length ? fld('Features of', sel('gt-lyr', [...(mapList().some(gisXY) ? [['site:bh', 'Boreholes and wells']] : []), ...vec.map(L => [L.id, L.name])])) + fld('Inside the areas of', sel('gt-area', polys.map(L => [L.id, L.name]))) : '<p class="note">Needs a layer of areas (polygons): add one, or make one with Buffer or Plume.</p>',
+  }[k];
+  return `<header><b>${GTOOLS[k][0]}</b><button type="button" class="btn link" data-act="gtool-close" aria-label="Close the tool">Close</button></header><p class="note gt-what">${GTOOLS[k][1]}</p>${body}
+    ${fld('Output layer name', `<input id="gt-name" type="text" value="${esc(GTOOLS[k][0])}">`)}<div class="gpr"><span class="note" id="gt-msg"></span><button type="button" class="btn primary" data-act="gtool-run">Run</button></div>`;
+}
+function gtoolFields() {
+  const s = gisSources().find(x => x.id === $('#gt-src')?.value), f = $('#gt-field'); if (!f) return;
+  f.innerHTML = (s?.fields || []).map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join('');
+  const nm = $('#gt-name'); if (nm && s && !nm.dataset.typed) nm.value = `${GTOOLS[S.gtool][0]}: ${(s.fields.find(x => x[0] === f.value) || [])[1] || ''}`.replace(/: $/, '');
+  const gd = $('#gt-guide'); if (gd && !gd.value && s?.id === 'site:lab') { const g = projGuide()[f.value]; if (g != null) gd.value = g; }
+}
+function gtoolOpen(k) {
+  if (S.tab !== 'gis') goTab('gis'); S.gtool = k;
+  requestAnimationFrame(() => { const el = $('#gis-tool'); if (!el) return; el.innerHTML = gtoolHTML(k); el.hidden = false; $('.gis')?.classList.add('has-tool'); gtoolFields(); S.gisMap?.updateSize(); });
+}
+function gtoolClose() { S.gtool = null; const el = $('#gis-tool'); if (el) { el.hidden = true; el.innerHTML = ''; } $('.gis')?.classList.remove('has-tool'); S.gisMap?.updateSize(); }
+document.addEventListener('change', e => { if (e.target.id === 'gt-src' || e.target.id === 'gt-field') { S.gtSrc = $('#gt-src')?.value; gtoolFields(); } });
+document.addEventListener('input', e => { if (e.target.id === 'gt-name') e.target.dataset.typed = '1'; });
+/* the surface as a picture over the map: each cell coloured on the ramp, faded where it is far from any point */
+function gridImage(L) {
+  const { g, val, mask, lo, hi, log } = L, cv = document.createElement('canvas'); cv.width = g.nx; cv.height = g.ny;
+  const cx = cv.getContext('2d'), im = cx.createImageData(g.nx, g.ny), ramp = GIS_RAMPS[L.ramp] || GIS_RAMPS['Yellow to red'], f = v => log && lo > 0 ? (Math.log10(Math.max(v, lo)) - Math.log10(lo)) / ((Math.log10(hi) - Math.log10(lo)) || 1) : (v - lo) / ((hi - lo) || 1);
+  const rgb = ramp.map(h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16)));
+  for (let r = 0; r < g.ny; r++) for (let c = 0; c < g.nx; c++) {
+    const i = r * g.nx + c, o = ((g.ny - 1 - r) * g.nx + c) * 4, t = Math.max(0, Math.min(1, f(val[i]))) * (rgb.length - 1), k = Math.min(rgb.length - 2, Math.floor(t)), u = t - k;
+    for (let q = 0; q < 3; q++) im.data[o + q] = Math.round(rgb[k][q] + (rgb[k + 1][q] - rgb[k][q]) * u);
+    im.data[o + 3] = Math.round(255 * mask[i]);
+  }
+  cx.putImageData(im, 0, 0); return cv.toDataURL('image/png');
+}
+function gtoolRun() {
+  const k = S.gtool, msg = $('#gt-msg'), name = $('#gt-name')?.value.trim() || GTOOLS[k][0], say = t => { if (msg) msg.textContent = t; };
+  try {
+    const src = gisSources().find(x => x.id === $('#gt-src')?.value), field = $('#gt-field')?.value, opts = { method: $('#gt-method')?.value || 'auto', cell: +($('#gt-cell')?.value || 0), log: $('#gt-log')?.value || 'auto' };
+    const fl = src?.fields.find(x => x[0] === field)?.[1] || field || '';
+    const describe = R => `${R.n} points, ${R.method === 'krige' ? `ordinary kriging (${R.vg.model} variogram, range ${fmtCell(+R.vg.range.toPrecision(3))} m)` : 'inverse distance'}${R.log ? ', log scale' : ''}, ${fmtCell(R.cell)} m cells${R.rmse != null ? `, leave-one-out error ±${fmtCell(+R.rmse.toPrecision(3))}` : ''}`;
+    const contourFeats = (R, levels) => { const G = gisNodes(R.s), feats = []; for (const v of levels) for (const l of fieldContours(G, v, .5, true)) if (l.length > 1) feats.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: l.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]) }, properties: { value: v } }); return feats; };
+    const gridLayer = (R, nm, ramp, note) => ({ id: uid('gl'), name: nm, kind: 'grid', g: R.s.g, val: Array.from(R.s.val, v => +v.toPrecision(5)), mask: Array.from(R.s.mask, v => +v.toFixed(2)), lo: R.lo, hi: R.hi, log: R.log, ramp, vis: true, op: .8, note, unit: fl });
+    if (k === 'surface' || k === 'contour' || k === 'plume') {
+      if (!src) throw new Error('Choose the input points.');
+      const R = gisSurface(src.pts(field), opts), note = describe(R);
+      if (k === 'surface') {
+        const out = [gridLayer(R, name, $('#gt-ramp').value, note)];
+        if ($('#gt-lines')?.checked) { const lv = gisLevels(R.lo, R.hi, R.log); out.unshift(gisVec(`${name} contours`, contourFeats(R, lv), 'line', { mode: 'single', color: '#3c4043', width: 1 }, { field: 'value', size: 10 }, note)); }
+        gisSave([...out, ...gisUser()]); renderView(true); toast(`${name}: ${note}.`);
+      } else if (k === 'contour') {
+        const iv = +($('#gt-iv')?.value || 0), lv = iv > 0 ? (() => { const a = []; for (let v = Math.ceil(R.lo / iv) * iv; v <= R.hi + 1e-9; v += iv) a.push(+v.toFixed(6)); return a; })() : gisLevels(R.lo, R.hi, R.log);
+        const feats = contourFeats(R, lv); if (!feats.length) throw new Error('No contours at these levels inside the data.');
+        gisAddLayer(gisVec(name, feats, 'line', { mode: 'single', color: src.id === 'site:wt' ? '#2867a8' : '#3c4043', width: 1.4 }, { field: 'value', size: 11 }, note)); toast(`${name}: ${feats.length} contour line${feats.length === 1 ? '' : 's'}; ${note}.`);
+      } else {
+        const gv = +$('#gt-guide').value; if (!(gv > 0) && $('#gt-guide').value === '') throw new Error('Enter the guideline value.');
+        const rings = fieldContours(gisNodes(R.s), gv, .5, true).filter(ringClosed);
+        if (!rings.length) throw new Error(R.hi < gv ? `No point is above ${fmtCell(gv)} (highest ${fmtCell(R.hi)}).` : 'The area above the guideline runs to the edge of the data and does not close. Add points around it, or use a lower guideline to see where it stops.');
+        rings.sort((a, b) => ringArea(b) - ringArea(a));
+        const feats = rings.map((r, i) => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [r.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)])] }, properties: { part: i + 1, guideline: gv, area_m2: Math.round(ringArea(r)) } }));
+        const total = feats.reduce((a, f) => a + f.properties.area_m2, 0);
+        gisAddLayer(gisVec(name, feats, 'polygon', { mode: 'single', color: '#d0611b', width: 2, fill: .35 }, { field: '', size: 11 }, `Above ${fmtCell(gv)} ${fl}: ${total.toLocaleString('en-CA')} m² in ${feats.length} part${feats.length === 1 ? '' : 's'}; ${note}`));
+        toast(`${name}: ${total.toLocaleString('en-CA')} m² above ${fmtCell(gv)}.`);
+      }
+    } else if (k === 'change') {
+      const r0 = $('#gt-r0').value, r1 = $('#gt-r1').value, list = mapList(); if (r0 === r1) throw new Error('Choose two different rounds.');
+      const h0 = gwHeads(list, r0, true).wells, h1 = gwHeads(list, r1, true).wells, pts = h1.map(w => { const p = h0.find(x => x.b.id === w.b.id), xy = gisXY(w.b); return p && xy ? { x: xy[0], y: xy[1], v: +(w.h - p.h).toFixed(3) } : null; }).filter(Boolean);
+      const R = gisSurface(pts, { method: opts.method, log: 'no' }), note = `${r0} to ${r1}: ${describe(R)}`, m = Math.max(Math.abs(R.lo), Math.abs(R.hi)) || .01;
+      const G = { ...gridLayer(R, `${name} (${r0} to ${r1})`, 'Blues', note), lo: -m, hi: m, ramp: 'Change' };
+      gisSave([gisVec(`${name} contours`, contourFeats(R, gisLevels(-m, m, false, 8)), 'line', { mode: 'single', color: '#3c4043', width: 1 }, { field: 'value', size: 10 }, note), G, ...gisUser()]); renderView(true); toast(`${name}: water rose up to ${fmtCell(+R.hi.toFixed(3))} and fell up to ${fmtCell(+(-R.lo).toFixed(3))} ${LEN()}.`);
+    } else if (k === 'buffer') {
+      const d = +$('#gt-dist').value; if (!(d > 0)) throw new Error('Enter a distance.');
+      const geoms = gisGeomsOf($('#gt-lyr').value), rings = gisBuffer(geoms, d); if (!rings.length) throw new Error('Nothing to buffer.');
+      gisAddLayer(gisVec(name, rings.map((r, i) => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [r] }, properties: { part: i + 1, distance_m: d, area_m2: Math.round(ringArea(r)) } })), 'polygon', { mode: 'single', color: '#8e44ad', width: 1.5, fill: .15 }, null, `${d} m around ${$('#gt-lyr').selectedOptions[0].text}`));
+    } else if (k === 'select') {
+      const lid = $('#gt-lyr').value, A = gisUser().find(L => L.id === $('#gt-area').value), areas = (A?.fc.features || []).flatMap(f => f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates : []);
+      const inside = ([x, y]) => areas.some(rs => rs.reduce((acc, r, i) => { let c = false; for (let a = 0, b = r.length - 1; a < r.length; b = a++) if ((r[a][1] > y) !== (r[b][1] > y) && x < (r[b][0] - r[a][0]) * (y - r[a][1]) / (r[b][1] - r[a][1]) + r[a][0]) c = !c; return i === 0 ? c : acc && !c; }, false));
+      const feats = lid === 'site:bh' ? mapList().map(b => ({ b, xy: gisXY(b) })).filter(x => x.xy && inside(x.xy)).map(({ b, xy }) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: xy }, properties: { name: b.name, type: b.well?.installed ? 'Monitoring well' : 'Borehole', depth_m: depthOf(b) } }))
+        : (gisUser().find(L => L.id === lid)?.fc.features || []).filter(f => gisVerts(f.geometry).some(inside));
+      if (!feats.length) throw new Error('No features fall inside those areas.');
+      gisAddLayer(gisVec(name, feats, lid === 'site:bh' ? 'point' : (gisUser().find(L => L.id === lid)?.geom || 'mixed'), { mode: 'single', color: '#00838f', width: 2, size: 6, fill: .3 }, { field: lid === 'site:bh' ? 'name' : '', size: 11 }, `Inside ${A.name}`));
+      toast(`${name}: ${feats.length} feature${feats.length === 1 ? '' : 's'} inside ${A.name}.`);
+    }
+    say('');
+  } catch (e) { say(e.message || String(e)); }
+}
+const gisVerts = g => !g ? [] : g.type === 'Point' ? [g.coordinates] : g.type === 'MultiPoint' || g.type === 'LineString' ? g.coordinates : g.type === 'Polygon' || g.type === 'MultiLineString' ? g.coordinates.flat() : g.type === 'MultiPolygon' ? g.coordinates.flat(2) : [];
+function gisGeomsOf(id) {   // segments and points of a layer, to measure distance to
+  if (id === 'site:bh') return mapList().map(gisXY).filter(Boolean).map(p => ({ pts: [p], segs: [] }));
+  return (gisUser().find(L => L.id === id)?.fc.features || []).map(f => { const g = f.geometry, lines = !g ? [] : g.type === 'Point' ? [] : g.type === 'LineString' ? [g.coordinates] : g.type === 'Polygon' || g.type === 'MultiLineString' ? g.coordinates : g.type === 'MultiPolygon' ? g.coordinates.flat() : [];
+    return { pts: g?.type === 'Point' ? [g.coordinates] : g?.type === 'MultiPoint' ? g.coordinates : [], segs: lines.flatMap(l => l.slice(1).map((p, i) => [l[i], p])), poly: g?.type === 'Polygon' ? [g.coordinates] : g?.type === 'MultiPolygon' ? g.coordinates : null }; });
+}
+/* buffer: the distance to the nearest feature on a fine grid, contoured at the buffer distance, so overlapping buffers merge */
+function gisBuffer(geoms, d) {
+  const all = geoms.flatMap(g => [...g.pts, ...g.segs.flat()]); if (!all.length) return [];
+  const x0 = Math.min(...all.map(p => p[0])) - d * 1.3, y0 = Math.min(...all.map(p => p[1])) - d * 1.3, x1 = Math.max(...all.map(p => p[0])) + d * 1.3, y1 = Math.max(...all.map(p => p[1])) + d * 1.3;
+  let cell = d / 8; while (((x1 - x0) / cell) * ((y1 - y0) / cell) > 60000) cell *= 1.4;
+  const nx = Math.ceil((x1 - x0) / cell), ny = Math.ceil((y1 - y0) / cell), W = nx + 1, c = new Float32Array(W * (ny + 1)), a = new Float32Array(W * (ny + 1)).fill(1);
+  const segD = (x, y, p, q) => { const dx = q[0] - p[0], dy = q[1] - p[1], L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((x - p[0]) * dx + (y - p[1]) * dy) / L)) : 0; return Math.hypot(x - p[0] - t * dx, y - p[1] - t * dy); };
+  const inPoly = (x, y, rs) => rs.reduce((acc, r, i) => { let ins = false; for (let m = 0, n = r.length - 1; m < r.length; n = m++) if ((r[m][1] > y) !== (r[n][1] > y) && x < (r[n][0] - r[m][0]) * (y - r[m][1]) / (r[n][1] - r[m][1]) + r[m][0]) ins = !ins; return i === 0 ? ins : acc && !ins; }, false);
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) {
+    const x = x0 + i * cell, y = y0 + j * cell; let m = Infinity;
+    for (const g of geoms) { if (g.poly && g.poly.some(rs => inPoly(x, y, rs))) { m = 0; break; } for (const p of g.pts) m = Math.min(m, Math.hypot(x - p[0], y - p[1])); for (const [p, q] of g.segs) if (m > 0) m = Math.min(m, segD(x, y, p, q)); }
+    c[j * W + i] = -m;   // contour at -d: inside is above
+  }
+  return fieldContours({ nx, ny, c, a, x0, x1: x0 + nx * cell, y0, y1: y0 + ny * cell }, -d, .5, true).filter(ringClosed).map(r => r.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]));
+}
 function siteHTML() {
   const pts = projList().filter(b => b.easting != null && b.northing != null);
   return `<div class="site-grid">
@@ -9429,21 +10200,57 @@ function homeHTML() {
     ['Map and sections', located === list.length && list.length ? 'Done' : 'To do', `${located} of ${list.length} located${siteOf()?.img || imageryOf().length ? ' · site drawing or imagery added' : ''}`, 'go-site', 'Open map'],
     ['Report', siteOf()?.report ? 'In progress' : 'To do', siteOf()?.report ? `${siteOf().report.pages.length} pages laid out` : 'Choose a template and lay out the pages', 'go-compose', 'Open reports'],
   ];
-  return `${facts.filter(Boolean).length ? `<p class="finding">${esc(facts.filter(Boolean).join(' · '))}</p>` : ''}
-  <section class="sec"><header><h3>Project steps</h3><span class="note">Work down the list; each step opens the right page</span></header><div class="body"><ol class="steps-list">${steps.map(([t, st, d, act, cta], i) => `<li><span class="sn${st === 'Done' ? ' done' : ''}">${i + 1}</span><span class="sd"><b>${t}</b><span class="note">${esc(d)}</span></span><span class="sb sb-${st.replace(/\s/g, '').toLowerCase()}">${st}</span><button class="btn" data-act="${act}" ${S.readOnly && act === 'new' ? 'disabled' : ''}>${cta}</button></li>`).join('')}</ol></div></section>
-  <div class="home-grid">
-    <section class="sec"><header><h3>Site plan</h3><button class="btn link" data-tab="site">Open site plan & sections</button></header><div class="body map-box" id="home-plan">${planSVG(640, 420, false)}</div></section>
-    <section class="sec"><header><h3>Needs attention</h3><span class="note">${todo.length + review.length ? `${todo.length + review.length} item${todo.length + review.length === 1 ? '' : 's'}` : ''}</span></header><div class="body att">
-      ${review.map(b => `<div class="att-row"><b>${esc(b.name)}</b><span>Ready for review</span><button class="btn" data-pick="${esc(b.id)}" data-goto="log">Review</button></div>`).join('')}
-      ${todo.slice(0, 8).map(({ b, n }) => `<div class="att-row"><b>${esc(b.name)}</b><span>${esc(n.map(x => x[0]).join(', '))}</span><button class="btn" data-qlpick="${esc(b.id)}" data-qlstep="${n[0][1]}">Fix</button></div>`).join('')}
-      ${todo.length > 8 ? `<p class="note">and ${todo.length - 8} more.</p>` : ''}
-      ${!todo.length && !review.length ? `<p class="note">Nothing missing. ${draft.length ? `${draft.length} draft log${draft.length === 1 ? '' : 's'} can go for review.` : 'All logs are reviewed or issued.'}</p>` : ''}
-      <div class="actions"><button class="btn" data-act="new">New borehole</button><button class="btn" data-tab="reports">Reports</button></div></div></section>
-  </div>
-  <section class="sec"><header><h3>Boreholes</h3><span class="note">Click a name to open its log</span></header><div class="body"><div class="scroll-x"><table class="sum">
+  const site = siteOf() || {}, tasks = site.tasks || [], dash = dashOn();
+  // latest water round: every well's reading on the newest date, with the change since the round before
+  const rd = roundDates(), wl = rd[0] ? list.filter(b => b.well?.installed).map(b => { const at = d => monitoring(b).find(w => w.date === d); const w = at(rd[0]); if (!w) return null; const p = rd[1] ? at(rd[1]) : null;
+    return { b, d: w.depth, el: b.elevation != null ? b.elevation - w.depth : null, ch: p ? p.depth - w.depth : null }; }).filter(Boolean) : [];
+  const ex = []; for (const b of list) for (const sm of b.samples || []) for (const k of Object.keys(sm.lab || {}).concat(['f1b'])) { const v = labVal(sm, k); if (exceeds(v, k)) ex.push({ b, sm, k, v, g: projGuide()[k] }); }
+  ex.sort((x, y) => y.v.v / y.g - x.v.v / x.g);
+  const ro = S.readOnly ? 'disabled' : '', due = d => d ? new Date(d + 'T12:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '';
+  const P = (id, title, body, extra = '', cls = '') => dash[id] ? `<section class="dp ${cls}" data-dash-panel="${id}"><header><h3>${title}</h3>${extra}</header><div class="dp-b">${body}</div></section>` : '';
+  const kpi = [['Boreholes', list.length, `${draft.length} draft · ${review.length} for review · ${issued} issued`], ['Monitoring wells', wells, wells ? `${rounds} monitoring round${rounds === 1 ? '' : 's'}` : 'none installed'],
+    ['Samples', list.reduce((a, b) => a + (b.samples || []).length, 0), `${labN} with lab results`], ['Over guideline', exN, exN ? `sample${exN === 1 ? '' : 's'} above the site guideline` : Object.keys(projGuide()).length ? 'none above the guideline' : 'no guideline set']];
+  const todoRows = tasks.map((t, i) => `<tr class="${t.done ? 'done' : ''}"><td class="ck"><input type="checkbox" data-task-done="${i}" ${t.done ? 'checked' : ''} ${ro} aria-label="Done: ${esc(t.t)}"></td><td>${esc(t.t)}</td><td class="m">${esc(t.who || '')}</td><td class="r m">${esc(due(t.due))}</td><td class="r">${S.readOnly ? '' : `<button type="button" class="btn link" data-task-del="${i}" aria-label="Remove ${esc(t.t)}">Remove</button>`}</td></tr>`).join('');
+  const auto = [...review.map(b => `<div class="att-row"><b>${esc(b.name)}</b><span>Ready for review</span><button class="btn" data-pick="${esc(b.id)}" data-goto="log">Review</button></div>`),
+    ...todo.slice(0, 6).map(({ b, n }) => `<div class="att-row"><b>${esc(b.name)}</b><span>${esc(n.map(x => x[0]).join(', '))}</span><button class="btn" data-qlpick="${esc(b.id)}" data-qlstep="${n[0][1]}">Fix</button></div>`)].join('') + (todo.length > 6 ? `<p class="note">and ${todo.length - 6} more.</p>` : '');
+  return `${facts.length ? `<p class="finding">${esc(facts.join(' · '))}</p>` : ''}
+  <div class="dash-bar"><span class="note"></span><button type="button" class="btn" data-act="dash-panels">Choose panels…</button></div>
+  <div class="dash">
+  ${P('summary', 'Site summary', `<div class="kpis">${kpi.map(([a, v, c]) => `<div><span>${a}</span><b>${v}</b><small>${esc(c)}</small></div>`).join('')}</div>`, '', 'wide')}
+  ${P('plan', 'Site plan', `<div class="map-box" id="home-plan">${planSVG(640, 420, false)}</div>`, '<button class="btn link" data-tab="site">Open the map</button>', 'tall')}
+  ${P('work', 'Work to do', `<table class="sum dash-t tasks">${todoRows ? `<tbody>${todoRows}</tbody>` : ''}</table>${tasks.length ? '' : '<p class="note">No tasks yet. Add what needs doing on this site: field work, lab orders, figures to issue.</p>'}
+      ${S.readOnly ? '' : `<div class="task-new"><input id="task-t" type="text" placeholder="Add a task, e.g. Water levels, round 4" autocomplete="off"><input id="task-who" type="text" placeholder="Field / office / who" autocomplete="off"><input id="task-due" type="date" aria-label="Due date"><button type="button" class="btn" data-act="task-add">Add</button></div>`}
+      ${auto ? `<h4>Needs attention</h4><div class="att">${auto}</div>` : `<p class="note">Nothing missing on the logs. ${draft.length ? `${draft.length} draft log${draft.length === 1 ? '' : 's'} can go for review.` : 'All logs are reviewed or issued.'}</p>`}`, `<span class="note">${tasks.filter(t => !t.done).length} open</span>`, 'wide')}
+  ${P('water', `Latest water levels${rd[0] ? ` · ${esc(rd[0])}` : ''}`, wl.length ? `<table class="sum dash-t"><thead><tr><th>Well</th><th class="r">Depth (${LEN()})</th><th class="r">Elevation (${LEN()})</th><th class="r">Change</th></tr></thead><tbody>${wl.map(x => `<tr><td><button class="pick" data-pick="${esc(x.b.id)}" data-goto="edit">${esc(x.b.name)}</button></td><td class="r">${fx(x.d)}</td><td class="r">${x.el != null ? fx(x.el) : '—'}</td><td class="r">${x.ch != null ? (x.ch > 0 ? '+' : x.ch < 0 ? '−' : '') + fx(Math.abs(x.ch)) : '—'}</td></tr>`).join('')}</tbody></table>` : `<p class="note">${wells ? 'No monitoring round yet.' : 'No wells installed.'}</p>${wells && !S.readOnly ? '<button class="btn" data-act="round">Monitoring round</button>' : ''}`, '<button class="btn link" data-tab="gw">Water levels</button>')}
+  ${P('exceed', 'Over guideline', ex.length ? `<table class="sum dash-t"><thead><tr><th>Sample</th><th>Parameter</th><th class="r">Result</th><th class="r">Guideline</th></tr></thead><tbody>${ex.slice(0, 10).map(x => `<tr><td>${esc(x.b.name)} ${esc(sampleId(x.sm))}</td><td>${esc(LAB_PARAMS[x.k]?.label || x.k)}</td><td class="r x">${fmtLab(x.v)}</td><td class="r">${fmtLab({ v: x.g })}</td></tr>`).join('')}</tbody></table>${ex.length > 10 ? `<p class="note">and ${ex.length - 10} more.</p>` : ''}` : `<p class="note">${Object.keys(projGuide()).length ? (labN ? 'No result is above the site guideline.' : 'No lab results yet.') : 'Choose the site guideline on the Lab results page to flag results above it.'}</p>`, '<button class="btn link" data-tab="contam">Lab results</button>')}
+  ${P('steps', 'Project steps', `<ol class="steps-list">${steps.map(([t, st, d, act, cta], i) => `<li><span class="sn${st === 'Done' ? ' done' : ''}">${i + 1}</span><span class="sd"><b>${t}</b><span class="note">${esc(d)}</span></span><span class="sb sb-${st.replace(/\s/g, '')}">${st}</span><button class="btn" data-act="${act}">${cta}</button></li>`).join('')}</ol>`, '', 'wide')}
+  ${P('bhs', 'Boreholes', `<div class="scroll-x"><table class="sum">
     <thead><tr><th>Borehole</th><th>Status</th><th class="r">Depth (${LEN()})</th><th class="r">Ground el. (${LEN()})</th><th>Well</th><th class="r">Latest water (${LEN()})</th><th class="r">Max vapour (ppm)</th><th class="r">Samples</th><th>Missing</th></tr></thead>
-    <tbody>${list.map(b => { const w = latestWater(b), v = vapourMax(b, null, null), n = bhNeeds(b); return `<tr><td><button class="pick" data-pick="${esc(b.id)}" data-goto="log">${esc(b.name)}</button></td><td>${statusPill(b)}</td><td class="r">${fx(depthOf(b))}</td><td class="r">${fx(b.elevation)}</td><td>${b.well?.installed ? (b.well.type === 'well' ? 'Monitoring well' : 'Standpipe') : '—'}</td><td class="r">${w ? fx(w.depth) : b.gwNone ? 'Dry' : '—'}</td><td class="r">${v ? v.cvc.toLocaleString('en-CA') : '—'}</td><td class="r">${(b.samples || []).length}</td><td>${n.length ? `<span class="note">${esc(n.map(x => x[0]).join(', '))}</span>` : '—'}</td></tr>`; }).join('')}</tbody></table></div></div></section>`;
+    <tbody>${list.map(b => { const w = latestWater(b), v = vapourMax(b, null, null), n = bhNeeds(b); return `<tr><td><button class="pick" data-pick="${esc(b.id)}" data-goto="log">${esc(b.name)}</button></td><td>${statusPill(b)}</td><td class="r">${fx(depthOf(b))}</td><td class="r">${fx(b.elevation)}</td><td>${b.well?.installed ? (b.well.type === 'well' ? 'Monitoring well' : 'Standpipe') : '—'}</td><td class="r">${w ? fx(w.depth) : b.gwNone ? 'Dry' : '—'}</td><td class="r">${v ? v.cvc.toLocaleString('en-CA') : '—'}</td><td class="r">${(b.samples || []).length}</td><td>${n.length ? `<span class="note">${esc(n.map(x => x[0]).join(', '))}</span>` : '—'}</td></tr>`; }).join('')}</tbody></table></div>`, '<span class="note">Click a name to open its log</span>', 'full')}
+  </div>`;
 }
+/* the overview's panels: which show is one choice for the whole app, kept between sessions */
+const DASH = [['summary', 'Site summary'], ['plan', 'Site plan'], ['work', 'Work to do'], ['water', 'Latest water levels'], ['exceed', 'Over guideline'], ['steps', 'Project steps'], ['bhs', 'Boreholes']];
+const dashOn = () => ({ ...Object.fromEntries(DASH.map(([k]) => [k, true])), ...jsonLS('bhlog.dash', {}) });
+function openDashPanels() {
+  const on = dashOn();
+  dialog('Overview panels', `<p class="note" style="margin:0 0 8px">Tick the panels to show on every site's overview.</p><div class="dash-pick">${DASH.map(([k, t]) => `<label class="check"><input type="checkbox" data-dash="${k}" ${on[k] ? 'checked' : ''}> ${t}</label>`).join('')}</div>`, '<button class="btn primary" data-act="close">Done</button>');
+}
+document.addEventListener('change', e => {
+  const d = e.target.closest?.('[data-dash]'); if (d) { lsSet('bhlog.dash', JSON.stringify({ ...dashOn(), [d.dataset.dash]: d.checked })); if (S.tab === 'home') renderView(true); return; }
+  const t = e.target.closest?.('[data-task-done]'); if (t && !S.readOnly) { const st = { ...(siteOf() || {}) }, ts = [...(st.tasks || [])], i = +t.dataset.taskDone; if (ts[i]) { ts[i] = { ...ts[i], done: t.checked }; setSite({ ...st, tasks: ts }); renderView(true); } }
+});
+function addTask() {
+  const t = $('#task-t')?.value.trim(); if (!t || S.readOnly) { $('#task-t')?.focus(); return; }
+  const st = { ...(siteOf() || {}) };
+  setSite({ ...st, tasks: [...(st.tasks || []), { id: uid(), t, who: $('#task-who')?.value.trim() || '', due: $('#task-due')?.value || '', done: false }] });
+  renderView(true); $('#task-t')?.focus();
+}
+document.addEventListener('click', e => {
+  const d = e.target.closest?.('[data-task-del]'); if (!d || S.readOnly) return;
+  const st = { ...(siteOf() || {}) }, ts = [...(st.tasks || [])]; ts.splice(+d.dataset.taskDel, 1); setSite({ ...st, tasks: ts }); renderView(true);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.closest?.('.task-new input')) { e.preventDefault(); addTask(); } });
 
 /* ---------- reports: every output and what goes on the logs, in one place ---------- */
 /* ---------- report editor: a report is a list of pages. Free pages hold diagrams you place, size and scale yourself;
@@ -11127,6 +11934,7 @@ document.addEventListener('click', e => {
   const act = t.dataset.act; if (!act) return;
   const b = cur();
   if (act.startsWith('l-')) return layerTool(act);
+  if (/^gtool-(surface|contour|plume|change|buffer|select)$/.test(act)) { gtoolOpen(act.slice(6)); return; }
   switch (act) {
     case 'menu': openMenu(); break;
     case 'find': openFind(); break;
@@ -11160,6 +11968,17 @@ document.addEventListener('click', e => {
     case 'drawer-edit-full': S.drawer = null; renderDrawer(); S.tab = 'edit'; S.formStale = true; renderMain(); setTimeout(() => $('#sec-well')?.scrollIntoView({ block: 'start' }), 50); break;
     case 'prefs': openPrefs(); break;
     case 'new-project': case 'new-site': openNewProject(); break;
+    case 'dash-panels': openDashPanels(); break;
+    case 'gis-add': if (S.tab !== 'gis') goTab('gis'); gisAddDialog(); break;
+    case 'gtool-run': gtoolRun(); break;
+    case 'gtool-close': gtoolClose(); break;
+    case 'gis-files': gisFileIn.click(); break;
+    case 'gis-svc-go': gisAddService(); break;
+    case 'gis-sym-go': gisSymApply(); break;
+    case 'gis-ren-go': gisRename(); break;
+    case 'gis-table-close': gisTable(null); break;
+    case 'gis-table': if (S.tab !== 'gis') goTab('gis'); { const L = gisUser().find(x => x.kind === 'vector'); if (L) requestAnimationFrame(() => gisTable(L.id)); else toast('Add a layer first: Add data.'); } break;
+    case 'task-add': addTask(); break;
     case 'site-rename-go': if (renameSite(S.renameKey, $('#site-name')?.value)) closeOverlay(); break;
     case 'np-save': {
       const name = $('#np-name').value.trim(); if (!name) { $('#np-name').classList.add('bad'); $('#np-name').focus(); return; }
@@ -11394,6 +12213,7 @@ $('#rtabs').innerHTML = RIBBON_TABS.map(([k, label]) => `<button role="tab" data
 setRibbonTab(S.rtab);
 const syncBar = () => document.documentElement.style.setProperty('--appbar-h', ($('.appbar')?.offsetHeight || 124) + 'px');
 addEventListener('resize', syncBar);
+if (window.ResizeObserver) new ResizeObserver(() => syncBar()).observe($('.appbar'));
 buildPatterns();
 if (lsGet('bhlog.field')) document.body.classList.add('field');
 render();

@@ -345,28 +345,90 @@ app.whenReady().then(async () => {
     })()`);
     expect(!r, r);
   });
-  await check('sites: the app opens on its sites; open, create, rename and remove a site; four stops on the rail', async (run, load) => {
+  await check('gis map: shapefiles and GeoJSON come in reprojected with their attributes; the tools make surfaces, plumes, buffers and selections', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      const setv = (id, v) => { const el = document.querySelector(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+      try {
+        loadDlExample(); await w(300); goTab('gis'); await w(500);
+        want(window.ol && window.proj4 && S.gisMap, 'the map is built with OpenLayers and proj4');
+        want(S.gisMap?.getView().getProjection().getCode() === gisCode(), 'the map is in the site UTM zone: ' + S.gisMap?.getView().getProjection().getCode());
+        const zb = Uint8Array.from(atob('UEsDBBQAAAAAAAAAAADyu916pgEAAKYBAAAOAAAAc2l0ZV9hcmVhcy5wcmpQUk9KQ1NbIk5BRDgzKENTUlMpIC8gVVRNIHpvbmUgMTNOIixHRU9HQ1NbIk5BRDgzKENTUlMpIixEQVRVTVsiTkFEODNfQ2FuYWRpYW5fU3BhdGlhbF9SZWZlcmVuY2VfU3lzdGVtIixTUEhFUk9JRFsiR1JTIDE5ODAiLDYzNzgxMzcsMjk4LjI1NzIyMjEwMV1dLFBSSU1FTVsiR3JlZW53aWNoIiwwXSxVTklUWyJkZWdyZWUiLDAuMDE3NDUzMjkyNTE5OTQzM11dLFBST0pFQ1RJT05bIlRyYW5zdmVyc2VfTWVyY2F0b3IiXSxQQVJBTUVURVJbImxhdGl0dWRlX29mX29yaWdpbiIsMF0sUEFSQU1FVEVSWyJjZW50cmFsX21lcmlkaWFuIiwtMTA1XSxQQVJBTUVURVJbInNjYWxlX2ZhY3RvciIsMC45OTk2XSxQQVJBTUVURVJbImZhbHNlX2Vhc3RpbmciLDUwMDAwMF0sUEFSQU1FVEVSWyJmYWxzZV9ub3J0aGluZyIsMF0sVU5JVFsibWV0cmUiLDFdXVBLAwQUAAAACAAAAAAAe7psC0MAAAB0AQAADgAAAHNpdGVfYXJlYXMuc2hwY2BQ52LADna9YGZgYMUhSQZwIMYsRgY0O4UUHUFUV3UEmK7Azm+YBuUzYOfD1ZPrjgVQc1qh5tzBwYfZswAHH6QeAFBLAwQUAAAACAAAAAAA8eChpUsAAACcAAAADgAAAHNpdGVfYXJlYXMuZGJmY2ZgYGBiYGBIZJBlwAb8HH1doUxnECGCJu/iGhDiEe8LVgoiONDkeRVcK5ITyxJLMvPzFBwVkIGRnqlCcEl+cnZBZk6qAgYwkAIAUEsBAhQAFAAAAAAAAAAAAPK73XqmAQAApgEAAA4AAAAAAAAAAAAAAAAAAAAAAHNpdGVfYXJlYXMucHJqUEsBAhQAFAAAAAgAAAAAAHu6bAtDAAAAdAEAAA4AAAAAAAAAAAAAAAAA0gEAAHNpdGVfYXJlYXMuc2hwUEsBAhQAFAAAAAgAAAAAAPHgoaVLAAAAnAAAAA4AAAAAAAAAAAAAAAAAQQIAAHNpdGVfYXJlYXMuZGJmUEsFBgAAAAADAAMAtAAAALgCAAAAAA=='), c => c.charCodeAt(0));
+        await gisAddFiles([new File([zb], 'site_areas.zip'), new File(['{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[-103.99819833472795,57.8996249908388]},"properties":{"sample":"TP1","F2_mgkg":590}},{"type":"Feature","geometry":{"type":"Point","coordinates":[-103.99794156463706,57.899757707421784]},"properties":{"sample":"TP2","F2_mgkg":1200}},{"type":"Feature","geometry":{"type":"Point","coordinates":[-103.99769354256377,57.89957609469091]},"properties":{"sample":"TP3","F2_mgkg":140}},{"type":"Feature","geometry":{"type":"Point","coordinates":[-103.99836201889448,57.89980593755586]},"properties":{"sample":"TP4","F2_mgkg":40}},{"type":"Feature","geometry":{"type":"Point","coordinates":[-103.9973524304315,57.899708144544476]},"properties":{"sample":"TP5","F2_mgkg":820}}]}'], 'samples.geojson')]); await w(400);
+        const A = gisUser().find(l => l.name === 'site_areas'), P = gisUser().find(l => l.name === 'samples');
+        want(A && A.geom === 'polygon' && A.fc.features.length === 2 && A.fc.features[0].properties.NAME === 'Excavation A' && A.fc.features[0].properties.DEPTH_M === 2.5, 'a zipped shapefile keeps its attributes: ' + JSON.stringify(A?.fc.features[0]?.properties));
+        const c0 = (A?.fc.features[0].geometry.coordinates || []).flat(3).slice(0, 2);
+        want(Math.abs(c0[0] - 559360) < .5 || Math.abs(c0[0] - 559420) < .5, 'its .prj (NAD83(CSRS) UTM 13) is honoured: ' + c0);
+        const tp = P?.fc.features[0].geometry.coordinates || [];
+        want(P && Math.hypot(tp[0] - 559380, tp[1] - 6417975) < 2, 'latitude and longitude land in the right place: ' + tp);
+        gisSymDialog(P.id); await w(50); setv('#sy-mode', 'grad'); setv('#sy-field', 'F2_mgkg'); setv('#sy-lab', 'sample'); gisSymApply(); await w(200);
+        const P2 = gisUser().find(l => l.id === P.id);
+        want(P2.sym.mode === 'grad' && P2.sym.classes.length === 5 && P2.sym.classes[0].min === 40 && P2.sym.classes[4].max === 1200 && P2.lab.field === 'sample', 'graduated classes and labels: ' + JSON.stringify(P2.sym.classes?.map(c => [c.min, c.max])));
+        gisTable(A.id); await w(100); want(document.querySelectorAll('#gis-table tbody tr').length === 2, 'the attribute table lists the features');
+        gtoolOpen('plume'); await w(250); setv('#gt-src', 'site:voc'); document.querySelector('#gt-guide').value = 500; document.querySelector('#gt-name').value = 'VOC plume'; runAct('gtool-run'); await w(500);
+        const pl = gisUser().find(l => l.name === 'VOC plume'), area = (pl?.fc.features || []).reduce((a, f) => a + f.properties.area_m2, 0);
+        want(pl && pl.geom === 'polygon' && area > 500, 'the plume at the guideline is a closed area: ' + area + ' ' + (document.querySelector('#gt-msg')?.textContent || ''));
+        const hot = mapList().filter(b => (vapourMax(b, null, null)?.cvc || 0) > 900 && gisXY(b));
+        gtoolOpen('select'); await w(250); setv('#gt-lyr', 'site:bh'); setv('#gt-area', pl.id); document.querySelector('#gt-name').value = 'In plume'; runAct('gtool-run'); await w(400);
+        const inP = gisUser().find(l => l.name === 'In plume')?.fc.features.map(f => f.properties.name) || [];
+        want(hot.length && hot.every(b => inP.includes(b.name)), 'boreholes far over the guideline fall inside it: ' + hot.map(b => b.name).filter(n => !inP.includes(n)));
+        gtoolOpen('surface'); await w(250); setv('#gt-src', 'site:voc'); document.querySelector('#gt-name').value = 'VOC surface'; runAct('gtool-run'); await w(500);
+        const sf = gisUser().find(l => l.name === 'VOC surface');
+        want(sf && sf.kind === 'grid' && sf.val.length === sf.g.nx * sf.g.ny && gisUser().some(l => l.name === 'VOC surface contours'), 'a surface and its contours');
+        gtoolOpen('buffer'); await w(250); setv('#gt-lyr', 'site:bh'); document.querySelector('#gt-dist').value = 5; document.querySelector('#gt-name').value = 'Buf'; runAct('gtool-run'); await w(400);
+        const bf = gisUser().find(l => l.name === 'Buf'), one = bf?.fc.features.find(f => f.properties.area_m2 < 120);
+        want(bf && bf.fc.features.length >= 1 && (!one || Math.abs(one.properties.area_m2 - Math.PI * 25) < 12), 'a 5 m buffer around a lone point is close to a 78.5 m² circle: ' + bf?.fc.features.map(f => f.properties.area_m2));
+        const n = gisUser().length; gisLayerAct('down', gisUser()[0].id); want(gisUser().length === n && gisUser()[1].name === 'Buf', 'layers reorder');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      gtoolClose(); return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('overview: panels you choose, and the work to do kept with the site', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        localStorage.removeItem('bhlog.dash'); loadDlExample(); await w(300); openSite(projKey(sortedList().find(b => /Dawn Lake/.test(b.project)))); await w(300);
+        want(S.tab === 'home', 'a site opens on its overview: ' + S.tab);
+        const ids = [...document.querySelectorAll('#view [data-dash-panel]')].map(x => x.dataset.dashPanel);
+        want(ids.join() === 'summary,plan,work,water,exceed,steps,bhs', 'every panel by default: ' + ids.join());
+        want(document.querySelectorAll('#view [data-dash-panel="water"] tbody tr').length > 0, 'the latest round lists the wells');
+        const t = document.querySelector('#task-t'); t.value = 'Water levels, round 4'; document.querySelector('#task-due').value = '2026-11-21'; runAct('task-add'); await w(150);
+        want((siteOf()?.tasks || []).length === 1 && siteOf().tasks[0].due === '2026-11-21', 'a task is kept with the site: ' + JSON.stringify(siteOf()?.tasks));
+        const ck = document.querySelector('[data-task-done="0"]'); ck.checked = true; ck.dispatchEvent(new Event('change', { bubbles: true })); await w(150);
+        want(siteOf().tasks[0].done === true, 'ticking it marks it done');
+        document.querySelector('[data-task-del="0"]').click(); await w(150); want(!(siteOf().tasks || []).length, 'and it can be removed');
+        runAct('dash-panels'); await w(100); const box = document.querySelector('[data-dash="steps"]'); box.checked = false; box.dispatchEvent(new Event('change', { bubbles: true })); await w(150); runAct('close');
+        want(!document.querySelector('#view [data-dash-panel="steps"]') && document.querySelector('#view [data-dash-panel="work"]'), 'an unticked panel is hidden, the rest stay');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      localStorage.removeItem('bhlog.dash'); return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+  await check('sites: the app opens on its sites; open, create, rename and remove a site; the ribbon tabs', async (run, load) => {
     await run(`localStorage.setItem('bhlog.tab', 'gw'); 1`);
     await load();
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); }, keepC = window.confirm;
       try {
         want(S.tab === 'sites' && document.querySelector('#view [data-view="sites"]'), 'the app opens on the sites page, whatever was open last: ' + S.tab);
-        want(/Sites/.test(document.querySelector('#view h2')?.textContent || ''), 'it is titled Sites');
+        want(/recent site/.test(document.querySelector('#view h2')?.textContent || '') && document.querySelector('#view [data-act="new-site"]'), 'it is a start window: recent sites and New site');
         loadDlExample(); loadSkExample(); await w(400); goTab('sites'); await w(200);
         const rows = [...document.querySelectorAll('#view [data-site-row]')];
         want(rows.length === siteList().length && rows.length >= 2, 'one row per site: ' + rows.length + ' / ' + siteList().length);
         const dl = siteList().find(s => /Dawn Lake/.test(s.name));
         want(dl && dl.n === sortedList().filter(b => projKey(b) === dl.key).length, 'a site counts its boreholes: ' + JSON.stringify(dl && [dl.n, dl.wells]));
-        const rail = [...document.querySelectorAll('#prail [data-tab]')].map(b => b.dataset.tab + ':' + b.textContent.trim());
-        want(rail.join('|') === 'sites:Sites|edit:Boreholes|site:Map & data|compose:Outputs', 'four stops on the rail: ' + rail.join('|'));
+        const rib = [...document.querySelectorAll('#rbar .rtabs2 button')].map(b => b.textContent.trim());
+        want(rib.join('|') === 'File|Project|Boreholes|Map|Analysis|Data|Layout', 'the ribbon tabs: ' + rib.join('|'));
+        want(!document.querySelector('#rbar .rpanel'), 'the start window has no tools under the ribbon');
         document.querySelector('#view [data-site-open="' + CSS.escape(dl.key) + '"]')?.click(); await w(300);
-        want(S.tab === 'edit' && projKey(cur()) === dl.key, 'opening a site goes to its boreholes: ' + S.tab + ' ' + projKey(cur()));
+        want(S.tab === 'home' && projKey(cur()) === dl.key, 'opening a site goes to its overview: ' + S.tab + ' ' + projKey(cur()));
         want(/Sites/.test(document.querySelector('#crumbs')?.textContent || ''), 'the breadcrumb leads back to Sites');
         goTab('gw'); await w(300);
-        const md = [...document.querySelectorAll('#view .mdtabs [data-tab]')].map(b => b.dataset.tab);
-        want(md.join() === 'home,site,gw,contam,soil,xsec,gwm,v3d,table', 'Map & data has its pages as tabs: ' + md.join());
-        want(document.querySelector('#view .mdtabs [data-tab="gw"]')?.getAttribute('aria-current') === 'page' && document.querySelector('#prail [data-tab="site"]')?.getAttribute('aria-current') === 'page', 'the tab and the rail stop both show where you are');
+        want(document.querySelector('#rbar [data-rib="analysis"]')?.getAttribute('aria-selected') === 'true' && document.querySelector('#rbar .rpanel [data-tab="gw"]')?.getAttribute('aria-pressed') === 'true', 'the ribbon tab and its page button show where you are');
+        goTab('xsec'); await w(200); document.querySelector('#rbar [data-rib="analysis"]').click(); await w(200);
+        want(S.tab === 'gw', 'a ribbon tab returns to the page last used on it: ' + S.tab);
+        document.querySelector('#rbar [data-rib="map"]').click(); await w(200); want(S.tab === 'xsec', 'and the Map tab to the section: ' + S.tab);
         goTab('sites'); await w(200);
         window.confirm = () => true;
         const n0 = siteList().length; renameSite(dl.key, 'Dawn Lake renamed'); await w(100);
@@ -484,7 +546,7 @@ app.whenReady().then(async () => {
   await check('borehole workspace: type depths in the layer list, pick the soil, Enter starts the next layer, the log follows', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); const b = sortedList().find(x => x.status !== 'issued'); S.sel = b.id; S.dtab = 'soil'; goTab('edit'); await w(200);
-      const has = { grid: !!document.querySelector('.ws .dgrid[data-sheet="layerList"][data-scope="one"]') && !!document.querySelector('.ws #ldetail [data-step="uscs"]'), log: !!document.querySelector('#ws-col svg'), tree: [...document.querySelectorAll('#prail button')].map(x => x.textContent), cur: document.querySelector('#prail [aria-current="page"]')?.textContent, rows: document.querySelectorAll('#list .bl-row').length, want: projList().length };
+      const has = { grid: !!document.querySelector('.ws .dgrid[data-sheet="layerList"][data-scope="one"]') && !!document.querySelector('.ws #ldetail [data-step="uscs"]'), log: !!document.querySelector('#ws-col svg'), tree: [...document.querySelectorAll('#rbar .rtabs2 button')].map(x => x.textContent), cur: document.querySelector('#rbar .rtabs2 [aria-selected="true"]')?.textContent, rows: document.querySelectorAll('#list .bl-row').length, want: projList().length };
       const n0 = b.layers.length, rows = () => [...document.querySelectorAll('.ws .dgrid[data-sheet="layerList"] tbody tr')];
       const last = rows().at(-1).querySelector('input[data-c="0"]'); last.focus();
       last.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(200);
@@ -506,7 +568,7 @@ app.whenReady().then(async () => {
       return { has, added, focusedCell: fresh?.dataset?.c, top, prevBottom, nl: { bottom: nl.bottom, uscs: nl.uscs }, logHasSand: /SAND/.test(logText), focusedRow, sheets, which: document.querySelector('[data-which="samples"]')?.textContent, sel: S.dsel.samples };
     })()`);
     expect(r.has.grid && r.has.log, 'workspace parts: ' + JSON.stringify(r.has));
-    expect(r.has.tree.join() === 'Sites,Boreholes,Map & data,Outputs' && r.has.cur === 'Boreholes' && r.has.rows === r.has.want, 'rail and list: ' + JSON.stringify(r.has));
+    expect(r.has.tree.join() === 'File,Project,Boreholes,Map,Analysis,Data,Layout' && r.has.cur === 'Boreholes' && r.has.rows === r.has.want, 'rail and list: ' + JSON.stringify(r.has));
     expect(r.added === 1 && r.top === r.prevBottom, 'Enter on the last row: ' + JSON.stringify(r));
     expect(r.nl.uscs === 'SP' && Math.abs(r.nl.bottom - (r.prevBottom + 1.2)) < 1e-6 && r.logHasSand, 'typed interval: ' + JSON.stringify(r.nl) + ' log has sand ' + r.logHasSand);
     expect(r.focusedRow === 0, 'log click focused row ' + r.focusedRow);
@@ -524,7 +586,7 @@ app.whenReady().then(async () => {
       const top = names()[0], max = sortedList().filter(b => b.project === cur().project).map(b => ({ n: b.name, v: vapourMax(b, null, null)?.cvc ?? -1 })).sort((a, b) => b.v - a.v)[0].n;
       document.querySelector('[data-blsort="name"]').click();
       document.querySelectorAll('#list .bl-row')[3].click(); await w(100);
-      return { filtered, wells, wantWells, top, max, tab: S.tab, rail: document.querySelector('#prail [aria-current="page"]')?.textContent };
+      return { filtered, wells, wantWells, top, max, tab: S.tab, rail: document.querySelector('#rbar .rtabs2 [aria-selected="true"]')?.textContent };
     })()`);
     expect(r.filtered === 9 && r.wells === r.wantWells && r.wells > 0, 'filter and chips: ' + JSON.stringify(r));
     expect(r.top === r.max, 'sort by vapour: ' + JSON.stringify(r));
@@ -813,15 +875,15 @@ app.whenReady().then(async () => {
     expect(!r.wtRatio, 'placeholder map gave a scale: ' + r.wt);
   });
 
-  await check('cross-section: page on the rail', async run => {
+  await check('cross-section: page on the Map tab', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)); loadLloydExample(); await w(100);
-      goTab('site'); await w(150); const tabs = [...document.querySelectorAll('#view .mdtabs [data-tab]')].map(b => b.dataset.tab);   /* the site's pages are the Map & data tabs */
+      goTab('site'); await w(150); const tabs = [...document.querySelectorAll('#rbar .rpanel [data-tab]')].map(b => b.dataset.tab);   /* the Map tab of the ribbon holds the map's pages */
       goTab('xsec'); await w(200); const svg = !!document.querySelector('#xs-draw svg'), chips = document.querySelectorAll('#ctl [data-secpick]').length;   /* the section line moved into the settings panel */
       goTab('site'); await w(200); const link = !!document.querySelector('#view [data-tab="xsec"]'), old = !!document.querySelector('#section');
       return { tabs, svg, chips, link, old };
     })()`);
-    expect(r.tabs.indexOf('soil') === r.tabs.indexOf('contam') + 1 && r.tabs.indexOf('xsec') === r.tabs.indexOf('soil') + 1 && r.tabs.indexOf('gwm') === r.tabs.indexOf('xsec') + 1 && r.tabs.indexOf('v3d') === r.tabs.indexOf('gwm') + 1, 'Map & data tab order: ' + r.tabs);
+    expect(r.tabs.join() === 'gis,site,xsec,v3d,soil', 'Map tab pages: ' + r.tabs);
     expect(r.svg && r.chips >= 2, 'section page draws: ' + JSON.stringify(r));
     expect(r.link && !r.old, 'map page links to the section page: ' + JSON.stringify(r));
   });
@@ -1553,7 +1615,7 @@ app.whenReady().then(async () => {
       const until = async (f, ms = 120000) => { const t0 = Date.now(); while (!f() && Date.now() - t0 < ms) await w(250); return f(); };
       try {
         loadXsExample(); await w(400);
-        goTab('site'); await w(150); want(document.querySelector('#view .mdtabs [data-tab="gwm"]'), 'a Model page in Map & data');
+        goTab('gw'); await w(150); want(document.querySelector('#rbar .rpanel [data-tab="gwm"]'), 'a Model page on the Analysis tab');
         goTab('gwm'); await w(300); const v = () => document.querySelector('#view') || document.body;
         want(/MODFLOW 6/.test(v().textContent), 'names the engine');
         for (const a of ['gw-run', 'gw-cal', 'gw-calt', 'gw-trans', 'gw-export', 'gw-feat-add']) want(document.querySelector('[data-act="' + a + '"]'), 'button ' + a);
@@ -1813,7 +1875,7 @@ app.whenReady().then(async () => {
         document.body.classList.add('drawer-open'); await w(100); const m1 = document.querySelector('#main').getBoundingClientRect().width; document.body.classList.remove('drawer-open');
         want(m0 - m1 < 140, 'drawer takes at most what the panel does not already: ' + Math.round(m0 - m1));
         /* 4: no borehole selected: no stale panel */
-        goTab('xsec'); await w(200); const keepBh = S.bh, keepSel = S.sel; S.bh = new Map(); S.sel = null; render(); await w(200); const startShown = !!document.querySelector('#main .start');
+        goTab('xsec'); await w(200); const keepBh = S.bh, keepSel = S.sel; S.bh = new Map(); S.sel = null; render(); await w(200); const startShown = !!document.querySelector('#main .start, #main [data-view="sites"]');
         want(startShown && document.querySelector('#ctl').hidden, 'no panel on the start screen: ' + startShown);
         S.bh = keepBh; S.sel = keepSel; render(); await w(200);
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
@@ -2129,11 +2191,11 @@ app.whenReady().then(async () => {
       try {
         loadDlExample(); await w(300);
         for (const [from, to] of [['log', 'edit'], ['edit', 'log'], ['log', 'report'], ['report', 'edit']]) {
-          goTab(from); await w(250); const sw = document.querySelector('.bh-views');
+          goTab(from); await w(250); const sw = document.querySelector('#rbar .rgrp[aria-label="View"]');
           want(sw && sw.querySelector('[data-tab="' + from + '"]')?.getAttribute('aria-pressed') === 'true', from + ': switch shows where you are');
           sw?.querySelector('[data-tab="' + to + '"]')?.click(); await w(250); want(S.tab === to, from + ' -> ' + to + ' with one click: ' + S.tab);
         }
-        goTab('xsec'); await w(200); want(!document.querySelector('.bh-views'), 'no borehole switch on other pages');
+        goTab('xsec'); await w(200); want(!document.querySelector('#rbar [data-tab="edit"]'), 'no borehole switch on other pages');
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       return F;
     })()`);
@@ -2421,7 +2483,7 @@ app.whenReady().then(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
       try {
         loadXsExample(); await w(400);
-        goTab('site'); await w(150); want(document.querySelector('#view .mdtabs [data-tab="v3d"]'), 'a 3D page in Map & data');
+        goTab('site'); await w(150); want(document.querySelector('#rbar .rpanel [data-tab="v3d"]'), 'a 3D page on the Map tab');
         goTab('v3d'); await w(800);
         const V = S.v3d; want(V && V.ok, '3D scene built: ' + (V && V.error));
         if (V && V.ok) {

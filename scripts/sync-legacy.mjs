@@ -28,7 +28,7 @@ if (left) { console.error('the offline build still loads', left); process.exit(1
 // update check go through the desktop shell, not the page.
 const hashes = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => `'sha256-${createHash('sha256').update(m[1]).digest('base64')}'`);
 const MAPS = 'https://server.arcgisonline.com https://tile.openstreetmap.org';
-const CSP = [`default-src 'none'`, `script-src 'self' ${hashes.join(' ')}`, `style-src 'self' 'unsafe-inline'`, `img-src 'self' data: blob: ${MAPS}`,
+const CSP = [`default-src 'none'`, `script-src 'self' ${hashes.join(' ')}`, `style-src 'self' 'unsafe-inline'`, `img-src 'self' data: blob: https:`,
   `connect-src 'self' data: blob: ${MAPS}`, `font-src 'self' data:`, `worker-src 'self' blob:`, `media-src 'self' data: blob:`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`, `frame-src 'none'`].join('; ');
 const head = `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta http-equiv="Content-Security-Policy" content="${CSP}">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>\n</head>\n<body>\n`;
 mkdirSync(out, { recursive: true });
