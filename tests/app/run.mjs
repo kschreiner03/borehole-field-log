@@ -1595,10 +1595,50 @@ app.whenReady().then(async () => {
       return out;
     })()`);
     expect(r.nseg > 0 && r.bad.length === 0, 'contour vertices must interpolate between data points in log10: ' + JSON.stringify(r.dbg) + r.nseg + ' segments, bad ' + JSON.stringify(r.bad.slice(0, 3)));
-    expect(r.drawn.includes('1') && r.pts > 0 && r.hollow > 0 && /interpolated/.test(r.label || ''), 'plume drawn: ' + JSON.stringify(r));
+    expect(r.drawn.includes('1') && r.pts > 0 && r.hollow > 0 && /interpolated|kriging/i.test(r.label || ''), 'plume drawn: ' + JSON.stringify({ drawn: r.drawn, pts: r.pts, hollow: r.hollow, label: r.label }));
     expect(r.none && r.noneContours === 0, 'no results message: ' + JSON.stringify(r));
     expect(r.playMany === false && r.playOne === true, 'play enabled only with several dates: ' + JSON.stringify(r));
     expect(r.depthPts === 4 && r.finite, 'depth-only project draws points: ' + JSON.stringify(r));
+  });
+
+  await check('cross-section plume: 3D kriging in real metres, layered, uses boreholes near the line, hatches the unconfirmed, marks the undelineated', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        // four boreholes on a line west to east, one 8 m off it; BH-2's deepest sample (4 m) is still dirty
+        const mk = (n, e, nn, smp) => { const b = blankBorehole(n); Object.assign(b, { project: 'Krige test', date: '2026-06-01', easting: e, northing: nn, elevation: 100, layers: [{ id: uid('l'), top: 0, bottom: 6, uscs: 'sm' }], samples: smp.map(([d, v, lt], i) => ({ id: uid('s'), no: i + 1, depth: d, lab: { benzene: { v, lt: !!lt } } })) }); S.bh.set(b.id, normalize(b)); store.save(S.bh.get(b.id)); return S.bh.get(b.id); };
+        const B = [mk('BH-1', 1000, 5000, [[1, .01, 1], [3, .01, 1], [5, .01, 1]]), mk('BH-2', 1020, 5000, [[1, 2], [2.5, 5], [4, 3]]), mk('BH-3', 1040, 5000, [[1, .4], [3, .05], [5, .01, 1]]), mk('BH-4', 1060, 5000, [[1, .01, 1], [3, .01, 1], [5, .01, 1]]), mk('BH-5', 1030, 5008, [[1, 1], [3, 2], [5, .3]])];
+        S.sel = B[0].id; setSite({ ...(siteOf() || {}), guide: { ...(siteOf()?.guide || {}), benzene: .1 } });
+        S.secIds = new Set([B[0].id, B[1].id, B[2].id, B[3].id]); secPickSave();
+        S.xs = { ...S.xs, date: '', medium: 'soil', param: 'benzene', round: false, plume: true, model: false, style: 'graded', interp: 'krige', aniso: 10, only: false };
+        goTab('xsec'); await w(500);
+        const svg = () => document.querySelector('#xs-draw svg')?.outerHTML || '', note = () => document.querySelector('#xs-draw [data-fnote] title')?.textContent || '';
+        want(/Kriging, 3D/.test(note()) && /1 off the line/.test(note()) && /typically within/.test(note()), 'the note says the method, the off-line borehole and the check: ' + note());
+        want(/data-notdelin/.test(svg()), 'BH-2 is marked not delineated below');
+        const nd = [...document.querySelectorAll('#xs-draw [data-notdelin] title')].map(x => x.textContent); want(nd.length === 1 && /BH-2/.test(nd[0]), 'only BH-2: ' + nd);
+        want(/data-hatch/.test(svg()) && /likely over, not confirmed/.test(svg()), 'unconfirmed areas are hatched and keyed');
+        // exact at a sample, real metres: the same value whatever the exaggeration
+        const G = XS_GEOM, val = (d, e) => plumeField(G.pos, S.xs, G).at(d, e)[0];
+        const p2 = G.pos.find(p => p.b.id === B[1].id), v1 = val(p2.d, 100 - 2.5);
+        want(Math.abs(Math.log10(v1) - Math.log10(5)) < .05, 'honours BH-2 at 2.5 m: ' + v1);
+        const mid = (p2.d + G.pos.find(p => p.b.id === B[2].id).d) / 2, a = val(mid, 97.5);
+        setSec('ve', '1'); await w(300); const b2 = val(mid, 97.5); setSec('ve', 'auto'); await w(200);
+        want(Math.abs(Math.log10(a) - Math.log10(b2)) < .02, 'the exaggeration does not change the plume: ' + [a, b2]);
+        // layering: with ×1 the plume reaches as far down as sideways; with ×30 it stays in its layer
+        const below = k => { S.xs = { ...S.xs, aniso: k }; return plumeField(XS_GEOM.pos, S.xs, XS_GEOM).at(p2.d, 100 - 5.5); };
+        const s1 = below(1), s30 = below(30); want(s1[1] !== s30[1] || s1[0] !== s30[0], 'layering changes the reach: ' + JSON.stringify([s1, s30]));
+        // only the section's own boreholes
+        S.xs = { ...S.xs, aniso: 10, only: true }; drawXsec(); await w(200); want(!/off the line/.test(note()), 'unticked: only the section boreholes');
+        // the controls
+        S.xs = { ...S.xs, only: false }; renderView(true); await w(300);
+        { loadDlExample(); await w(300); S.secIds = new Set(); S.xs = { ...S.xs, medium: 'soil', param: 'benzene', interp: 'krige', only: false, date: '' }; goTab('xsec'); await w(300); const t0 = performance.now(); drawXsec(); const ms = performance.now() - t0; window.__ms = ms; want(ms < 2500, 'redraw time on the Dawn Lake example: ' + Math.round(ms) + ' ms'); S.sel = B[0].id; renderView(true); await w(300); }
+        const sel = document.querySelector('#xs-interp'); want(sel && [...sel.options].map(o => o.value).join() === 'krige,idw,tin' && document.querySelector('#xs-aniso'), 'interpolation and layering choices');
+        sel.value = 'idw'; sel.dispatchEvent(new Event('change', { bubbles: true })); await w(400); want(/Inverse distance, 3D/.test(note()), 'inverse distance: ' + note());
+        const s2 = document.querySelector('#xs-interp'); s2.value = 'tin'; s2.dispatchEvent(new Event('change', { bubbles: true })); await w(400); want(/triangles/.test(note()) && !document.querySelector('#xs-aniso'), 'triangles, no layering choice');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
   });
 
   await check('report: section item carries date and plume', async run => {
