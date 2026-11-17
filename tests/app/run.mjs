@@ -1143,7 +1143,7 @@ app.whenReady().then(async () => {
         const box = s => +/data-extent="1" x="([-0-9.]+)"/.exec(s)?.[1];
         const x0 = ITEM_C.get(ex.id)[0]; plan.o = { ...plan.o, cx: ITEM_C.get(plan.id)[0] + 40, cy: ITEM_C.get(plan.id)[1] }; pageItemsSVG(curPage()); const x1 = ITEM_C.get(ex.id)[0];
         want(x1 > x0, 'the extent map follows the map: ' + x0 + ' → ' + x1);
-        ex.o = {}; want(/Choose the map/.test(pageItemsSVG(curPage())), 'asks for its map');
+        ex.o = {}; want(/Choose what this shows the extent of/.test(pageItemsSVG(curPage())), 'asks for its map');
         ex.o = { link: plan.id }; commit(); await w(300);
         S.csel = sm.id; rerenderCompose(); await w(300); want(document.querySelector('#cmp-props [data-act="cmp-xs-use"]') && document.querySelector('[data-copt="fit"]'), 'its panel');
         S.csel = ex.id; rerenderCompose(); await w(300); want(document.querySelector('#co-link')?.value === plan.id, 'extent panel names its map');
@@ -1181,6 +1181,39 @@ app.whenReady().then(async () => {
         goTab('xsec'); await w(300); const aId = secLinesOf().find(l => l.name === 'A').id; document.querySelector('[data-secuse="' + aId + '"]').click(); await w(300);
         want(secLineOf().name === 'A', 'A chosen again');
         await outputAct('open-edit', fB.id); await w(300); want(repLayout().pages[0].items.find(i => i.t === 'section').o.secDef.line.name === 'B', 'editing the B figure still shows B');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('outputs: extent map chosen from its panel (a map on the page, the whole site, the Map page view); section legend wraps, limits in the note', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); S.sel = [...S.bh.values()].find(b => /Dawn/i.test(b.project || '') && b.easting != null)?.id || S.sel;
+        goTab('site'); await w(500);   // the Map page's view exists
+        goTab('compose'); S.cout = false; S.csort = false; await w(300);
+        // a cross-section figure with an extent map and no other map
+        const pg = newPage('free', { title: 'SECTION' }), ex = newItem('extent', 560, 120, { w: 220, h: 170 }); pg.items.push(newItem('section', 40, 300, { w: 720, h: 420 }), ex);
+        repLayout().pages.push(pg); S.cpage = repLayout().pages.length - 1; S.csel = ex.id; commit(); await w(400);
+        const pick = async v => { const s = document.querySelector('#co-link'); if (!s) { F.push('no #co-link'); return; } s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); await w(300); };
+        const opts = () => [...document.querySelectorAll('#co-link option')].map(o => o.value);
+        want(opts().includes('@site') && opts().includes('@main'), 'whole site and Map page view offered with no other map: ' + opts());
+        await pick('@site'); want(curPage().items.find(i => i.id === ex.id).o.link === '@site' && /data-extent/.test(pageItemsSVG(curPage())), 'the whole site');
+        await pick('@main'); const o = curPage().items.find(i => i.id === ex.id).o; want(o.link === '@main' && o.ext?.hw > 0 && /data-extent/.test(pageItemsSVG(curPage())), 'the Map page view, saved: ' + JSON.stringify(o.ext));
+        // add a site plan: it is offered and can be chosen from the panel
+        const plan = newItem('plan', 40, 120, { w: 480, h: 160 }); curPage().items.push(plan); S.csel = ex.id; commit(); await w(400);
+        want(opts().includes(plan.id), 'the plan is offered');
+        await pick(plan.id); want(curPage().items.find(i => i.id === ex.id).o.link === plan.id && /data-extent/.test(pageItemsSVG(curPage())), 'the plan chosen from the panel');
+        // the section legend at a narrow width: every item inside the drawing, in rows
+        S.secIds = new Set(); S.xs = { ...S.xs, medium: 'soil', param: 'benzene', interp: 'krige', plume: true, style: 'graded', date: '' }; goTab('xsec'); await w(300);
+        const d = document.querySelector('#xs-draw'); d.style.width = '560px'; drawXsec(); await w(200);
+        const svgEl = d.querySelector('svg'), Wd = +svgEl.getAttribute('width'), bad = [...svgEl.querySelectorAll('[data-plegend] text, [data-fnote]')].filter(x => { const b = x.getBBox(); return b.x + b.width > Wd + 1; });
+        want(!bad.length, 'legend and note inside the drawing: ' + bad.map(x => x.textContent).join(' | '));
+        want(svgEl.querySelectorAll('[data-plegend]').length >= 2, 'the legend wraps into rows at this width: ' + svgEl.querySelectorAll('[data-plegend]').length);
+        const nt = document.querySelector('#xs-note')?.textContent || ''; want(/Plume: .*Limits: between boreholes the plume is an estimate/.test(nt) && /Ordinary kriging, 3D/.test(nt), 'the note gives the method and its limits: ' + nt.slice(-200));
+        d.style.width = '';
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       return F;
     })()`);

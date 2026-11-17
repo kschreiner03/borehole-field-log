@@ -4624,6 +4624,22 @@ const XS_METHODS = {
   near: ['Nearest sample, 3D', 'Thiessen (1911) polygons in 3D. As GDAL grid nearest. Each spot takes the closest sample: nothing is invented between them.'],
   tin: ['Triangles on the section', 'Linear interpolation on a Delaunay triangulation of the samples on the section. As QGIS TIN interpolation (linear).'],
 };
+const XS_LIMITS = {
+  krige: 'smooths peaks between samples and assumes the soil varies the same way everywhere on the site',
+  uk: 'the trend is a straight-line fit and can be pulled by a few high samples; values are held to the range of the samples',
+  ik: 'gives chances, not concentrations, and depends on the guideline chosen; a single sample can swing a small site',
+  rst: 'can bulge or dip between samples (held to their range); the tension sets how stiff it is',
+  rbf: 'can bulge or dip between samples (held to their range)',
+  idw: 'makes bull’s-eyes around samples and is never higher than the highest sample',
+  nn: 'works in the section plane only (nearby boreholes are placed onto it) and shows nothing beyond the outer samples',
+  near: 'is blocky: values step halfway between samples',
+  points: 'shows only the area inside the samples on the section, with straight-line steps between them',
+  guided: 'takes its shape from the forecast or the model, so it carries their assumptions',
+  data: 'shows only the screened depths, blended straight between wells',
+};
+function plumeLimits(method) {
+  return 'Limits: between boreholes the plume is an estimate, not a measurement. It cannot see clay or sand lenses, fill, utility trenches or other paths that the samples do not show, it treats results from different dates as one time, and the layering setting is a judgement. This method ' + (XS_LIMITS[method] || 'is an interpolation') + '. Shading fades where few samples support it, hatching marks likely but unconfirmed areas and “?” marks boreholes still over the guideline at their deepest sample. Confirm plume edges by sampling before using them for design or volumes.';
+}
 const XS_INTERP = Object.fromEntries(Object.entries(XS_METHODS).map(([k, v]) => [k, v[0]]));
 const XS_3D = new Set(['krige', 'uk', 'ik', 'rst', 'rbf', 'idw', 'nn', 'near']);
 const XS_ANISO = [1, 3, 10, 30, 100];
@@ -4772,7 +4788,8 @@ function plume3dField(G, xs, medium, param, lv, how) {
   const fac = Math.pow(10, M.loo), name = XS_METHODS[how][0];
   const check = how === 'ik' ? (M.constant ? 'every sample is on the same side of the guideline' : 'each sample predicted from the others is on the wrong side ' + Math.round(M.loo * 100) + ' % of the way on average') : 'each sample predicted from the others is typically within ×' + (fac < 10 ? fac.toFixed(1) : Math.round(fac));
   const note = name + (how === 'ik' ? ' (contours: 50, 80 and 95 % chance of exceeding the guideline)' : ' on log values') + ', layered ×' + k + ' (a metre down counts as ' + k + ' m sideways)' + (M.V ? ', fitted range ' + fu(M.V.range) + (M.V.nug ? ', nugget ' + Math.round(M.V.nug / M.V.sill * 100) + ' %' : '') : '') + ': ' + P.length + ' samples from ' + P.boreholes + ' borehole' + (P.boreholes === 1 ? '' : 's') + (P.off ? ' (' + P.off + ' off the line)' : '') + '; ' + check + '. Faded where few samples support it; hatched where likely over the guideline but not confirmed. Method: ' + XS_METHODS[how][1];
-  return { at, note, method: how, prob: how === 'ik' };
+  const short = name + ', layered ×' + k + ' · ' + (how === 'ik' ? (M.constant ? 'every sample on one side of the guideline' : 'checked: wrong side ' + Math.round(M.loo * 100) + ' % on average') : 'checked: within ×' + (fac < 10 ? fac.toFixed(1) : Math.round(fac))) + ' · interpreted between samples, not measured; see the note for its limits';
+  return { at, note, short, method: how, prob: how === 'ik' };
 }
 function plumeField(pos, xs, G, cell = 4) {
   const medium = xs.medium || 'soil', param = medium === 'vapour' ? '' : xs.param, date = xs.date || '';
@@ -4848,7 +4865,7 @@ function plumeField(pos, xs, G, cell = 4) {
     const x = x0 + (x1 - x0) * i / nx, y = y0 + (y1 - y0) * j / ny, d = (x - G.X(0)) / (G.X(G.maxD) - G.X(0) || 1) * G.maxD, e = G.e1 - (y - G.m.t) / G.plotH * (G.e1 - G.e0);
     const [v, w] = at(d, e); c[j * (nx + 1) + i] = Number.isFinite(v) ? v : 0; a[j * (nx + 1) + i] = Number.isFinite(w) ? w : 0;
   }
-  return { nx, ny, x0, x1, y0, y1, c, a, at, method, note, pts, lv, medium, param, hatch: !!f3, prob: !!f3?.prob };
+  return { nx, ny, x0, x1, y0, y1, c, a, at, method, note, short: f3?.short, pts, lv, medium, param, hatch: !!f3, prob: !!f3?.prob };
 }
 /* contour lines of a field at one level (marching squares on log10, cells with weight under minA left out), joined into
    continuous polylines in drawing coordinates */
@@ -4887,9 +4904,9 @@ function fieldSVG(g, { style = 'graded', family = 'meas', dashed = false, name =
     : (v, w) => v >= lv[0].v && w > .3 ? [cols[1], Math.round(.25 * w * 10) / 10] : null;
   const attr = style === 'graded' ? 'data-cell' : style === 'bands' ? 'data-band' : 'data-tint';
   if (!dashed && g.hatch && family === 'meas') {   // likely over the first level, but the samples barely support it: hatched
-    const hid = 'hz' + Math.random().toString(36).slice(2, 7); o.push('<defs><pattern id="' + hid + '" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#b42318" stroke-width="1.2"/></pattern></defs><g clip-path="url(#' + G.gclip + ')" data-unconfirmed="1">');
-    for (let j = 0; j < ny; j++) { let run = null; const flush = () => { if (run) o.push('<rect data-hatch="1" x="' + (x0 + run.i * sx).toFixed(2) + '" y="' + (y0 + j * sy).toFixed(2) + '" width="' + (run.n * sx).toFixed(2) + '" height="' + sy.toFixed(2) + '" fill="url(#' + hid + ')" fill-opacity=".55"/>'); run = null; };
-      for (let i = 0; i < nx; i++) { const [v, w] = cell(i, j), on = v >= lv[0].v && w > .03 && w < .5; if (on) { if (run) run.n++; else run = { i, n: 1 }; } else flush(); } flush(); }
+    const hid = 'hz' + Math.random().toString(36).slice(2, 7); o.push('<defs><pattern id="' + hid + '" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#b42318" stroke-width="1"/></pattern></defs><g clip-path="url(#' + G.gclip + ')" data-unconfirmed="1">');
+    for (let j = 0; j < ny; j++) { let run = null; const flush = () => { if (run) o.push('<rect data-hatch="1" x="' + (x0 + run.i * sx).toFixed(2) + '" y="' + (y0 + j * sy).toFixed(2) + '" width="' + (run.n * sx).toFixed(2) + '" height="' + sy.toFixed(2) + '" fill="url(#' + hid + ')" fill-opacity=".4"/>'); run = null; };
+      for (let i = 0; i < nx; i++) { const [v, w] = cell(i, j), on = v >= lv[0].v && w > .15 && w < .5; if (on) { if (run) run.n++; else run = { i, n: 1 }; } else flush(); } flush(); }
     o.push('</g>');
   }
   if (!dashed) {
@@ -4981,22 +4998,30 @@ function plumeSVG(pos, xs, X, Y, top, bw, W, H, m) {
     for (const p of deep.values()) if (!p.lt && p.v >= lv[0].v) { const x = X(p.d), y = Y(top(p.b) - p.bot) + (medium === 'groundwater' ? 2 : 6);
       over.push('<g data-notdelin="1"><title>' + esc(p.b.name + ': the deepest ' + (medium === 'groundwater' ? 'screen' : 'sample') + ' (' + fu(p.bot) + ') is still over the ' + lv[0].label.split(' (')[0] + ', so the plume is not delineated below it') + '</title><path d="M' + x.toFixed(1) + ' ' + y.toFixed(1) + 'v14" stroke="#7f0000" stroke-width="1.2" stroke-dasharray="2 2"/><text x="' + x.toFixed(1) + '" y="' + (y + 25).toFixed(1) + '" text-anchor="middle" style="font:700 11px Arial,sans-serif;fill:#7f0000;paint-order:stroke;stroke:#fff;stroke-width:3px">?</text></g>'); } }
   over.push(pointLabelsSVG(labs, bw, m, H));
-  // legend: what is shown, in the chosen style, and how it was shaped
-  const style = xs.style || 'graded', gid = 'pg' + Math.random().toString(36).slice(2, 7); let lx = m.l; const ly = H - 22;
-  const head = `${name}${medium === 'vapour' ? '' : ', ' + medium}${xs.date ? `, as of ${xs.date}` : ', latest'}${xs.round ? ', this round only' : ''}:`;
-  o.push(`<text x="${lx}" y="${ly}" class="lbl2" style="font-weight:600">${esc(head)}</text>`); lx += textW(head, '600 11px ' + labelFont()) + 10;
-  const sw = (t, el) => { o.push(el(lx), `<text x="${lx + 22}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 30 + textW(t, '11px ' + labelFont()); };
-  if (!lv.length) sw('no guideline set, so no contours', x => `<rect x="${x}" y="${ly - 9}" width="16" height="9" fill="#fff" stroke="#3a1a00" stroke-width=".6"/>`);
-  else if (style === 'graded') { o.push(`<defs><linearGradient id="${gid}">${R.map((c, i) => `<stop offset="${i / (R.length - 1)}" stop-color="${c}"/>`).join('')}</linearGradient></defs>`);
-    const t = g?.prob ? 'chance of exceeding the guideline: lines at 50 / 80 / 95 %' : `${fmtLevel(lv[0].v)} → ${fmtLevel(lv[0].v * 300)} ${unit} (log scale), lines at ${lv.map(l => fmtLevel(l.v)).join(' / ')}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="60" height="9" fill="url(#${gid})" stroke="#3a1a00" stroke-width=".6"/><text x="${lx + 66}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 74 + textW(t, '11px ' + labelFont()); }
-  else if (style === 'bands') lv.forEach((l, i) => sw(`≥ ${l.label}`, x => `<rect x="${x}" y="${ly - 9}" width="16" height="9" fill="${R[i + 1]}" stroke="#3a1a00" stroke-width=".6"/>`));
-  else sw(`lines at ${lv.map(l => fmtLevel(l.v)).join(', ')} ${unit} (${lv.map(l => l.label.split(' (')[0]).join(', ')})`, x => `<path d="M${x} ${ly - 4}h16" stroke="#7f0000" stroke-width="1.6"/>`);
-  sw('below first level', x => `<circle cx="${x + 8}" cy="${ly - 4}" r="4" fill="${R[0]}" stroke="#4d0000"/>`);
-  sw('not detected', x => `<circle cx="${x + 8}" cy="${ly - 4}" r="4" fill="#fff" stroke="#4d0000" stroke-width="1.3" stroke-dasharray="2 1.5"/>`);
-  if (g?.hatch) sw('likely over, not confirmed', x => `<rect x="${x}" y="${ly - 9}" width="16" height="9" fill="#fff" stroke="#b42318" stroke-width=".6"/><path d="M${x} ${ly}l9 -9M${x + 6} ${ly}l9 -9M${x - 3} ${ly - 3}l6 -6" stroke="#b42318" stroke-width="1"/>`);
-  if (over.some(s => s.startsWith('<g data-notdelin'))) sw('not delineated below', x => `<text x="${x + 8}" y="${ly}" text-anchor="middle" style="font:700 11px Arial,sans-serif;fill:#7f0000">?</text>`);
-  if (g?.note) { const room = W - m.l - 8, f = 'italic 11px ' + labelFont(); let t = g.note; while (t.length > 8 && textW(t, f) > room) t = t.slice(0, -2).trimEnd() + '…';
-    o.push(`<text data-fnote="1" x="${m.l}" y="${H - 8}" class="lbl2" style="font-style:italic"><title>${esc(g.note)}</title>${esc(t)}</text>`); }
+  // legend: what is shown, in the chosen style, and how it was shaped; the items wrap into rows that fit the width
+  const style = xs.style || 'graded', gid = 'pg' + Math.random().toString(36).slice(2, 7), f11 = '11px Arial, Helvetica, sans-serif', items = [];
+  const head = name + (medium === 'vapour' ? '' : ', ' + medium) + (xs.date ? ', as of ' + xs.date : ', latest') + (xs.round ? ', this round only' : '') + ':';
+  items.push({ w: textW(head, '600 ' + f11) + 10, svg: (x, y) => '<text x="' + x + '" y="' + y + '" class="lbl2" style="font-weight:600">' + esc(head) + '</text>' });
+  const sw = (tx, el) => items.push({ w: 30 + textW(tx, f11), svg: (x, y) => el(x, y) + '<text x="' + (x + 22) + '" y="' + y + '" class="lbl2">' + esc(tx) + '</text>' });
+  if (!lv.length) sw('no guideline set, so no contours', (x, y) => '<rect x="' + x + '" y="' + (y - 9) + '" width="16" height="9" fill="#fff" stroke="#3a1a00" stroke-width=".6"/>');
+  else if (style === 'graded') { o.push('<defs><linearGradient id="' + gid + '">' + R.map((c, i) => '<stop offset="' + i / (R.length - 1) + '" stop-color="' + c + '"/>').join('') + '</linearGradient></defs>');
+    const tx = g?.prob ? 'chance of exceeding the guideline: lines at 50 / 80 / 95 %' : fmtLevel(lv[0].v) + ' → ' + fmtLevel(lv[0].v * 300) + ' ' + unit + ' (log scale), lines at ' + lv.map(l => fmtLevel(l.v)).join(' / ');
+    items.push({ w: 74 + textW(tx, f11), svg: (x, y) => '<rect x="' + x + '" y="' + (y - 9) + '" width="60" height="9" fill="url(#' + gid + ')" stroke="#3a1a00" stroke-width=".6"/><text x="' + (x + 66) + '" y="' + y + '" class="lbl2">' + esc(tx) + '</text>' }); }
+  else if (style === 'bands') lv.forEach((l, i) => sw(g?.prob ? '≥ ' + ['50', '80', '95'][i] + ' % chance over' : '≥ ' + l.label, (x, y) => '<rect x="' + x + '" y="' + (y - 9) + '" width="16" height="9" fill="' + R[i + 1] + '" stroke="#3a1a00" stroke-width=".6"/>'));
+  else sw(g?.prob ? 'lines at 50, 80 and 95 % chance over the guideline' : 'lines at ' + lv.map(l => fmtLevel(l.v)).join(', ') + ' ' + unit + ' (' + lv.map(l => l.label.split(' (')[0]).join(', ') + ')', (x, y) => '<path d="M' + x + ' ' + (y - 4) + 'h16" stroke="#7f0000" stroke-width="1.6"/>');
+  sw('below first level', (x, y) => '<circle cx="' + (x + 8) + '" cy="' + (y - 4) + '" r="4" fill="' + R[0] + '" stroke="#4d0000"/>');
+  sw('not detected', (x, y) => '<circle cx="' + (x + 8) + '" cy="' + (y - 4) + '" r="4" fill="#fff" stroke="#4d0000" stroke-width="1.3" stroke-dasharray="2 1.5"/>');
+  if (g?.hatch) sw('likely over, not confirmed', (x, y) => '<rect x="' + x + '" y="' + (y - 9) + '" width="16" height="9" fill="#fff" stroke="#b42318" stroke-width=".6"/><path d="M' + x + ' ' + y + 'l9 -9M' + (x + 6) + ' ' + y + 'l9 -9M' + (x - 3) + ' ' + (y - 3) + 'l6 -6" stroke="#b42318" stroke-width="1"/>');
+  if (over.some(q => q.startsWith('<g data-notdelin'))) sw('not delineated below', (x, y) => '<text x="' + (x + 8) + '" y="' + y + '" text-anchor="middle" style="font:700 11px Arial,sans-serif;fill:#7f0000">?</text>');
+  const room = W - m.l - 8, rows = [[]]; let used = 0;
+  for (const it of items) { if (used + it.w > room && rows[rows.length - 1].length) { rows.push([]); used = 0; } rows[rows.length - 1].push(it); used += it.w; }
+  const shortNote = g?.short || g?.note || '', fi = 'italic ' + f11, noteL = []; { let line = ''; for (const wd of shortNote.split(' ')) { const tryL = line ? line + ' ' + wd : wd; if (textW(tryL, fi) > room && line) { noteL.push(line); line = wd; } else line = tryL; } if (line) noteL.push(line); }
+  const maxL = rows.length > 1 && W >= 760 ? 1 : 2, nl = Math.min(maxL, noteL.length); if (noteL.length > nl) { let s2 = noteL.slice(nl - 1).join(' '); while (s2.length > 8 && textW(s2 + '…', fi) > room) s2 = s2.slice(0, -2).trimEnd(); noteL.splice(nl - 1, noteL.length, s2 + '…'); }
+  const LH = 14, last = H - 22 - Math.max(0, nl - 1) * 13; rows.forEach((r, i) => { let x = m.l; const y = last - (rows.length - 1 - i) * LH; o.push('<g data-plegend="' + i + '">'); for (const it of r) { o.push(it.svg(x, y)); x += it.w; } o.push('</g>'); });
+  XS_GEOM.plRows = rows.length;
+  // one short line on the drawing; the whole account, with what the method cannot know, in the note under the section
+  if (noteL.length) o.push('<text data-fnote="1" x="' + m.l + '" y="' + (H - 8 - (noteL.length - 1) * 13) + '" class="lbl2" style="font-style:italic"><title>' + esc(g.note) + '</title>' + noteL.map((l, i) => '<tspan x="' + m.l + '" dy="' + (i ? 13 : 0) + '">' + esc(l) + '</tspan>').join('') + '</text>');
+  XS_GEOM.plumeNote = g?.note ? g.note.replace(/\s*Method: .*$/, '') + ' ' + plumeLimits(g.method) : '';
   return o.join('');
 }
 /* ---------- forecast: cited properties and transport solutions ---------- */
@@ -6349,7 +6374,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const su = b => b.well?.installed && b.well.stickup > 0 ? b.well.stickup : 0;
   let W = forceW || Math.max(el.clientWidth, 600), H = fillH || secOpt('h'); const m = { l: 62, r: 64, t: 70, b: 30 };
   // room under the drawing for offset labels (three staggered rows) and the plume legend
-  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? 34 : 0, mdH = xs?.model ? 20 : 0, gwH = xs && xs.gwFlow !== false && S.gwm?.run?.ok ? 18 : 0;
+  const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? (W < 760 ? 62 : 48) : 0, mdH = xs?.model ? 20 : 0, gwH = xs && xs.gwFlow !== false && S.gwm?.run?.ok ? 18 : 0;
   m.b += offH + plH + mdH + gwH; if (!fillH) H += offH + plH + mdH + gwH;
   const maxD = pos[pos.length - 1].d || 1;
   /* the header, top down: the axis label and scale line; the model caption and its note (purple), each on its own line; then the
@@ -6459,7 +6484,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   el.innerHTML = o.join('');
   const missing = pos.filter(p => !wOf(p.b)).map(p => p.b.name);
   note.textContent = [located ? (secLineOf() ? `Section along the line drawn on the map: ${pos.map(p => p.b.name).join(' → ')}, each placed where it falls along the line${pos.some(p => p.off) ? ', with its distance off the line below' : ''}.` : ordered ? `Section through ${pos.map(p => p.b.name).join(' → ')}; distances are measured along that line.` : 'Best-fit line through all boreholes; each is projected onto it.') : 'Some boreholes have no coordinates, so all are spaced evenly.', noElev ? 'Some boreholes have no ground elevation; all are drawn from 0.' : '',
-    missing.length ? `No ${xs?.date ? `water reading on or before ${xs.date}` : S.round ? 'reading near this date' : 'reading'} for ${missing.join(', ')}.` : '', xs ? 'Water: solid ticks are measured levels, hollow triangles are seepage or strikes while drilling; dashed lines join static readings of the same round (interpolated).' : ''].filter(Boolean).join(' ');
+    missing.length ? `No ${xs?.date ? `water reading on or before ${xs.date}` : S.round ? 'reading near this date' : 'reading'} for ${missing.join(', ')}.` : '', xs ? 'Water: solid ticks are measured levels, hollow triangles are seepage or strikes while drilling; dashed lines join static readings of the same round (interpolated).' : ''].filter(Boolean).join(' ') + (XS_GEOM?.plumeNote && xs && xs.plume !== false ? ' Plume: ' + XS_GEOM.plumeNote : '');
 }
 
 /* ---------- Excel import ---------- */
@@ -10445,7 +10470,7 @@ function itemInner(it, w, h) {
   if (MAP_ITEMS.has(it.t) && o.sym) ro.sym = o.sym;
   if (MAP_ITEMS.has(it.t) && o.lbl) ro.lbl = o.lbl;
   if (it.t === 'wt' && o.farrow) ro.farrow = o.farrow;
-  if (it.t === 'secmap' || it.t === 'extent') for (const k of ['fit', 'base', 'link', 'zoom']) if (o[k] != null && o[k] !== '') ro[k] = o[k];
+  if (it.t === 'secmap' || it.t === 'extent') for (const k of ['fit', 'base', 'link', 'zoom', 'ext']) if (o[k] != null && o[k] !== '') ro[k] = o[k];
   if (['plan', 'secmap', 'extent'].includes(it.t) && o.bare) ro.bare = true;
   if (it.t === 'plan' && (o.legend === '1' || o.legend === '0')) ro.legend = o.legend === '1';
   if (it.t === 'plan' && o.rp) ro.mres = { p: o.rp, d0: o.rd0 !== '' && o.rd0 != null ? fromD(+o.rd0) : null, d1: o.rd1 !== '' && o.rd1 != null ? fromD(+o.rd1) : null };
@@ -10461,7 +10486,7 @@ function itemInner(it, w, h) {
     if (it.t === 'plan') { const r = planSVG(w, h, false); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'section') return fromEl(el => { RO.xs = { shape: 'guided', style: 'graded', ...(o.xs || S.xs) }; if (o.secDef) RO.secDef = o.secDef; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
     if (it.t === 'secmap') { if (o.secDef) RO.secDef = o.secDef; return secmapSVG(w, h) || msg('Needs a section through two or more located boreholes.'); }
-    if (it.t === 'extent') return extentSVG(w, h) || msg(o.link ? 'The chosen map has no extent yet.' : 'Choose the map whose extent this shows.');
+    if (it.t === 'extent') return extentSVG(w, h) || msg(!o.link ? 'Choose what this shows the extent of (in its settings).' : o.link === '@main' ? 'Open the Map page, then choose “The Map page’s view” again.' : o.link === '@site' ? 'No located boreholes yet.' : 'The chosen map has no extent yet.');
     if (it.t === 'wt') return wtMapSVG(w, h)?.svg || msg('Needs water levels in at least 3 wells with coordinates and ground elevations.');
     if (it.t === 'vap') { const r = vapourMapSVG(w, h); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'flow') { const F = gwFlow(); return F.error ? msg(F.error) : flowPlanSVG(F, w, h); }
@@ -10534,10 +10559,19 @@ function secmapSVG(W, H) {
   o.push(miniNorth(W), '</svg>');
   return o.join('');
 }
-function extentSVG(W, H) {
+/* the area an extent map outlines: a map on the page (as it is drawn), the whole site (every located borehole), or the Map
+   page's view saved when it was chosen. [centre, half width, half height] in metres, or null */
+function extentBox() {
+  if (RO.link === '@site') { const pts = mapList().filter(b => b.easting != null && b.northing != null); if (!pts.length) return null;
+    const xs = pts.map(b => b.easting), ys = pts.map(b => b.northing), hw = Math.max(10, (Math.max(...xs) - Math.min(...xs)) / 2 * 1.15), hh = Math.max(10, (Math.max(...ys) - Math.min(...ys)) / 2 * 1.15);
+    return [[(Math.max(...xs) + Math.min(...xs)) / 2, (Math.max(...ys) + Math.min(...ys)) / 2], hw, hh]; }
+  if (RO.link === '@main') { const e = RO.ext; return e ? [[e.cx, e.cy], e.hw, e.hh] : null; }
   const map = PAGE_CTX?.items.find(x => x.id === RO.link), sc0 = map && ITEM_SC.get(map.id), c0 = map && ITEM_C.get(map.id);
-  if (!map || !sc0 || !c0) return null;
-  const ih = Math.max(20, map.h - (map.cap ? 18 : 0)), hw = map.w / 2 / sc0, hh = ih / 2 / sc0, zoom = +RO.zoom || 5;
+  if (!map || !sc0 || !c0) return null; const ih = Math.max(20, map.h - (map.cap ? 18 : 0)); return [c0, map.w / 2 / sc0, ih / 2 / sc0];
+}
+function extentSVG(W, H) {
+  const bx = extentBox(); if (!bx) return null;
+  const [c0, hw, hh] = bx, zoom = +RO.zoom || 5;
   const { X, Y, sc, cx, cy } = miniView(W, H, [[c0[0] - hw * zoom, c0[1] - hh * zoom], [c0[0] + hw * zoom, c0[1] + hh * zoom]], 4);
   const o = ['<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Extent of the map"><rect width="' + W + '" height="' + H + '" fill="#f7f9fb"/>'];
   if (RO.base !== '0' && basemapKey() !== 'none') o.push(basemapSVG(W, H, cx, cy, sc, .9));
@@ -10927,7 +10961,7 @@ function propsHTML() {
     ${it.t === 'legend' ? legendPanelHTML(it, pg) : ''}
     ${it.t === 'section' ? `<p class="note">${it.o?.secDef ? `Shows the section saved with it (${it.o.secDef.line ? "the line drawn on the map" : it.o.secDef.pick?.length >= 2 ? it.o.secDef.pick.length + " boreholes picked in order" : "best-fit line"}); changes on the <button class="btn link" data-tab="xsec">Cross-section</button> page do not move it.` : `Follows the section line chosen on the <button class="btn link" data-tab="xsec">Cross-section</button> page.`}${it.o?.xs ? ` Shows ${esc(it.o.xs.date ? 'the date ' + it.o.xs.date : 'the latest data')}${it.o.xs.plume !== false && (it.o.xs.param || it.o.xs.medium === 'vapour') ? ` with the ${esc(it.o.xs.medium === 'vapour' ? 'vapour' : (LAB_PARAMS[it.o.xs.param]?.label || '') + ' ' + it.o.xs.medium)} plume` : ''}.` : ' Shows that page\'s current view: date, plume and model results.'}</p><button class="btn" data-act="cmp-xs-use" ${S.readOnly ? 'disabled' : ''}>Use the Cross-section page's current view</button>
       <h4>Layers</h4>${(() => { const x = it.o?.xs || S.xs, ro = S.readOnly ? 'disabled' : ''; return [['plume', 'Measured plume', x.plume !== false], ['model', 'Forecast (model)', !!x.model], ['gwFlow', 'Model heads & flow (MODFLOW 6)', x.gwFlow !== false], ['ptLabels', 'Values at the points', !!x.ptLabels]].map(([k, l, on]) => `<label class="check"><input type="checkbox" data-cxs="${k}" ${on ? 'checked' : ''} ${ro}> ${esc(l)}</label>`).join(''); })()}` : ''}
-    ${it.t === 'extent' ? (() => { const maps = pg.items.filter(x => MAP_ITEMS.has(x.t) && x.t !== 'extent'); return '<label class="cmp-lbl" for="co-link">Shows the extent of</label><select id="co-link" data-copt="link"><option value="">Choose a map…</option>' + maps.map(m => '<option value="' + m.id + '" ' + (it.o?.link === m.id ? 'selected' : '') + '>' + esc(m.cap || RITEMS[m.t][0]) + '</option>').join('') + '</select><p class="note">The red box is the area the chosen map shows; it follows that map when it is panned or zoomed.</p>'; })() : ''}
+    ${it.t === 'extent' ? (() => { const maps = pg.items.filter(x => MAP_ITEMS.has(x.t) && x.t !== 'extent'); return '<label class="cmp-lbl" for="co-link">Shows the extent of</label><select id="co-link" data-copt="link"><option value="">Choose…</option>' + (maps.length ? '<optgroup label="A map on this page">' + maps.map((m, i) => '<option value="' + m.id + '" ' + (it.o?.link === m.id ? 'selected' : '') + '>' + esc(m.cap || RITEMS[m.t][0] + (maps.filter(q => q.t === m.t).length > 1 ? ' ' + (i + 1) : '')) + '</option>').join('') + '</optgroup>' : '') + '<option value="@site" ' + (it.o?.link === '@site' ? 'selected' : '') + '>The whole site (every borehole)</option><option value="@main" ' + (it.o?.link === '@main' ? 'selected' : '') + '>The Map page’s view' + (it.o?.link === '@main' ? ' (as saved)' : ' (as it is now)') + '</option></select><p class="note">' + (it.o?.link === '@main' ? 'The red box is the Map page’s view when it was chosen; choose it again to take the view as it is now.' : it.o?.link === '@site' ? 'The red box is the area of every located borehole.' : maps.length ? 'The red box is the area the chosen map shows; it follows that map when it is panned or zoomed.' : 'There is no other map on this page: choose the whole site or the Map page’s view, or add a site plan.') + '</p>'; })() : ''}
     ${it.t === 'secmap' ? '<p class="note">' + (it.o?.secDef ? 'Shows the section saved with it; changes on the Cross-section page do not move it.' : 'Follows the section line on the Cross-section page.') + ' Only the section’s boreholes are named; the others are grey dots.</p><button class="btn" data-act="cmp-xs-use" ' + (S.readOnly ? 'disabled' : '') + '>Use the Cross-section page’s current section</button>' : ''}
     ${it.t === 'plan' || it.t === 'wt' || it.t === 'vap' ? '<p class="note">A fixed scale is true on the printed Letter page; resize the frame to show more or less of the site.</p>' : ''}
     ${it.t === 'soilgraph' ? `<label class="cmp-lbl" for="co-kind">Graph</label><select id="co-kind" data-copt="kind">${SOIL_GRAPHS.map(g => `<option value="${g[0]}" ${(it.o?.kind || 'texture') === g[0] ? 'selected' : ''}>${esc(g[1])}</option>`).join('')}</select>` : ''}
@@ -11421,6 +11455,7 @@ function composeChange(t) {
   else if (t.id === 'cmp-add-page') { if (!t.value) return; L.pages.splice(S.cpage + 1, 0, t.value === 'xsec' ? xsecPage() : newPage(t.value)); S.cpage++; S.csel = null; }
   else if (t.dataset.clog) { const s = new Set(pg.bh || []); t.checked ? s.add(t.dataset.clog) : s.delete(t.dataset.clog); pg.bh = projList().map(b => b.id).filter(id => s.has(id)); }
   else if (it && t.dataset.cprop) it[t.dataset.cprop] = t.type === 'checkbox' ? t.checked : t.value;
+  else if (it && t.dataset.copt === 'link' && it.t === 'extent' && t.value === '@main') { const v = S._plan || (S.mv && { cx: S.mv.cx, cy: S.mv.cy, sc: S.mv.sc, W: 800, H: 460 }); if (!v) { toast('Open the Map page and set its view first; then choose it here.'); t.value = it.o?.link || ''; return; } it.o = { ...(it.o || {}), link: '@main', ext: { cx: +v.cx.toFixed(2), cy: +v.cy.toFixed(2), hw: +(v.W / 2 / v.sc).toFixed(2), hh: +(v.H / 2 / v.sc).toFixed(2) } }; }
   else if (it && t.dataset.copt) it.o = { ...(it.o || {}), [t.dataset.copt]: t.value };
   else if (it && t.dataset.cxs) it.o = { ...(it.o || {}), xs: { ...(it.o?.xs || S.xs), [t.dataset.cxs]: t.checked } };
   else if (it && t.dataset.coptNone) { const k = t.dataset.coptNone; it.o = { ...(it.o || {}), [k]: t.checked ? 'none' : (k === 'fillc' || k === 'bg' ? '#ffffff' : '#1f2937') }; }
