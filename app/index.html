@@ -2353,7 +2353,7 @@ function layersPanelHTML() {
       UTM Zone ${z}${zFixed ? ', from the boreholes’ coordinate system' : ''}.</p>${basemapKey() === 'apple' && window.desktop?.appleMaps && !S.readOnly ? `<button class="btn" data-act="apple-setup">${S.apple.who ? 'Apple Maps key…' : 'Set up Apple Maps…'}</button>` : ''}
     <h4>Go to</h4>${goToHTML()}
     <h4>Layers</h4><ul class="lyr-list">${rows}</ul>
-    <details class="lbl-site"><summary>Borehole labels</summary>${labelsHTML('s')}</details>
+    <details class="lbl-site" ${S.lblOpen ? 'open' : ''}><summary>Borehole labels</summary>${labelsHTML('s')}</details>
     <h4>Results on the map</h4>${resPickHTML()}
     <h4>Water levels for contours and flow</h4><div class="gw-src-pick">${gwSrcHTML()}</div>${gwSkipHTML(gwHeads(mapList()).skip)}
     <details ${S.offMap.size ? 'open' : ''}><summary>Boreholes on maps · ${ps.filter(onMap).length} of ${ps.length}</summary><div class="lyr-bhs">${bh}</div><p class="note">Unticked boreholes are left out of maps, sections and the flow calculation, never out of logs or tables.</p></details>`;
@@ -8871,7 +8871,7 @@ function labelsHTML(pre) {
     + '<label class="cmp-geo"><span>Colour</span><input type="color" ' + d + '="color" value="' + (c.color || '#1f2937') + '" ' + ro + '></label>'
     + '<label class="cmp-geo"><span>Backing</span><select ' + d + '="bg" ' + ro + '>' + [['', 'As the map'], ['box', 'Box'], ['halo', 'White halo'], ['none', 'None']].map(([v, l]) => '<option value="' + v + '" ' + ((c.bg || '') === v ? 'selected' : '') + '>' + l + '</option>').join('') + '</select></label>'
     + '<label class="cmp-geo"><span>Position</span><select ' + d + '="pos" ' + ro + '>' + Object.entries(LBL_POS).map(([v, l]) => '<option value="' + v + '" ' + ((c.pos || 'r') === v ? 'selected' : '') + '>' + l + '</option>').join('') + '</select></label></div>'
-    + (rows ? '<details class="lbl-each"><summary>Each borehole’s label</summary><table class="sum lbl-tab"><thead><tr><th>Borehole</th><th>Label</th><th>Position</th><th>Show</th></tr></thead><tbody>' + rows + '</tbody></table>' + (pre === 'c' ? '<p class="note">Drag a label on the selected map to nudge it.</p>' : '') + '</details>' : '')
+    + (rows ? '<details class="lbl-each" ' + (S.lblEachOpen ? 'open' : '') + '><summary>Each borehole’s label</summary><table class="sum lbl-tab"><thead><tr><th>Borehole</th><th>Label</th><th>Position</th><th>Show</th></tr></thead><tbody>' + rows + '</tbody></table>' + (pre === 'c' ? '<p class="note">Drag a label on the selected map to nudge it.</p>' : '') + '</details>' : '')
     + '<div class="cmp-row"><button class="btn" data-' + pre + 'lblact="reset" ' + ro + '>Reset labels</button>' + (pre === 'c' ? '<button class="btn" data-clblact="project" ' + ro + ' title="Use these labels on the Map page and every map that has not got its own">Use for every map</button>' : '') + '</div>';
 }
 /* one change from a label editor, applied to a label settings object (a map's own, or the project's) */
@@ -10167,7 +10167,7 @@ function resReach(s, P) {
   if (!nn.length) return Infinity; nn.sort((a, c) => a - c); return Math.max(5, nn[Math.min(nn.length - 1, Math.floor(nn.length * .75))]);
 }
 function resStyle(p) {
-  const s = { viz: 'both', interp: 'krige', reach: null, limit: true, lim: null, op: .6, labels: 'value', nd: '#ffffff', ...resDefault(p), ...(siteOf()?.resStyle?.[p] || {}) };
+  const s = { viz: 'both', interp: 'krige', reach: null, limit: true, lim: null, op: .6, labels: 'value', nd: '#ffffff', psize: 12.5, lsize: 11, lpos: 'br', ...resDefault(p), ...(siteOf()?.resStyle?.[p] || {}) };
   const br = (s.breaks || []).map(Number).filter(v => v > 0).sort((a, c) => a - c); s.breaks = br;
   s.colors = Array.from({ length: br.length + 1 }, (_, i) => s.colors?.[i] || rampOf(br.length + 1)[i]);
   return s;
@@ -10217,13 +10217,13 @@ function resultsLayerSVG(pts, X, Y, M = S.mres) {
   }
   const zs = vals.map(x => lg(x.r.v)), z0 = Math.min(...zs), z1 = Math.max(...zs);
   for (const { b, r } of all.filter(x => x.b.resOff)) { const x = X(b.easting), y = Y(b.northing), val = `${r.lt ? '<' : ''}${nfmt(r.v)}`;
-    o.push(`<g data-res="${esc(b.id)}" data-resoff="1"><title>${esc(`${gwName(b)}: ${resLabel(p)} ${val} ${u}, left out of the contours`)}</title><circle cx="${x}" cy="${y}" r="12.5" style="fill:none;stroke:var(--muted)" stroke-width="1.4" stroke-dasharray="3 2"/>${s.labels === 'none' ? '' : `<text x="${x + 10}" y="${y + 21}" style="font:italic 11px var(--f-mono, monospace);fill:var(--muted);paint-order:stroke;stroke:#fff;stroke-width:3">${esc(val)} (not used)</text>`}</g>`); }
+    o.push(`<g data-res="${esc(b.id)}" data-resoff="1"><title>${esc(`${gwName(b)}: ${resLabel(p)} ${val} ${u}, left out of the contours`)}</title><circle cx="${x}" cy="${y}" r="${+s.psize || 12.5}" style="fill:none;stroke:var(--muted)" stroke-width="1.4" stroke-dasharray="3 2"/>${s.labels === 'none' ? '' : `<text ${resLabPos(s, x, y, +s.psize || 12.5)} style="font:italic ${+s.lsize || 11}px var(--f-mono, monospace);fill:var(--muted);paint-order:stroke;stroke:#fff;stroke-width:3">${esc(val)} (not used)</text>`}</g>`); }
   for (const { b, r } of vals) {
     const x = X(b.easting), y = Y(b.northing), val = `${r.lt ? '<' : ''}${nfmt(r.v)}`, c = symFill(resColour(p, r));
-    const rad = s.viz === 'graduated' ? 6 + 14 * (z1 > z0 ? (lg(r.v) - z0) / (z1 - z0) : .5) : 12.5;
+    const kz = (+s.psize || 12.5) / 12.5, rad = kz * (s.viz === 'graduated' ? 6 + 14 * (z1 > z0 ? (lg(r.v) - z0) / (z1 - z0) : .5) : 12.5);
     const lab = s.labels === 'none' ? '' : s.labels === 'id' ? `${gwName(b)} ${val}` : val;
     o.push(`<g data-res="${esc(b.id)}"><title>${esc(`${gwName(b)}: ${resLabel(p)} ${val} ${u} at ${fu(r.sm.depth)} (${sampleId(r.sm)})`)}</title><circle cx="${x}" cy="${y}" r="${rad.toFixed(1)}" style="fill:${c};stroke:var(--ink)" stroke-width=".9" opacity=".95"/>
-      ${lab ? `<text x="${x + 10}" y="${y + 21}" style="font:700 11px var(--f-mono, monospace);fill:${lim != null && !r.lt && r.v > lim ? '#a3271a' : 'var(--ink)'};paint-order:stroke;stroke:#fff;stroke-width:3">${esc(lab)}</text>` : ''}</g>`);
+      ${lab ? `<text ${resLabPos(s, x, y, rad)} style="font:700 ${+s.lsize || 11}px var(--f-mono, monospace);fill:${lim != null && !r.lt && r.v > lim ? '#a3271a' : 'var(--ink)'};paint-order:stroke;stroke:#fff;stroke-width:3">${esc(lab)}</text>` : ''}</g>`);
   }
   return o.join('');
 }
@@ -10242,9 +10242,15 @@ function resStyleHTML(p) {
     <label class="check note"><input type="checkbox" data-rs="limit" ${s.limit ? 'checked' : ''} ${ro}> Limit outline at</label><input type="number" step="any" min="0" data-rs="lim" value="${s.lim ?? ''}" placeholder="${p === 'cvc' ? (S.co.vThr ?? 100) : projGuide()[p] ?? 'value'}" style="width:90px" ${ro}><span class="note">${esc(u)}</span>
     <label class="note" for="rs-op">Shading</label><input id="rs-op" type="range" min=".1" max="1" step=".05" data-rs="op" value="${s.op}" ${ro}>
     <label class="note" for="rs-labels">Labels</label><select id="rs-labels" data-rs="labels" ${ro}>${opt({ value: 'Value', id: 'Borehole and value', none: 'None' }, s.labels)}</select>
+    <label class="note" for="rs-lpos">Label place</label><select id="rs-lpos" data-rs="lpos" ${ro}>${opt({ br: 'Below right', r: 'Right', l: 'Left', t: 'Above', b: 'Below' }, s.lpos)}</select>
+    <label class="note" for="rs-lsize">Label size</label><input id="rs-lsize" type="number" min="6" max="30" step="0.5" data-rs="lsize" value="${s.lsize}" style="width:70px" ${ro}><span class="note">px</span>
+    <label class="note" for="rs-psize">Point size</label><input id="rs-psize" type="number" min="3" max="40" step="0.5" data-rs="psize" value="${s.psize}" style="width:70px" ${ro}><span class="note">px radius${s.viz === 'graduated' ? ' (the middle size; graduated points scale with it)' : ''}</span>
     <h4>Boreholes in the contours</h4><div class="rs-use">${mapList().filter(b => resultAt(b, p)).map(b => `<label class="check note"><input type="checkbox" data-resuse="${esc(b.id)}" ${b.resOff ? '' : 'checked'} ${ro}> ${esc(gwName(b))}</label>`).join('') || '<span class="note">No results yet.</span>'}</div>
     <p class="note">Saved with the project: the Map page, the VOC map, report maps and legends all use it. An unticked borehole stays on the map, hollow, but is left out of the shading and contours.</p></details>`;
 }
+/* where a result's value label sits: below right (as before), right, left, above or below the point, clear of its circle */
+function resLabPos(s, x, y, rad) { const fs = +s.lsize || 11, p = s.lpos || 'br', at = (X, Y, a) => 'x="' + X.toFixed(1) + '" y="' + Y.toFixed(1) + '" text-anchor="' + a + '"';
+  return p === 'r' ? at(x + rad + 4, y + fs * .35, 'start') : p === 'l' ? at(x - rad - 4, y + fs * .35, 'end') : p === 't' ? at(x, y - rad - 4, 'middle') : p === 'b' ? at(x, y + rad + fs, 'middle') : at(x + rad * .8, y + rad + fs * .75, 'start'); }
 function vapourMapSVG(W, H) {
   const list = mapList(), F = mapFrame(list, W, H); if (!F) return '<p class="note">Add easting and northing to plot boreholes.</p>';
   const p = S.mapParam && LAB_PARAMS[S.mapParam] ? S.mapParam : 'cvc', { X, Y } = F, o = [...F.head];
@@ -10268,6 +10274,7 @@ function contamHTML() {
       <div class="body"><div class="scroll-x map-box">${vapourMapSVG(620, 460)}</div>
       <div class="legend">${legendRows('vap', mapList()).filter(r => !r.head).map(r => `<span><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true">${r.sym(11, 7)}</svg>${esc(r.t)}</span>`).join('')}</div>
       ${resStyleHTML(S.mapParam && LAB_PARAMS[S.mapParam] ? S.mapParam : 'cvc')}
+      <details class="lbl-site" ${S.lblOpen ? 'open' : ''}><summary>Borehole labels</summary>${labelsHTML('s')}</details>
       <p class="note">Highest headspace reading in each borehole${S.vFrom != null || S.vTo != null ? ' in the chosen depth range' : ''}. Shading, contours and the outline are interpolated in log₁₀ between boreholes (kriging by default, held between the highest and lowest reading; or as chosen under Style and contours), only inside the outer boreholes, and within a set distance of a reading if one is given. They are an interpretation to guide sampling, not a measured boundary; confirm with laboratory analysis.</p></div></section>
     <section class="sec"><header><h3>Highest reading by borehole</h3></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th title="Untick to leave a borehole out of the shading and contours; it stays on the map">Use</th><th>Borehole</th><th class="r">Max (ppm)</th><th class="r">Depth (${LEN()})</th><th>Sample</th><th class="r">Readings</th></tr></thead><tbody>
       ${rows.map(r => `<tr${r.b.resOff ? ' class="muted"' : ''}><td><input type="checkbox" data-resuse="${esc(r.b.id)}" ${r.b.resOff ? '' : 'checked'} ${S.readOnly ? 'disabled' : ''} aria-label="Use ${esc(r.b.name)} in the contours"></td><td><button class="pick" data-pick="${esc(r.b.id)}" data-goto="log">${r.s ? `<span class="dot sq" style="background:${symFill(resColour('cvc', { v: r.s.cvc }))};border:1px solid var(--ink)"></span>` : '<span class="dot sq" style="background:var(--panel);border:1px dashed var(--muted)"></span>'}${esc(r.b.name)}</button></td><td class="r">${r.s ? `<b${r.s.cvc >= thr ? ' style="color:var(--negative)"' : ''}>${r.s.cvc.toLocaleString('en-CA')}</b>` : '—'}</td><td class="r">${r.s ? fx(r.s.depth) : '—'}</td><td>${r.s ? esc(sampleId(r.s)) : '—'}</td><td class="r">${r.n}</td></tr>`).join('')}</tbody></table></div></div></section>
@@ -11212,7 +11219,7 @@ document.addEventListener('change', e => { if (e.target.id === 'out-sort') { S.o
 document.addEventListener('change', e => {
   const el = e.target, box = el.closest?.('.res-style'); if (!box || S.readOnly) return;
   const p = resEdP(box), s = resStyle(p);
-  if (el.dataset.rs) { const k = el.dataset.rs, v = el.type === 'checkbox' ? el.checked : ['op', 'lim', 'reach'].includes(k) ? (el.value === '' ? null : +el.value) : el.value; setResStyle(p, { [k]: v }); }
+  if (el.dataset.rs) { const k = el.dataset.rs, v = el.type === 'checkbox' ? el.checked : ['op', 'lim', 'reach', 'psize', 'lsize'].includes(k) ? (el.value === '' ? null : +el.value) : el.value; setResStyle(p, { [k]: v }); }
   else if (el.dataset.rsc != null) { const c = [...s.colors]; c[+el.dataset.rsc] = el.value; setResStyle(p, { colors: c }); }
   else if (el.dataset.rsnone != null) { const c = [...s.colors], i = +el.dataset.rsnone; c[i] = el.checked ? 'none' : rampOf(c.length)[i] === '#ffffff' ? '#fff5c2' : rampOf(c.length)[i]; setResStyle(p, { colors: c }); }
   else if (el.dataset.rsb != null) { const b = [...s.breaks], v = +el.value; if (v > 0) { b[+el.dataset.rsb] = v; const pairs = b.map((x, i) => [x, s.colors[i + 1]]).sort((q, r) => q[0] - r[0]); setResStyle(p, { breaks: pairs.map(q => q[0]), colors: [s.colors[0], ...pairs.map(q => q[1])] }); } }
@@ -11228,7 +11235,7 @@ document.addEventListener('click', e => {
   else { const st = siteOf() || {}, rs = { ...(st.resStyle || {}) }; delete rs[p]; setSite({ ...st, resStyle: rs }); }
   renderView(true);
 });
-document.addEventListener('toggle', e => { if (e.target.classList?.contains('res-style')) S.resOpen = e.target.open; }, true);
+document.addEventListener('toggle', e => { if (e.target.classList?.contains('res-style')) S.resOpen = e.target.open; if (e.target.classList?.contains('lbl-site')) S.lblOpen = e.target.open; if (e.target.classList?.contains('lbl-each')) S.lblEachOpen = e.target.open; }, true);
 document.addEventListener('change', e => { const id = e.target.dataset?.resuse; if (!id || S.readOnly) return; const b = S.bh.get(id); if (!b) return; if (e.target.checked) delete b.resOff; else b.resOff = true; b.updated = new Date().toISOString(); store.save(b); renderView(true); });
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-clblact], [data-slblact]'); if (!b || S.readOnly) return;

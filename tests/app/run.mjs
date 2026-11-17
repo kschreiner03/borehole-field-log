@@ -1220,6 +1220,35 @@ app.whenReady().then(async () => {
     expect(!r.length, r.join(' || '));
   });
 
+  await check('vapour map: point size, value label size and place, and borehole labels editable; output maps follow', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); S.mapParam = ''; goTab('contam'); await w(500);
+        const set = async (sel, v) => { const el = document.querySelector(sel); if (!el) { F.push('no ' + sel); return; } if (el.type === 'checkbox') el.checked = v; else el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await w(300); };
+        const map = () => document.querySelector('.map-box svg');
+        const pts = () => [...map().querySelectorAll('[data-res]:not([data-resoff]) circle')].map(c => +c.getAttribute('r'));
+        want(pts().length > 0, 'result points drawn: ' + pts().length);
+        await set('#rs-viz', 'points'); await set('#rs-psize', '20');
+        want(pts().every(v => v === 20), 'point size 20: ' + pts().slice(0, 4));
+        await set('#rs-lsize', '15'); await set('#rs-lpos', 't');
+        const tx = map().querySelector('[data-res]:not([data-resoff]) text'); want(tx && /15px/.test(tx.getAttribute('style')) && tx.getAttribute('text-anchor') === 'middle' && +tx.getAttribute('y') < +tx.parentNode.querySelector('circle').getAttribute('cy'), 'value label 15 px, above: ' + tx?.outerHTML.slice(0, 160));
+        // graduated sizes scale with it
+        await set('#rs-viz', 'graduated'); const g = pts(); want(Math.max(...g) <= 20 * 20 / 12.5 + .1 && Math.max(...g) > 20, 'graduated scales with the size: ' + Math.max(...g));
+        // borehole name labels on this page
+        want(document.querySelector('.lbl-site [data-slbl="size"]'), 'the label editor is on the VOC map page');
+        await set('[data-slbl="size"]', '16'); const b = mapList().find(x => x.easting != null);
+        await set('[data-slblb="' + b.id + '.t"]', 'VAP-NAME');
+        want([...map().querySelectorAll('[data-lbl] text')].some(x => x.textContent === 'VAP-NAME' && /16px/.test(x.getAttribute('style'))), 'a borehole renamed and resized on the map');
+        // an output vapour map follows the project settings
+        const pg = newPage('free'), it = newItem('vap', 40, 120, { w: 600, h: 440 }); pg.items.push(it);
+        const svg = pageItemsSVG(pg); want(svg.includes('VAP-NAME') && /font:700 15px/.test(svg), 'the output map follows');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
   await check('outputs: map symbols for boreholes and wells, per map or for the project; legend on or off', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
