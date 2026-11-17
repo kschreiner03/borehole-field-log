@@ -4613,7 +4613,19 @@ function plumeContours(P, levels) {
    Soil and vapour: the triangulated network of samples, inside the data only. Every field fades out over 5 m past the
    outermost data point and stays below the water table (groundwater). */
 const PF_FADE = 5, PF_SCREEN = .35, PF_CLAMP = 2;
-const XS_INTERP = { krige: 'Kriging, 3D (layered)', idw: 'Inverse distance, 3D', tin: 'Triangles between samples on the section' };
+const XS_METHODS = {
+  krige: ['Ordinary kriging, 3D', 'Matheron (1963); Isaaks & Srivastava (1989). As ArcGIS Kriging (ordinary) and SAGA Ordinary Kriging in QGIS. The standard estimate, with its error.'],
+  uk: ['Universal kriging, 3D (trend)', 'Kriging with a linear trend in plan and depth: Matheron (1969); Goovaerts (1997). As ArcGIS Kriging (universal) and SAGA Universal Kriging. For a plume that grades one way, e.g. lower with depth or away from the source.'],
+  ik: ['Indicator kriging: chance over the guideline', 'Journel (1983); Goovaerts (1997). As ArcGIS Geostatistical Analyst indicator kriging. Each sample is over (1) or under (0) the guideline; the contours are the 50, 80 and 95 % chance of exceeding it, not concentrations.'],
+  rst: ['Spline with tension, 3D', 'Regularized spline with tension: Mitasova & Mitas (1993); Mitasova et al. (1995). As GRASS v.vol.rst (in QGIS through GRASS). Smooth, passes close to every sample; held to the range of the samples.'],
+  rbf: ['Radial basis: multiquadric, 3D', 'Hardy (1971). As ArcGIS Radial Basis Functions (multiquadric). Smooth and exact at the samples; held to their range.'],
+  idw: ['Inverse distance, 3D', 'Shepard (1968). As QGIS IDW and GDAL grid invdistnn (12 nearest, power 2). Local; can look spotty.'],
+  nn: ['Natural neighbour, on the section', 'Sibson (1981), discrete form of Park et al. (2006). As ArcGIS Natural Neighbor and SAGA Natural Neighbour. Local and smooth, nothing beyond the samples; worked in the section plane (nearby boreholes placed onto it).'],
+  near: ['Nearest sample, 3D', 'Thiessen (1911) polygons in 3D. As GDAL grid nearest. Each spot takes the closest sample: nothing is invented between them.'],
+  tin: ['Triangles on the section', 'Linear interpolation on a Delaunay triangulation of the samples on the section. As QGIS TIN interpolation (linear).'],
+};
+const XS_INTERP = Object.fromEntries(Object.entries(XS_METHODS).map(([k, v]) => [k, v[0]]));
+const XS_3D = new Set(['krige', 'uk', 'ik', 'rst', 'rbf', 'idw', 'nn', 'near']);
 const XS_ANISO = [1, 3, 10, 30, 100];
 /* the samples the 3D methods use: every located borehole within reach of the section (on it or off it), in real metres. Values
    are log10; a non-detect counts as clean at half its detection limit (one at or over the first level is left out: it says
@@ -4646,6 +4658,28 @@ function variogram3d(P, k) {
     for (const nf of [0, .05, .1, .2, .3, .45]) { const nug = nf * sill, err = bins.reduce((a, [h, g, c]) => a + c * (g - (nug + (sill - nug) * (1 - Math.exp(-3 * h / range)))) ** 2, 0); if (!best || err < best.err) best = { err, range, nug }; } }
   return { nug: best.nug, sill, range: best.range, h3 };
 }
+function invertSym(A0) {
+  const m = A0.length, A = A0.map((r, i) => { const x = new Float64Array(2 * m); for (let j = 0; j < m; j++) x[j] = r[j]; x[m + i] = 1; return x; });
+  for (let c = 0; c < m; c++) { let r = c; for (let i = c + 1; i < m; i++) if (Math.abs(A[i][c]) > Math.abs(A[r][c])) r = i; if (Math.abs(A[r][c]) < 1e-12) return null; [A[c], A[r]] = [A[r], A[c]];
+    const p = A[c][c]; for (let q = 0; q < 2 * m; q++) A[c][q] /= p; for (let i = 0; i < m; i++) if (i !== c && A[i][c]) { const f = A[i][c]; for (let q = 0; q < 2 * m; q++) A[i][q] -= f * A[c][q]; } }
+  return A.map(r => r.slice(m));
+}
+/* P: samples [E, N, z, value]; ker(q, p) the kernel; trend: 'const' (one term) or 'linear' (1, E, N, z, scaled); nugget on the
+   diagonal for smoothing. Returns val(E, N, z), var(E, N, z) (kriging variance when ker is a variogram), loo (median |error|) */
+function kernelFit(P, ker, trend = 'const', diag = 0) {
+  const n = P.length; if (n < (trend === 'linear' ? 6 : 3)) return null;
+  const c0 = [0, 1, 2].map(k => P.reduce((s, p) => s + p[k], 0) / n), sc = Math.max(1, ...P.map(p => Math.hypot(p[0] - c0[0], p[1] - c0[1], p[2] - c0[2])));
+  const basis = q => trend === 'linear' ? [1, (q[0] - c0[0]) / sc, (q[1] - c0[1]) / sc, (q[2] - c0[2]) / sc] : [1], nb = basis(P[0]).length, m = n + nb;
+  const A = Array.from({ length: m }, () => new Float64Array(m));
+  for (let i = 0; i < n; i++) { for (let j = 0; j < n; j++) A[i][j] = ker(P[i], P[j]) + (i === j ? diag : 0); const f = basis(P[i]); for (let l = 0; l < nb; l++) A[i][n + l] = A[n + l][i] = f[l]; }
+  const inv = invertSym(A); if (!inv) return null;
+  const y = [...P.map(p => p[3]), ...Array(nb).fill(0)], al = inv.map(r => r.reduce((s, v, j) => s + v * y[j], 0)), lo = Math.min(...y.slice(0, n)), hi = Math.max(...y.slice(0, n));
+  const bOf = q => [...P.map(p => ker(q, p)), ...basis(q)];
+  const val = (E, N, z) => { const b = bOf([E, N, z]); let v = 0; for (let i = 0; i < m; i++) v += al[i] * b[i]; return Math.max(lo, Math.min(hi, v)); };
+  const vr = (E, N, z) => { const b = bOf([E, N, z]); let s = 0; for (let i = 0; i < m; i++) { let w = 0; for (let j = 0; j < m; j++) w += inv[i][j] * b[j]; s += w * b[i]; } return Math.max(0, s); };
+  const errs = P.map((_, i) => Math.abs(al[i] / inv[i][i])).sort((a, b) => a - b);
+  return { val, var: vr, loo: errs[Math.floor(errs.length / 2)], lo, hi };
+}
 /* ordinary kriging in 3D with that variogram. fit(E, N, z) -> [log10 value, kriging variance]; loo = typical leave-one-out
    error (median |error|, log10), from the inverse of the kriging matrix (each sample predicted from all the others) */
 function krige3d(P, k) {
@@ -4663,6 +4697,41 @@ function krige3d(P, k) {
   const val = (E, N, z) => { const q = [E, N, z]; let v = al[n]; for (let i = 0; i < n; i++) v += al[i] * gam(V.h3(q, P[i])); return Math.max(lo, Math.min(hi, v)); };
   return { fit, val, V, loo: errs[Math.floor(errs.length / 2)] };
 }
+function ukrige3d(P, k) {
+  if (P.length < 6) return null; const n = P.length, c0 = [0, 1, 2].map(j => P.reduce((s, p) => s + p[j], 0) / n);
+  // the linear trend by least squares (normal equations), then the variogram of the residuals
+  const X = P.map(p => [1, p[0] - c0[0], p[1] - c0[1], k * (p[2] - c0[2])]), XtX = [0, 1, 2, 3].map(a => [0, 1, 2, 3].map(b => X.reduce((s, r) => s + r[a] * r[b], 0))), inv = invertSym(XtX.map(r => r.map((v, i) => v + (i === r.length ? 0 : 0))));
+  if (!inv) return null; const Xty = [0, 1, 2, 3].map(a => X.reduce((s, r, i) => s + r[a] * P[i][3], 0)), beta = inv.map(r => r.reduce((s, v, j) => s + v * Xty[j], 0));
+  const R = P.map((p, i) => [p[0], p[1], p[2], p[3] - X[i].reduce((s, v, j) => s + v * beta[j], 0)]), V = variogram3d(R, k);
+  const gam = h => h < 1e-9 ? 0 : V.nug + (V.sill - V.nug) * (1 - Math.exp(-3 * h / V.range)), M = kernelFit(P, (a, b) => gam(V.h3(a, b)), 'linear');
+  return M && { ...M, V, trend: beta };
+}
+/* indicator kriging: 1 where a sample is over the guideline, 0 where under (non-detects under it count as 0); ordinary kriging of
+   the indicators gives the chance of exceeding the guideline, 0–1 */
+function ikrige3d(P, k, g) {
+  const L = Math.log10(g), I = P.map(p => [p[0], p[1], p[2], p[3] >= L ? 1 : 0]), ones = I.filter(p => p[3]).length;
+  if (!ones || ones === I.length) { const c = ones ? 1 : 0; return { val: () => c, var: () => 0, loo: 0, V: { sill: 1, range: 1, nug: 0 }, constant: true }; }
+  const V = variogram3d(I, k), gam = h => h < 1e-9 ? 0 : V.nug + (V.sill - V.nug) * (1 - Math.exp(-3 * h / V.range)), M = kernelFit(I, (a, b) => gam(V.h3(a, b)));
+  return M && { ...M, V };
+}
+/* radial basis functions in 3D, layered: the multiquadric of Hardy (1971), sqrt(r² + c²) with c the typical spacing, and the
+   completely regularized spline with tension of Mitasova et al. (1995), R(ρ) = erf(ρ/2)/ρ − 1/√π with ρ = φr, φ = 2 / spacing.
+   A linear trend is added (the conditionally positive definite form) and a small smoothing on the diagonal */
+function rbf3d(P, k, kind) {
+  if (P.length < 6) return null; const h3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], k * (a[2] - b[2]));
+  const nn = P.map((p, i) => Math.min(...P.filter((_, j) => j !== i).map(q => h3(p, q) || Infinity))).filter(isFinite).sort((a, b) => a - b), sp = Math.max(.5, nn[Math.floor(nn.length / 2)] || 1);
+  const ker = kind === 'mq' ? (a, b) => Math.sqrt(h3(a, b) ** 2 + sp * sp) : (a, b) => { const r = h3(a, b) * 2 / sp; return r < 1e-9 ? 0 : erf(r / 2) / r - 1 / Math.sqrt(Math.PI); };
+  const M = kernelFit(P, ker, 'linear');
+  return M && { ...M, spacing: sp * 2.5, h3 };
+}
+/* nearest sample in 3D (Thiessen) */
+function near3d(P, k) {
+  if (!P.length) return null; const h3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], k * (a[2] - b[2]));
+  const nn = P.map((p, i) => Math.min(...P.filter((_, j) => j !== i).map(q => h3(p, q) || Infinity))).filter(isFinite).sort((a, b) => a - b), sp = Math.max(1, nn[Math.floor(nn.length / 2)] || 1) * 2.5;
+  const val = (E, N, z) => { const q = [E, N, z]; let b = Infinity, v = 0; for (const p of P) { const d = h3(q, p); if (d < b) { b = d; v = p[3]; } } return v; };
+  const errs = P.map((p, i) => { let b = Infinity, v = 0; P.forEach((o, j) => { if (j === i) return; const d = h3(p, o); if (d < b) { b = d; v = o[3]; } }); return Math.abs(v - p[3]); }).sort((a, b) => a - b);
+  return { val, loo: errs[Math.floor(errs.length / 2)], spacing: sp, h3 };
+}
 /* inverse distance in 3D, layered the same way: the 12 nearest, power 2. The spread is how far the nearest sample is, against
    the typical spacing */
 function idw3d(P, k) {
@@ -4673,19 +4742,37 @@ function idw3d(P, k) {
   const errs = P.map((p, i) => { const rest = P.filter((_, j) => j !== i), d = rest.map(q => [h3(p, q), q[3]]).sort((a, b) => a[0] - b[0]).slice(0, 12); let sw = 0, sv = 0; for (const [h, v] of d) { const w = 1 / Math.max(h * h, 1e-9); sw += w; sv += w * v; } return Math.abs(sv / sw - p[3]); }).sort((a, b) => a - b);
   return { fit, loo: errs[Math.floor(errs.length / 2)], spacing: sp };
 }
+function nn2d(P, k, G) {
+  if (P.length < 3) return null; const path = []; for (let i = 0; i <= 120; i++) path.push(G.pos.at(G.maxD * i / 120));
+  const S2 = P.map(p => { let b = 0, bd = Infinity; path.forEach((q, i) => { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; b = i; } }); return [G.maxD * b / 120, k * p[2], p[3]]; });
+  const nx = Math.max(20, Math.min(160, Math.ceil(G.plotW / 5))), ny = Math.max(12, Math.min(100, Math.ceil(G.plotH / 5))), x0 = 0, x1 = G.maxD || 1, y0 = k * G.e0, y1 = k * G.e1, dx = (x1 - x0) / nx, dy = (y1 - y0) / ny;
+  const acc = new Float64Array((nx + 1) * (ny + 1)), cnt = new Float64Array((nx + 1) * (ny + 1)), near = (x, y) => { let b = Infinity, v = 0; for (const s of S2) { const d = Math.hypot(s[0] - x, s[1] - y); if (d < b) { b = d; v = s[2]; } } return [b, v]; };
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { const x = x0 + i * dx, y = y0 + j * dy, [r, v] = near(x, y), ri = Math.ceil(r / dx), rj = Math.ceil(r / dy);
+    for (let jj = Math.max(0, j - rj); jj <= Math.min(ny, j + rj); jj++) for (let ii = Math.max(0, i - ri); ii <= Math.min(nx, i + ri); ii++) if (Math.hypot((ii - i) * dx, (jj - j) * dy) <= r) { const q = jj * (nx + 1) + ii; acc[q] += v; cnt[q]++; } }
+  const val = (E, N, z) => { let b = 0, bd = Infinity; path.forEach((q, i) => { const d = Math.hypot(q[0] - E, q[1] - N); if (d < bd) { bd = d; b = i; } }); const fi = Math.max(0, Math.min(nx, (G.maxD * b / 120 - x0) / dx)), fj = Math.max(0, Math.min(ny, (k * z - y0) / dy)), i = Math.round(fi), j = Math.round(fj), q = j * (nx + 1) + i; return cnt[q] ? acc[q] / cnt[q] : near(fi * dx, k * z)[1]; };
+  const errs = S2.map((s, i) => { let b = Infinity, v = 0; S2.forEach((o, j) => { if (j === i) return; const d = Math.hypot(o[0] - s[0], o[1] - s[1]); if (d < b) { b = d; v = o[2]; } }); return Math.abs(v - s[2]); }).sort((a, b) => a - b);
+  return { val, loo: errs[Math.floor(errs.length / 2)] };
+}
 /* a 3D method as a section field: evaluated on a coarse grid along the line and blended between nodes. Weight = how well the
    samples support each spot (1 at a sample, fading to 0 where kriging can say little), so unsupported areas fade out */
 function plume3dField(G, xs, medium, param, lv, how) {
-  const P = plume3dPts(G, xs, medium, param, lv), k = +xs.aniso || 10, M = how === 'idw' ? idw3d(P, k) : krige3d(P, k); if (!M) return null;
+  const P = plume3dPts(G, xs, medium, param, lv), k = +xs.aniso || 10, g0 = lv[0]?.v;
+  if (how === 'ik' && !(g0 > 0)) return null;
+  const M = how === 'idw' ? idw3d(P, k) : how === 'uk' ? ukrige3d(P, k) : how === 'ik' ? ikrige3d(P, k, g0) : how === 'rst' ? rbf3d(P, k, 'rst') : how === 'rbf' ? rbf3d(P, k, 'mq') : how === 'near' ? near3d(P, k) : how === 'nn' ? nn2d(P, k, G) : krige3d(P, k); if (!M) return null;
+  const isK = how === 'krige' || how === 'uk' || how === 'ik', h3 = M.h3 || ((a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], k * (a[2] - b[2]))), sp = M.spacing || (() => { const nn = P.map((p, i) => Math.min(...P.filter((_, j) => j !== i).map(q => h3(p, q) || Infinity))).filter(isFinite).sort((a, b) => a - b); return Math.max(1, nn[Math.floor(nn.length / 2)] || 1) * 2.5; })();
+  if (!M.fit) M.fit = (E, N, z) => { const q = [E, N, z]; return [M.val(E, N, z), isK ? M.var(E, N, z) : Math.min(1, (Math.min(...P.map(p => h3(q, p))) / sp) ** 2)]; };
+  // a chance (indicator kriging) is shown on the guideline's scale: 50 % at the guideline, 80 % at ×10, 95 % at ×100
+  const toC = how === 'ik' ? p => { const seg = [[0, -2], [.5, 0], [.8, 1], [.95, 2], [1, 2.5]]; let i = 1; while (i < seg.length - 1 && p > seg[i][0]) i++; const [a, la] = seg[i - 1], [b, lb] = seg[i]; return g0 * Math.pow(10, la + (lb - la) * Math.max(0, Math.min(1, (p - a) / (b - a)))); } : v => Math.pow(10, v);
   const nx = Math.max(8, Math.ceil(G.plotW / 10)), ny = Math.max(6, Math.ceil(G.plotH / 10)), vals = new Float32Array((nx + 1) * (ny + 1)), sup = new Float32Array((nx + 1) * (ny + 1));
-  const conf = s2 => how === 'idw' ? 1 - s2 : 1 - s2 / (M.V.sill || 1);
+  const conf = s2 => !isK ? 1 - s2 : 1 - s2 / (M.V.sill || 1);
   for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { const d = G.maxD * i / nx, e = G.e1 - (G.e1 - G.e0) * j / ny, [E, N] = G.pos.at(d), [v, s2] = M.fit(E, N, e); vals[j * (nx + 1) + i] = v; sup[j * (nx + 1) + i] = Math.max(0, Math.min(1, (conf(s2) - .1) / .6)); }
   const at = (d, e) => { const fi = Math.max(0, Math.min(nx, d / (G.maxD || 1) * nx)), fj = Math.max(0, Math.min(ny, (G.e1 - e) / ((G.e1 - G.e0) || 1) * ny)), i = Math.min(nx - 1, Math.floor(fi)), j = Math.min(ny - 1, Math.floor(fj)), u = fi - i, w = fj - j, W = nx + 1;
     const bl = A => A[j * W + i] * (1 - u) * (1 - w) + A[j * W + i + 1] * u * (1 - w) + A[(j + 1) * W + i] * (1 - u) * w + A[(j + 1) * W + i + 1] * u * w;
-    const [E, N] = G.pos.at(d); return [Math.pow(10, M.val ? M.val(E, N, e) : M.fit(E, N, e)[0]), bl(sup)]; };
-  const fac = Math.pow(10, M.loo), name = how === 'idw' ? 'Inverse distance, 3D' : 'Kriging, 3D';
-  const note = name + ' on log values, layered ×' + k + ' (a metre down counts as ' + k + ' m sideways)' + (M.V ? ', fitted range ' + fu(M.V.range) + (M.V.nug ? ', nugget ' + Math.round(M.V.nug / M.V.sill * 100) + ' %' : '') : '') + ': ' + P.length + ' samples from ' + P.boreholes + ' borehole' + (P.boreholes === 1 ? '' : 's') + (P.off ? ' (' + P.off + ' off the line)' : '') + '; checked by predicting each sample from the others: typically within ×' + (fac < 10 ? fac.toFixed(1) : Math.round(fac)) + '. Faded where few samples support it; hatched where likely over the guideline but not confirmed.';
-  return { at, note, method: how };
+    const [E, N] = G.pos.at(d); return [toC(M.val ? M.val(E, N, e) : M.fit(E, N, e)[0]), bl(sup)]; };
+  const fac = Math.pow(10, M.loo), name = XS_METHODS[how][0];
+  const check = how === 'ik' ? (M.constant ? 'every sample is on the same side of the guideline' : 'each sample predicted from the others is on the wrong side ' + Math.round(M.loo * 100) + ' % of the way on average') : 'each sample predicted from the others is typically within ×' + (fac < 10 ? fac.toFixed(1) : Math.round(fac));
+  const note = name + (how === 'ik' ? ' (contours: 50, 80 and 95 % chance of exceeding the guideline)' : ' on log values') + ', layered ×' + k + ' (a metre down counts as ' + k + ' m sideways)' + (M.V ? ', fitted range ' + fu(M.V.range) + (M.V.nug ? ', nugget ' + Math.round(M.V.nug / M.V.sill * 100) + ' %' : '') : '') + ': ' + P.length + ' samples from ' + P.boreholes + ' borehole' + (P.boreholes === 1 ? '' : 's') + (P.off ? ' (' + P.off + ' off the line)' : '') + '; ' + check + '. Faded where few samples support it; hatched where likely over the guideline but not confirmed. Method: ' + XS_METHODS[how][1];
+  return { at, note, method: how, prob: how === 'ik' };
 }
 function plumeField(pos, xs, G, cell = 4) {
   const medium = xs.medium || 'soil', param = medium === 'vapour' ? '' : xs.param, date = xs.date || '';
@@ -4701,10 +4788,10 @@ function plumeField(pos, xs, G, cell = 4) {
   const dMin = pts.length ? Math.min(...pts.map(p => p.d)) : 0, dMax = pts.length ? Math.max(...pts.map(p => p.d)) : 0;
   const fade = d => d < dMin ? Math.max(0, 1 - (dMin - d) / PF_FADE) : d > dMax ? Math.max(0, 1 - (d - dMax) / PF_FADE) : 1;
   const lg = v => Math.log10(Math.max(v, 1e-12));
-  let method = medium === 'groundwater' ? (['data', 'krige', 'idw'].includes(xs.shape) ? xs.shape : 'guided') : (xs.interp || 'krige') === 'tin' ? 'points' : (xs.interp || 'krige'), note = '', at;
-  const f3 = (method === 'krige' || method === 'idw') && G.pos?.at && pts.length ? plume3dField(G, xs, medium, param, lv, method) : null;
+  let method = medium === 'groundwater' ? (xs.shape === 'data' || XS_3D.has(xs.shape) ? xs.shape : 'guided') : (xs.interp || 'krige') === 'tin' ? 'points' : (xs.interp || 'krige'), note = '', at;
+  const f3 = XS_3D.has(method) && G.pos?.at && pts.length ? plume3dField(G, xs, medium, param, lv, method) : null;
   if (f3) { const wtE = medium === 'groundwater' ? byD(pos.map(p => { const w = waterAt(p.b, date); return w && p.b.elevation != null ? [p.d, p.b.elevation - w.depth] : null; }).filter(Boolean)) : []; at = (d, e) => wtE.length && e > lerp(wtE, d) + 1e-9 ? [0, 0] : f3.at(d, e); note = f3.note; }
-  else if (method === 'krige' || method === 'idw') { method = medium === 'groundwater' ? 'data' : 'points'; note = 'Too few samples for the 3D method; shown with ' + (medium === 'groundwater' ? 'data only' : 'triangles') + '.'; }
+  else if (XS_3D.has(method)) { method = medium === 'groundwater' ? 'data' : 'points'; note = 'Too few samples for ' + XS_METHODS[xs.interp || xs.shape]?.[0] + '; shown with ' + (medium === 'groundwater' ? 'data only' : 'triangles') + '.'; }
   if (f3) {}
   else if (medium === 'groundwater') {
     const wtE = byD(pos.map(p => { const w = waterAt(p.b, date); return w && p.b.elevation != null ? [p.d, p.b.elevation - w.depth] : null; }).filter(Boolean));
@@ -4761,7 +4848,7 @@ function plumeField(pos, xs, G, cell = 4) {
     const x = x0 + (x1 - x0) * i / nx, y = y0 + (y1 - y0) * j / ny, d = (x - G.X(0)) / (G.X(G.maxD) - G.X(0) || 1) * G.maxD, e = G.e1 - (y - G.m.t) / G.plotH * (G.e1 - G.e0);
     const [v, w] = at(d, e); c[j * (nx + 1) + i] = Number.isFinite(v) ? v : 0; a[j * (nx + 1) + i] = Number.isFinite(w) ? w : 0;
   }
-  return { nx, ny, x0, x1, y0, y1, c, a, at, method, note, pts, lv, medium, param, hatch: !!f3 };
+  return { nx, ny, x0, x1, y0, y1, c, a, at, method, note, pts, lv, medium, param, hatch: !!f3, prob: !!f3?.prob };
 }
 /* contour lines of a field at one level (marching squares on log10, cells with weight under minA left out), joined into
    continuous polylines in drawing coordinates */
@@ -4825,7 +4912,7 @@ function fieldSVG(g, { style = 'graded', family = 'meas', dashed = false, name =
       if (best && !dashed) { const near = lines.flat().filter(q => q[0] > best[0] - 30); best = [best[0], (Math.min(...near.map(q => q[1])) + Math.max(...near.map(q => q[1]))) / 2]; }   // beside the tip, halfway down it
       if (best && !(dashed && k)) { let lx = best[0] + 4, ly = best[1] + (dashed ? 12 : 4); const tw = 130;   // step clear of labels already placed
         for (let n = 0; n < 6 && (G.labels || []).some(q => Math.abs(q[1] - ly) < 12 && lx < q[0] + q[2] && q[0] < lx + tw); n++) ly += 13;
-        (G.labels ||= []).push([lx, ly, tw]); best = [lx - 4, ly - (dashed ? 12 : 4)]; labels.push(`<text data-clabel="${[1, 10, 100][k]}" x="${(best[0] + 4).toFixed(1)}" y="${(best[1] + (dashed ? 12 : 4)).toFixed(1)}" style="font:600 10.5px Arial,sans-serif;fill:${line};paint-order:stroke;stroke:#fff;stroke-width:3px">${esc(`${family === 'model' ? 'forecast ' : k === 0 && g.medium !== 'vapour' ? 'guideline ' : ''}${fmtLevel(l.v)} ${unit}`)}</text>`); }
+        (G.labels ||= []).push([lx, ly, tw]); best = [lx - 4, ly - (dashed ? 12 : 4)]; labels.push(`<text data-clabel="${[1, 10, 100][k]}" x="${(best[0] + 4).toFixed(1)}" y="${(best[1] + (dashed ? 12 : 4)).toFixed(1)}" style="font:600 10.5px Arial,sans-serif;fill:${line};paint-order:stroke;stroke:#fff;stroke-width:3px">${esc(g.prob ? ['50', '80', '95'][k] + ' % chance over the guideline' : `${family === 'model' ? 'forecast ' : k === 0 && g.medium !== 'vapour' ? 'guideline ' : ''}${fmtLevel(l.v)} ${unit}`)}</text>`); }
     }
   });
   o.push('</g>'); (G.over ||= []).push(...labels);
@@ -4901,7 +4988,7 @@ function plumeSVG(pos, xs, X, Y, top, bw, W, H, m) {
   const sw = (t, el) => { o.push(el(lx), `<text x="${lx + 22}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 30 + textW(t, '11px ' + labelFont()); };
   if (!lv.length) sw('no guideline set, so no contours', x => `<rect x="${x}" y="${ly - 9}" width="16" height="9" fill="#fff" stroke="#3a1a00" stroke-width=".6"/>`);
   else if (style === 'graded') { o.push(`<defs><linearGradient id="${gid}">${R.map((c, i) => `<stop offset="${i / (R.length - 1)}" stop-color="${c}"/>`).join('')}</linearGradient></defs>`);
-    const t = `${fmtLevel(lv[0].v)} → ${fmtLevel(lv[0].v * 300)} ${unit} (log scale), lines at ${lv.map(l => fmtLevel(l.v)).join(' / ')}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="60" height="9" fill="url(#${gid})" stroke="#3a1a00" stroke-width=".6"/><text x="${lx + 66}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 74 + textW(t, '11px ' + labelFont()); }
+    const t = g?.prob ? 'chance of exceeding the guideline: lines at 50 / 80 / 95 %' : `${fmtLevel(lv[0].v)} → ${fmtLevel(lv[0].v * 300)} ${unit} (log scale), lines at ${lv.map(l => fmtLevel(l.v)).join(' / ')}`; o.push(`<rect x="${lx}" y="${ly - 9}" width="60" height="9" fill="url(#${gid})" stroke="#3a1a00" stroke-width=".6"/><text x="${lx + 66}" y="${ly}" class="lbl2">${esc(t)}</text>`); lx += 74 + textW(t, '11px ' + labelFont()); }
   else if (style === 'bands') lv.forEach((l, i) => sw(`≥ ${l.label}`, x => `<rect x="${x}" y="${ly - 9}" width="16" height="9" fill="${R[i + 1]}" stroke="#3a1a00" stroke-width=".6"/>`));
   else sw(`lines at ${lv.map(l => fmtLevel(l.v)).join(', ')} ${unit} (${lv.map(l => l.label.split(' (')[0]).join(', ')})`, x => `<path d="M${x} ${ly - 4}h16" stroke="#7f0000" stroke-width="1.6"/>`);
   sw('below first level', x => `<circle cx="${x + 8}" cy="${ly - 4}" r="4" fill="${R[0]}" stroke="#4d0000"/>`);
@@ -9272,8 +9359,9 @@ function xsPlumeCtl() {
     ${xs.medium === 'vapour' ? '' : `<select id="xs-param" aria-label="Parameter" style="width:auto">${params.length ? params.map(p => `<option value="${p}" ${xs.param === p ? 'selected' : ''}>${esc(LAB_PARAMS[p].label)}</option>`).join('') : '<option value="">No results</option>'}</select>`}
     <label class="check" title="Show only results within 7 days of the date"><input type="checkbox" id="xs-round" ${xs.round ? 'checked' : ''}> This round only</label></span>
     <span class="lay-ctl"><select id="xs-layer" aria-label="Layers" style="width:auto">${[['meas', 'Measured'], ['model', 'Forecast'], ['both', 'Compare measured and forecast']].map(([v, t]) => `<option value="${v}" ${(xs.plume !== false && xs.model ? 'both' : xs.model ? 'model' : 'meas') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-    ${xs.medium === 'groundwater' ? `<select id="xs-shape" aria-label="Plume shape" style="width:auto" title="Model-guided: the forecast's shape, matched to every measured result. Data only: blended between wells across the screens. Kriging and inverse distance, 3D: from every well near the line, in real metres."><option value="guided" ${!['data', 'krige', 'idw'].includes(xs.shape) ? 'selected' : ''}>Shape: model-guided</option><option value="data" ${xs.shape === 'data' ? 'selected' : ''}>Shape: data only</option><option value="krige" ${xs.shape === 'krige' ? 'selected' : ''}>Shape: kriging, 3D (layered)</option><option value="idw" ${xs.shape === 'idw' ? 'selected' : ''}>Shape: inverse distance, 3D</option></select>` : `<select id="xs-interp" aria-label="Interpolation" style="width:auto" title="Kriging and inverse distance work in real metres, in plan and depth together, from every borehole near the line">${Object.entries(XS_INTERP).map(([v, l]) => `<option value="${v}" ${(xs.interp || 'krige') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`}
-    ${(xs.medium === 'groundwater' ? ['krige', 'idw'].includes(xs.shape) : (xs.interp || 'krige') !== 'tin') ? `<select id="xs-aniso" aria-label="Layering" style="width:auto" title="How much further a plume reaches sideways than down: soil layers make plumes long and thin. A metre down counts as this many metres sideways.">${XS_ANISO.map(k => `<option value="${k}" ${(+xs.aniso || 10) === k ? 'selected' : ''}>${k === 1 ? 'Same sideways and down' : 'Reaches ×' + k + ' further sideways'}</option>`).join('')}</select><label class="check" title="Use boreholes near the line too, by their real distance (untick: only the section's own)"><input type="checkbox" id="xs-near" ${xs.only !== true ? 'checked' : ''}> Boreholes near the line</label>` : ''}
+    ${xs.medium === 'groundwater' ? `<select id="xs-shape" aria-label="Plume shape" style="width:auto" title="Model-guided: the forecast's shape, matched to every measured result. Data only: blended between wells across the screens. Kriging and inverse distance, 3D: from every well near the line, in real metres."><option value="guided" ${!['data', 'krige', 'idw'].includes(xs.shape) ? 'selected' : ''}>Shape: model-guided</option><option value="data" ${xs.shape === 'data' ? 'selected' : ''}>Shape: data only</option>${Object.entries(XS_METHODS).filter(([v]) => v !== 'tin').map(([v, [l, s]]) => `<option value="${v}" title="${esc(s)}" ${xs.shape === v ? 'selected' : ''}>Shape: ${esc(l.charAt(0).toLowerCase() + l.slice(1))}</option>`).join('')}</select>` : `<select id="xs-interp" aria-label="Interpolation" style="width:auto" title="Kriging and inverse distance work in real metres, in plan and depth together, from every borehole near the line">${Object.entries(XS_METHODS).map(([v, [l, s]]) => `<option value="${v}" title="${esc(s)}" ${(xs.interp || 'krige') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`}
+    ${(() => { const mk = xs.medium === 'groundwater' ? xs.shape : (xs.interp || 'krige'); return XS_METHODS[mk] ? `<details class="xs-method"><summary class="note">About this method</summary><p class="note">${esc(XS_METHODS[mk][1])}</p></details>` : ''; })()}
+    ${(xs.medium === 'groundwater' ? XS_3D.has(xs.shape) : (xs.interp || 'krige') !== 'tin') ? `<select id="xs-aniso" aria-label="Layering" style="width:auto" title="How much further a plume reaches sideways than down: soil layers make plumes long and thin. A metre down counts as this many metres sideways.">${XS_ANISO.map(k => `<option value="${k}" ${(+xs.aniso || 10) === k ? 'selected' : ''}>${k === 1 ? 'Same sideways and down' : 'Reaches ×' + k + ' further sideways'}</option>`).join('')}</select><label class="check" title="Use boreholes near the line too, by their real distance (untick: only the section's own)"><input type="checkbox" id="xs-near" ${xs.only !== true ? 'checked' : ''}> Boreholes near the line</label>` : ''}
     <select id="xs-style" aria-label="Drawing style" style="width:auto">${[['graded', 'Graded shading'], ['lines', 'Contour lines'], ['bands', 'Filled bands']].map(([v, t]) => `<option value="${v}" ${(xs.style || 'graded') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
     <label class="check"><input type="checkbox" id="xs-soilcol" ${xs.soilColour ? 'checked' : ''}> Keep soil colours</label>
     <label class="check" title="The reading beside each point; labels are moved apart so none overlap"><input type="checkbox" id="xs-ptlabels" ${xs.ptLabels ? 'checked' : ''}> Show values</label>

@@ -1613,7 +1613,7 @@ app.whenReady().then(async () => {
         S.xs = { ...S.xs, date: '', medium: 'soil', param: 'benzene', round: false, plume: true, model: false, style: 'graded', interp: 'krige', aniso: 10, only: false };
         goTab('xsec'); await w(500);
         const svg = () => document.querySelector('#xs-draw svg')?.outerHTML || '', note = () => document.querySelector('#xs-draw [data-fnote] title')?.textContent || '';
-        want(/Kriging, 3D/.test(note()) && /1 off the line/.test(note()) && /typically within/.test(note()), 'the note says the method, the off-line borehole and the check: ' + note());
+        want(/kriging, 3D/i.test(note()) && /1 off the line/.test(note()) && /typically within/.test(note()), 'the note says the method, the off-line borehole and the check: ' + note());
         want(/data-notdelin/.test(svg()), 'BH-2 is marked not delineated below');
         const nd = [...document.querySelectorAll('#xs-draw [data-notdelin] title')].map(x => x.textContent); want(nd.length === 1 && /BH-2/.test(nd[0]), 'only BH-2: ' + nd);
         want(/data-hatch/.test(svg()) && /likely over, not confirmed/.test(svg()), 'unconfirmed areas are hatched and keyed');
@@ -1632,8 +1632,20 @@ app.whenReady().then(async () => {
         // the controls
         S.xs = { ...S.xs, only: false }; renderView(true); await w(300);
         { loadDlExample(); await w(300); S.secIds = new Set(); S.xs = { ...S.xs, medium: 'soil', param: 'benzene', interp: 'krige', only: false, date: '' }; goTab('xsec'); await w(300); const t0 = performance.now(); drawXsec(); const ms = performance.now() - t0; window.__ms = ms; want(ms < 2500, 'redraw time on the Dawn Lake example: ' + Math.round(ms) + ' ms'); S.sel = B[0].id; renderView(true); await w(300); }
-        const sel = document.querySelector('#xs-interp'); want(sel && [...sel.options].map(o => o.value).join() === 'krige,idw,tin' && document.querySelector('#xs-aniso'), 'interpolation and layering choices');
-        sel.value = 'idw'; sel.dispatchEvent(new Event('change', { bubbles: true })); await w(400); want(/Inverse distance, 3D/.test(note()), 'inverse distance: ' + note());
+        const sel = document.querySelector('#xs-interp'); want(sel && [...sel.options].map(o => o.value).join() === 'krige,uk,ik,rst,rbf,idw,nn,near,tin' && document.querySelector('#xs-aniso'), 'interpolation and layering choices');
+        // every method draws, honours the samples where it should, and says where it comes from
+        const p3 = XS_GEOM.pos.find(p => p.b.id === B[2].id), p1 = XS_GEOM.pos.find(p => p.b.id === B[0].id);
+        for (const k of ['krige', 'uk', 'ik', 'rst', 'rbf', 'idw', 'nn', 'near']) {
+          S.xs = { ...S.xs, interp: k }; const g = plumeField(XS_GEOM.pos, S.xs, XS_GEOM), at = (d, e) => g.at(d, e)[0];
+          want(g.method === k && g.note.includes(XS_METHODS[k][0]) && g.note.includes('Method: '), k + ': named with its source: ' + g.method + ' / ' + g.note.slice(0, 80));
+          const vals = []; for (let i = 0; i <= 20; i++) for (let j = 0; j <= 10; j++) vals.push(at(XS_GEOM.maxD * i / 20, 100 - 6 * j / 10)); want(vals.every(Number.isFinite), k + ': finite everywhere');
+          if (k === 'ik') { want(at(p2.d, 97.5) > .1 && at(p1.d, 97) < .1 && g.prob, 'indicator: over at BH-2, under at BH-1 (chance as level): ' + [at(p2.d, 97.5), at(p1.d, 97)]); continue; }
+          if (['krige', 'uk', 'rst', 'rbf', 'near'].includes(k)) want(Math.abs(Math.log10(at(p2.d, 97.5)) - Math.log10(5)) < .1, k + ': exact at BH-2 2.5 m: ' + at(p2.d, 97.5));
+          want(at(p1.d, 97) < .1, k + ': clean at BH-1: ' + at(p1.d, 97));
+        }
+        S.xs = { ...S.xs, interp: 'ik' }; drawXsec(); await w(200); want(/% chance over the guideline/.test(svg()) && /chance of exceeding the guideline/.test(svg()), 'indicator kriging is labelled as chances');
+        S.xs = { ...S.xs, interp: 'krige' }; renderView(true); await w(300); want(/About this method/.test(document.querySelector('#ctl')?.textContent || document.body.textContent), 'the method is explained');
+        { const s1 = document.querySelector('#xs-interp'); s1.value = 'idw'; s1.dispatchEvent(new Event('change', { bubbles: true })); } await w(400); want(/Inverse distance, 3D/.test(note()), 'inverse distance: ' + note());
         const s2 = document.querySelector('#xs-interp'); s2.value = 'tin'; s2.dispatchEvent(new Event('change', { bubbles: true })); await w(400); want(/triangles/.test(note()) && !document.querySelector('#xs-aniso'), 'triangles, no layering choice');
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       return F;
