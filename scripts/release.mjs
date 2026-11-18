@@ -19,7 +19,9 @@ const dry = args.includes('--dry'), noBuild = args.includes('--no-build'), want 
 const notesArg = flag('--notes') ?? (flag('--notes-file') ? readFileSync(flag('--notes-file'), 'utf8') : undefined);
 const stop = msg => { console.error(`\n${msg}\n`); process.exit(1); };
 const out = (cmd, a) => execFileSync(cmd, a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' }).trim();
-const run = (cmd, a, env) => { console.log(`\n> ${cmd} ${a.join(' ')}`); if (!dry) execFileSync(cmd, a, { stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, ...env } }); };
+// on Windows the command goes through the shell, so an argument with spaces (a commit message, a title) is quoted
+const q = a => process.platform === 'win32' ? a.map(s => /[\s"]/.test(s) ? `"${s.replace(/"/g, '\\"')}"` : s) : a;
+const run = (cmd, a, env) => { console.log(`\n> ${cmd} ${a.join(' ')}`); if (!dry) execFileSync(cmd, q(a), { stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, ...env } }); };
 const pkg = () => JSON.parse(readFileSync('package.json', 'utf8'));
 
 // 1. ready: GitHub CLI signed in; on main, nothing uncommitted, the same as GitHub
