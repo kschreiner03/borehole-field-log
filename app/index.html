@@ -2353,7 +2353,7 @@ function layersPanelHTML() {
       UTM Zone ${z}${zFixed ? ', from the boreholes’ coordinate system' : ''}.</p>${basemapKey() === 'apple' && window.desktop?.appleMaps && !S.readOnly ? `<button class="btn" data-act="apple-setup">${S.apple.who ? 'Apple Maps key…' : 'Set up Apple Maps…'}</button>` : ''}
     <h4>Go to</h4>${goToHTML()}
     <h4>Layers</h4><ul class="lyr-list">${rows}</ul>
-    <details class="lbl-site" ${S.lblOpen ? 'open' : ''}><summary>Borehole labels</summary>${labelsHTML('s')}</details>
+    <details class="lbl-site" ${S.lblOpen ? 'open' : ''}><summary>Borehole labels</summary>${labelsHTML('s')}</details><details class="furn-site" ${S.furnOpen ? 'open' : ''}><summary>North arrow and scale bar</summary>${furnHTML('s')}</details>
     <h4>Results on the map</h4>${resPickHTML()}
     <h4>Water levels for contours and flow</h4><div class="gw-src-pick">${gwSrcHTML()}</div>${gwSkipHTML(gwHeads(mapList()).skip)}
     <details ${S.offMap.size ? 'open' : ''}><summary>Boreholes on maps · ${ps.filter(onMap).length} of ${ps.length}</summary><div class="lyr-bhs">${bh}</div><p class="note">Unticked boreholes are left out of maps, sections and the flow calculation, never out of logs or tables.</p></details>`;
@@ -3481,6 +3481,9 @@ function astmSymbol(name) {
   return base + grade;
 }
 const symbolSet = () => SYMBOL_SETS[S.co.symbols] || SYMBOL_SETS.fgdc;
+function soilKeyLabel(code, origin) { const s = soilOf(code), og = origin && ORIGINS[origin] ? ' (' + ORIGINS[origin].toLowerCase() + ')' : '';
+  if (!s) return code + og; if (s.nonUscs) return s.p.charAt(0) + s.p.slice(1).toLowerCase() + og;
+  return code + ' – ' + (s.imp ? s.imp + ' ' : '') + s.p + (s.grad ? ', ' + s.grad : '') + (s.plast ? ', ' + s.plast + ' plasticity' : '') + og; }
 function soilRects(x, y, w, h, code, origin, texture) {
   const tx = texture ? (typeof texture === 'string' ? texOf({ texture }) : texture) : null;
   const s = soilOf(code), set = symbolSet(), tk = textureKinds(tx), tpats = (tx?.sys === 'cssc' || tx?.sys === 'usda') && set.textures?.[tx.name];
@@ -4305,7 +4308,9 @@ const chips = (k, v, list) => `<div class="chips">${list.map(t => `<button type=
 /* a borehole's logged units, paired by name (or by the alias set on the Cross-section page), neighbouring layers of one unit merged */
 function xsUnits(b) { const alias = siteOf()?.xsec?.alias || {}, out = [];
   for (const l of (b.layers || []).filter(l => l.top != null && l.bottom > l.top).sort((a, c) => a.top - c.top)) { const u = alias[b.id + '|' + defaultUnit(l)] || defaultUnit(l), last = out[out.length - 1];
-    if (last && last.u === u && Math.abs(last.bot - l.top) < 1e-6) last.bot = l.bottom; else out.push({ u, top: l.top, bot: l.bottom, fill: soilOf(l.uscs)?.fill || 'panel-2' }); }
+    const ps = soilOf(l.uscs)?.p || '', th = l.bottom - l.top;
+    if (last && last.u === u && Math.abs(last.bot - l.top) < 1e-6) { last.bot = l.bottom; last.pw[ps] = (last.pw[ps] || 0) + th; } else out.push({ u, top: l.top, bot: l.bottom, fill: soilOf(l.uscs)?.fill || 'panel-2', pw: { [ps]: th } }); }
+  for (const o of out) { o.p = Object.entries(o.pw).sort((a, c) => c[1] - a[1])[0]?.[0] || ''; delete o.pw; }
   return out; }
 const defaultUnit = l => l.unit || (l.origin && l.origin !== 'bedrock' ? ORIGINS[l.origin] : '') || (soilOf(l.uscs)?.group === 'rock' ? 'Bedrock' : soilOf(l.uscs)?.p ? soilOf(l.uscs).p[0] + soilOf(l.uscs).p.slice(1).toLowerCase() : '');
 const descHTML = l => { const d = composeDesc(l); return d.name ? `<b>${esc(d.name)}</b>${d.body ? ', ' + esc(d.body) : ''}` : esc(d.text); };
@@ -4614,6 +4619,7 @@ function plumeContours(P, levels) {
    outermost data point and stays below the water table (groundwater). */
 const PF_FADE = 5, PF_SCREEN = .35, PF_CLAMP = 2;
 const XS_METHODS = {
+  auto: ['Automatic: the most accurate for these samples', 'Kriging, universal kriging, spline with tension, radial basis and inverse distance are each fitted at every layering ratio; each sample is then predicted from the others, and the method and ratio with the smallest typical error are used. The note under the section says which, and how the others did.'],
   krige: ['Ordinary kriging, 3D', 'Matheron (1963); Isaaks & Srivastava (1989). As ArcGIS Kriging (ordinary) and SAGA Ordinary Kriging in QGIS. The standard estimate, with its error.'],
   uk: ['Universal kriging, 3D (trend)', 'Kriging with a linear trend in plan and depth: Matheron (1969); Goovaerts (1997). As ArcGIS Kriging (universal) and SAGA Universal Kriging. For a plume that grades one way, e.g. lower with depth or away from the source.'],
   ik: ['Indicator kriging: chance over the guideline', 'Journel (1983); Goovaerts (1997). As ArcGIS Geostatistical Analyst indicator kriging. Each sample is over (1) or under (0) the guideline; the contours are the 50, 80 and 95 % chance of exceeding it, not concentrations.'],
@@ -4641,8 +4647,8 @@ function plumeLimits(method) {
   return 'Limits: between boreholes the plume is an estimate, not a measurement. It cannot see clay or sand lenses, fill, utility trenches or other paths that the samples do not show, it treats results from different dates as one time, and the layering setting is a judgement. This method ' + (XS_LIMITS[method] || 'is an interpolation') + '. Shading fades where few samples support it, hatching marks likely but unconfirmed areas and “?” marks boreholes still over the guideline at their deepest sample. Confirm plume edges by sampling before using them for design or volumes.';
 }
 const XS_INTERP = Object.fromEntries(Object.entries(XS_METHODS).map(([k, v]) => [k, v[0]]));
-const XS_3D = new Set(['krige', 'uk', 'ik', 'rst', 'rbf', 'idw', 'nn', 'near']);
-const XS_ANISO = [1, 3, 10, 30, 100];
+const XS_3D = new Set(['auto', 'krige', 'uk', 'ik', 'rst', 'rbf', 'idw', 'nn', 'near']), XS_AUTO = ['krige', 'uk', 'rst', 'rbf', 'idw'];   // the methods whose check is a true leave-one-out refit, so they compare fairly
+const XS_ANISO = [1, 3, 10, 30, 100], XS_ANISO_MEMO = new Map(); let XS_ANISO_PICK = null, XS_METHOD_PICK = null;
 /* the samples the 3D methods use: every located borehole within reach of the section (on it or off it), in real metres. Values
    are log10; a non-detect counts as clean at half its detection limit (one at or over the first level is left out: it says
    nothing). A well screen gives points at its top, middle and bottom (below the water table) */
@@ -4772,9 +4778,21 @@ function nn2d(P, k, G) {
 /* a 3D method as a section field: evaluated on a coarse grid along the line and blended between nodes. Weight = how well the
    samples support each spot (1 at a sample, fading to 0 where kriging can say little), so unsupported areas fade out */
 function plume3dField(G, xs, medium, param, lv, how) {
-  const P = plume3dPts(G, xs, medium, param, lv), k = +xs.aniso || 10, g0 = lv[0]?.v;
+  const P = plume3dPts(G, xs, medium, param, lv), g0 = lv[0]?.v;
   if (how === 'ik' && !(g0 > 0)) return null;
-  const M = how === 'idw' ? idw3d(P, k) : how === 'uk' ? ukrige3d(P, k) : how === 'ik' ? ikrige3d(P, k, g0) : how === 'rst' ? rbf3d(P, k, 'rst') : how === 'rbf' ? rbf3d(P, k, 'mq') : how === 'near' ? near3d(P, k) : how === 'nn' ? nn2d(P, k, G) : krige3d(P, k); if (!M) return null;
+  const fitK = (h, k) => { try { return h === 'idw' ? idw3d(P, k) : h === 'uk' ? ukrige3d(P, k) : h === 'ik' ? ikrige3d(P, k, g0) : h === 'rst' ? rbf3d(P, k, 'rst') : h === 'rbf' ? rbf3d(P, k, 'mq') : h === 'near' ? near3d(P, k) : h === 'nn' ? nn2d(P, k, G) : krige3d(P, k); } catch { return null; } };
+  const autoM = how === 'auto', cands = autoM ? XS_AUTO : [how];
+  // layering: the ratio given, or (Automatic) the one whose fit best predicts each sample from the others
+  const autoK = xs.aniso == null || xs.aniso === 'auto' || !(+xs.aniso > 0), ks = autoK ? XS_ANISO : [+xs.aniso]; let k, M, tried = [], byM = [];
+  if (autoK || autoM) { const mk = cands.join(',') + '|' + ks.join(',') + '|' + G.maxD.toFixed(1) + '|' + P.length + '|' + P.slice(0, 400).map(p => p.map(v => v.toFixed(2)).join(',')).join(';');
+    if (XS_ANISO_MEMO.has(mk)) ({ k, M, tried, byM, how } = XS_ANISO_MEMO.get(mk));
+    else { const all = []; for (const h of cands) for (const kk of ks) { const m = fitK(h, kk); if (m && isFinite(m.loo)) all.push([h, kk, m]); } if (!all.length) return null;
+      const best = all.reduce((a, c) => c[2].loo < a[2].loo - 1e-9 ? c : a); [how, k, M] = best;
+      tried = all.filter(q => q[0] === how).map(q => [q[1], q[2].loo]);
+      byM = cands.map(h => { const q = all.filter(r => r[0] === h); return q.length ? [h, Math.min(...q.map(r => r[2].loo))] : null; }).filter(Boolean);
+      if (XS_ANISO_MEMO.size > 20) XS_ANISO_MEMO.clear(); XS_ANISO_MEMO.set(mk, { k, M, tried, byM, how }); }
+    if (autoK) XS_ANISO_PICK = k; if (autoM) XS_METHOD_PICK = how; }
+  else { k = +xs.aniso; M = fitK(how, k); if (!M) return null; } if (!M) return null;
   const isK = how === 'krige' || how === 'uk' || how === 'ik', h3 = M.h3 || ((a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], k * (a[2] - b[2]))), sp = M.spacing || (() => { const nn = P.map((p, i) => Math.min(...P.filter((_, j) => j !== i).map(q => h3(p, q) || Infinity))).filter(isFinite).sort((a, b) => a - b); return Math.max(1, nn[Math.floor(nn.length / 2)] || 1) * 2.5; })();
   if (!M.fit) M.fit = (E, N, z) => { const q = [E, N, z]; return [M.val(E, N, z), isK ? M.var(E, N, z) : Math.min(1, (Math.min(...P.map(p => h3(q, p))) / sp) ** 2)]; };
   // a chance (indicator kriging) is shown on the guideline's scale: 50 % at the guideline, 80 % at ×10, 95 % at ×100
@@ -4787,9 +4805,10 @@ function plume3dField(G, xs, medium, param, lv, how) {
     const [E, N] = G.pos.at(d); return [toC(M.val ? M.val(E, N, e) : M.fit(E, N, e)[0]), bl(sup)]; };
   const fac = Math.pow(10, M.loo), name = XS_METHODS[how][0];
   const check = how === 'ik' ? (M.constant ? 'every sample is on the same side of the guideline' : 'each sample predicted from the others is on the wrong side ' + Math.round(M.loo * 100) + ' % of the way on average') : 'each sample predicted from the others is typically within ×' + (fac < 10 ? fac.toFixed(1) : Math.round(fac));
-  const note = name + (how === 'ik' ? ' (contours: 50, 80 and 95 % chance of exceeding the guideline)' : ' on log values') + ', layered ×' + k + ' (a metre down counts as ' + k + ' m sideways)' + (M.V ? ', fitted range ' + fu(M.V.range) + (M.V.nug ? ', nugget ' + Math.round(M.V.nug / M.V.sill * 100) + ' %' : '') : '') + ': ' + P.length + ' samples from ' + P.boreholes + ' borehole' + (P.boreholes === 1 ? '' : 's') + (P.off ? ' (' + P.off + ' off the line)' : '') + '; ' + check + '. Faded where few samples support it; hatched where likely over the guideline but not confirmed. Method: ' + XS_METHODS[how][1];
-  const short = name + ', layered ×' + k + ' · ' + (how === 'ik' ? (M.constant ? 'every sample on one side of the guideline' : 'checked: wrong side ' + Math.round(M.loo * 100) + ' % on average') : 'checked: within ×' + (fac < 10 ? fac.toFixed(1) : Math.round(fac))) + ' · interpreted between samples, not measured; see the note for its limits';
-  return { at, note, short, method: how, prob: how === 'ik' };
+  const note = name + (how === 'ik' ? ' (contours: 50, 80 and 95 % chance of exceeding the guideline)' : ' on log values') + ', layered ×' + k + ' (a metre down counts as ' + k + ' m sideways' + (autoK && tried.length > 1 ? '; chosen automatically as the layering that best predicts the samples, of ×' + tried.map(q => q[0]).join(', ×') : '') + ')' + (M.V ? ', fitted range ' + fu(M.V.range) + (M.V.nug ? ', nugget ' + Math.round(M.V.nug / M.V.sill * 100) + ' %' : '') : '') + ': ' + P.length + ' samples from ' + P.boreholes + ' borehole' + (P.boreholes === 1 ? '' : 's') + (P.off ? ' (' + P.off + ' off the line)' : '') + '; ' + check + '. Faded where few samples support it; hatched where likely over the guideline but not confirmed. Method: ' + XS_METHODS[how][1];
+  const short = name + ', layered ×' + k + (autoK ? ' (auto)' : '') + ' · ' + (how === 'ik' ? (M.constant ? 'every sample on one side of the guideline' : 'checked: wrong side ' + Math.round(M.loo * 100) + ' % on average') : 'checked: within ×' + (fac < 10 ? fac.toFixed(1) : Math.round(fac))) + ' · interpreted between samples, not measured; see the note for its limits';
+  const xf = v => '×' + (10 ** v < 10 ? (10 ** v).toFixed(1) : Math.round(10 ** v)), pickNote = autoM && byM.length > 1 ? ' Chosen automatically as the most accurate here (typical error predicting each sample from the others: ' + byM.slice().sort((a, b) => a[1] - b[1]).map(([h, v]) => XS_METHODS[h][0].replace(/, 3D.*$|: .*$/, '') + ' ' + xf(v)).join(', ') + ').' : '';
+  return { at, note: pickNote && /\sMethod: /.test(note) ? note.replace(/(\s*Method: )/,' ' + pickNote.trim() + '$1') : note + pickNote, short: (autoM ? 'Automatic: ' : '') + short, method: how, prob: how === 'ik' };
 }
 function plumeField(pos, xs, G, cell = 4) {
   const medium = xs.medium || 'soil', param = medium === 'vapour' ? '' : xs.param, date = xs.date || '';
@@ -4805,7 +4824,7 @@ function plumeField(pos, xs, G, cell = 4) {
   const dMin = pts.length ? Math.min(...pts.map(p => p.d)) : 0, dMax = pts.length ? Math.max(...pts.map(p => p.d)) : 0;
   const fade = d => d < dMin ? Math.max(0, 1 - (dMin - d) / PF_FADE) : d > dMax ? Math.max(0, 1 - (d - dMax) / PF_FADE) : 1;
   const lg = v => Math.log10(Math.max(v, 1e-12));
-  let method = medium === 'groundwater' ? (xs.shape === 'data' || XS_3D.has(xs.shape) ? xs.shape : 'guided') : (xs.interp || 'krige') === 'tin' ? 'points' : (xs.interp || 'krige'), note = '', at;
+  let method = medium === 'groundwater' ? (xs.shape === 'data' || XS_3D.has(xs.shape) ? xs.shape : 'guided') : (xs.interp || 'auto') === 'tin' ? 'points' : (xs.interp || 'auto'), note = '', at;
   const f3 = XS_3D.has(method) && G.pos?.at && pts.length ? plume3dField(G, xs, medium, param, lv, method) : null;
   if (f3) { const wtE = medium === 'groundwater' ? byD(pos.map(p => { const w = waterAt(p.b, date); return w && p.b.elevation != null ? [p.d, p.b.elevation - w.depth] : null; }).filter(Boolean)) : []; at = (d, e) => wtE.length && e > lerp(wtE, d) + 1e-9 ? [0, 0] : f3.at(d, e); note = f3.note; }
   else if (XS_3D.has(method)) { method = medium === 'groundwater' ? 'data' : 'points'; note = 'Too few samples for ' + XS_METHODS[xs.interp || xs.shape]?.[0] + '; shown with ' + (medium === 'groundwater' ? 'data only' : 'triangles') + '.'; }
@@ -4865,7 +4884,7 @@ function plumeField(pos, xs, G, cell = 4) {
     const x = x0 + (x1 - x0) * i / nx, y = y0 + (y1 - y0) * j / ny, d = (x - G.X(0)) / (G.X(G.maxD) - G.X(0) || 1) * G.maxD, e = G.e1 - (y - G.m.t) / G.plotH * (G.e1 - G.e0);
     const [v, w] = at(d, e); c[j * (nx + 1) + i] = Number.isFinite(v) ? v : 0; a[j * (nx + 1) + i] = Number.isFinite(w) ? w : 0;
   }
-  return { nx, ny, x0, x1, y0, y1, c, a, at, method, note, short: f3?.short, pts, lv, medium, param, hatch: !!f3, prob: !!f3?.prob };
+  return { nx, ny, x0, x1, y0, y1, c, a, at, method: f3?.method || method, note, short: f3?.short, pts, lv, medium, param, hatch: !!f3, prob: !!f3?.prob };
 }
 /* contour lines of a field at one level (marching squares on log10, cells with weight under minA left out), joined into
    continuous polylines in drawing coordinates */
@@ -4899,9 +4918,9 @@ function fieldSVG(g, { style = 'graded', family = 'meas', dashed = false, name =
   const unit = g.medium === 'vapour' ? 'ppm' : g.medium === 'groundwater' ? 'mg/L' : LAB_PARAMS[g.param]?.unit || '';
   const { nx, ny, c, a, x0, x1, y0, y1 } = g, sx = (x1 - x0) / nx, sy = (y1 - y0) / ny, W = nx + 1, l0 = Math.log10(lv[0].v), l3 = Math.log10(lv[0].v * 300);
   const cell = (i, j) => { const k = j * W + i; return [(c[k] + c[k + 1] + c[k + W] + c[k + W + 1]) / 4, (a[k] + a[k + 1] + a[k + W] + a[k + W + 1]) / 4]; };
-  const colourOf = style === 'graded' ? (v, w) => { if (!(v >= lv[0].v * .6) || w <= .02) return null; const lg = Math.log10(v), al = Math.round(Math.min(1, (lg - Math.log10(lv[0].v * .6)) / .22) * w * .85 * 10) / 10; return al > 0 ? [hexMix(cols, Math.round((lg - l0) / (l3 - l0) * 20) / 20), al] : null; }
-    : style === 'bands' ? (v, w) => { if (!(v >= lv[0].v) || w <= .02) return null; const k = lv.filter(l => v >= l.v).length; return [cols[k], Math.round((.5 + k * .13) * w * 10) / 10]; }
-    : (v, w) => v >= lv[0].v && w > .3 ? [cols[1], Math.round(.25 * w * 10) / 10] : null;
+  const colourOf = style === 'graded' ? (v, w) => { if (!(v >= lv[0].v * .6) || w <= .02) return null; const lg = Math.log10(v), al = Math.min(1, (lg - Math.log10(lv[0].v * .6)) / .22) * w * .85; return al > .01 ? [hexMix(cols, (lg - l0) / (l3 - l0)), al] : null; }
+    : style === 'bands' ? (v, w) => { if (!(v >= lv[0].v) || w <= .02) return null; const k = lv.filter(l => v >= l.v).length; return [cols[k], (.5 + k * .13) * w]; }
+    : (v, w) => v >= lv[0].v && w > .3 ? [cols[1], .25 * w] : null;
   const attr = style === 'graded' ? 'data-cell' : style === 'bands' ? 'data-band' : 'data-tint';
   if (!dashed && g.hatch && family === 'meas') {   // likely over the first level, but the samples barely support it: hatched
     const hid = 'hz' + Math.random().toString(36).slice(2, 7); o.push('<defs><pattern id="' + hid + '" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#b42318" stroke-width="1"/></pattern></defs><g clip-path="url(#' + G.gclip + ')" data-unconfirmed="1">');
@@ -4910,13 +4929,19 @@ function fieldSVG(g, { style = 'graded', family = 'meas', dashed = false, name =
     o.push('</g>');
   }
   if (!dashed) {
-    o.push(`<g clip-path="url(#${G.gclip})" shape-rendering="crispEdges" ${family === 'model' ? 'data-model-fill="1"' : ''}>`);
-    for (let j = 0; j < ny; j++) { let run = null;
-      const flush = () => { if (run && run.col) o.push(`<rect ${attr}="1" x="${(x0 + run.i * sx).toFixed(2)}" y="${(y0 + j * sy).toFixed(2)}" width="${(run.n * sx).toFixed(2)}" height="${sy.toFixed(2)}" fill="${run.col[0]}" fill-opacity="${run.col[1]}"/>`); };
-      for (let i = 0; i < nx; i++) { const [v, w] = cell(i, j), col = colourOf(v, w), k = col ? col.join('|') : '';
-        if (run && run.k === k) run.n++; else { flush(); run = { i, n: 1, k, col }; } }
-      flush(); }
-    o.push('</g>');
+    // one smooth picture at up to three times the drawing's resolution: concentration blended on a log scale and colour and
+    // strength continuous between grid points, so the shading prints and zooms without the steps and seams of small rectangles.
+    // Contour lines, points and labels stay vector on top. In a page without a canvas (none here), nothing is drawn
+    const S3 = Math.max(1, Math.min(3, Math.sqrt(2.6e6 / Math.max(1, (x1 - x0) * (y1 - y0))))), cw = Math.max(1, Math.round((x1 - x0) * S3)), ch = Math.max(1, Math.round((y1 - y0) * S3));
+    const cv = typeof document !== 'undefined' ? document.createElement('canvas') : null, ctx = cv && (cv.width = cw, cv.height = ch, cv.getContext('2d'));
+    if (ctx) { const img = ctx.createImageData(cw, ch), D = img.data, rgb = new Map(), Lc = Float32Array.from(c, v => Math.log10(Math.max(v, 1e-12)));
+      const toRgb = s => { let r = rgb.get(s); if (!r) { const m2 = /rgb\((\d+),(\d+),(\d+)\)/.exec(s); r = m2 ? [+m2[1], +m2[2], +m2[3]] : [1, 3, 5].map(k => parseInt(s.slice(k, k + 2), 16)); rgb.set(s, r); } return r; };
+      let any = false;
+      for (let py = 0; py < ch; py++) { const fj = (py + .5) / ch * ny, j2 = Math.min(ny - 1, Math.floor(fj)), u = fj - j2;
+        for (let px = 0; px < cw; px++) { const fi = (px + .5) / cw * nx, i2 = Math.min(nx - 1, Math.floor(fi)), s2 = fi - i2, k0 = j2 * W + i2;
+          const bl = A => (A[k0] * (1 - s2) + A[k0 + 1] * s2) * (1 - u) + (A[k0 + W] * (1 - s2) + A[k0 + W + 1] * s2) * u;
+          const col = colourOf(10 ** bl(Lc), bl(a)); if (!col) continue; const [r, g2, b] = toRgb(col[0]), q = (py * cw + px) * 4; D[q] = r; D[q + 1] = g2; D[q + 2] = b; D[q + 3] = Math.round(Math.min(1, col[1]) * 255); any = true; } }
+      if (any) { ctx.putImageData(img, 0, 0); o.push(`<g clip-path="url(#${G.gclip})" ${family === 'model' ? 'data-model-fill="1"' : ''}><image ${attr}="1" x="${x0.toFixed(2)}" y="${y0.toFixed(2)}" width="${(x1 - x0).toFixed(2)}" height="${(y1 - y0).toFixed(2)}" preserveAspectRatio="none" href="${cv.toDataURL('image/png')}"/></g>`); } }
   }
   o.push(`<g clip-path="url(#${G.gclip})">`);
   const labels = [];
@@ -6376,6 +6401,32 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   // room under the drawing for offset labels (three staggered rows) and the plume legend
   const offH = pos.some(p => Math.abs(p.off) >= .5) ? 40 : 0, plH = xs && xs.plume !== false && (xs.param || xs.medium === 'vapour') ? (W < 760 ? 62 : 48) : 0, mdH = xs?.model ? 20 : 0, gwH = xs && xs.gwFlow !== false && S.gwm?.run?.ok ? 18 : 0;
   m.b += offH + plH + mdH + gwH; if (!fillH) H += offH + plH + mdH + gwH;
+  // the key: one entry per soil class logged on the section (SM is "Silty sand" once, whatever its origin or texture), drawn in
+  // the pattern of its most-logged variant; plasticity is added only where two classes would otherwise read the same
+  const soilKey = (() => { const seen = new Map();
+    for (const p of pos) for (const l of (p.b.layers || []).filter(l => l.top != null && l.bottom > l.top).sort((a, c) => a.top - c.top)) { const code = String(l.uscs || '').toUpperCase(); if (!code) continue;
+      if (!seen.has(code)) seen.set(code, { code, th: {} }); const e = seen.get(code), ck = (l.origin || '') + '|' + (l.texture || ''); e.th[ck] = (e.th[ck] || 0) + (l.bottom - l.top); }
+    const nm = (code, plast) => { const s = soilOf(code); if (!s) return code; const n = ((s.grad ? s.grad + ' ' : '') + (s.imp ? s.imp + ' ' : '') + s.p.toLowerCase()).trim(); return n.charAt(0).toUpperCase() + n.slice(1) + (plast && s.plast ? ' (' + s.plast + ' plasticity)' : ''); };
+    const base = [...seen.keys()].map(c => nm(c));
+    for (const e of seen.values()) { const [origin, texture] = Object.entries(e.th).sort((a, c) => c[1] - a[1])[0][0].split('|'); Object.assign(e, { origin, texture, label: nm(e.code, base.filter(b => b === nm(e.code)).length > 1) }); delete e.th; }
+    const items = [...seen.values()], room = W - m.l - m.r; let rows = items.length ? 1 : 0, used = 0;
+    for (const it of items) { it.w = 32 + textW(it.label, '11px ' + labelFont()) + 14; if (used + it.w > room && used) { rows++; used = 0; } used += it.w; }
+    return { items, rows }; })();
+  if (soilKey.rows > 1) { m.b += (soilKey.rows - 1) * 15; if (!fillH) H += (soilKey.rows - 1) * 15; }
+  // boreholes too close to draw apart: the gap between them is opened to a column and a margin (more for long names, which
+  // stagger in up to three rows). Drawing distances change only there; pos.at still finds each true place along the line, so
+  // the ground, layers, plume and water follow. The header and note say where the spacing is not to scale
+  let spreadPairs = [];
+  if (pos.length > 1 && S.sec.spread !== false) {
+    const tru = pos.map(p => p.d), span = Math.max(100, W - m.l - m.r - 40), longest = Math.max(...pos.map(p => textW(p.b.name, '600 12px ' + labelFont()))), need = Math.max(secOpt('bw') + 14, longest / 2.6 + 4);
+    let disp = tru.slice();
+    for (let it = 0; it < 5; it++) { const g = need * Math.max(1e-6, disp[disp.length - 1]) / span, nd = [tru[0]]; for (let i = 1; i < tru.length; i++) nd.push(nd[i - 1] + Math.max(tru[i] - tru[i - 1], g)); disp = nd; }
+    if (disp.some((v, i) => Math.abs(v - tru[i]) > 1e-6)) {
+      spreadPairs = pos.map((p, i) => i && disp[i] - disp[i - 1] > tru[i] - tru[i - 1] + 1e-6 ? [pos[i - 1].b.name, p.b.name, tru[i] - tru[i - 1]] : null).filter(Boolean);
+      const toTrue = dd => { if (dd <= disp[0]) return tru[0] + dd - disp[0]; for (let i = 1; i < disp.length; i++) if (dd <= disp[i] || i === disp.length - 1) { const f = disp[i] > disp[i - 1] ? (dd - disp[i - 1]) / (disp[i] - disp[i - 1]) : 0; return tru[i - 1] + f * (tru[i] - tru[i - 1]); } return dd; };
+      pos.forEach((p, i) => { p.dTrue = tru[i]; p.d = disp[i]; }); if (pos.at) { const at0 = pos.at; pos.at = dd => at0(toTrue(dd)); } pos.toTrue = toTrue; pos.spread = true;
+    }
+  }
   const maxD = pos[pos.length - 1].d || 1;
   /* the header, top down: the axis label and scale line; the model caption and its note (purple), each on its own line; then the
      borehole names in as many rows (up to three) as they need at full width, one more when an exaggeration may narrow it */
@@ -6399,38 +6450,116 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   const datum = commonDatum(bhs);
   const o = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Cross-section">`];
   o.push(`<text class="lbl" x="${m.l}" y="16">${noElev ? `Depth (${LEN()})` : `Elevation (${LEN()}${datum ? ', ' + esc(datum) : ''})`}</text>`);
-  o.push(`<text class="lbl2" x="${W - m.r}" y="16" text-anchor="end">${xs?.date ? `As of ${esc(xs.date)} · ` : ''}${located ? `Length ${fu(maxD, 0)}${ve ? ` · vertical exaggeration ×${ve >= 10 ? Math.round(ve) : ve.toFixed(1)}` : ''}` : 'Not to horizontal scale'}</text>`);
+  o.push(`<text class="lbl2" x="${W - m.r}" y="16" text-anchor="end">${xs?.date ? `As of ${esc(xs.date)} · ` : ''}${located ? `Length ${fu(pos.spread ? pos.toTrue(maxD) : maxD, 0)}${pos.spread ? ' · spacing opened where boreholes are close' : ve ? ` · vertical exaggeration ×${ve >= 10 ? Math.round(ve) : ve.toFixed(1)}` : ''}` : 'Not to horizontal scale'}</text>`);
   for (const v of ticks) { const yy = Y(fromD(v)); o.push(`<line x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}" style="stroke:var(--grid)"/><text class="tick" x="${m.l - 8}" y="${yy + 4}" text-anchor="end">${+v.toFixed(2)}</text>`); }
   o.push(`<path data-ground="1" d="${pos.map((p, i) => `${i ? 'L' : 'M'}${X(p.d)} ${Y(top(p.b))}`).join('')}" fill="none" style="stroke:var(--earth)" stroke-width="2" stroke-dasharray="6 3"><title>Ground surface interpolated between boreholes (measured at each borehole)</title></path>`);
   const bw = secOpt('bw');
   for (const p of pos) o.push(`<path d="M${X(p.d) - bw / 2 - 6} ${Y(top(p.b))}h${bw + 12}" style="stroke:var(--earth)" stroke-width="2.4"/>`);
   // interpreted units: join the top and base of the same unit in neighbouring boreholes; units missing next door pinch out halfway
   const plumeOn = xs && ((xs.plume !== false && (xs.param || xs.medium === 'vapour')) || xs.model), soilStyle = plumeOn && !xs.soilColour ? 'filter:grayscale(1) opacity(.75)' : '';
+  let soilNote = '';
   if (S.sec.units !== false) {
     o.push(`<g data-soil="1" style="${soilStyle}">`);
     const units = xsUnits;
-    const U2 = pos.map(p => units(p.b));
-    for (let i = 0; i < pos.length - 1; i++) {
-      const A = pos[i], B = pos[i + 1], xa = X(A.d) + bw / 2, xb = X(B.d) - bw / 2, xm = xa + (xb - xa) / 3, xm2 = xb - (xb - xa) / 3, ea = top(A.b), eb = top(B.b);
-      for (const ua of U2[i]) {
-        const ub = U2[i + 1].find(u => u.u === ua.u);
-        if (ub) o.push(`<path data-unit="join" d="M${xa} ${Y(ea - ua.top)}L${xb} ${Y(eb - ub.top)}L${xb} ${Y(eb - ub.bot)}L${xa} ${Y(ea - ua.bot)}Z" style="fill:var(--${ua.fill});stroke:var(--muted)" fill-opacity=".28" stroke-width=".7" stroke-dasharray="4 3"><title>${esc(ua.u)} (interpreted)</title></path>`);
-        else o.push(`<path data-unit="pinch" d="M${xa} ${Y(ea - ua.top)}L${xm} ${Y(ea - (ua.top + ua.bot) / 2)}L${xa} ${Y(ea - ua.bot)}Z" style="fill:var(--${ua.fill});stroke:var(--muted)" fill-opacity=".28" stroke-width=".7" stroke-dasharray="4 3"/>`);
+    let nAuto = 0; const U2 = pos.map(p => units(p.b)), K = 24, lerp = (a, b, t) => a + (b - a) * t, T = Array.from({ length: K + 1 }, (_, k) => k / K);
+    // 1. pair the units of neighbouring boreholes in stratigraphic order: a weighted longest common subsequence (same unit name,
+    //    preferring the seam at a similar elevation), so bands never cross and a repeated unit pairs with its own seam
+    const align = (A, B, ea, eb) => { const n = A.length, nb = B.length, D = Array.from({ length: n + 1 }, () => new Float64Array(nb + 1));
+      const wt = (a, b) => { const ov = Math.max(0, Math.min(ea - a.top, eb - b.top) - Math.max(ea - a.bot, eb - b.bot)); if (a.u === b.u) return 1 + ov / Math.max(a.bot - a.top, b.bot - b.top, 1e-6);
+        const thin = Math.max(1e-6, Math.min(a.bot - a.top, b.bot - b.top)); return a.p && a.p === b.p && ov / thin >= .5 ? .4 + .4 * Math.min(1, ov / thin) : -1; };
+      for (let i = n - 1; i >= 0; i--) for (let j = nb - 1; j >= 0; j--) { const m = wt(A[i], B[j]); D[i][j] = Math.max(D[i + 1][j], D[i][j + 1], m > 0 ? m + D[i + 1][j + 1] : -1); }
+      const pr = []; let i = 0, j = 0; while (i < n && j < nb) { const m = wt(A[i], B[j]); if (m > 0 && Math.abs(D[i][j] - m - D[i + 1][j + 1]) < 1e-9) { pr.push([i, j, A[i].u !== B[j].u]); i++; j++; } else if (D[i + 1][j] >= D[i][j + 1]) i++; else j++; }
+      return pr; };
+    const path = pos.at ? Array.from({ length: 121 }, (_, k) => [pos.at(pos[pos.length - 1].d * k / 120), pos[pos.length - 1].d * k / 120]) : null, own = new Set(pos.map(p => p.b.id));
+    const offH = !path || noElev ? [] : mapList().filter(b => !own.has(b.id) && b.easting != null && b.northing != null && b.elevation != null && b.layers?.length).map(b => { let best = null; for (const [q, d] of path) { const s = Math.hypot(q[0] - b.easting, q[1] - b.northing); if (!best || s < best.s) best = { s, d }; } return { b, d: best.d, dist: best.s, U: units(b), e: top(b) }; })
+      .filter(h => h.dist <= Math.max(20, pos[pos.length - 1].d * .5)).sort((a, c) => a.dist - c.dist).slice(0, 60), usedOff = new Set();
+    const G = pos.slice(0, -1).map((A, i) => { const B = pos[i + 1]; return { i, xa: X(A.d) + bw / 2, xb: X(B.d) - bw / 2, ea: top(A.b), eb: top(B.b), pr: align(U2[i], U2[i + 1], top(A.b), top(B.b)) }; });
+    // 2. smooth contacts: each paired contact is a curve whose slope at a borehole blends the slopes either side (monotone:
+    //    flat where they disagree in sign), so a unit runs smoothly across several boreholes without overshooting
+    const slopes = pos.map(() => new Map()), key = y => Math.round(y * 4), note = (i, side, y, s) => { const m = slopes[i], k = key(y); if (!m.has(k)) m.set(k, { L: [], R: [] }); m.get(k)[side].push(s); };
+    for (const g of G) for (const [a, b] of g.pr) { const A = U2[g.i][a], B = U2[g.i + 1][b], w = Math.max(1, g.xb - g.xa);
+      for (const [ya, yb] of [[Y(g.ea - A.top), Y(g.eb - B.top)], [Y(g.ea - A.bot), Y(g.eb - B.bot)]]) { note(g.i, 'R', ya, (yb - ya) / w); note(g.i + 1, 'L', yb, (yb - ya) / w); } }
+    const tan = (i, y, own, other) => { const l = slopes[i]?.get(key(y))?.[other]; if (!l?.length) return own; const o = l.reduce((s, v) => s + v, 0) / l.length; return o * own <= 0 ? 0 : 2 * o * own / (o + own); };
+    const curve = (g, ya, yb) => { const w = Math.max(1, g.xb - g.xa), s = (yb - ya) / w, ma = tan(g.i, ya, s, 'L') * w, mb = tan(g.i + 1, yb, s, 'R') * w;
+      return T.map(t => { const t2 = t * t, t3 = t2 * t; return (2 * t3 - 3 * t2 + 1) * ya + (t3 - 2 * t2 + t) * ma + (-2 * t3 + 3 * t2) * yb + (t3 - t2) * mb; }); };
+    const line = (ya, yb) => T.map(t => lerp(ya, yb, t)), cache = new Map();
+    const contact = (g, ya, yb, name, which) => { const ck = g.i + '|' + Math.round(ya * 2) + '|' + Math.round(yb * 2); if (cache.has(ck)) return cache.get(ck);
+      const c = curve(g, ya, yb), gapM = Math.abs(pos[g.i + 1].d - pos[g.i].d), Lc = Math.max(8, gapM * .5), ev = [];
+      if (gapM > 0) for (const h of offH) { const tk = (h.d - pos[g.i].d) / (pos[g.i + 1].d - pos[g.i].d); if (tk < -.25 || tk > 1.25) continue;
+        const k = Math.max(0, Math.min(K, Math.round(tk * K))), cand = h.U.filter(u => u.u === name); if (!cand.length) continue;
+        const u = cand.reduce((a, b2) => Math.abs(Y(h.e - b2[which]) - c[k]) < Math.abs(Y(h.e - a[which]) - c[k]) ? b2 : a), r = Y(h.e - u[which]) - c[k], w = Math.exp(-((h.dist / Lc) ** 2)) * (tk < 0 || tk > 1 ? .5 : 1);
+        if (w > .02) { ev.push({ tk, r, w }); usedOff.add(h.b.id); } }
+      const out2 = ev.length ? c.map((v, k) => { const tt = T[k]; let sw = 0, sr = 0; for (const e of ev) { const wt = e.w * Math.exp(-(((tt - e.tk) * gapM / Lc) ** 2)); sw += wt; sr += wt * e.r; } return v + 4 * tt * (1 - tt) * sr / (1 + sw); }) : c;
+      cache.set(ck, out2); return out2; };
+    // off-line boreholes that show the unit (or reach its depth without it) bound where a pinch-out can be
+    const offPinch = (g, names, f, fromA, lowY) => { const gapM = pos[g.i + 1].d - pos[g.i].d; if (!(Math.abs(gapM) > 0)) return f;
+      for (const h of offH) { const tk = (h.d - pos[g.i].d) / gapM; if (tk <= .05 || tk >= .95 || h.dist > Math.max(8, Math.abs(gapM) * .5)) continue; const s = fromA ? tk : 1 - tk, has = h.U.some(u => names.has(u.u)), deep = Y(h.e - Math.max(0, ...h.U.map(u => u.bot))) >= lowY;
+        if (has) { f = Math.max(f, Math.min(.92, s + .08)); usedOff.add(h.b.id); } else if (deep) { f = Math.min(f, Math.max(.08, s - .05)); usedOff.add(h.b.id); } }
+      return f; };
+    // 3. where a unit pinches out: from its thickness trend (the borehole before it), else halfway; held to 15 to 85 % of the gap
+    const thick = (i, names) => (U2[i] || []).filter(u => names.has(u.u)).reduce((s, u) => s + u.bot - u.top, 0);
+    const pinchAt = (here, prev, units2, gap) => { const names = new Set(units2.map(u => u.u)), t0 = thick(here, names), tp = prev >= 0 && prev < pos.length ? thick(prev, names) : 0, dp = Math.abs(pos[here].d - (pos[prev]?.d ?? pos[here].d));
+      if (!(tp > t0 && dp > 0)) return .5; return Math.max(.15, Math.min(.85, t0 / ((tp - t0) / dp) / Math.max(1e-6, gap))); };
+    const poly = (g, up, lo, t0, t1) => { const ks = T.map((t, k) => k).filter(k => T[k] >= t0 - 1e-9 && T[k] <= t1 + 1e-9), xs = k => (g.xa + (g.xb - g.xa) * T[k]).toFixed(1);
+      return 'M' + ks.map(k => xs(k) + ' ' + up[k].toFixed(1)).join('L') + 'L' + ks.reverse().map(k => xs(k) + ' ' + Math.max(lo[k], up[k]).toFixed(1)).join('L') + 'Z'; };
+    const sty = (u, op = .42) => `style="fill:var(--${u.fill});stroke:var(--muted)" fill-opacity="${op}" stroke-width=".7" stroke-dasharray="4 3"`;
+    for (const g of G) {
+      const A = U2[g.i], B = U2[g.i + 1], ya = (u, k) => Y(g.ea - u[k]), yb = (u, k) => Y(g.eb - u[k]), gapM = Math.abs(pos[g.i + 1].d - pos[g.i].d), out = [], over = new Map(), wide = g.xb - g.xa > 46;
+      const split = (us, yy, up, lo, t0, t1, tag) => { const u0 = yy(us[0], 'top'), u1 = yy(us[us.length - 1], 'bot'), h = Math.max(1e-6, u1 - u0);
+        for (const u of us) { const c0 = (yy(u, 'top') - u0) / h, c1 = (yy(u, 'bot') - u0) / h, U = up.map((v, k) => v + (lo[k] - v) * c0), L = up.map((v, k) => v + (lo[k] - v) * c1);
+          out.push(`<path data-unit="${tag}" d="${poly(g, U, L, t0, t1)}" ${sty(u, tag === 'unknown' ? .2 : .42)}><title>${esc(u.u)} (${tag === 'unknown' ? 'not reached by the next borehole; continuation unknown' : tag === 'pinch' ? 'interpreted pinch-out' : 'interpreted'})</title></path>`); } };
+      const runs = [...g.pr, [A.length, B.length]]; let pa = -1, pb = -1;
+      for (const [ia, ib] of runs) {
+        const Dn = A.slice(pa + 1, ia), In = B.slice(pb + 1, ib), hasP = pa >= 0, hasQ = ia < A.length;
+        if ((Dn.length || In.length) && A.length && B.length) {
+          const uA = hasP ? ya(A[pa], 'bot') : Dn.length ? ya(Dn[0], 'top') : hasQ ? ya(A[ia], 'top') : null, lA = hasQ ? ya(A[ia], 'top') : Dn.length ? ya(Dn[Dn.length - 1], 'bot') : uA;
+          const uB = hasP ? yb(B[pb], 'bot') : In.length ? yb(In[0], 'top') : hasQ ? yb(B[ib], 'top') : null, lB = hasQ ? yb(B[ib], 'top') : In.length ? yb(In[In.length - 1], 'bot') : uB;
+          if (Dn.length && In.length) {   // one unit gives way to another between the boreholes: they meet halfway
+            const up = line(uA, uB), lo = line(lA, lB); split(Dn, ya, up, lo, 0, .5, 'pinch'); split(In, yb, up, lo, .5, 1, 'pinch');
+            out.push(`<path data-facies="1" d="M${((g.xa + g.xb) / 2).toFixed(1)} ${lerp(uA, uB, .5).toFixed(1)}V${lerp(lA, lB, .5).toFixed(1)}" style="stroke:var(--muted)" stroke-width=".9" stroke-dasharray="2 2"/>`);
+            if (hasP) over.set('b' + pa, up); if (hasQ) over.set('t' + ia, lo);
+          } else if (!hasQ && hasP) {   // below the bottom of the shallower borehole: continues, unknown, part way only
+            const us = Dn.length ? Dn : In, fromA = !!Dn.length, base = fromA ? line(uA, uB) : line(uA, uB), yy = fromA ? ya : yb, top0 = yy(us[0], 'top'), bot0 = yy(us[us.length - 1], 'bot');
+            const up = base.map((v, k) => v + (top0 - (fromA ? uA : uB))), lo = base.map((v, k) => v + (bot0 - (fromA ? uA : uB)));
+            split(us, yy, up, lo, fromA ? 0 : .5, fromA ? .5 : 1, 'unknown');
+          } else if (Dn.length) {   // pinches out towards B, at the point its thickness trend reaches zero
+            const f = offPinch(g, new Set(Dn.map(u => u.u)), pinchAt(g.i, g.i - 1, Dn, gapM), true, Math.max(lA, lB)), land = (uB + lB) / 2, tip = lerp((uA + lA) / 2, land, f);
+            const up = T.map(t => t <= f ? lerp(uA, tip, t / f) : lerp(tip, land, (t - f) / (1 - f))), lo = T.map(t => t <= f ? lerp(lA, tip, t / f) : lerp(tip, land, (t - f) / (1 - f)));
+            split(Dn, ya, up, lo, 0, f, 'pinch'); if (wide) out.push(`<text data-pinch="1" x="${(g.xa + (g.xb - g.xa) * f + 3).toFixed(1)}" y="${(tip + 3).toFixed(1)}" style="font:700 9px Arial,sans-serif;fill:var(--muted)">?</text>`);
+            if (hasP) over.set('b' + pa, up); if (hasQ) over.set('t' + ia, lo);
+          } else {   // a unit only in B pinches out towards A
+            const f = offPinch(g, new Set(In.map(u => u.u)), pinchAt(g.i + 1, g.i + 2, In, gapM), false, Math.max(lA, lB)), land = (uA + lA) / 2, tip = lerp((uB + lB) / 2, land, f), t0 = 1 - f;
+            const up = T.map(t => t >= t0 ? lerp(tip, uB, (t - t0) / f) : lerp(land, tip, t / t0)), lo = T.map(t => t >= t0 ? lerp(tip, lB, (t - t0) / f) : lerp(land, tip, t / t0));
+            split(In, yb, up, lo, t0, 1, 'pinch'); if (wide) out.push(`<text data-pinch="1" x="${(g.xa + (g.xb - g.xa) * t0 - 8).toFixed(1)}" y="${(tip + 3).toFixed(1)}" style="font:700 9px Arial,sans-serif;fill:var(--muted)">?</text>`);
+            if (hasP) over.set('b' + pa, up); if (hasQ) over.set('t' + ia, lo);
+          }
+        }
+        pa = ia; pb = ib;
       }
-      for (const ub of U2[i + 1]) if (!U2[i].some(u => u.u === ub.u)) o.push(`<path data-unit="pinch" d="M${xb} ${Y(eb - ub.top)}L${xm2} ${Y(eb - (ub.top + ub.bot) / 2)}L${xb} ${Y(eb - ub.bot)}Z" style="fill:var(--${ub.fill});stroke:var(--muted)" fill-opacity=".28" stroke-width=".7" stroke-dasharray="4 3"/>`);
+      // the paired units, between their (smooth) top and base, or the edge of a pinch-out next to them
+      for (const [a, b, auto] of g.pr) { const u = A[a], up = over.get('t' + a) || contact(g, ya(u, 'top'), yb(B[b], 'top'), u.u, 'top'), lo = over.get('b' + a) || contact(g, ya(u, 'bot'), yb(B[b], 'bot'), u.u, 'bot'); if (auto) nAuto++;
+        out.unshift(`<path data-unit="join"${auto ? ' data-auto="1"' : ''} d="${poly(g, up, lo, 0, 1)}" ${sty(u)}><title>${esc(auto ? u.u + ' and ' + B[b].u + ' (paired: same soil at the same level)' : u.u + ' (interpreted between boreholes)')}</title></path>`); }
+      // 4. less sure away from the boreholes: the shading fades towards the middle of each gap
+      const id = 'sf' + g.i + Math.random().toString(36).slice(2, 6);
+      o.push(`<defs><linearGradient id="${id}g" gradientUnits="userSpaceOnUse" x1="${g.xa}" x2="${g.xb}" y1="0" y2="0"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#bdbdbd"/><stop offset="1" stop-color="#fff"/></linearGradient><mask id="${id}" maskUnits="userSpaceOnUse"><rect x="${g.xa - 1}" y="0" width="${g.xb - g.xa + 2}" height="${H}" fill="url(#${id}g)"/></mask></defs><g data-gap="${g.i}" mask="url(#${id})">${out.join('')}</g>`);
     }
-    const seen = new Map(); U2.flat().forEach(u => seen.has(u.u) || seen.set(u.u, u.fill));
-    let lx = m.l;
-    for (const [u, fl] of seen) { o.push(`<rect x="${lx}" y="${H - 16 - plH - mdH - gwH}" width="12" height="9" style="fill:var(--${fl});stroke:var(--muted)" fill-opacity=".6"/><text x="${lx + 16}" y="${H - 8 - plH - mdH - gwH}" class="lbl2">${esc(u)}</text>`); lx += 26 + u.length * 5.6; }
+    soilNote = 'Layers: units of the same name joined in order' + (nAuto ? ', with ' + nAuto + ' join' + (nAuto > 1 ? 's' : '') + ' between differently named units of the same soil at the same level' : '') + '; pinch-outs placed from thickness trends' + (usedOff.size ? ' and from ' + usedOff.size + ' borehole' + (usedOff.size > 1 ? 's' : '') + ' off the line, which also shape the contacts' : '') + '. Between boreholes the layers are interpreted, not measured.';
     o.push('</g>');
   }
+  if (soilKey.items.length) { const room = W - m.l - m.r, base = H - 8 - plH - mdH - gwH - (soilKey.rows - 1) * 15; let lx = m.l, row = 0;
+    o.push(`<g data-soilkey="1" style="${soilStyle}">`);
+    for (const it of soilKey.items) { if (lx + it.w > m.l + room && lx > m.l) { row++; lx = m.l; } const y = base + row * 15;
+      o.push(`<g data-key="${esc(it.code)}"><title>${esc(it.label)}</title>${soilRects(lx, y - 10, 24, 12, it.code, it.origin, it.texture)}<rect x="${lx}" y="${y - 10}" width="24" height="12" fill="none" style="stroke:var(--ink)" stroke-width=".6"/><text x="${lx + 30}" y="${y}" class="lbl2">${esc(it.label)}</text></g>`); lx += it.w; }
+    o.push('</g>'); }
   // interpreted and modelled concentrations stay below the ground line
   const gclip = 'gc' + Math.random().toString(36).slice(2, 8), gl = pos.map(p => [X(p.d), Y(top(p.b))]);
   o.push(`<defs><clipPath id="${gclip}"><path d="M0 ${gl[0][1]}${gl.map(q => `L${q[0]} ${q[1]}`).join('')}L${W} ${gl[gl.length - 1][1]}L${W} ${H}L0 ${H}Z"/></clipPath></defs>`);
-  XS_GEOM = { X, Y, m, plotW, plotH, maxD, e0, e1, W, H, pos, located, noElev, plH, mdH, gwH, gclip, labels: [] };
+  XS_GEOM = { X, Y, m, plotW, plotH, maxD, e0, e1, W, H, pos, located, noElev, plH, mdH, gwH, gclip, labels: [], soilNote };
   const gs = gwH ? gwSectionSVG(XS_GEOM) : null;
-  if (xs && S.sec.water !== false) { const sat = pos.map(p => ({ p, w: wOf(p.b) })).filter(x => x.w && x.w.kind !== 'strike' && x.w.depth != null);
-    if (sat.length >= 2) o.push(`<path data-sat="1" d="M${X(sat[0].p.d)} ${Y(e0)}${sat.map(x => `L${X(x.p.d)} ${Y(top(x.p.b) - x.w.depth)}`).join('')}L${X(sat[sat.length - 1].p.d)} ${Y(e0)}Z" clip-path="url(#${gclip})" style="fill:var(--water)" fill-opacity=".07"><title>Below the water table on the date shown</title></path>`); }
+  // the water table across the whole section: through each borehole's reading (any kind), carried level out to both edges
+  const wprof = S.sec.water === false ? [] : pos.map(p => ({ p, w: wOf(p.b) })).filter(x => x.w && x.w.depth != null), wxL = m.l, wxR = W - m.r;
+  const wY = x => Y(top(x.p.b) - x.w.depth), wPath = wprof.length ? [[wxL, wY(wprof[0])], ...wprof.map(x => [X(x.p.d), wY(x)]), [wxR, wY(wprof[wprof.length - 1])]] : [];
+  if (wPath.length) o.push(`<path data-sat="1" d="M${wxL} ${Y(e0)}${wPath.map(q => `L${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join('')}L${wxR} ${Y(e0)}Z" clip-path="url(#${gclip})" style="fill:var(--water)" fill-opacity=".09"><title>Below the water table${xs?.date ? ' on the date shown' : ''} (interpolated between readings, carried level beyond the outer ones)</title></path>`);
   if (xs?.model) o.push(modelSVG(xs.date || '', xs));
   if (xs && xs.plume !== false && (xs.param || xs.medium === 'vapour')) o.push(plumeSVG(pos, xs, X, Y, top, bw, W, H, m));
   // the model's flow over the plume shading, under the borehole columns
@@ -6466,8 +6595,12 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   }
   const wpts = S.sec.water === false ? [] : pos.map(p => ({ p, w: wOf(p.b) })).filter(x => x.w);
   // the water table is joined only between static readings of the same round (within 7 days); the join is interpolated
-  for (let i = 0; i < wpts.length - 1; i++) { const a = wpts[i], c = wpts[i + 1]; if (!xs) { o.push(`<path d="M${X(a.p.d)} ${Y(top(a.p.b) - a.w.depth)}L${X(c.p.d)} ${Y(top(c.p.b) - c.w.depth)}" fill="none" style="stroke:var(--water)" stroke-width="2" stroke-dasharray="7 4"/>`); continue; }
-    if (a.w.kind === 'static' && c.w.kind === 'static' && sameRound(a.w, c.w)) o.push(`<path data-wjoin="1" d="M${X(a.p.d) + bw / 2} ${Y(top(a.p.b) - a.w.depth)}L${X(c.p.d) - bw / 2} ${Y(top(c.p.b) - c.w.depth)}" fill="none" style="stroke:var(--water)" stroke-width="1.6" stroke-dasharray="7 4"><title>Water table interpolated between ${esc(a.p.b.name)} and ${esc(c.p.b.name)}</title></path>`); }
+  if (wPath.length) { const seg = (x1, y1, x2, y2, firm, tt) => o.push(`<path ${firm ? 'data-wjoin="1"' : 'data-west="1"'} d="M${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" style="stroke:var(--water)" stroke-width="${firm ? 1.6 : 1.3}" stroke-dasharray="${firm ? '7 4' : '2 3'}" opacity="${firm ? 1 : .8}"><title>${esc(tt)}</title></path>`);
+    const f = wprof[0], l = wprof[wprof.length - 1];
+    seg(wxL, wY(f), X(f.p.d) - bw / 2, wY(f), false, 'Water table carried level beyond ' + f.p.b.name + ' (estimated)');
+    for (let i = 0; i < wprof.length - 1; i++) { const a = wprof[i], c = wprof[i + 1], firm = a.w.kind === 'static' && c.w.kind === 'static' && sameRound(a.w, c.w);
+      seg(X(a.p.d) + bw / 2, wY(a), X(c.p.d) - bw / 2, wY(c), firm, firm ? 'Water table interpolated between ' + a.p.b.name + ' and ' + c.p.b.name : 'Water table estimated between ' + a.p.b.name + ' and ' + c.p.b.name + ' (readings of different kinds or dates)'); }
+    seg(X(l.p.d) + bw / 2, wY(l), wxR, wY(l), false, 'Water table carried level beyond ' + l.p.b.name + ' (estimated)'); }
   const wlBoxes = [];
   wpts.forEach((x, i) => {
     const xx = X(x.p.d), yy = Y(top(x.p.b) - x.w.depth);
@@ -6484,7 +6617,7 @@ function drawSection(el = $('#section'), note = $('#section-note'), forceW, list
   el.innerHTML = o.join('');
   const missing = pos.filter(p => !wOf(p.b)).map(p => p.b.name);
   note.textContent = [located ? (secLineOf() ? `Section along the line drawn on the map: ${pos.map(p => p.b.name).join(' → ')}, each placed where it falls along the line${pos.some(p => p.off) ? ', with its distance off the line below' : ''}.` : ordered ? `Section through ${pos.map(p => p.b.name).join(' → ')}; distances are measured along that line.` : 'Best-fit line through all boreholes; each is projected onto it.') : 'Some boreholes have no coordinates, so all are spaced evenly.', noElev ? 'Some boreholes have no ground elevation; all are drawn from 0.' : '',
-    missing.length ? `No ${xs?.date ? `water reading on or before ${xs.date}` : S.round ? 'reading near this date' : 'reading'} for ${missing.join(', ')}.` : '', xs ? 'Water: solid ticks are measured levels, hollow triangles are seepage or strikes while drilling; dashed lines join static readings of the same round (interpolated).' : ''].filter(Boolean).join(' ') + (XS_GEOM?.plumeNote && xs && xs.plume !== false ? ' Plume: ' + XS_GEOM.plumeNote : '');
+    spreadPairs.length ? 'Drawn apart so the columns do not overlap (the horizontal scale is not true between them): ' + spreadPairs.map(([a, b, d]) => a + ' and ' + b + ' (' + fu(d, 1) + ' apart)').join(', ') + '.' : '', missing.length ? `No ${xs?.date ? `water reading on or before ${xs.date}` : S.round ? 'reading near this date' : 'reading'} for ${missing.join(', ')}.` : '', xs ? 'Water: solid ticks are measured levels, hollow triangles are seepage or strikes while drilling; dashed lines join static readings of the same round (interpolated); dotted lines are estimated (other readings, or carried level past the outer boreholes) and the blue tint is below the water table.' : ''].filter(Boolean).join(' ') + (XS_GEOM?.soilNote ? ' ' + XS_GEOM.soilNote : '') + (XS_GEOM?.plumeNote && xs && xs.plume !== false ? ' Plume: ' + XS_GEOM.plumeNote : '');
 }
 
 /* ---------- Excel import ---------- */
@@ -8848,19 +8981,28 @@ function lblCfg() {
   for (const [k, v] of Object.entries(r.bh || {})) bh[k] = { ...(bh[k] || {}), ...v };
   return { ...LBL_DEF, ...s, ...r, bh };
 }
+/* what borehole names keep clear of while a map with results is drawn: result circles and value labels (obs), names placed (placed) */
+let LBL_AVOID = null;
+const boxHits = (b, list) => list.reduce((s, o) => s + Math.max(0, Math.min(b[2], o[2]) - Math.max(b[0], o[0])) * Math.max(0, Math.min(b[3], o[3]) - Math.max(b[1], o[1])), 0);
 function bhLabelSVG(b, x, y, sub, dflt = 'box', named = true) {
+  if (LBL_AVOID?.named.has(b.id)) named = false;   // its value label already carries the name
   const c = lblCfg(), per = c.bh[b.id] || {}; if (per.hide) return '';
   const text = named ? (per.t != null && per.t !== '' ? String(per.t) : gwName(b)) : '', fs = Math.max(5, +c.size || 11.5), ss = Math.max(6, fs - 1.5);
   const lines = [text && { t: text, f: (c.weight || '600') + ' ' + fs + 'px var(--f-label)', s: fs }, sub != null && sub !== '' && { t: String(sub), f: ss + 'px var(--f-label)', s: ss, wl: true }].filter(Boolean);
   if (!lines.length) return '';
   const lh = l => l.s * 1.15, h = lines.reduce((s, l) => s + lh(l), 0), w = Math.max(...lines.map(l => l.t.length * l.s * .61)), pos = per.pos || c.pos || 'r', bg = c.bg || dflt;
-  const anchor = pos === 'l' ? 'end' : pos === 'r' ? 'start' : 'middle';
-  let ax = pos === 'l' ? x - 10 : pos === 'r' ? x + 10 : x, top = pos === 't' ? y - 11 - h : pos === 'b' ? y + 11 : y - lh(lines[0]) - 5;
-  ax += +per.dx || 0; top += +per.dy || 0;
-  const bx = anchor === 'start' ? ax - 3 : anchor === 'end' ? ax - w - 3 : ax - w / 2 - 3, col = c.color || 'var(--ink)';
+  const A = LBL_AVOID, gap = A ? Math.max(10, (A.rad.get(b.id) || 0) + 4) : 10;
+  const geo = (p, k = 1) => { const g = gap * k, s = p[0], d = p[1], an = s === 'l' ? 'end' : s === 'r' ? 'start' : 'middle', X0 = (s === 'l' ? x - g : s === 'r' ? x + g : x) + (+per.dx || 0), T = (d === 't' || s === 't' && !d ? y - g - 1 - h : d === 'b' || s === 'b' && !d ? y + g + 1 : y - lh(lines[0]) - 5) + (+per.dy || 0);
+    const B = an === 'start' ? X0 - 3 : an === 'end' ? X0 - w - 3 : X0 - w / 2 - 3; return { an, X0, T, B, box: [B, T - 1, B + w + 6, T + h + 1] }; };
+  let G = geo(pos);
+  if (A) { // its own side first, then the other sides and the corners, then the same set further out
+    const ring = [pos, ...['r', 'l', 't', 'b', 'rt', 'rb', 'lt', 'lb'].filter(q => q !== pos)], cands = per.pos ? [[pos, 1]] : [...ring.map(q => [q, 1]), ...ring.map(q => [q, 2.2]), ...ring.map(q => [q, 3.6])];
+    let best = null; for (const [i, q] of cands.entries()) { const g = geo(...q), s = boxHits(g.box, A.obs) + boxHits(g.box, A.placed) + edgeHits(g.box, A) + i * .01; if (!best || s < best.s) best = { g, s, k: q[1] }; if (s < 1) break; }
+    G = best.g; A.placed.push(G.box); if (best.k > 1) { const bb = G.box, px = Math.max(bb[0], Math.min(x, bb[2])), py = Math.max(bb[1], Math.min(y, bb[3])), d = Math.hypot(px - x, py - y) || 1, r0 = A.rad.get(b.id) || 6; G.lead = '<path data-lbllead="1" d="M' + (x + (px - x) / d * r0).toFixed(1) + ' ' + (y + (py - y) / d * r0).toFixed(1) + 'L' + px.toFixed(1) + ' ' + py.toFixed(1) + '" style="stroke:var(--muted)" stroke-width=".8" fill="none"/>'; } }
+  const anchor = G.an, ax = G.X0, top = G.T, bx = G.B, col = c.color || 'var(--ink)';
   const halo = bg === 'halo' ? ';paint-order:stroke;stroke:#fff;stroke-width:3;stroke-linejoin:round' : '';
   let yy = top; const tx = lines.map(l => { const by = yy + l.s * .95; yy += lh(l); return '<text x="' + ax.toFixed(1) + '" y="' + by.toFixed(1) + '" text-anchor="' + anchor + '"' + (l.wl ? ' class="wl"' : '') + ' style="font:' + l.f + (l.wl ? '' : ';fill:' + col) + halo + '">' + esc(l.t) + '</text>'; }).join('');
-  return '<g data-lbl="' + esc(b.id) + '">' + (bg === 'box' ? '<rect x="' + bx.toFixed(1) + '" y="' + (top - 1).toFixed(1) + '" width="' + (w + 6).toFixed(1) + '" height="' + (h + 2).toFixed(1) + '" rx="2" style="fill:var(--panel)" opacity=".8"/>' : '') + tx + '</g>';
+  return '<g data-lbl="' + esc(b.id) + '">' + (G.lead || '') + (bg === 'box' ? '<rect x="' + bx.toFixed(1) + '" y="' + (top - 1).toFixed(1) + '" width="' + (w + 6).toFixed(1) + '" height="' + (h + 2).toFixed(1) + '" rx="2" style="fill:var(--panel)" opacity=".8"/>' : '') + tx + '</g>';
 }
 /* the label editor: one block for a map in Outputs (pre 'c', writes the map's own) or the Map page (pre 's', the project's) */
 function labelsHTML(pre) {
@@ -9384,9 +9526,9 @@ function xsPlumeCtl() {
     ${xs.medium === 'vapour' ? '' : `<select id="xs-param" aria-label="Parameter" style="width:auto">${params.length ? params.map(p => `<option value="${p}" ${xs.param === p ? 'selected' : ''}>${esc(LAB_PARAMS[p].label)}</option>`).join('') : '<option value="">No results</option>'}</select>`}
     <label class="check" title="Show only results within 7 days of the date"><input type="checkbox" id="xs-round" ${xs.round ? 'checked' : ''}> This round only</label></span>
     <span class="lay-ctl"><select id="xs-layer" aria-label="Layers" style="width:auto">${[['meas', 'Measured'], ['model', 'Forecast'], ['both', 'Compare measured and forecast']].map(([v, t]) => `<option value="${v}" ${(xs.plume !== false && xs.model ? 'both' : xs.model ? 'model' : 'meas') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-    ${xs.medium === 'groundwater' ? `<select id="xs-shape" aria-label="Plume shape" style="width:auto" title="Model-guided: the forecast's shape, matched to every measured result. Data only: blended between wells across the screens. Kriging and inverse distance, 3D: from every well near the line, in real metres."><option value="guided" ${!['data', 'krige', 'idw'].includes(xs.shape) ? 'selected' : ''}>Shape: model-guided</option><option value="data" ${xs.shape === 'data' ? 'selected' : ''}>Shape: data only</option>${Object.entries(XS_METHODS).filter(([v]) => v !== 'tin').map(([v, [l, s]]) => `<option value="${v}" title="${esc(s)}" ${xs.shape === v ? 'selected' : ''}>Shape: ${esc(l.charAt(0).toLowerCase() + l.slice(1))}</option>`).join('')}</select>` : `<select id="xs-interp" aria-label="Interpolation" style="width:auto" title="Kriging and inverse distance work in real metres, in plan and depth together, from every borehole near the line">${Object.entries(XS_METHODS).map(([v, [l, s]]) => `<option value="${v}" title="${esc(s)}" ${(xs.interp || 'krige') === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`}
-    ${(() => { const mk = xs.medium === 'groundwater' ? xs.shape : (xs.interp || 'krige'); return XS_METHODS[mk] ? `<details class="xs-method"><summary class="note">About this method</summary><p class="note">${esc(XS_METHODS[mk][1])}</p></details>` : ''; })()}
-    ${(xs.medium === 'groundwater' ? XS_3D.has(xs.shape) : (xs.interp || 'krige') !== 'tin') ? `<select id="xs-aniso" aria-label="Layering" style="width:auto" title="How much further a plume reaches sideways than down: soil layers make plumes long and thin. A metre down counts as this many metres sideways.">${XS_ANISO.map(k => `<option value="${k}" ${(+xs.aniso || 10) === k ? 'selected' : ''}>${k === 1 ? 'Same sideways and down' : 'Reaches ×' + k + ' further sideways'}</option>`).join('')}</select><label class="check" title="Use boreholes near the line too, by their real distance (untick: only the section's own)"><input type="checkbox" id="xs-near" ${xs.only !== true ? 'checked' : ''}> Boreholes near the line</label>` : ''}
+    ${xs.medium === 'groundwater' ? `<select id="xs-shape" aria-label="Plume shape" style="width:auto" title="Model-guided: the forecast's shape, matched to every measured result. Data only: blended between wells across the screens. Kriging and inverse distance, 3D: from every well near the line, in real metres."><option value="guided" ${!(xs.shape === 'data' || XS_METHODS[xs.shape]) ? 'selected' : ''}>Shape: model-guided</option><option value="data" ${xs.shape === 'data' ? 'selected' : ''}>Shape: data only</option>${Object.entries(XS_METHODS).filter(([v]) => v !== 'tin').map(([v, [l, s]]) => `<option value="${v}" title="${esc(s)}" ${xs.shape === v ? 'selected' : ''}>Shape: ${esc(l.charAt(0).toLowerCase() + l.slice(1))}</option>`).join('')}</select>` : `<select id="xs-interp" aria-label="Interpolation" style="width:auto" title="Kriging and inverse distance work in real metres, in plan and depth together, from every borehole near the line">${Object.entries(XS_METHODS).map(([v, [l, s]]) => `<option value="${v}" title="${esc(s)}" ${(xs.interp || 'auto') === v ? 'selected' : ''}>${esc(v === 'auto' && XS_METHOD_PICK && (xs.interp || 'auto') === 'auto' ? 'Automatic (' + XS_METHODS[XS_METHOD_PICK][0].replace(/, 3D.*$|: .*$/, '').toLowerCase() + ')' : l)}</option>`).join('')}</select>`}
+    ${(() => { const mk = xs.medium === 'groundwater' ? xs.shape : (xs.interp || 'auto'); return XS_METHODS[mk] ? `<details class="xs-method"><summary class="note">About this method</summary><p class="note">${esc(XS_METHODS[mk][1])}</p></details>` : ''; })()}
+    ${(xs.medium === 'groundwater' ? XS_3D.has(xs.shape) : (xs.interp || 'auto') !== 'tin') ? `<select id="xs-aniso" aria-label="Layering" style="width:auto" title="How much further a plume reaches sideways than down: soil layers make plumes long and thin. A metre down counts as this many metres sideways."><option value="auto" ${xs.aniso == null || xs.aniso === 'auto' || !(+xs.aniso > 0) ? 'selected' : ''}>Layering: automatic${XS_ANISO_PICK && (xs.aniso == null || xs.aniso === 'auto') ? ' (×' + XS_ANISO_PICK + ')' : ''}</option>${XS_ANISO.map(k => `<option value="${k}" ${+xs.aniso === k ? 'selected' : ''}>${k === 1 ? 'Same sideways and down' : 'Reaches ×' + k + ' further sideways'}</option>`).join('')}</select><label class="check" title="Use boreholes near the line too, by their real distance (untick: only the section's own)"><input type="checkbox" id="xs-near" ${xs.only !== true ? 'checked' : ''}> Boreholes near the line</label>` : ''}
     <select id="xs-style" aria-label="Drawing style" style="width:auto">${[['graded', 'Graded shading'], ['lines', 'Contour lines'], ['bands', 'Filled bands']].map(([v, t]) => `<option value="${v}" ${(xs.style || 'graded') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
     <label class="check"><input type="checkbox" id="xs-soilcol" ${xs.soilColour ? 'checked' : ''}> Keep soil colours</label>
     <label class="check" title="The reading beside each point; labels are moved apart so none overlap"><input type="checkbox" id="xs-ptlabels" ${xs.ptLabels ? 'checked' : ''}> Show values</label>
@@ -9520,19 +9662,18 @@ function planSVG(W, H, interactive) {
   // a key map (the site smaller than a symbol): one project-location star in place of the boreholes, their labels and results
   if (keyMap) { const kx = pts.reduce((s, b) => s + X(b.easting), 0) / pts.length, ky = pts.reduce((s, b) => s + Y(b.northing), 0) / pts.length, st = [...Array(10)].map((_, k) => { const r = k % 2 ? 4 : 10, a = Math.PI / 5 * k - Math.PI / 2; return `${(kx + r * Math.cos(a)).toFixed(1)} ${(ky + r * Math.sin(a)).toFixed(1)}`; });
     o.push(`<path data-keystar="1" d="M${st.join('L')}Z" style="fill:#d4533f;stroke:#fff" stroke-width="1.2"><title>Project location</title></path>`); }
-  if (!keyMap && (RO.mres ? MR.p && MR.p !== 'none' : lyrOn('res'))) o.push(resultsLayerSVG(pts, X, Y, MR));
+  LBL_AVOID = null; if (!keyMap && (RO.mres ? MR.p && MR.p !== 'none' : lyrOn('res'))) o.push(resultsLayerSVG(pts, X, Y, MR, W, H));
   for (const b of keyMap ? [] : pts) {
     // water elevations are labelled at wells only, from a standpipe or completion reading (never seepage while drilling)
     const SI = secLineOf() ? new Set(secLineOf().ids || []) : S.secIds, on = SI.size ? SI.has(b.id) : true, lw0 = b.well?.installed ? readingFor(b) : null, lw = lw0 && lw0.kind !== 'strike' ? lw0 : null;
     o.push(`<g ${interactive && S.mapEdit ? `data-bhpt="${esc(b.id)}" style="cursor:${S.mapTool === 'move' ? 'grab' : 'default'}"` : interactive ? `data-secpick="${esc(b.id)}" style="cursor:pointer"` : ''}><title>${esc(`${b.name}${wellId(b) ? ' / ' + wellId(b) : ''}${lw && b.elevation != null ? ` · water el. ${fu(b.elevation - lw.depth)}` : ''}`)}</title>
       <circle cx="${X(b.easting)}" cy="${Y(b.northing)}" r="12" fill="transparent"/>${SI.size && on ? `<circle cx="${X(b.easting)}" cy="${Y(b.northing)}" r="10.5" style="fill:none;stroke:var(--accent)" stroke-width="2"/>` : ''}
       ${BH_SYMBOL(X(b.easting), Y(b.northing), !!b.well?.installed)}
-      ${bhLabelSVG(b, X(b.easting), Y(b.northing), S.lyr.wl !== false && lw && b.elevation != null ? fx(b.elevation - lw.depth) : null, 'box', S.lyr.labels !== false)}</g>`);
+      ${bhLabelSVG(b, X(b.easting), Y(b.northing), S.lyr.wl !== false && lw && b.elevation != null ? fx(b.elevation - lw.depth) : null, 'box', RO.names ?? S.lyr.labels !== false)}</g>`);
   }
+  LBL_AVOID = null;
   if (RO.legend ?? lyrOn('legend')) o.push(mapLegendSVG(W, H, pts, RO.mres ? MR : lyrOn('res') ? MR : null));
-  if (!RO.bare) o.push(`<g transform="translate(${W - 30},34)"><path d="M0 -18L7 6L0 1L-7 6z" style="fill:var(--ink)"/><text y="20" text-anchor="middle" style="font:700 11px var(--f-label)">N</text></g>`);
-  const sb = niceStep(free ? W / sc / 5 : span / 4, 1), sbw = sb * sc;
-  if (!RO.bare) o.push(`<g transform="translate(16,${H - 18})"><rect width="${sbw / 2}" height="5" style="fill:var(--ink)"/><rect x="${sbw / 2}" width="${sbw / 2}" height="5" style="fill:var(--panel);stroke:var(--ink)"/><text x="0" y="-4" class="tick">0</text><text x="${sbw}" y="-4" class="tick" text-anchor="end">${+sb.toFixed(1)} m</text></g>`);
+  o.push(mapFurnSVG(W, H, sc));
   if (!RO.bare) o.push(`<text x="16" y="18" class="lbl2">${esc(pts[0]?.crs || '')}${RO.scale ? ` · scale 1:${RO.scale.toLocaleString('en-CA')} on Letter` : ''}${RO.grid ? ` · grid ${RO.grid} m` : ''}${S.contours && wp.length >= 3 ? ` · water-table contours (${LEN()}, interpolated)` : ''}</text></svg>`);
   return o.join('');
 }
@@ -9810,8 +9951,7 @@ function flowPlanSVG(F, W, H) {
   o.push(flowOffMarks(F.skip, X, Y));
   if (F.robust) F.wells.forEach((w, k) => { if (F.wts[k] < .5) o.push(`<circle data-downweighted="1" cx="${X(w.e)}" cy="${Y(w.n)}" r="10" style="fill:none;stroke:#d9822b" stroke-width="2" stroke-dasharray="3 2"><title>${esc(`${gwName(w.b)}: down-weighted (weight ${F.wts[k].toFixed(2)}), it disagrees with the other wells`)}</title></circle>`); });
   for (const w of pts) o.push(`<g><title>${esc(`${gwName(w.b)}: head ${fu(w.h)} (${w.w.date || 'undated'})`)}</title>${BH_SYMBOL(X(w.e), Y(w.n), true)}${bhLabelSVG(w.b, X(w.e), Y(w.n), fx(w.h), 'halo')}</g>`);
-  o.push(`<g transform="translate(${W - 30} 34)"><path d="M0 -16l7 20-7-5-7 5z" style="fill:var(--ink)"/><text y="16" text-anchor="middle" style="font:700 11px Arial,Helvetica,sans-serif;fill:var(--ink)">N</text></g>`);
-  const sb = niceStep(span / 4, 2); o.push(`<g transform="translate(18 ${H - 18})"><rect width="${sb * sc}" height="5" style="fill:var(--ink)"/><text y="-5" style="font:10px Arial,Helvetica,sans-serif;fill:var(--ink)">0</text><text x="${sb * sc}" y="-5" text-anchor="middle" style="font:10px Arial,Helvetica,sans-serif;fill:var(--ink)">${+sb.toFixed(1)} m</text></g>`);
+  o.push(mapFurnSVG(W, H, sc));
   o.push('</g></svg>');
   return o.join('');
 }
@@ -10020,17 +10160,17 @@ function joinSegs(segs, tol) {
 }
 /* the water-table surface for maps: a thin-plate spline through the heads, sampled on a fine grid over the wells' outline
    (the hull: nothing is drawn beyond the outer wells). Bands: one shape per band; lines: smooth contour lines per level */
-function headSurface(P, levels, f0) {
+function headSurface(P, levels, f0, pad = 0) {
   const f = f0 || tpsFit(P); if (!f) return null;
   const hull = convexHull(P.map(p => [p[0], p[1]])); if (hull.length < 3) return null;
-  const x0 = Math.min(...hull.map(p => p[0])), x1 = Math.max(...hull.map(p => p[0])), y0 = Math.min(...hull.map(p => p[1])), y1 = Math.max(...hull.map(p => p[1]));
+  const x0 = Math.min(...hull.map(p => p[0])) - pad, x1 = Math.max(...hull.map(p => p[0])) + pad, y0 = Math.min(...hull.map(p => p[1])) - pad, y1 = Math.max(...hull.map(p => p[1])) + pad;
   const st = Math.max(x1 - x0, y1 - y0) / 60 || 1, nx = Math.max(2, Math.ceil((x1 - x0) / st) + 1), ny = Math.max(2, Math.ceil((y1 - y0) / st) + 1);
   const g = [], node = (i, j) => g[j * (nx + 1) + i];
   for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { const x = x0 + i * st, y = y0 + j * st; g.push([x, y, f(x, y)]); }
   const band = z => { let k = 0; while (k < levels.length && z >= levels[k]) k++; return k; };
   // cells well outside the hull are skipped (the drawing is clipped to it anyway)
   const segD = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy || 1))); return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); };
-  const near = p => inHull(p, hull) || hull.some((a, i) => segD(p, a, hull[(i + 1) % hull.length]) < st * 1.5);
+  const near = p => inHull(p, hull) || hull.some((a, i) => segD(p, a, hull[(i + 1) % hull.length]) < st * 1.5 + pad);
   const bands = Array.from({ length: levels.length + 1 }, () => []), tris = [];
   for (let j = 0; j < ny; j++) {
     let run = null;   // cells wholly inside one band merge along the row into one rectangle
@@ -10076,6 +10216,52 @@ function tinLine(pts, tris, z) {
   }
   return segs;
 }
+/* ---------- north arrow and scale bar on the maps: style, size and corner, the project's (site.furn) with a map's own on top (RO.furn) ---------- */
+const FURN_DEF = { nStyle: 'arrow', nSize: 26, nPos: 'tr', sStyle: 'alt', sLen: '', sUnits: 'auto', sPos: 'bl', sRatio: '', sSize: 10.5 };
+const NORTH_STYLES = { arrow: 'Arrow', half: 'Half-filled arrow', compass: 'Compass star', circle: 'Arrow in a circle', simple: 'Line and N', none: 'None' };
+const SBAR_STYLES = { alt: 'Alternating blocks', bar: 'Solid bar', line: 'Line with ticks', double: 'Double row', none: 'None' };
+const CORNERS = { tr: 'Top right', tl: 'Top left', br: 'Bottom right', bl: 'Bottom left' };
+function furnCfg() { return { ...FURN_DEF, ...(siteOf()?.furn || {}), ...(RO.furn || {}) }; }
+/* a north arrow of height s centred on 0,0 with its N above, in ink and paper colours */
+function northShape(style, s, ink = 'var(--ink)', paper = 'var(--panel)') {
+  const h = s / 2, fs = Math.max(8, s * .42), f = v => v.toFixed(1), N = '<text y="' + f(-h - 3) + '" text-anchor="middle" style="font:700 ' + f(fs) + 'px Arial,Helvetica,sans-serif;fill:' + ink + '">N</text>';
+  if (style === 'half') return '<path d="M0 ' + f(-h) + 'L' + f(s * .32) + ' ' + f(h) + 'L0 ' + f(h * .55) + 'Z" style="fill:' + ink + '"/><path d="M0 ' + f(-h) + 'L' + f(-s * .32) + ' ' + f(h) + 'L0 ' + f(h * .55) + 'Z" style="fill:' + paper + ';stroke:' + ink + '" stroke-width="1"/>' + N;
+  if (style === 'compass') { const a = s * .13, pt = (dx, dy, dark) => '<path d="M0 0L' + f(dx * h + dy * a) + ' ' + f(dy * h - dx * a) + 'L' + f(dx * h) + ' ' + f(dy * h) + 'Z" style="fill:' + (dark ? ink : paper) + ';stroke:' + ink + '" stroke-width=".8"/><path d="M0 0L' + f(dx * h - dy * a) + ' ' + f(dy * h + dx * a) + 'L' + f(dx * h) + ' ' + f(dy * h) + 'Z" style="fill:' + (dark ? paper : ink) + ';stroke:' + ink + '" stroke-width=".8"/>';
+    return pt(0, -1, true) + pt(1, 0, false) + pt(0, 1, false) + pt(-1, 0, false) + N; }
+  if (style === 'circle') return '<circle r="' + f(h) + '" style="fill:' + paper + ';stroke:' + ink + '" stroke-width="1.2"/><path d="M0 ' + f(-h * .8) + 'L' + f(h * .38) + ' ' + f(h * .6) + 'L0 ' + f(h * .3) + 'L' + f(-h * .38) + ' ' + f(h * .6) + 'Z" style="fill:' + ink + '"/>' + N;
+  if (style === 'simple') return '<path d="M0 ' + f(h) + 'V' + f(-h) + 'M' + f(-s * .16) + ' ' + f(-h + s * .26) + 'L0 ' + f(-h) + 'L' + f(s * .16) + ' ' + f(-h + s * .26) + '" fill="none" style="stroke:' + ink + '" stroke-width="1.6" stroke-linejoin="round"/>' + N;
+  return '<path d="M0 ' + f(-h) + 'L' + f(s * .3) + ' ' + f(h) + 'L0 ' + f(h * .55) + 'L' + f(-s * .3) + ' ' + f(h) + 'Z" style="fill:' + ink + '"/>' + N;
+}
+/* the north arrow and scale bar drawn on a map of W x H at sc px per metre */
+function mapFurnSVG(W, H, sc) {
+  if (RO.bare) return ''; const c = furnCfg(), o = [], m = 14, sbH = c.sStyle === 'none' ? 0 : 30 + (c.sRatio ? 13 : 0) + (c.sStyle === 'double' ? 5 : 0);
+  if (c.nStyle !== 'none') { const s = Math.max(10, Math.min(120, +c.nSize || 26)), fs = Math.max(8, s * .42), top = c.nPos[0] === 't', right = c.nPos[1] === 'r';
+    const same = c.sStyle !== 'none' && c.nPos === c.sPos, cx = right ? W - m - s * .5 : m + s * .5, cy = top ? m + fs + 3 + s / 2 + (same ? sbH : 0) : H - m - s / 2 - (same ? sbH : 0);
+    o.push('<g data-mapnorth="' + c.nStyle + '" data-size="' + s + '" transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')">' + northShape(c.nStyle, s) + '</g>'); }
+  if (c.sStyle !== 'none' && sc > 0) {
+    const ft = c.sUnits === 'ft' || (c.sUnits !== 'm' && S.units === 'ft'), ppu = sc * (ft ? .3048 : 1), unit = ft ? 'ft' : 'm', fs = Math.max(7, Math.min(20, +c.sSize || 10.5));
+    const len = +c.sLen > 0 ? +c.sLen : niceFloor(W * .24 / ppu), Lp = Math.min(len * ppu, W - 2 * m - 30), n = c.sStyle === 'bar' || c.sStyle === 'line' ? 1 : 4, seg = Lp / n, bh = c.sStyle === 'line' ? 0 : 5;
+    const right = c.sPos[1] === 'r', top = c.sPos[0] === 't', x0 = right ? W - m - Lp - fs * 1.2 : m + 2, y0 = top ? m + fs + 4 + (c.sRatio ? fs + 3 : 0) : H - m - bh - (c.sStyle === 'double' ? 5 : 0);
+    const fmt = v => (+v.toFixed(2)).toLocaleString('en-CA'), lab = (x, t) => '<text x="' + x.toFixed(1) + '" y="' + (y0 - 4).toFixed(1) + '" text-anchor="middle" style="font:' + fs + 'px Arial,Helvetica,sans-serif;fill:var(--ink);paint-order:stroke;stroke:var(--panel);stroke-width:2.5px">' + t + '</text>', r = [];
+    if (c.sStyle === 'line') r.push('<path d="M' + x0 + ' ' + (y0 - 1) + 'v6h' + Lp.toFixed(1) + 'v-6" fill="none" style="stroke:var(--ink)" stroke-width="1.4"/>');
+    else if (c.sStyle === 'bar') r.push('<rect x="' + x0 + '" y="' + y0 + '" width="' + Lp.toFixed(1) + '" height="' + bh + '" style="fill:var(--ink)"/>');
+    else for (let i = 0; i < n; i++) { r.push('<rect x="' + (x0 + i * seg).toFixed(1) + '" y="' + y0 + '" width="' + seg.toFixed(1) + '" height="' + bh + '" style="fill:' + (i % 2 ? 'var(--panel)' : 'var(--ink)') + ';stroke:var(--ink)" stroke-width=".8"/>');
+      if (c.sStyle === 'double') r.push('<rect x="' + (x0 + i * seg).toFixed(1) + '" y="' + (y0 + bh) + '" width="' + seg.toFixed(1) + '" height="' + bh + '" style="fill:' + (i % 2 ? 'var(--ink)' : 'var(--panel)') + ';stroke:var(--ink)" stroke-width=".8"/>'); }
+    const L = Lp / ppu, labs = n > 1 ? [lab(x0, '0'), lab(x0 + 2 * seg, fmt(L / 2)), lab(x0 + Lp, fmt(L) + ' ' + unit)] : [lab(x0, '0'), lab(x0 + Lp, fmt(L) + ' ' + unit)];
+    const ratio = c.sRatio ? '<text x="' + x0 + '" y="' + (y0 - 6 - fs).toFixed(1) + '" style="font:600 ' + fs + 'px Arial,Helvetica,sans-serif;fill:var(--ink);paint-order:stroke;stroke:var(--panel);stroke-width:2.5px">Scale 1:' + Math.round(PX_PER_M / sc).toLocaleString('en-CA') + '</text>' : '';
+    o.push('<g data-mapscale="' + c.sStyle + '" data-len="' + +L.toFixed(3) + '" data-unit="' + unit + '">' + r.join('') + labs.join('') + ratio + '</g>'); }
+  return o.join('');
+}
+/* the editor: pre 'c' a map in Outputs (its own), 's' the project's */
+function furnHTML(pre) {
+  const c = furnCfg(), ro = S.readOnly ? 'disabled' : '', d = 'data-' + pre + 'furn', sel = (k, list) => '<select ' + d + '="' + k + '" ' + ro + '>' + Object.entries(list).map(([v, l]) => '<option value="' + v + '" ' + (String(c[k]) === v ? 'selected' : '') + '>' + esc(l) + '</option>').join('') + '</select>';
+  const num = (k, mn, mx, st, ph) => '<input type="number" min="' + mn + '" max="' + mx + '" step="' + st + '" ' + d + '="' + k + '" value="' + esc(c[k] ?? '') + '" ' + (ph ? 'placeholder="' + ph + '"' : '') + ' ' + ro + '>';
+  return '<h4>North arrow</h4><div class="cmp-geos"><label class="cmp-geo"><span>Style</span>' + sel('nStyle', NORTH_STYLES) + '</label><label class="cmp-geo"><span>Size</span>' + num('nSize', 10, 120, 1) + '<span class="note">px</span></label><label class="cmp-geo"><span>Corner</span>' + sel('nPos', CORNERS) + '</label></div>'
+    + '<h4>Scale bar</h4><div class="cmp-geos"><label class="cmp-geo"><span>Style</span>' + sel('sStyle', SBAR_STYLES) + '</label><label class="cmp-geo"><span>Length</span>' + num('sLen', 0, 100000, 'any', 'auto') + '<span class="note">' + (c.sUnits === 'ft' || (c.sUnits !== 'm' && S.units === 'ft') ? 'ft' : 'm') + '</span></label><label class="cmp-geo"><span>Units</span>' + sel('sUnits', { auto: 'As the project', m: 'Metres', ft: 'Feet' }) + '</label><label class="cmp-geo"><span>Text size</span>' + num('sSize', 7, 20, .5) + '<span class="note">px</span></label><label class="cmp-geo"><span>Corner</span>' + sel('sPos', CORNERS) + '</label><label class="cmp-geo"><span>Ratio</span>' + sel('sRatio', { '': 'Hidden', '1': 'Show 1:N' }) + '</label></div>'
+    + '<div class="cmp-row"><button class="btn" data-' + pre + 'furnact="reset" ' + ro + '>Reset</button>' + (pre === 'c' ? '<button class="btn" data-cfurnact="project" ' + ro + ' title="Use these on the Map page and every map that has not got its own">Use for every map</button>' : '') + '</div>'
+    + (pre === 'c' ? '<p class="note">For a north arrow or scale bar you can move anywhere on the page, use Add item › North arrow or Scale bar, and set this map’s to None.</p>' : '');
+}
+const furnVal = (k, v) => ['nSize', 'sLen', 'sSize'].includes(k) ? (v === '' ? '' : +v) : v;
 /* a plan frame for project maps: boreholes and the site image, north arrow and scale bar */
 function mapFrame(list, W, H, pad = 44) {
   const site = siteOf(), pts = list.filter(b => b.easting != null && b.northing != null);
@@ -10089,9 +10275,7 @@ function mapFrame(list, W, H, pad = 44) {
   head.push(basemapSVG(W, H, cx, cy, sc, .75));
   if (site?.img) head.push(`<image href="${site.img}" x="${X(site.e0)}" y="${Y(site.n1)}" width="${(site.e1 - site.e0) * sc}" height="${(site.n1 - site.n0) * sc}" preserveAspectRatio="none" opacity=".5"/>`);
   head.push(imagerySVG(X, Y, sc, .7), `<g opacity=".7">${featuresSVG(X, Y)}</g>`);
-  const sb = niceStep(span / 4, 2);
-  const tail = [`<g transform="translate(${W - 28} 32)"><path d="M0 -15l6 18-6-4-6 4z" style="fill:var(--ink)"/><text y="15" text-anchor="middle" style="font:600 11px var(--f-body);fill:var(--ink)">N</text></g>`,
-    `<g transform="translate(16 ${H - 16})"><rect width="${sb * sc}" height="4" style="fill:var(--ink)"/><text y="-5" style="font:11px var(--f-body);fill:var(--ink)">0</text><text x="${sb * sc}" y="-5" text-anchor="middle" style="font:11px var(--f-body);fill:var(--ink)">${+sb.toFixed(1)} m</text></g>`, '</g></svg>'];
+  const tail = [mapFurnSVG(W, H, sc), '</g></svg>'];
   return { X, Y, sc, pts, head, tail };
 }
 
@@ -10138,26 +10322,54 @@ function idwFit(P, pow = 3, k = 8) {
   return (x, y) => { const d = P.map(([px, py, z]) => [(x - px) ** 2 + (y - py) ** 2, z]).sort((a, c) => a[0] - c[0]).slice(0, k); if (d[0][0] < 1e-9) return d[0][1];
     let sw = 0, sz = 0; for (const [d2, z] of d) { const w = 1 / d2 ** (pow / 2); sw += w; sz += w * z; } return sz / sw; };
 }
-/* ordinary kriging with an exponential variogram (no nugget, sill = the variance of the readings, practical range = half the
-   widest spacing): the standard geostatistical estimate, smooth like a contour map drawn by hand, exact at each reading, and
-   held to the range of the readings. Readings at the same spot are averaged */
+/* ordinary kriging, calibrated to the readings: the variogram model (exponential, spherical or Gaussian), its range and nugget
+   are chosen by leave-one-out cross-validation, using Dubrule's (1983) shortcut (the error of leaving reading i out is
+   (K⁻¹z)ᵢ / (K⁻¹)ᵢᵢ, one matrix inverse per trial). Sill = the variance of the readings. Exact at each reading, held to their
+   range. Readings at the same spot are averaged. f.cal = { model, range, nug, rmse } (rmse in the readings' units, here log10) */
+function invMat(A0) { const m = A0.length, A = A0.map((r, i) => [...r, ...Array.from({ length: m }, (_, j) => +(i === j))]);
+  for (let c = 0; c < m; c++) { let r = c; for (let i = c + 1; i < m; i++) if (Math.abs(A[i][c]) > Math.abs(A[r][c])) r = i; if (Math.abs(A[r][c]) < 1e-12) return null; [A[c], A[r]] = [A[r], A[c]];
+    const p = A[c][c]; for (let k = 0; k < 2 * m; k++) A[c][k] /= p; for (let i = 0; i < m; i++) if (i !== c && A[i][c]) { const f = A[i][c]; for (let k = 0; k < 2 * m; k++) A[i][k] -= f * A[c][k]; } }
+  return A.map(row => row.slice(m)); }
+const VARIO = { exponential: r => 1 - Math.exp(-3 * r), spherical: r => r < 1 ? 1.5 * r - .5 * r ** 3 : 1, gaussian: r => 1 - Math.exp(-3 * r * r) };
+const KRIGE_MEMO = new Map();
 function krigeFit(P0) {
   const seen = new Map(); for (const [x, y, z] of P0) { const k = x.toFixed(2) + ',' + y.toFixed(2), s = seen.get(k); s ? (s[2] += z, s[3]++) : seen.set(k, [x, y, z, 1]); }
   const P = [...seen.values()].map(([x, y, z, c]) => [x, y, z / c]), n = P.length; if (n < 3) return null;
+  const mk = P.map(p => p.map(v => v.toFixed(3)).join(',')).join(';'); if (KRIGE_MEMO.has(mk)) return KRIGE_MEMO.get(mk);
   const zs = P.map(p => p[2]), mean = zs.reduce((a, v) => a + v, 0) / n, sill = zs.reduce((a, v) => a + (v - mean) ** 2, 0) / n || 1e-6, lo = Math.min(...zs), hi = Math.max(...zs);
   let dmax = 0; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) dmax = Math.max(dmax, Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1]));
-  const range = Math.max(1, dmax / 2), gam = h => sill * (1 - Math.exp(-3 * h / range)), m = n + 1;
-  // the inverse of the kriging matrix, once (Gauss–Jordan with partial pivoting)
-  const A = Array.from({ length: m }, (_, i) => Array.from({ length: 2 * m }, (_, j) => j < m ? (i < n && j < n ? gam(Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1])) : i === n && j === n ? 0 : 1) : (j - m === i ? 1 : 0)));
-  for (let c = 0; c < m; c++) { let r = c; for (let i = c + 1; i < m; i++) if (Math.abs(A[i][c]) > Math.abs(A[r][c])) r = i; if (Math.abs(A[r][c]) < 1e-12) return null; [A[c], A[r]] = [A[r], A[c]];
-    const p = A[c][c]; for (let k = 0; k < 2 * m; k++) A[c][k] /= p; for (let i = 0; i < m; i++) if (i !== c && A[i][c]) { const f = A[i][c]; for (let k = 0; k < 2 * m; k++) A[i][k] -= f * A[c][k]; } }
-  const inv = A.map(row => row.slice(m));
-  return (x, y) => { const b = P.map(p => gam(Math.hypot(x - p[0], y - p[1]))); b.push(1); let z = 0; for (let i = 0; i < n; i++) { let w = 0; for (let k = 0; k < m; k++) w += inv[i][k] * b[k]; z += w * P[i][2]; } return Math.max(lo, Math.min(hi, z)); };
+  const D = P.map(p => P.map(q => Math.hypot(p[0] - q[0], p[1] - q[1]))), m = n + 1;
+  const build = (model, range, nug) => { const sh = VARIO[model], gam = h => h < 1e-9 ? 0 : nug + (sill - nug) * sh(h / range);
+    const inv = invMat(Array.from({ length: m }, (_, i) => Array.from({ length: m }, (_, j) => i < n && j < n ? gam(D[i][j]) : i === n && j === n ? 0 : 1))); if (!inv) return null;
+    let se = 0; for (let i = 0; i < n; i++) { let wz = 0; for (let k = 0; k < n; k++) wz += inv[i][k] * zs[k]; const e = wz / inv[i][i]; if (!isFinite(e)) return null; se += e * e; }
+    return { model, range, nug, gam, inv, rmse: Math.sqrt(se / n) }; };
+  let best = null;
+  for (const model of Object.keys(VARIO)) for (const fr of [.1, .2, .35, .5, .75, 1]) for (const nf of [0, .1, .25]) {
+    const c = build(model, Math.max(1, dmax * fr), sill * nf); if (c && (!best || c.rmse < best.rmse - 1e-12)) best = c; }
+  if (!best) best = build('exponential', Math.max(1, dmax / 2), 0); if (!best) return null;
+  const { gam, inv } = best, f = (x, y) => { const b = P.map(p => gam(Math.hypot(x - p[0], y - p[1]))); b.push(1); let z = 0; for (let i = 0; i < n; i++) { let w = 0; for (let k = 0; k < m; k++) w += inv[i][k] * b[k]; z += w * P[i][2]; } return Math.max(lo, Math.min(hi, z)); };
+  f.cal = { model: best.model, range: best.range, nug: sill ? best.nug / sill : 0, rmse: best.rmse };
+  if (KRIGE_MEMO.size > 40) KRIGE_MEMO.clear(); KRIGE_MEMO.set(mk, f); return f;
 }
 /* nearest borehole: each point takes the reading of the closest borehole (Thiessen areas); nothing is invented between them */
 const nearestFit = P => (x, y) => { let best = Infinity, z = 0; for (const [px, py, pz] of P) { const d = (x - px) ** 2 + (y - py) ** 2; if (d < best) { best = d; z = pz; } } return z; };
-const RES_INTERP = { krige: 'Kriging (smooth, the standard estimate)', idw: 'Inverse distance (local, can look spotty)', smooth: 'Spline (smooth, held to the readings)', linear: 'Straight-line between boreholes (triangles)', nearest: 'Nearest borehole (areas, nothing invented between)' };
-const resFit = (s, P) => s.interp === 'idw' ? idwFit(P) : s.interp === 'smooth' ? clampedTps(P) : s.interp === 'nearest' ? nearestFit(P) : krigeFit(P) || clampedTps(P);
+const RES_INTERP = { auto: 'Automatic: the most accurate for these readings (recommended)', krige: 'Kriging (smooth, the standard estimate)', idw: 'Inverse distance (local, can look spotty)', smooth: 'Spline (smooth, held to the readings)', linear: 'Straight-line between boreholes (triangles)', nearest: 'Nearest borehole (areas, nothing invented between)' };
+const resFit = (s, P) => s.interp === 'auto' ? resAuto(P).f : s.interp === 'idw' ? idwFit(P) : s.interp === 'smooth' ? clampedTps(P) : s.interp === 'nearest' ? nearestFit(P) : krigeFit(P) || clampedTps(P);
+/* the method that best predicts each reading from the others (leave-one-out, in log10): calibrated kriging, spline, inverse
+   distance, nearest borehole. { key, f, rmse, all: { key: rmse } } */
+const RES_AUTO_MEMO = new Map(), RES_AUTO_LAST = {};
+const RES_AUTO_NAMES = { krige: 'kriging (calibrated)', smooth: 'spline', idw: 'inverse distance', nearest: 'nearest borehole' };
+function resAuto(P) {
+  const mk = P.map(p => p.map(v => v.toFixed(3)).join(',')).join(';'); if (RES_AUTO_MEMO.has(mk)) return RES_AUTO_MEMO.get(mk);
+  const loo = fit => { let se = 0, n = 0; for (let i = 0; i < P.length; i++) { const rest = P.filter((_, j) => j !== i), f = fit(rest); if (!f) return null; const v = f(P[i][0], P[i][1]); if (!isFinite(v)) return null; se += (v - P[i][2]) ** 2; n++; } return n ? Math.sqrt(se / n) : null; };
+  const kf = krigeFit(P), all = { krige: kf?.cal?.rmse ?? null, smooth: P.length >= 4 ? loo(clampedTps) : null, idw: loo(q => idwFit(q)), nearest: loo(nearestFit) };
+  let key = 'krige'; for (const [k, v] of Object.entries(all)) if (v != null && (all[key] == null || v < all[key] * (key === 'krige' ? .95 : 1))) key = k;
+  const f = key === 'krige' ? kf : key === 'smooth' ? clampedTps(P) : key === 'idw' ? idwFit(P) : nearestFit(P);
+  const r = { key, f: f || kf || idwFit(P), rmse: all[key], all, cal: kf?.cal }; if (RES_AUTO_MEMO.size > 40) RES_AUTO_MEMO.clear(); RES_AUTO_MEMO.set(mk, r); return r;
+}
+/* in words, for the style editor and notes */
+function resAutoText(r) { if (!r) return ''; const x = v => '×' + (10 ** v < 10 ? (10 ** v).toFixed(1) : Math.round(10 ** v));
+  return 'Picked ' + RES_AUTO_NAMES[r.key] + (r.key === 'krige' && r.cal ? ' (' + r.cal.model + ', range ' + Math.round(r.cal.range) + ' m' + (r.cal.nug ? ', nugget ' + Math.round(r.cal.nug * 100) + ' %' : '') + ')' : '') + ': each reading predicted from the others within ' + x(r.rmse) + ' on average' + Object.entries(r.all).filter(([k, v]) => k !== r.key && v != null).map(([k, v], i) => (i ? ', ' : '; ') + RES_AUTO_NAMES[k] + ' ' + x(v)).join('') + '.'; }
 /* the spline held to the range of the readings, so it cannot invent a value higher or lower than any measured */
 function clampedTps(P) { const f = tpsFit(P); if (!f) return null; const zs = P.map(p => p[2]), lo = Math.min(...zs), hi = Math.max(...zs); return (x, y) => Math.max(lo, Math.min(hi, f(x, y))); }
 /* how far from a borehole shading reaches: the style's own distance (m); blank or 0 = no limit (the outer boreholes' outline only) */
@@ -10167,7 +10379,7 @@ function resReach(s, P) {
   if (!nn.length) return Infinity; nn.sort((a, c) => a - c); return Math.max(5, nn[Math.min(nn.length - 1, Math.floor(nn.length * .75))]);
 }
 function resStyle(p) {
-  const s = { viz: 'both', interp: 'krige', reach: null, limit: true, lim: null, op: .6, labels: 'value', nd: '#ffffff', psize: 12.5, lsize: 11, lpos: 'br', ...resDefault(p), ...(siteOf()?.resStyle?.[p] || {}) };
+  const s = { viz: 'both', interp: 'auto', reach: null, limit: true, lim: null, op: .6, labels: 'value', nd: '#ffffff', psize: 12.5, lsize: 11, lpos: 'br', ...resDefault(p), ...(siteOf()?.resStyle?.[p] || {}) };
   const br = (s.breaks || []).map(Number).filter(v => v > 0).sort((a, c) => a - c); s.breaks = br;
   s.colors = Array.from({ length: br.length + 1 }, (_, i) => s.colors?.[i] || rampOf(br.length + 1)[i]);
   return s;
@@ -10188,9 +10400,10 @@ const symFill = c => c === 'none' ? '#ffffff' : c;
 function resLegendRows(p) { return [...(RES_FIELD[p] ? [] : [['Not detected', resStyle(p).nd]]), ...resClasses(p).map(c => [c[3], c[2]])]; }
 /* the results layer drawn on a plan, in the project's style for the parameter: shading or contour lines between boreholes
    (in log10, inside the boreholes' outline), the limit outline, and a symbol and label at each borehole */
-function resultsLayerSVG(pts, X, Y, M = S.mres) {
+function resultsLayerSVG(pts, X, Y, M = S.mres, W = 0, H = 0) {
   const p = M?.p; if (!p || p === 'none') return '';
   const s = resStyle(p), o = [], all = pts.map(b => ({ b, r: resultAt(b, p, M.d0, M.d1) })).filter(x => x.r), vals = all.filter(x => !x.b.resOff), lim = resLimit(p), u = resUnit(p);
+  const A = LBL_AVOID = { obs: pts.map(b => { const x = X(b.easting), y = Y(b.northing); return [x - 6, y - 6, x + 6, y + 6]; }), placed: [], rad: new Map(), named: new Set(), W, H };
   // in log10: a zero reading is taken as the bottom of the range (1 ppm for headspace, a tenth of the lowest detected lab value),
   // not as a vanishing number that would drag the surface down around every clean borehole
   const pos = vals.map(x => x.r.v).filter(v => v > 0), floor = p === 'cvc' ? 1 : pos.length ? Math.min(...pos) / 10 : 1e-6;
@@ -10200,30 +10413,44 @@ function resultsLayerSVG(pts, X, Y, M = S.mres) {
     const zs = P.map(q => q[2]), zmin = Math.min(...zs), zmax = Math.max(...zs);
     const heat = s.viz === 'heat', lv = heat ? Array.from({ length: 11 }, (_, i) => zmin + (zmax - zmin) * (i + 1) / 12) : s.breaks.map(lg);
     const cols = heat ? Array.from({ length: 12 }, (_, i) => { const v = 10 ** (zmin + (zmax - zmin) * (i + .5) / 12); return resColour(p, { v }); }) : s.colors;
-    const lin = s.interp === 'linear', H = lin ? null : headSurface(P, lv, resFit(s, P)), tris = lin ? delaunay(P) : null;
+    // past the outer boreholes by half the typical spacing (not for straight-line triangles, which stop at the outline)
+    const lin = s.interp === 'linear', nnd = P.map((q, i) => Math.min(...P.filter((_, j) => j !== i).map(r => Math.hypot(q[0] - r[0], q[1] - r[1])))).filter(isFinite).sort((a, c) => a - c), pad = lin ? 0 : Math.max(3, (nnd[Math.floor(nnd.length / 2)] || 0) * .5);
+    const fit = resFit(s, P); if (s.interp === 'auto') { RES_AUTO_LAST[p] = resAuto(P); queueMicrotask(() => document.querySelectorAll('[data-resauto="' + p + '"]').forEach(el => { el.textContent = resAutoText(RES_AUTO_LAST[p]); })); }
+    const H = lin ? null : headSurface(P, lv, fit, pad), tris = lin ? delaunay(P) : null;
     const tr = tris || delaunay(P), bands = H ? H.bands : tinBands(P, tr, lv), lineAt = z => H ? (H.lines[lv.indexOf(z)]?.polys || []) : joinSegs(tinLine(P, tr, z), 1e-3);
     const hull = H ? H.hull : convexHull(P.map(q => [q[0], q[1]])), id = 'rs' + Math.random().toString(36).slice(2, 8);
     // shading stays inside the outer boreholes and within the reach of a reading (circles round each one)
     const reach = resReach(s, P), sc = Math.abs(X(1) - X(0)) || 1, circles = isFinite(reach) ? P.map(q => `<circle cx="${X(q[0]).toFixed(1)}" cy="${Y(q[1]).toFixed(1)}" r="${(reach * sc).toFixed(1)}"/>`).join('') : '';
-    o.push(`<defs><clipPath id="${id}"><path d="${polyD(hull, X, Y)}"/></clipPath>${circles ? `<clipPath id="${id}r">${circles}</clipPath>` : ''}</defs>${circles ? `<g clip-path="url(#${id}r)" data-resreach="${reach.toFixed(1)}">` : ''}<g clip-path="url(#${id})">`);
+    const padC = pad ? P.map(q => `<circle cx="${X(q[0]).toFixed(1)}" cy="${Y(q[1]).toFixed(1)}" r="${(pad * sc).toFixed(1)}"/>`).join('') + (() => { const hl = hull.length; let s2 = ''; for (let i = 0; i < hl; i++) { const a = hull[i], b = hull[(i + 1) % hl], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, nx = dy / L * pad, ny = -dx / L * pad; s2 += `<path d="M${X(a[0] - nx)} ${Y(a[1] - ny)}L${X(b[0] - nx)} ${Y(b[1] - ny)}L${X(b[0] + nx)} ${Y(b[1] + ny)}L${X(a[0] + nx)} ${Y(a[1] + ny)}Z"/>`; } return s2; })() : '';
+    o.push(`<defs><clipPath id="${id}"><path d="${polyD(hull, X, Y)}"/>${padC}</clipPath>${circles ? `<clipPath id="${id}r">${circles}</clipPath>` : ''}</defs>${circles ? `<g clip-path="url(#${id}r)" data-resreach="${reach.toFixed(1)}">` : ''}<g clip-path="url(#${id})">`);
     if (surf && s.viz !== 'lines') o.push(`<g data-resband="1" opacity="${s.op}">${bands.map((polys, k) => polys.length && cols[k] !== 'none' ? `<path d="${polys.map(pg => polyD(pg, X, Y)).join('')}" style="fill:${cols[k]};stroke:${cols[k]}" stroke-width=".6"/>` : '').join('')}</g>`);
     if (surf && (s.viz === 'lines' || s.viz === 'both')) s.breaks.forEach(v => { const ls = lineAt(lg(v)); if (!ls.length) return;
       o.push(`<path data-resline="${v}" d="${ls.map(l => polyD(l, X, Y, false)).join('')}" style="stroke:var(--ink)" stroke-width="1" fill="none" opacity=".7"/>`);
       const long = ls.reduce((a, c) => c.length > a.length ? c : a), m = long[Math.floor(long.length / 2)];
       o.push(`<text x="${X(m[0]).toFixed(1)}" y="${(Y(m[1]) - 3).toFixed(1)}" text-anchor="middle" style="font:600 10px var(--f-body, Arial);fill:var(--ink);paint-order:stroke;stroke:#fff;stroke-width:3">${nfmt(v)}</text>`); });
-    if (lim != null) { const ls = H ? (lv.includes(lg(lim)) ? lineAt(lg(lim)) : headSurface(P, [lg(lim)], resFit(s, P))?.lines[0]?.polys || []) : joinSegs(tinLine(P, tr, lg(lim)), 1e-3);
+    if (lim != null) { const ls = H ? (lv.includes(lg(lim)) ? lineAt(lg(lim)) : headSurface(P, [lg(lim)], fit, pad)?.lines[0]?.polys || []) : joinSegs(tinLine(P, tr, lg(lim)), 1e-3);
       if (ls.length) o.push(`<path data-reslim="1" d="${ls.map(l => polyD(l, X, Y, false)).join('')}" style="stroke:var(--negative)" stroke-width="2.2" stroke-dasharray="7 4" fill="none"><title>${esc(`${resLabel(p)}: ${nfmt(lim)} ${u} limit, interpolated between boreholes`)}</title></path>`); }
     o.push('</g>', circles ? '</g>' : '');
   }
-  const zs = vals.map(x => lg(x.r.v)), z0 = Math.min(...zs), z1 = Math.max(...zs);
-  for (const { b, r } of all.filter(x => x.b.resOff)) { const x = X(b.easting), y = Y(b.northing), val = `${r.lt ? '<' : ''}${nfmt(r.v)}`;
-    o.push(`<g data-res="${esc(b.id)}" data-resoff="1"><title>${esc(`${gwName(b)}: ${resLabel(p)} ${val} ${u}, left out of the contours`)}</title><circle cx="${x}" cy="${y}" r="${+s.psize || 12.5}" style="fill:none;stroke:var(--muted)" stroke-width="1.4" stroke-dasharray="3 2"/>${s.labels === 'none' ? '' : `<text ${resLabPos(s, x, y, +s.psize || 12.5)} style="font:italic ${+s.lsize || 11}px var(--f-mono, monospace);fill:var(--muted);paint-order:stroke;stroke:#fff;stroke-width:3">${esc(val)} (not used)</text>`}</g>`); }
-  for (const { b, r } of vals) {
-    const x = X(b.easting), y = Y(b.northing), val = `${r.lt ? '<' : ''}${nfmt(r.v)}`, c = symFill(resColour(p, r));
-    const kz = (+s.psize || 12.5) / 12.5, rad = kz * (s.viz === 'graduated' ? 6 + 14 * (z1 > z0 ? (lg(r.v) - z0) / (z1 - z0) : .5) : 12.5);
-    const lab = s.labels === 'none' ? '' : s.labels === 'id' ? `${gwName(b)} ${val}` : val;
-    o.push(`<g data-res="${esc(b.id)}"><title>${esc(`${gwName(b)}: ${resLabel(p)} ${val} ${u} at ${fu(r.sm.depth)} (${sampleId(r.sm)})`)}</title><circle cx="${x}" cy="${y}" r="${rad.toFixed(1)}" style="fill:${c};stroke:var(--ink)" stroke-width=".9" opacity=".95"/>
-      ${lab ? `<text ${resLabPos(s, x, y, rad)} style="font:700 ${+s.lsize || 11}px var(--f-mono, monospace);fill:${lim != null && !r.lt && r.v > lim ? '#a3271a' : 'var(--ink)'};paint-order:stroke;stroke:#fff;stroke-width:3">${esc(lab)}</text>` : ''}</g>`);
+  const zs = vals.map(x => lg(x.r.v)), z0 = Math.min(...zs), z1 = Math.max(...zs), fs = +s.lsize || 11, psz = +s.psize || 12.5, lm = RO.vlab || s.labels;
+  // every point first (so labels know where they all are), then the value labels placed clear of points, other labels and the edge
+  const marks = [...all.filter(x => x.b.resOff).map(({ b, r }) => ({ b, r, off: true, rad: psz })), ...vals.map(({ b, r }) => ({ b, r, rad: psz / 12.5 * (s.viz === 'graduated' ? 6 + 14 * (z1 > z0 ? (lg(r.v) - z0) / (z1 - z0) : .5) : 12.5) }))];
+  for (const m of marks) { m.x = X(m.b.easting); m.y = Y(m.b.northing); m.val = (m.r.lt ? '<' : '') + nfmt(m.r.v);
+    m.lab = lm === 'none' ? '' : m.off ? m.val + ' (not used)' : lm === 'id' ? gwName(m.b) + ' ' + m.val : m.val; if (lm === 'id' && m.lab && !m.off) A.named.add(m.b.id);
+    A.rad.set(m.b.id, m.rad); m.ci = A.obs.push([m.x - m.rad, m.y - m.rad, m.x + m.rad, m.y + m.rad]) - 1; }
+  const first = s.lpos || 'br', ring = [first, ...['br', 'r', 'l', 't', 'b', 'tr', 'tl', 'bl'].filter(q => q !== first)], cands = [...ring.map(q => [q, 1]), ...ring.map(q => [q, 2.4])];
+  for (const m of marks.filter(m => m.lab).sort((a, c) => (a.off - c.off) || c.r.v - a.r.v)) { let best = null; const others = A.obs.filter((_, j) => j !== m.ci);
+    for (const [i, [q, k]] of cands.entries()) { const L = resLabAt(q, fs, m.x, m.y, m.rad, k), bx = resLabBox(L, fs, m.lab), sc = boxHits(bx, others) + edgeHits(bx, A) + i * .01; if (!best || sc < best.sc) best = { L, bx, sc, k }; if (sc < 1) break; }
+    m.L = best.L; m.bx = best.bx; m.far = best.k > 1; A.obs.push(best.bx); }
+  // a label moved out from its point gets a thin leader to it
+  const lead = m => { if (!m.far) return ''; const px = Math.max(m.bx[0], Math.min(m.x, m.bx[2])), py = Math.max(m.bx[1], Math.min(m.y, m.bx[3])), d = Math.hypot(px - m.x, py - m.y) || 1;
+    return `<path data-reslead="1" d="M${(m.x + (px - m.x) / d * m.rad).toFixed(1)} ${(m.y + (py - m.y) / d * m.rad).toFixed(1)}L${px.toFixed(1)} ${py.toFixed(1)}" style="stroke:var(--muted)" stroke-width=".8" fill="none"/>`; };
+  const at = m => `x="${m.L[0].toFixed(1)}" y="${m.L[1].toFixed(1)}" text-anchor="${m.L[2]}"`;
+  for (const m of marks.filter(m => m.off)) { const { b, x, y } = m;
+    o.push(`<g data-res="${esc(b.id)}" data-resoff="1"><title>${esc(`${gwName(b)}: ${resLabel(p)} ${m.val} ${u}, left out of the contours`)}</title><circle cx="${x}" cy="${y}" r="${m.rad}" style="fill:none;stroke:var(--muted)" stroke-width="1.4" stroke-dasharray="3 2"/>${m.lab ? `${lead(m)}<text ${at(m)} style="font:italic ${fs}px var(--f-mono, monospace);fill:var(--muted);paint-order:stroke;stroke:#fff;stroke-width:3">${esc(m.lab)}</text>` : ''}</g>`); }
+  for (const m of marks.filter(m => !m.off)) { const { b, r, x, y, rad } = m, c = symFill(resColour(p, r));
+    o.push(`<g data-res="${esc(b.id)}"><title>${esc(`${gwName(b)}: ${resLabel(p)} ${m.val} ${u} at ${fu(r.sm.depth)} (${sampleId(r.sm)})`)}</title><circle cx="${x}" cy="${y}" r="${rad.toFixed(1)}" style="fill:${c};stroke:var(--ink)" stroke-width=".9" opacity=".95"/>
+      ${m.lab ? `${lead(m)}<text ${at(m)} style="font:700 ${fs}px var(--f-mono, monospace);fill:${lim != null && !r.lt && r.v > lim ? '#a3271a' : 'var(--ink)'};paint-order:stroke;stroke:#fff;stroke-width:3">${esc(m.lab)}</text>` : ''}</g>`);
   }
   return o.join('');
 }
@@ -10237,28 +10464,35 @@ function resStyleHTML(p) {
     <div class="rs-classes">${s.colors.map((c, i) => `<div class="rs-row"><input type="color" data-rsc="${i}" value="${c === 'none' ? '#ffffff' : c}" aria-label="Colour of class ${i + 1}" ${ro} ${c === 'none' ? 'disabled' : ''}><label class="check note" title="No shading for this class"><input type="checkbox" data-rsnone="${i}" ${c === 'none' ? 'checked' : ''} ${ro}>clear</label><span class="note">${i === 0 ? 'under' : 'from'}</span>${i === 0 ? `<span class="rs-v">${s.breaks.length ? nfmt(s.breaks[0]) : 'any'}</span>` : `<input type="number" step="any" min="0" data-rsb="${i - 1}" value="${s.breaks[i - 1]}" aria-label="Class ${i + 1} starts at" ${ro}>`}<span class="note">${esc(u)}</span>${i ? `<button class="btn" data-rsdel="${i - 1}" aria-label="Remove this class" ${ro}>✕</button>` : ''}</div>`).join('')}</div>
     <div class="cmp-row"><button class="btn" data-rsadd ${ro}>Add a contour</button><button class="btn" data-rsreset ${ro}>Reset</button></div>
     ${RES_FIELD[p] ? '' : `<div class="rs-row"><input type="color" data-rs="nd" value="${s.nd}" aria-label="Not detected colour" ${ro}><span class="note">not detected</span></div>`}
-    <label class="note" for="rs-interp">Between boreholes</label><select id="rs-interp" data-rs="interp" ${ro}>${opt(RES_INTERP, s.interp)}</select>
+    <label class="note" for="rs-interp">Between boreholes</label><select id="rs-interp" data-rs="interp" ${ro}>${opt(RES_INTERP, s.interp)}</select>${s.interp === 'auto' ? `<p class="note" data-resauto="${esc(p)}">${esc(resAutoText(RES_AUTO_LAST[p]))}</p>` : ''}
     <label class="note" for="rs-reach">Shade within</label><input id="rs-reach" type="number" step="any" min="0" data-rs="reach" value="${s.reach ?? ''}" placeholder="no limit" style="width:80px" ${ro} data-tip="How far from a borehole the shading may reach, m. Blank: as far as the outer boreholes."><span class="note">m of a borehole</span>
     <label class="check note"><input type="checkbox" data-rs="limit" ${s.limit ? 'checked' : ''} ${ro}> Limit outline at</label><input type="number" step="any" min="0" data-rs="lim" value="${s.lim ?? ''}" placeholder="${p === 'cvc' ? (S.co.vThr ?? 100) : projGuide()[p] ?? 'value'}" style="width:90px" ${ro}><span class="note">${esc(u)}</span>
     <label class="note" for="rs-op">Shading</label><input id="rs-op" type="range" min=".1" max="1" step=".05" data-rs="op" value="${s.op}" ${ro}>
     <label class="note" for="rs-labels">Labels</label><select id="rs-labels" data-rs="labels" ${ro}>${opt({ value: 'Value', id: 'Borehole and value', none: 'None' }, s.labels)}</select>
+    <label class="check note"><input type="checkbox" data-lyr="labels" ${S.lyr.labels !== false ? 'checked' : ''}> Borehole names${s.labels === 'id' ? ' (not repeated where the value label has the name)' : ''}</label>
     <label class="note" for="rs-lpos">Label place</label><select id="rs-lpos" data-rs="lpos" ${ro}>${opt({ br: 'Below right', r: 'Right', l: 'Left', t: 'Above', b: 'Below' }, s.lpos)}</select>
     <label class="note" for="rs-lsize">Label size</label><input id="rs-lsize" type="number" min="6" max="30" step="0.5" data-rs="lsize" value="${s.lsize}" style="width:70px" ${ro}><span class="note">px</span>
     <label class="note" for="rs-psize">Point size</label><input id="rs-psize" type="number" min="3" max="40" step="0.5" data-rs="psize" value="${s.psize}" style="width:70px" ${ro}><span class="note">px radius${s.viz === 'graduated' ? ' (the middle size; graduated points scale with it)' : ''}</span>
     <h4>Boreholes in the contours</h4><div class="rs-use">${mapList().filter(b => resultAt(b, p)).map(b => `<label class="check note"><input type="checkbox" data-resuse="${esc(b.id)}" ${b.resOff ? '' : 'checked'} ${ro}> ${esc(gwName(b))}</label>`).join('') || '<span class="note">No results yet.</span>'}</div>
     <p class="note">Saved with the project: the Map page, the VOC map, report maps and legends all use it. An unticked borehole stays on the map, hollow, but is left out of the shading and contours.</p></details>`;
 }
-/* where a result's value label sits: below right (as before), right, left, above or below the point, clear of its circle */
-function resLabPos(s, x, y, rad) { const fs = +s.lsize || 11, p = s.lpos || 'br', at = (X, Y, a) => 'x="' + X.toFixed(1) + '" y="' + Y.toFixed(1) + '" text-anchor="' + a + '"';
-  return p === 'r' ? at(x + rad + 4, y + fs * .35, 'start') : p === 'l' ? at(x - rad - 4, y + fs * .35, 'end') : p === 't' ? at(x, y - rad - 4, 'middle') : p === 'b' ? at(x, y + rad + fs, 'middle') : at(x + rad * .8, y + rad + fs * .75, 'start'); }
+/* where a value label sits around its point (k > 1: further out, for a crowded spot), and the box it takes */
+function resLabAt(p, fs, x, y, rad, k = 1) { const d = rad + 4 + (k - 1) * (rad + fs), e = d - 4;
+  return p === 'r' ? [x + d, y + fs * .35, 'start'] : p === 'l' ? [x - d, y + fs * .35, 'end'] : p === 't' ? [x, y - d, 'middle'] : p === 'b' ? [x, y + e + fs, 'middle']
+    : p === 'tr' ? [x + e * .8, y - e - 2, 'start'] : p === 'tl' ? [x - e * .8, y - e - 2, 'end'] : p === 'bl' ? [x - e * .8, y + e + fs * .75, 'end'] : [x + e * .8, y + e + fs * .75, 'start']; }
+function resLabBox(L, fs, text) { const [X, Y, a] = L, w = String(text).length * fs * .62, x0 = a === 'start' ? X : a === 'end' ? X - w : X - w / 2;
+  return [x0 - 3, Y - fs * .95, x0 + w + 3, Y + fs * .4 + 1]; }
+/* how much of a box falls off the map */
+const edgeHits = (b, A) => !A.W ? 0 : (b[2] - b[0]) * (b[3] - b[1]) - Math.max(0, Math.min(b[2], A.W) - Math.max(b[0], 0)) * Math.max(0, Math.min(b[3], A.H) - Math.max(b[1], 0));
 function vapourMapSVG(W, H) {
   const list = mapList(), F = mapFrame(list, W, H); if (!F) return '<p class="note">Add easting and northing to plot boreholes.</p>';
   const p = S.mapParam && LAB_PARAMS[S.mapParam] ? S.mapParam : 'cvc', { X, Y } = F, o = [...F.head];
-  o.push(resultsLayerSVG(F.pts, X, Y, { p, d0: S.vFrom, d1: S.vTo }));
+  LBL_AVOID = null; o.push(resultsLayerSVG(F.pts, X, Y, { p, d0: S.vFrom, d1: S.vTo }, W, H));
   for (const b of F.pts) { const x = X(b.easting), y = Y(b.northing), r = resultAt(b, p, S.vFrom, S.vTo);
-    if (!r) o.push(`<g><title>${esc(`${gwName(b)}: no ${p === 'cvc' ? 'vapour readings' : 'result'}`)}</title><circle cx="${x}" cy="${y}" r="6" style="fill:var(--panel);stroke:var(--muted)" stroke-width="1.2"/></g>`);
-    o.push(bhLabelSVG(b, x, y, null, 'halo')); }
-  o.push(...F.tail);
+    // the borehole and well symbols as on the Map page (its symbology, or this map's own in Outputs)
+    o.push(`<g data-bhsym="${esc(b.id)}"><title>${esc(r ? gwName(b) : `${gwName(b)}: no ${p === 'cvc' ? 'vapour readings' : 'result'}`)}</title>${BH_SYMBOL(x, y, !!b.well?.installed)}</g>`);
+    o.push(bhLabelSVG(b, x, y, null, 'halo', RO.names ?? S.lyr.labels !== false)); }
+  LBL_AVOID = null; o.push(...F.tail);
   return o.join('');
 }
 function contamHTML() {
@@ -10274,7 +10508,7 @@ function contamHTML() {
       <div class="body"><div class="scroll-x map-box">${vapourMapSVG(620, 460)}</div>
       <div class="legend">${legendRows('vap', mapList()).filter(r => !r.head).map(r => `<span><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true">${r.sym(11, 7)}</svg>${esc(r.t)}</span>`).join('')}</div>
       ${resStyleHTML(S.mapParam && LAB_PARAMS[S.mapParam] ? S.mapParam : 'cvc')}
-      <details class="lbl-site" ${S.lblOpen ? 'open' : ''}><summary>Borehole labels</summary>${labelsHTML('s')}</details>
+      <details class="lbl-site" ${S.lblOpen ? 'open' : ''}><summary>Borehole labels</summary>${labelsHTML('s')}</details><details class="furn-site" ${S.furnOpen ? 'open' : ''}><summary>North arrow and scale bar</summary>${furnHTML('s')}</details>
       <p class="note">Highest headspace reading in each borehole${S.vFrom != null || S.vTo != null ? ' in the chosen depth range' : ''}. Shading, contours and the outline are interpolated in log₁₀ between boreholes (kriging by default, held between the highest and lowest reading; or as chosen under Style and contours), only inside the outer boreholes, and within a set distance of a reading if one is given. They are an interpretation to guide sampling, not a measured boundary; confirm with laboratory analysis.</p></div></section>
     <section class="sec"><header><h3>Highest reading by borehole</h3></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th title="Untick to leave a borehole out of the shading and contours; it stays on the map">Use</th><th>Borehole</th><th class="r">Max (ppm)</th><th class="r">Depth (${LEN()})</th><th>Sample</th><th class="r">Readings</th></tr></thead><tbody>
       ${rows.map(r => `<tr${r.b.resOff ? ' class="muted"' : ''}><td><input type="checkbox" data-resuse="${esc(r.b.id)}" ${r.b.resOff ? '' : 'checked'} ${S.readOnly ? 'disabled' : ''} aria-label="Use ${esc(r.b.name)} in the contours"></td><td><button class="pick" data-pick="${esc(r.b.id)}" data-goto="log">${r.s ? `<span class="dot sq" style="background:${symFill(resColour('cvc', { v: r.s.cvc }))};border:1px solid var(--ink)"></span>` : '<span class="dot sq" style="background:var(--panel);border:1px dashed var(--muted)"></span>'}${esc(r.b.name)}</button></td><td class="r">${r.s ? `<b${r.s.cvc >= thr ? ' style="color:var(--negative)"' : ''}>${r.s.cvc.toLocaleString('en-CA')}</b>` : '—'}</td><td class="r">${r.s ? fx(r.s.depth) : '—'}</td><td>${r.s ? esc(sampleId(r.s)) : '—'}</td><td class="r">${r.n}</td></tr>`).join('')}</tbody></table></div></div></section>
@@ -10365,7 +10599,7 @@ const ROPTS = {
   secmap: [['fit', 'Area shown', [['', 'The whole site'], ['section', 'The section and its boreholes']]], ['base', 'Background', [['', 'Plain'], ['1', 'Basemap']]], ['bare', 'North arrow', [['', 'Show'], ['1', 'Hide']]], ['scale', 'Scale', SCALES]],
   extent: [['zoom', 'Area around the map', [['', '×5'], [3, '×3'], [10, '×10'], [25, '×25'], [100, '×100'], [1000, '×1000']]], ['base', 'Background', [['', 'Basemap'], ['0', 'Plain']]], ['bare', 'North arrow', [['', 'Show'], ['1', 'Hide']]], ['scale', 'Scale', SCALES]],
   hydro: [['mode', 'Plot', [['elev', 'Water elevation'], ['depth', 'Depth to water']]]],
-  north: [['mode', 'Points to', [['grid', 'Grid north (the map is drawn grid-north up)'], ['true', 'True north (turned by the meridian convergence)']]]],
+  north: [['mode', 'Points to', [['grid', 'Grid north (the map is drawn grid-north up)'], ['true', 'True north (turned by the meridian convergence)']]], ['style', 'Style', [['', 'Half-filled arrow'], ['arrow', 'Arrow'], ['compass', 'Compass star'], ['circle', 'Arrow in a circle'], ['simple', 'Line and N']]]],
   shape: [['kind', 'Shape', [['rect', 'Rectangle'], ['ellipse', 'Ellipse'], ['line', 'Line'], ['arrow', 'Arrow']]], ['dir', 'Direction (lines)', [['down', 'Top-left to bottom-right'], ['up', 'Bottom-left to top-right'], ['h', 'Across'], ['v', 'Down']]]],
 };
 const mm = px => Math.round(px * 25.4 / 96), pxOf = v => v * 96 / 25.4;
@@ -10476,10 +10710,13 @@ function itemInner(it, w, h) {
   if (MAP_ITEMS.has(it.t) && o.cx != null && o.cy != null) { ro.cx = +o.cx; ro.cy = +o.cy; }
   if (MAP_ITEMS.has(it.t) && o.sym) ro.sym = o.sym;
   if (MAP_ITEMS.has(it.t) && o.lbl) ro.lbl = o.lbl;
+  if (MAP_ITEMS.has(it.t) && o.furn) ro.furn = o.furn;
   if (it.t === 'wt' && o.farrow) ro.farrow = o.farrow;
   if (it.t === 'secmap' || it.t === 'extent') for (const k of ['fit', 'base', 'link', 'zoom', 'ext']) if (o[k] != null && o[k] !== '') ro[k] = o[k];
   if (['plan', 'secmap', 'extent'].includes(it.t) && o.bare) ro.bare = true;
   if (it.t === 'plan' && (o.legend === '1' || o.legend === '0')) ro.legend = o.legend === '1';
+  if ((it.t === 'plan' || it.t === 'vap') && (o.names === '1' || o.names === '0')) ro.names = o.names === '1';
+  if ((it.t === 'plan' || it.t === 'vap') && o.vlab) ro.vlab = o.vlab;
   if (it.t === 'plan' && o.rp) ro.mres = { p: o.rp, d0: o.rd0 !== '' && o.rd0 != null ? fromD(+o.rd0) : null, d1: o.rd1 !== '' && o.rd1 != null ? fromD(+o.rd1) : null };
   const msg = t => (delete ro.sc, `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#f6f8fa"/><text x="12" y="24" style="font:12px Arial,sans-serif;fill:#5d6a75">${esc(t)}</text></svg>`);
   const fromEl = (fn, none) => { const el = document.createElement('div'); fn(el); return el.querySelector('svg')?.outerHTML || msg(none); };
@@ -10498,7 +10735,7 @@ function itemInner(it, w, h) {
     if (it.t === 'vap') { const r = vapourMapSVG(w, h); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'flow') { const F = gwFlow(); return F.error ? msg(F.error) : flowPlanSVG(F, w, h); }
     if (it.t === 'hydro') return fromEl(el => drawHydro(el, mapList(), { W: w, H: h, elevMode: o.mode !== 'depth' }), 'No dated water readings to plot.');
-    if (it.t === 'text') { const sz = Math.max(4, Math.min(200, +o.size || 11)), wt = o.weight || (sz >= 14 ? 700 : 400), al = o.align || 'start', tx = al === 'middle' ? w / 2 : al === 'end' ? w - 6 : 6, fam = o.font || 'Arial,Helvetica,sans-serif', bg = (o.bg && o.bg !== 'none') || (o.bd && o.bd !== 'none') ? `<rect x="${(+o.bdw || 1) / 2}" y="${(+o.bdw || 1) / 2}" width="${w - (+o.bdw || 1)}" height="${h - (+o.bdw || 1)}" style="fill:${o.bg && o.bg !== 'none' ? o.bg : 'none'};stroke:${o.bd && o.bd !== 'none' ? o.bd : 'none'}" stroke-width="${+o.bdw || 1}"/>` : '', lines = String(o.text ? fillTokens(o.text) : 'Double-click to type…').split('\n').flatMap(p => wrap(p, Math.max(4, Math.floor((w - 12) / (sz * (wt == 700 ? .56 : .52)))))); return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${bg}${lines.map((l, i) => `<text x="${tx}" y="${(sz * 1.02 + 2 + i * sz * 1.25).toFixed(1)}" text-anchor="${al}" style="${o.halo ? `paint-order:stroke;stroke:${o.halo};stroke-width:${2 * (+o.haloW || 1)}px;stroke-linejoin:round;` : ''}font:${o.slant === 'italic' ? 'italic ' : ''}${wt} ${sz}px ${fam};fill:${o.text ? (o.color || 'var(--ink)') : 'var(--muted)'}">${esc(l)}</text>`).join('')}</svg>`; }
+    if (it.t === 'text') { const sz = Math.max(4, Math.min(200, +o.size || 11)), wt = o.weight || (sz >= 14 ? 700 : 400), al = o.align || 'start', tx = al === 'middle' ? w / 2 : al === 'end' ? w - 6 : 6, fam = o.font || 'Arial,Helvetica,sans-serif', bg = (o.bg && o.bg !== 'none') || (o.bd && o.bd !== 'none') ? `<rect x="${(+o.bdw || 1) / 2}" y="${(+o.bdw || 1) / 2}" width="${w - (+o.bdw || 1)}" height="${h - (+o.bdw || 1)}" style="fill:${o.bg && o.bg !== 'none' ? o.bg : 'none'};stroke:${o.bd && o.bd !== 'none' && !(PAGE_EDGES && !+o.rot) ? o.bd : 'none'}" stroke-width="${+o.bdw || 1}"/>` : '', lines = String(o.text ? fillTokens(o.text) : 'Double-click to type…').split('\n').flatMap(p => wrap(p, Math.max(4, Math.floor((w - 12) / (sz * (wt == 700 ? .56 : .52)))))); return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${bg}${lines.map((l, i) => `<text x="${tx}" y="${(sz * 1.02 + 2 + i * sz * 1.25).toFixed(1)}" text-anchor="${al}" style="${o.halo ? `paint-order:stroke;stroke:${o.halo};stroke-width:${2 * (+o.haloW || 1)}px;stroke-linejoin:round;` : ''}font:${o.slant === 'italic' ? 'italic ' : ''}${wt} ${sz}px ${fam};fill:${o.text ? (o.color || 'var(--ink)') : 'var(--muted)'}">${esc(l)}</text>`).join('')}</svg>`; }
     if (it.t === 'image' && o.logo) return S.co.logo ? `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><image href="${S.co.logo}" width="${w}" height="${h}" preserveAspectRatio="xMinYMid meet"/></svg>` : `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><text x="4" y="${h / 2 + 4}" style="font:700 11px Arial,sans-serif;fill:#c5ccd3">LOGO</text></svg>`;
     if (it.t === 'image') return o.img ? `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><image href="${o.img}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/></svg>` : msg('Choose a picture in the panel on the right.');
     return msg('');
@@ -10594,11 +10831,25 @@ const ITEM_SC = new Map(), ITEM_C = new Map(); let PAGE_CTX = null;
 /* report items that are maps: each keeps its own view (centre o.cx/o.cy, scale o.scale), set by pan & zoom and lockable */
 const MAP_ITEMS = new Set(['plan', 'wt', 'vap', 'flow', 'secmap', 'extent']);
 function pageItemsSVG(pg) {
-  PAGE_CTX = pg;
+  PAGE_CTX = pg; PAGE_EDGES = [];
   const late = it => it.t === 'scalebar' || it.t === 'extent' || (it.t === 'text' && /\{scale\}/i.test(it.o?.text || ''));
-  try { const first = pg.items.map(it => late(it) ? null : itemSVG(it)); return pg.items.map((it, i) => first[i] ?? itemSVG(it)).join(''); }
-  finally { PAGE_CTX = null; }
+  try { const first = pg.items.map(it => late(it) ? null : itemSVG(it)), out = pg.items.map((it, i) => first[i] ?? itemSVG(it)).join(''); return out + edgesSVG(PAGE_EDGES); }
+  finally { PAGE_CTX = null; PAGE_EDGES = null; }
 }
+/* frames and text-box borders on a page, as edges: { x0, y0, x1, y1 (one horizontal or vertical line), c, w, dash, id }. Lines of
+   the same colour, width and pattern that lie on one line and touch or overlap are joined into one and drawn once, with square
+   ends so corners and T-joins close; nothing is drawn twice or side by side, so meeting boxes print as one clean line */
+let PAGE_EDGES = null;
+function addBoxEdges(x, y, w, h, c, sw, dash, id) { if (!PAGE_EDGES) return false; const r = v => Math.round(v * 4) / 4;
+  const X0 = r(x), Y0 = r(y), X1 = r(x + w), Y1 = r(y + h); for (const e of [[X0, Y0, X1, Y0], [X0, Y1, X1, Y1], [X0, Y0, X0, Y1], [X1, Y0, X1, Y1]]) PAGE_EDGES.push({ x0: e[0], y0: e[1], x1: e[2], y1: e[3], c, w: sw, dash: dash || '', id }); return true; }
+function edgesSVG(E) {
+  if (!E?.length) return ''; const groups = new Map();
+  for (const e of E) { const hz = e.y0 === e.y1, k = [hz ? 'h' : 'v', hz ? e.y0 : e.x0, e.c, e.w, e.dash].join('|'); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(hz ? [Math.min(e.x0, e.x1), Math.max(e.x0, e.x1), e.id] : [Math.min(e.y0, e.y1), Math.max(e.y0, e.y1), e.id]); }
+  const o = ['<g data-edges="1">'];
+  for (const [k, segs] of groups) { const [dir, at, c, w, dash] = k.split('|'); segs.sort((a, b) => a[0] - b[0]); const runs = [];
+    for (const s of segs) { const r = runs[runs.length - 1]; if (r && s[0] <= r[1] + .5) { r[1] = Math.max(r[1], s[1]); r.ids.add(s[2]); } else runs.push(Object.assign([s[0], s[1]], { ids: new Set([s[2]]) })); }
+    for (const r of runs) o.push('<path data-frame="1" data-of="' + esc([...r.ids].join(' ')) + '" d="' + (dir === 'h' ? 'M' + r[0] + ' ' + at + 'H' + r[1] : 'M' + at + ' ' + r[0] + 'V' + r[1]) + '" fill="none" style="stroke:' + c + '" stroke-width="' + w + '" stroke-linecap="' + (dash ? 'butt' : 'square') + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>'); }
+  return o.concat('</g>').join(''); }
 const niceFloor = v => { const p = 10 ** Math.floor(Math.log10(v)); return [5, 2.5, 2, 1].map(k => k * p).find(n => n <= v) || p; };
 /* a segmented scale bar for a map on the same page: lengths come from the map's drawn scale (page px per metre), so the
    ratio is true when the PDF is printed at 100 % on its paper */
@@ -10635,9 +10886,7 @@ function northSVG(it, w, h) {
     }
   }
   const nh = 4 + note.length * 11, cx = w / 2, s2 = Math.min(w, h - nh - 14) / 2 - 2, cy = s2 + 16;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><g data-north="1" data-mode="${mode}" data-rot="${+rot.toFixed(4)}" transform="rotate(${rot} ${cx} ${cy})">
-    <path d="M${cx} ${cy - s2}L${cx + s2 * .38} ${cy + s2 * .7}L${cx} ${cy + s2 * .38}Z" fill="#000"/><path d="M${cx} ${cy - s2}L${cx - s2 * .38} ${cy + s2 * .7}L${cx} ${cy + s2 * .38}Z" fill="#fff" stroke="#000" stroke-width="1"/>
-    <text x="${cx}" y="${cy - s2 - 2}" text-anchor="middle" style="font:bold 12px Arial,sans-serif;fill:#000">N</text></g>
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><g data-north="1" data-mode="${mode}" data-rot="${+rot.toFixed(4)}" transform="rotate(${rot} ${cx} ${cy})"><g transform="translate(${cx} ${cy + 4})">${northShape(o.style || 'half', s2 * 1.6, '#000', '#fff')}</g></g>
     ${note.map((t, i) => `<text data-note="1" x="${cx}" y="${h - 4 - (note.length - 1 - i) * 11}" text-anchor="middle" style="font:9px Arial,sans-serif;fill:#333">${esc(t)}</text>`).join('')}</svg>`;
 }
 /* legend: only what the project actually shows */
@@ -10712,7 +10961,7 @@ function frameSVG(it, x, y, w, h) {
 function itemSVG(it) {
   const cap = it.cap ? 18 : 0, ih = Math.max(['text', 'shape', 'image'].includes(it.t) ? 2 : 20, it.h - cap), body = itemInner(it, it.w, ih).replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
   if (+it.o?.rot) return `<g data-g="${it.id}"><g transform="rotate(${-+it.o.rot} ${it.x + it.w / 2} ${it.y + it.h / 2})"><svg x="${it.x}" y="${it.y}" width="${it.w}" height="${it.h}" viewBox="0 0 ${it.w} ${it.h}" overflow="visible">${body}</svg></g></g>`;
-  return `<g data-g="${it.id}">${cap ? `<text x="${it.x + 2}" y="${it.y + 12}" style="font:700 10.5px Arial,Helvetica,sans-serif;fill:var(--ink)">${esc(it.cap)}</text>` : ''}<svg x="${it.x}" y="${it.y + cap}" width="${it.w}" height="${ih}" viewBox="0 0 ${it.w} ${ih}" overflow="${it.t === 'shape' ? 'visible' : 'hidden'}">${body}</svg>${it.frame !== false ? frameSVG(it, it.x, it.y + cap, it.w, ih) : ''}</g>`;
+  return `<g data-g="${it.id}">${cap ? `<text x="${it.x + 2}" y="${it.y + 12}" style="font:700 10.5px Arial,Helvetica,sans-serif;fill:var(--ink)">${esc(it.cap)}</text>` : ''}<svg x="${it.x}" y="${it.y + cap}" width="${it.w}" height="${ih}" viewBox="0 0 ${it.w} ${ih}" overflow="${it.t === 'shape' ? 'visible' : 'hidden'}">${body}</svg>${it.frame !== false ? (() => { const sw = +it.fw > 0 ? +it.fw : .8, dash = it.fd === 'dash' ? sw * 4 + ' ' + sw * 2.5 : it.fd === 'dot' ? sw + ' ' + sw * 2 : ''; return addBoxEdges(it.x, it.y + cap, it.w, ih, it.fc || 'var(--ink)', sw, dash, it.id) ? '' : frameSVG(it, it.x, it.y + cap, it.w, ih); })() : ''}${it.t === 'text' && it.o?.bd && it.o.bd !== 'none' && PAGE_EDGES ? (addBoxEdges(it.x, it.y + cap, it.w, ih, it.o.bd, +it.o.bdw || 1, '', it.id), '') : ''}</g>`;
 }
 /* every page of the finished report, in order: {svg} for a log page, {framed:{title, body}} for the others */
 async function layoutPages(L = repLayout()) {
@@ -10948,6 +11197,11 @@ function mapViewHTML(it) {
     <label class="check"><input type="checkbox" data-cview-lock ${lock ? 'checked' : ''} ${ro ? 'disabled' : ''}> Lock the view</label>
     <p class="note">${lock ? 'Locked: the map keeps this extent and scale until you untick Lock.' : on ? 'Drag on the map to pan, scroll to zoom. Press Esc or click off the map when done, then tick Lock.' : 'Double-click the map, or Pan & zoom, to set the extent; then lock it.'}</p>`;
 }
+/* what an output map keeps of its own instead of following the Map page (view, results, legend, symbols, labels) */
+function mapOwnList(it) { const o = it.o || {};
+  return [(o.cx != null || o.scale) && 'its own view', it.t === 'plan' && o.rp && 'its own results', it.t === 'plan' && (o.legend === '1' || o.legend === '0') && 'its own legend setting', o.sym && Object.keys(o.sym).length && 'its own symbols', o.lbl && Object.keys(o.lbl).length && 'its own labels', (o.names === '1' || o.names === '0') && 'its own name labels setting', o.furn && Object.keys(o.furn).length && 'its own north arrow and scale bar', o.vlab && 'its own value labels setting'].filter(Boolean); }
+function mapMatchHTML(it) { const own = mapOwnList(it), ro = S.readOnly ? 'disabled' : '', src = it.t === 'vap' ? 'the VOC map' : it.t === 'wt' ? 'the water-table map' : 'the Map page';
+  return `<h4>Matches ${src}?</h4><p class="note" data-mapown="${own.length}">${own.length ? `This map has ${esc(own.join(', ').replace(/, ([^,]*)$/, ' and $1'))}, so it can differ from ${src}. Everything else (layers, basemap, results, symbols, labels) follows ${src} as it is now.` : `Yes: it follows ${src} as it is now (layers, basemap, results, symbols and labels)${it.t === 'plan' ? ', fitted to the boreholes' : ''}.`}</p><button class="btn" data-cmatch ${ro}${own.length || (it.t === 'plan' && S.mv) ? '' : ' disabled'} title="Drop this map's own settings${it.t === 'plan' ? ' and show the area you last zoomed to on the Map page' : ''}">Match ${src}</button>`; }
 function propsHTML() {
   if (S.cmulti?.size >= 2) return `<h3>${S.cmulti.size} selected</h3><p class="note">Shift or Ctrl/⌘-click adds or removes an item. Dragging moves them together.</p>
     <h4>Align</h4><div class="cmp-row">${[['left', 'Left'], ['hcenter', 'Centre'], ['right', 'Right'], ['top', 'Top'], ['vcenter', 'Middle'], ['bottom', 'Bottom']].map(([k, t]) => `<button class="btn" data-calign="${k}">${t}</button>`).join('')}</div>
@@ -10964,7 +11218,8 @@ function propsHTML() {
     ${(ROPTS[it.t] || []).map(([k, l, list]) => sel(k, l, list)).join('')}
     ${it.t === 'plan' ? `<label class="cmp-lbl" for="co-rp">Results shown</label><select id="co-rp" data-copt="rp"><option value="">As on the Map page${lyrOn('res') ? ': ' + esc(resLabel(S.mres.p)) : ' (none)'}</option><option value="none" ${it.o?.rp === 'none' ? 'selected' : ''}>None</option>${resultParams().map(([k, l]) => `<option value="${k}" ${it.o?.rp === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
       ${it.o?.rp && it.o.rp !== 'none' ? `<div class="cmp-geos"><label class="cmp-geo"><span>From</span><input type="number" step="any" min="0" data-copt="rd0" value="${esc(it.o.rd0 ?? '')}" placeholder="top"><span class="note">${LEN()}</span></label><label class="cmp-geo"><span>To</span><input type="number" step="any" min="0" data-copt="rd1" value="${esc(it.o.rd1 ?? '')}" placeholder="bottom"><span class="note">${LEN()}</span></label></div>` : ''}` : ''}
-    ${MAP_ITEMS.has(it.t) ? mapViewHTML(it) + symbolsHTML(it) + withRO({ lbl: it.o?.lbl }, () => labelsHTML('c')) : ''}
+    ${it.t === 'plan' || it.t === 'vap' ? (() => { const ro = S.readOnly ? 'disabled' : '', op = (k, list) => list.map(([v, l]) => '<option value="' + v + '" ' + ((it.o?.[k] || '') === v ? 'selected' : '') + '>' + esc(l) + '</option>').join(''), st = lyrOn('res') || it.t === 'vap' ? resStyle(it.t === 'vap' ? (S.mapParam && LAB_PARAMS[S.mapParam] ? S.mapParam : 'cvc') : S.mres.p) : null;
+      return '<h4>Labels shown</h4><label class="cmp-lbl" for="co-names">Borehole names</label><select id="co-names" data-copt="names" ' + ro + '>' + op('names', [['', 'As the Map page (' + (S.lyr.labels !== false ? 'shown' : 'hidden') + ')'], ['1', 'Show'], ['0', 'Hide']]) + '</select><label class="cmp-lbl" for="co-vlab">Value labels</label><select id="co-vlab" data-copt="vlab" ' + ro + '>' + op('vlab', [['', 'As the style' + (st ? ' (' + ({ value: 'value', id: 'borehole and value', none: 'none' }[st.labels] || 'value') + ')' : '')], ['value', 'Value'], ['id', 'Borehole and value'], ['none', 'None']]) + '</select><p class="note">Where a value label carries the borehole’s name, its separate name label is left off.</p>'; })() : ''}${['plan', 'vap', 'wt'].includes(it.t) ? mapMatchHTML(it) : ''}${MAP_ITEMS.has(it.t) ? mapViewHTML(it) + symbolsHTML(it) + withRO({ lbl: it.o?.lbl }, () => labelsHTML('c')) + (['plan', 'vap', 'wt', 'flow'].includes(it.t) ? withRO({ furn: it.o?.furn }, () => furnHTML('c')) : '') : ''}
     ${it.t === 'legend' ? legendPanelHTML(it, pg) : ''}
     ${it.t === 'section' ? `<p class="note">${it.o?.secDef ? `Shows the section saved with it (${it.o.secDef.line ? "the line drawn on the map" : it.o.secDef.pick?.length >= 2 ? it.o.secDef.pick.length + " boreholes picked in order" : "best-fit line"}); changes on the <button class="btn link" data-tab="xsec">Cross-section</button> page do not move it.` : `Follows the section line chosen on the <button class="btn link" data-tab="xsec">Cross-section</button> page.`}${it.o?.xs ? ` Shows ${esc(it.o.xs.date ? 'the date ' + it.o.xs.date : 'the latest data')}${it.o.xs.plume !== false && (it.o.xs.param || it.o.xs.medium === 'vapour') ? ` with the ${esc(it.o.xs.medium === 'vapour' ? 'vapour' : (LAB_PARAMS[it.o.xs.param]?.label || '') + ' ' + it.o.xs.medium)} plume` : ''}.` : ' Shows that page\'s current view: date, plume and model results.'}</p><button class="btn" data-act="cmp-xs-use" ${S.readOnly ? 'disabled' : ''}>Use the Cross-section page's current view</button>
       <h4>Layers</h4>${(() => { const x = it.o?.xs || S.xs, ro = S.readOnly ? 'disabled' : ''; return [['plume', 'Measured plume', x.plume !== false], ['model', 'Forecast (model)', !!x.model], ['gwFlow', 'Model heads & flow (MODFLOW 6)', x.gwFlow !== false], ['ptLabels', 'Values at the points', !!x.ptLabels]].map(([k, l, on]) => `<label class="check"><input type="checkbox" data-cxs="${k}" ${on ? 'checked' : ''} ${ro}> ${esc(l)}</label>`).join(''); })()}` : ''}
@@ -11235,7 +11490,7 @@ document.addEventListener('click', e => {
   else { const st = siteOf() || {}, rs = { ...(st.resStyle || {}) }; delete rs[p]; setSite({ ...st, resStyle: rs }); }
   renderView(true);
 });
-document.addEventListener('toggle', e => { if (e.target.classList?.contains('res-style')) S.resOpen = e.target.open; if (e.target.classList?.contains('lbl-site')) S.lblOpen = e.target.open; if (e.target.classList?.contains('lbl-each')) S.lblEachOpen = e.target.open; }, true);
+document.addEventListener('toggle', e => { if (e.target.classList?.contains('res-style')) S.resOpen = e.target.open; if (e.target.classList?.contains('lbl-site')) S.lblOpen = e.target.open; if (e.target.classList?.contains('furn-site')) S.furnOpen = e.target.open; if (e.target.classList?.contains('lbl-each')) S.lblEachOpen = e.target.open; }, true);
 document.addEventListener('change', e => { const id = e.target.dataset?.resuse; if (!id || S.readOnly) return; const b = S.bh.get(id); if (!b) return; if (e.target.checked) delete b.resOff; else b.resOff = true; b.updated = new Date().toISOString(); store.save(b); renderView(true); });
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-clblact], [data-slblact]'); if (!b || S.readOnly) return;
@@ -11243,6 +11498,15 @@ document.addEventListener('click', e => {
   const it = S.tab === 'compose' && curPage().items.find(x => x.id === S.csel); if (!it) return;
   if (b.dataset.clblact === 'reset') { const o = { ...(it.o || {}) }; delete o.lbl; it.o = o; commit(); return; }
   const st = siteOf() || {}; setSite({ ...st, lblStyle: withRO({ lbl: it.o?.lbl }, lblCfg) }); toast('These labels are now the project’s: the Map page and every map without its own use them.'); commit();
+});
+/* the project's north arrow and scale bar; a map's own reset or made the project's */
+document.addEventListener('change', e => { const el = e.target, k = el.dataset?.sfurn; if (!k || S.readOnly) return; const st = siteOf() || {}; setSite({ ...st, furn: { ...(st.furn || {}), [k]: furnVal(k, el.value) } }); renderView(true); });
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-cfurnact], [data-sfurnact]'); if (!b || S.readOnly) return;
+  if (b.dataset.sfurnact) { const n = { ...(siteOf() || {}) }; delete n.furn; setSite(n); renderView(true); return; }
+  const it = S.tab === 'compose' && curPage().items.find(x => x.id === S.csel); if (!it) return;
+  if (b.dataset.cfurnact === 'reset') { const o = { ...(it.o || {}) }; delete o.furn; it.o = o; commit(); return; }
+  const st = siteOf() || {}; setSite({ ...st, furn: withRO({ furn: it.o?.furn }, furnCfg) }); toast('This north arrow and scale bar are now the project’s: the Map page and every map without its own use them.'); commit();
 });
 /* the Map page: the project's labels */
 document.addEventListener('change', e => {
@@ -11260,6 +11524,14 @@ document.addEventListener('click', e => {
   const it = curPage().items.find(x => x.id === S.csel); if (!it) return; const ex = [...(it.o?.extra || [])];
   if (b.dataset.lgadd != null) ex.push({ t: '', s: 'dot', c: 'ink' }); else ex.splice(+b.dataset.lgxdel, 1);
   it.o = { ...(it.o || {}), extra: ex }; commit();
+});
+/* an output map made to match the Map page: its own settings dropped, and (a site plan) the Map page's last view taken */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-cmatch]'); if (!b || S.tab !== 'compose' || S.readOnly) return;
+  const it = curPage().items.find(x => x.id === S.csel); if (!it) return; const o = { ...(it.o || {}) };
+  for (const k of ['lbl', 'sym', 'rp', 'rd0', 'rd1', 'legend', 'cx', 'cy', 'scale', 'lock', 'names', 'vlab', 'furn']) delete o[k]; it.o = o;
+  if (it.t === 'plan' && S.mv) setMapView(it, S.mv.sc * (it.w / (S._plan?.W || it.w)), [S.mv.cx, S.mv.cy]);
+  commit(); toast('This map now matches ' + (it.t === 'vap' ? 'the VOC map' : it.t === 'wt' ? 'the water-table map' : 'the Map page') + '.');
 });
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-cview]'); if (!b || S.tab !== 'compose') return;
@@ -11467,6 +11739,7 @@ function composeChange(t) {
   else if (it && t.dataset.cxs) it.o = { ...(it.o || {}), xs: { ...(it.o?.xs || S.xs), [t.dataset.cxs]: t.checked } };
   else if (it && t.dataset.coptNone) { const k = t.dataset.coptNone; it.o = { ...(it.o || {}), [k]: t.checked ? 'none' : (k === 'fillc' || k === 'bg' ? '#ffffff' : '#1f2937') }; }
   else if (it && t.dataset.coptPct) it.o = { ...(it.o || {}), [t.dataset.coptPct]: Math.max(0, Math.min(1, 1 - (+t.value || 0) / 100)) };
+  else if (it && t.dataset.cfurn) it.o = { ...(it.o || {}), furn: { ...(it.o?.furn || {}), [t.dataset.cfurn]: furnVal(t.dataset.cfurn, t.value) } };
   else if (it && t.dataset.clbl) it.o = { ...(it.o || {}), lbl: lblEdit(it.o?.lbl, t, 'all') };
   else if (it && t.dataset.clblb) it.o = { ...(it.o || {}), lbl: lblEdit(it.o?.lbl, t, 'one') };
   else if (it && t.dataset.csym) { const [k, f] = t.dataset.csym.split('.'), sym = { ...(it.o?.sym || {}) }; sym[k] = { ...(sym[k] || {}), [f]: f === 'size' ? +t.value || SYM_DEF[k].size : t.value }; it.o = { ...(it.o || {}), sym }; }
@@ -12776,7 +13049,7 @@ document.addEventListener('change', e => {
   if (t.id === 'xs-model') { setXs('model', t.checked); renderView(true); return; }
   if (t.id === 'xs-layer') { S.xs = { ...S.xs, plume: t.value !== 'model', model: t.value !== 'meas' }; setXs('layer', t.value); renderView(true); return; }
   if (t.id === 'xs-shape' || t.id === 'xs-style' || t.id === 'xs-interp') { setXs(t.id.slice(3), t.value); ctlRender?.(); return; }
-  if (t.id === 'xs-aniso') { setXs('aniso', +t.value); return; }
+  if (t.id === 'xs-aniso') { setXs('aniso', t.value === 'auto' ? 'auto' : +t.value); return; }
   if (t.id === 'xs-near') { setXs('only', !t.checked); return; }
   if (t.id === 'xs-soilcol') { setXs('soilColour', t.checked); return; }
   // groundwater model inputs

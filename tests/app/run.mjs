@@ -752,7 +752,7 @@ app.whenReady().then(async () => {
         { const Q = [[0, 0, 3], [10, 0, 0], [0, 10, 0], [10, 10, 0], [5, 5, 1]], kf = krigeFit(Q); let hi = -Infinity, lo = Infinity; for (let x = -5; x <= 15; x++) for (let y = -5; y <= 15; y++) { const v = kf(x, y); hi = Math.max(hi, v); lo = Math.min(lo, v); }
           want(Math.abs(kf(0, 0) - 3) < 1e-6 && hi <= 3 + 1e-9 && lo >= -1e-9, 'kriging is exact at a reading and held to the readings: ' + [kf(0, 0), lo, hi]);
           want(nearestFit(Q)(1, 1) === 3 && nearestFit(Q)(9, 9) === 0, 'nearest borehole takes the closest reading'); }
-        { const keepS = siteOf()?.resStyle; setSite({ ...siteOf(), resStyle: {} }); want(resStyle('cvc').interp === 'krige', 'kriging by default');
+        { const keepS = siteOf()?.resStyle; setSite({ ...siteOf(), resStyle: {} }); want(resStyle('cvc').interp === 'auto', 'automatic by default'); { const P = [[0, 0, 1], [30, 0, 2], [0, 30, 1.5], [30, 30, 3], [15, 15, 2.2], [45, 10, .5]], a = resAuto(P); want(a && RES_AUTO_NAMES[a.key] && a.rmse >= 0 && Object.values(a.all).filter(v => v != null).length >= 3 && a.f(15, 15) > 1.5 && /Picked/.test(resAutoText(a)), 'automatic picks the most accurate method: ' + resAutoText(a)); const k = krigeFit(P); want(k?.cal && VARIO[k.cal.model] && Math.abs(k(30, 30) - 3) < 1e-6, 'kriging calibrated and exact: ' + JSON.stringify(k?.cal)); }
           for (const k of Object.keys(RES_INTERP)) { setResStyle('cvc', { interp: k, viz: 'filled' }); want(/data-resband/.test(resultsLayerSVG(pts, X, Y, M)), 'draws with ' + k); }
           setSite({ ...siteOf(), resStyle: keepS }); }
         // under 10 ppm has no shading; a borehole left out stays on the map, hollow, and out of the contours
@@ -943,7 +943,7 @@ app.whenReady().then(async () => {
         const plan = pg.items.find(i => i.t === 'plan'); S.csel = plan.id; rerenderCompose(); await w(250);
         const set = (sel, v) => { const el = document.querySelector(sel); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
         set('[data-cprop="fc"]', '#ff0000'); await w(150); set('[data-cprop="fw"]', '2.5'); await w(150); set('[data-cprop="fd"]', 'dash'); await w(150);
-        const fr = new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + pageItemsSVG(curPage()) + '</svg>', 'image/svg+xml').querySelector('[data-g="' + plan.id + '"] [data-frame]');
+        const fr = new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + pageItemsSVG(curPage()) + '</svg>', 'image/svg+xml').querySelector('[data-frame][data-of~="' + plan.id + '"]');
         want(fr && /#ff0000/.test(fr.getAttribute('style')) && fr.getAttribute('stroke-width') === '2.5' && fr.getAttribute('stroke-dasharray'), 'frame colour, width and line: ' + fr?.outerHTML);
         // a click off every item clears the selection
         document.querySelector('#cmp-paper').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 5, clientY: 5 })); await w(100);
@@ -1232,7 +1232,7 @@ app.whenReady().then(async () => {
         await set('#rs-viz', 'points'); await set('#rs-psize', '20');
         want(pts().every(v => v === 20), 'point size 20: ' + pts().slice(0, 4));
         await set('#rs-lsize', '15'); await set('#rs-lpos', 't');
-        const tx = map().querySelector('[data-res]:not([data-resoff]) text'); want(tx && /15px/.test(tx.getAttribute('style')) && tx.getAttribute('text-anchor') === 'middle' && +tx.getAttribute('y') < +tx.parentNode.querySelector('circle').getAttribute('cy'), 'value label 15 px, above: ' + tx?.outerHTML.slice(0, 160));
+        const txs = [...map().querySelectorAll('[data-res]:not([data-resoff]) text')], tx = txs[0], up = txs.filter(x => x.getAttribute('text-anchor') === 'middle' && +x.getAttribute('y') < +x.parentNode.querySelector('circle').getAttribute('cy')); want(tx && /15px/.test(tx.getAttribute('style')) && up.length >= txs.length / 2, 'value labels 15 px, above where there is room: ' + up.length + ' of ' + txs.length);
         // graduated sizes scale with it
         await set('#rs-viz', 'graduated'); const g = pts(); want(Math.max(...g) <= 20 * 20 / 12.5 + .1 && Math.max(...g) > 20, 'graduated scales with the size: ' + Math.max(...g));
         // borehole name labels on this page
@@ -1243,6 +1243,122 @@ app.whenReady().then(async () => {
         // an output vapour map follows the project settings
         const pg = newPage('free'), it = newItem('vap', 40, 120, { w: 600, h: 440 }); pg.items.push(it);
         const svg = pageItemsSVG(pg); want(svg.includes('VAP-NAME') && /font:700 15px/.test(svg), 'the output map follows');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('maps: borehole names keep clear of result points and value labels', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); S.mapParam = ''; goTab('contam'); await w(500);
+        const set = async (sel, v) => { const el = document.querySelector(sel); if (!el) { F.push('no ' + sel); return; } el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await w(300); };
+        const ov = (a, b) => Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+        const clash = (svg, tag) => { const names = [...svg.querySelectorAll('[data-lbl] text')].map(x => [x.textContent, x.getBBox()]);
+          const vals = [...svg.querySelectorAll('[data-res] text, [data-res] circle')].map(x => [x.textContent || 'point', x.getBBox()]), bad = [];
+          for (const [n, a] of names) for (const [v, b] of vals) if (ov(a, b) > 4) bad.push(n + '/' + v);
+          want(names.length > 2 && vals.length > 2, tag + ': labels drawn ' + names.length + '/' + vals.length);
+          want(!bad.length, tag + ': names over results: ' + bad.slice(0, 6).join(', ')); };
+        const map = () => document.querySelector('.map-box svg');
+        for (const [lpos, ps] of [['br', '12.5'], ['r', '20'], ['t', '16'], ['l', '25']]) { await set('#rs-lpos', lpos); await set('#rs-psize', ps); clash(map(), 'VOC map ' + lpos + ' ' + ps); }
+        // a borehole given its own position keeps it
+        const b = mapList().find(x => x.easting != null); await set('[data-slblb="' + b.id + '.pos"]', 'l');
+        const g = map().querySelector('[data-lbl="' + b.id + '"] text'); want(g?.getAttribute('text-anchor') === 'end', 'own position kept'); await set('[data-slblb="' + b.id + '.pos"]', '');
+        await set('#rs-lpos', 'br'); await set('#rs-psize', '12.5');
+        // the Map page with the results layer on
+        S.mres = { ...(S.mres || {}), p: 'cvc' }; S.lyr = { ...S.lyr, res: true }; goTab('site'); await w(600);
+        const ms = document.querySelector('#plan svg'); if (ms) clash(ms, 'Map page'); else F.push('no Map page svg');
+        want(LBL_AVOID === null, 'cleared after drawing');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('maps: value labels stay readable zoomed out (clear of other labels and points); output map matches the Map page', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); S.mres = { ...(S.mres || {}), p: 'cvc' }; S.lyr = { ...S.lyr, res: true }; goTab('site'); await w(600);
+        const ov = (a, b) => Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+        const check = tag => { const svg = document.querySelector('#plan svg'), W = +svg.getAttribute('width'), H = +svg.getAttribute('height');
+          const gs = [...svg.querySelectorAll('[data-res]')].map(g => ({ id: g.dataset.res, t: g.querySelector('text')?.getBBox(), c: g.querySelector('circle').getBBox() }));
+          const names = [...svg.querySelectorAll('[data-lbl] text')].map(x => x.getBBox()), bad = [];
+          for (const a of gs) { if (!a.t) continue;
+            if (a.t.x < -1 || a.t.y < -1 || a.t.x + a.t.width > W + 1 || a.t.y + a.t.height > H + 1) bad.push(a.id + ' off the map');
+            for (const b of gs) if (b !== a && (ov(a.t, b.c) > 4 || (b.t && ov(a.t, b.t) > 4))) bad.push(a.id + '/' + b.id);
+            for (const n of names) if (ov(a.t, n) > 4) bad.push(a.id + '/name'); }
+          want(gs.filter(g => g.t).length > 2, tag + ': value labels drawn'); want(!bad.length, tag + ': ' + [...new Set(bad)].slice(0, 6).join(', ')); };
+        check('fitted');
+        const v = S._plan; for (const f of [.5, .3]) { S.mv = { cx: v.cx, cy: v.cy, sc: v.sc * f }; S.mvProj = projKey(projList()[0]); drawPlan(); await w(300); check('zoomed out ×' + f); }
+        // an output site plan with its own settings is told so, and Match the Map page drops them and takes the view
+        goTab('compose'); S.cout = false; S.csort = false; await w(300);
+        const pg = newPage('free'), it = newItem('plan', 40, 120, { w: 600, h: 440 }); it.o = { ...(it.o || {}), lbl: { size: 30 }, sym: { bh: { size: 15 } }, rp: 'none', scale: 2500, cx: 1, cy: 1 }; pg.items.push(it);
+        repLayout().pages.push(pg); S.cpage = repLayout().pages.length - 1; S.csel = it.id; commit(); await w(400);
+        const own = document.querySelector('[data-mapown]'); want(own && +own.dataset.mapown >= 4 && /own view/.test(own.textContent), 'own settings listed: ' + own?.textContent);
+        document.querySelector('[data-cmatch]').click(); await w(400);
+        const o = curPage().items.find(x => x.id === it.id).o; want(!o.lbl && !o.sym && !o.rp && Math.abs(o.cx - S.mv.cx) < .1 && o.scale > 0, 'matched: ' + JSON.stringify(o));
+        want(+document.querySelector('[data-mapown]')?.dataset.mapown === 1, 'only the Map page view left as its own');
+        const svg = pageItemsSVG(curPage()); want(/data-res=/.test(svg) && !/font:600 30px/.test(svg), 'results as on the Map page, labels as the project');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('maps: no double labels; names follow the Map page layer; each output map can choose names and value labels', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); S.mapParam = ''; S.lyr = { ...S.lyr, labels: true }; goTab('contam'); await w(500);
+        const set = async (sel, v) => { const el = document.querySelector(sel); if (!el) { F.push('no ' + sel); return; } if (el.type === 'checkbox') el.checked = v; else el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await w(300); };
+        const map = () => document.querySelector('.map-box svg'), names = s => [...s.querySelectorAll('[data-lbl] text')].map(x => x.textContent), vals = s => [...s.querySelectorAll('[data-res] text')].map(x => x.textContent);
+        await set('#rs-labels', 'id');
+        const n1 = names(map()), v1 = vals(map()); want(v1.length > 2 && !n1.some(n => v1.some(v => v.startsWith(n + ' '))), 'each name once with its value: ' + n1.slice(0, 4) + ' / ' + v1.slice(0, 4));
+        await set('#rs-labels', 'value'); want(names(map()).length > 2, 'names back when the values have no name');
+        await set('.res-style [data-lyr="labels"]', false); want(!names(map()).length && vals(map()).length > 2, 'names off from the VOC map: values only');
+        // an output vapour map follows, and can choose its own
+        goTab('compose'); S.cout = false; S.csort = false; await w(300);
+        const pg = newPage('free'), it = newItem('vap', 40, 120, { w: 600, h: 440 }); pg.items.push(it); repLayout().pages.push(pg); S.cpage = repLayout().pages.length - 1; S.csel = it.id; commit(); await w(400);
+        const svgOf = () => { const d = document.createElement('div'); d.innerHTML = pageItemsSVG(curPage()); document.body.appendChild(d); return d; };
+        let d = svgOf(); want(!names(d).length, 'output follows: no names'); d.remove();
+        await set('#co-names', '1'); await set('#co-vlab', 'none'); d = svgOf(); want(names(d).length > 2 && !vals(d).length, 'own choice: names only'); d.remove();
+        await set('#co-names', '0'); d = svgOf(); want(!names(d).length && !vals(d).length, 'all labels off'); d.remove();
+        await set('#co-vlab', 'id'); await set('#co-names', '1'); d = svgOf(); const n2 = names(d), v2 = vals(d); want(v2.length > 2 && !n2.some(n => v2.some(v => v.startsWith(n + ' '))), 'no double labels on the output'); d.remove();
+        S.lyr = { ...S.lyr, labels: true };
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('maps: north arrow and scale bar style, size and corner; the VOC map uses the Map page symbols', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadLloydExample(); await w(300); goTab('site'); await w(500);
+        const set = async (sel, v) => { const el = document.querySelector(sel); if (!el) { F.push('no ' + sel); return; } el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); await w(300); };
+        const pl = () => document.querySelector('#plan svg');
+        want(pl().querySelector('[data-mapnorth="arrow"]') && pl().querySelector('[data-mapscale="alt"]'), 'default arrow and scale bar');
+        await set('[data-sfurn="nStyle"]', 'compass'); await set('[data-sfurn="nSize"]', '50'); await set('[data-sfurn="sStyle"]', 'line'); await set('[data-sfurn="sLen"]', '20'); await set('[data-sfurn="sPos"]', 'br');
+        const n = pl().querySelector('[data-mapnorth]'), sb = pl().querySelector('[data-mapscale]');
+        want(n?.dataset.mapnorth === 'compass' && n.dataset.size === '50', 'north arrow style and size: ' + n?.outerHTML.slice(0, 90));
+        want(sb?.dataset.mapscale === 'line' && +sb.dataset.len === 20 && sb.getBBox().x > +pl().getAttribute('width') / 2, 'scale bar 20 m, line, bottom right');
+        // the VOC map follows, with the Map page symbols
+        S.mapParam = ''; goTab('contam'); await w(500); const v = document.querySelector('.map-box svg');
+        want(v.querySelector('[data-mapnorth="compass"]') && v.querySelector('[data-mapscale="line"]'), 'VOC map follows');
+        want(v.querySelectorAll('[data-bhsym]').length >= mapList().filter(b => b.easting != null).length, 'every borehole symbol drawn');
+        // an output map's own
+        goTab('compose'); S.cout = false; S.csort = false; await w(300);
+        const pg = newPage('free'), it = newItem('vap', 40, 120, { w: 600, h: 440 }); pg.items.push(it); repLayout().pages.push(pg); S.cpage = repLayout().pages.length - 1; S.csel = it.id; commit(); await w(400);
+        await set('[data-cfurn="nStyle"]', 'none'); await set('[data-cfurn="sRatio"]', '1');
+        const svg = pageItemsSVG(curPage()); want(!/data-mapnorth/.test(svg) && /Scale 1:/.test(svg), 'own: no arrow, ratio shown');
+        // the North arrow item takes a style
+        const na = newItem('north', 700, 120); na.o = { ...(na.o || {}), style: 'circle' }; curPage().items.push(na); commit(); await w(300);
+        want(/<circle r=/.test(pageItemsSVG(curPage())), 'north item style');
+        const st = siteOf(); delete st.furn; setSite({ ...st });
       } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
       return F;
     })()`);
@@ -1527,7 +1643,7 @@ app.whenReady().then(async () => {
       S.sel = A.id; S.secIds = new Set(); goTab('xsec'); await w(200);
       const svg = document.querySelector('#xs-draw svg'), texts = [...svg.querySelectorAll('text')].map(t => t.textContent);
       const ground = svg.querySelector('[data-ground]'), out = { offC: texts.find(t => /XC|6\\.0/.test(t) && /projected/.test(t)) || texts.filter(t => /projected/.test(t)), ground: ground && { dash: ground.getAttribute('stroke-dasharray'), title: ground.querySelector('title')?.textContent } };
-      const joins = () => [...document.querySelectorAll('#xs-draw svg path[data-unit]')].map(p => p.dataset.unit);
+      const joins = () => [...document.querySelectorAll('#xs-draw svg path[data-unit]')].map(p => p.dataset.unit + (p.dataset.auto ? ':auto' : ''));
       out.before = joins();
       const sel = document.querySelector('[data-xsalias="' + C.id + '|Clay till"]'); out.ui = !!sel; if (sel) { sel.value = 'Upper clay'; sel.dispatchEvent(new Event('change', { bubbles: true })); } await w(100); out.after = joins(); out.saved = siteOf()?.xsec?.alias?.[C.id + '|Clay till'];
       // RF4: two boreholes at the same place
@@ -1536,8 +1652,68 @@ app.whenReady().then(async () => {
     })()`);
     expect(JSON.stringify(r.offC).includes('6.0 m') && JSON.stringify(r.offC).includes('projected'), 'off-line label: ' + JSON.stringify(r.offC));
     expect(r.ground && r.ground.dash && /interpolated between boreholes/.test(r.ground.title || ''), 'ground marked interpolated: ' + JSON.stringify(r.ground));
-    expect(r.ui && r.saved === 'Upper clay' && r.after.filter(u => u === 'join').length > r.before.filter(u => u === 'join').length, 'alias joins units: ' + JSON.stringify(r));
+    expect(r.ui && r.saved === 'Upper clay' && r.before.includes('join:auto') && !r.after.includes('join:auto') && r.after.filter(u => u === 'join').length > r.before.filter(u => u === 'join').length, 'same soil at the same level pairs automatically; pairing by hand makes it a named join: ' + JSON.stringify(r));
     expect(r.finite, 'coincident boreholes give NaN/Infinity');
+  });
+
+  await check('cross-section: layers paired in order (no crossing), repeated seams, pinch-outs from the thickness trend, one unit giving way to another', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        const L = (top, bottom, uscs, unit) => ({ id: uid('l'), top, bottom, uscs, unit });
+        const mk = (name, de, layers) => { const b = blankBorehole(name); Object.assign(b, { project: 'Strat test', easting: 500000 + de, northing: 6000000, crs: 'UTM NAD83(CSRS) Zone 12', elevation: 600, layers }); const n = normalize(b); S.bh.set(n.id, n); store.save(n); return n; };
+        // A: clay, sand seam, clay, sand seam, till; B: clay, sand seam, clay, till (the lower seam pinches out); C: clay, silt (the sand gives way to silt), clay, till
+        const A = mk('SA', 0, [L(0, 2, 'cl', 'Clay'), L(2, 3, 'sp', 'Sand'), L(3, 5, 'cl', 'Clay'), L(5, 5.6, 'sp', 'Sand'), L(5.6, 9, 'ci', 'Till')]);
+        const B = mk('SB', 40, [L(0, 2.2, 'cl', 'Clay'), L(2.2, 3.1, 'sp', 'Sand'), L(3.1, 5.8, 'cl', 'Clay'), L(5.8, 9, 'ci', 'Till')]);
+        const C = mk('SC', 80, [L(0, 2.1, 'cl', 'Clay'), L(2.1, 3, 'ml', 'Silt'), L(3, 6, 'cl', 'Clay')]);
+        S.sel = A.id; S.secIds = new Set([A.id, B.id, C.id]); S.xs = { ...S.xs, plume: false, model: false, param: '' }; goTab('xsec'); await w(400);
+        const svg = document.querySelector('#xs-draw svg'); want(!/NaN|Infinity/.test(svg.outerHTML), 'finite');
+        const kinds = [...svg.querySelectorAll('path[data-unit]')].map(p => p.dataset.unit + ':' + p.querySelector('title')?.textContent.split(' (')[0]);
+        want(kinds.filter(k => k === 'join:Sand').length === 1, 'the upper seam pairs once (A–B): ' + kinds);
+        want(kinds.filter(k => k === 'join:Clay').length === 4, 'both clays pair in both gaps: ' + kinds);
+        want(kinds.includes('pinch:Sand') && kinds.includes('pinch:Silt'), 'lower seam pinches, sand gives way to silt: ' + kinds);
+        want(svg.querySelector('[data-facies]'), 'a contact where sand gives way to silt');
+        want(kinds.some(k => k === 'unknown:Till'), 'till below the shallower borehole C is shown as unknown: ' + kinds);
+        // no band crosses another: in each gap, at every x, the units' tops keep their order
+        const g0 = svg.querySelector('[data-gap="0"]'), paths = [...g0.querySelectorAll('path[data-unit="join"]')].map(p => p.getAttribute('d').slice(1).split('L').map(s => s.split(' ').map(Number)));
+        const ok = paths.every((a, i) => paths.every((b, j) => j <= i || a.slice(0, 25).every((q, k) => { const r2 = b[k]; return !r2 || Math.sign(q[1] - r2[1]) === Math.sign(a[0][1] - b[0][1]) || Math.abs(q[1] - r2[1]) < .6; })));
+        want(ok, 'no crossing bands');
+        want(svg.querySelector('[data-pinch]'), 'a ? marks the pinch-out');
+        const keys = [...svg.querySelectorAll('[data-soilkey] [data-key]')].map(k => k.dataset.key).sort().join(), labs = [...svg.querySelectorAll('[data-soilkey] text')].map(x => x.textContent);
+        want(keys === 'CI,CL,ML,SP' && labs.includes('Poorly graded sand') && labs.includes('Silt') && labs.includes('Clay (low plasticity)') && labs.includes('Clay (medium plasticity)') && labs.length === 4, 'the key is the soils as classified in the logs: ' + keys + ' / ' + labs);
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
+  await check('cross-section: off-line boreholes shape contacts and pinch-outs; the note says how; water across the whole section', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        const L = (top, bottom, uscs, unit) => ({ id: uid('l'), top, bottom, uscs, unit });
+        const mk = (name, de, dn, layers, water) => { const b = blankBorehole(name); Object.assign(b, { project: 'Off test', easting: 500000 + de, northing: 6000000 + dn, crs: 'UTM NAD83(CSRS) Zone 12', elevation: 600, layers, water: water || [] }); const n = normalize(b); S.bh.set(n.id, n); store.save(n); return n; };
+        const A = mk('OA', 0, 0, [L(0, 2, 'cl', 'Clay'), L(2, 4, 'sp', 'Sand'), L(4, 8, 'ci', 'Till')], [{ id: uid('w'), date: '2026-05-01', depth: 2.5, measured: 2.5, ref: 'gs', kind: 'static' }]);
+        const B = mk('OB', 60, 0, [L(0, 2, 'cl', 'Clay'), L(2, 8, 'ci', 'Till')]);
+        S.sel = A.id; S.secIds = new Set([A.id, B.id]); S.xs = { ...S.xs, plume: false, model: false, param: '', date: '' }; goTab('xsec'); await w(400);
+        const tipX = () => { const p = [...document.querySelectorAll('#xs-draw svg path[data-unit="pinch"]')].find(q => /Sand/.test(q.querySelector('title')?.textContent || '')); return p ? Math.max(...p.getAttribute('d').slice(1).split('L').map(s => +s.split(' ')[0])) : null; };
+        const top0 = () => { const p = [...document.querySelectorAll('#xs-draw svg path[data-unit="join"]')].find(q => /^Clay/.test(q.querySelector('title')?.textContent || '')); return p ? p.getAttribute('d') : ''; };
+        const x1 = tipX(), d1 = top0(); want(x1 != null, 'the sand pinches out');
+        // a borehole 3 m off the line at 45 m still has the sand: the pinch-out moves past it; with the clay base at 3 m the contact bends
+        mk('OC', 45, 3, [L(0, 3, 'cl', 'Clay'), L(3, 4, 'sp', 'Sand'), L(4, 8, 'ci', 'Till')]); drawXsec(); await w(200);
+        const x2 = tipX(), d2 = top0(), svg = document.querySelector('#xs-draw svg');
+        want(x2 > x1 + 5, 'pinch-out moved past the off-line borehole: ' + x1 + ' → ' + x2);
+        want(d2 && d2 !== d1, 'the clay contact bends towards it');
+        const nt = document.querySelector('#xs-note')?.textContent || ''; want(/Layers: units of the same name joined in order/.test(nt) && /1 borehole off the line/.test(nt), 'the note says how: ' + nt.slice(-260));
+        // water: one reading still gives a line and tint across the whole section
+        const W = +svg.getAttribute('width'), sat = svg.querySelector('[data-sat]'), bb = sat?.getBBox();
+        want(sat && bb.width > W * .7, 'tint across the section: ' + bb?.width + ' of ' + W);
+        want(svg.querySelectorAll('[data-west]').length >= 2, 'water line carried to both edges');
+        want(!/NaN|Infinity/.test(svg.outerHTML), 'finite');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
   });
 
   await check('cross-section: water by date', async run => {
@@ -1663,6 +1839,25 @@ app.whenReady().then(async () => {
     expect(r.depthPts === 4 && r.finite, 'depth-only project draws points: ' + JSON.stringify(r));
   });
 
+  await check('cross-section plume: layering chosen automatically (the ratio that best predicts the samples)', async run => {
+    const r = await run(`(async () => {
+      const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
+      try {
+        loadDlExample(); await w(300); S.sel = [...S.bh.values()].find(b => /Dawn/i.test(b.project || '') && b.easting != null)?.id || S.sel; S.secIds = new Set();
+        S.xs = { ...S.xs, date: '', medium: 'soil', param: 'benzene', round: false, plume: true, model: false, style: 'graded', interp: 'krige', only: false }; delete S.xs.aniso; goTab('xsec'); await w(600);
+        { const keep = S.xs; S.xs = { ...S.xs, interp: 'auto' }; renderView(true); await w(500); const nt = document.querySelector('#xs-note')?.textContent || ''; want(/Chosen automatically as the most accurate here/.test(nt) && XS_AUTO.includes(XS_METHOD_PICK) && (document.querySelector('#xs-interp')?.selectedOptions[0]?.textContent || '').includes('Automatic ('), 'method chosen automatically: ' + XS_METHOD_PICK + ' / ' + nt.slice(-200)); S.xs = keep; drawXsec(); await w(200); }
+        const note = () => document.querySelector('#xs-note')?.textContent || '', sel = document.querySelector('#xs-aniso');
+        want(sel && sel.value === 'auto', 'automatic by default: ' + sel?.value);
+        want(/chosen automatically as the layering that best predicts the samples/.test(note()) && XS_ANISO.includes(XS_ANISO_PICK), 'the note says it was chosen: ' + note().slice(-300));
+        // choosing a ratio by hand still works, and Automatic comes back
+        sel.value = '3'; sel.dispatchEvent(new Event('change', { bubbles: true })); await w(500); want(/layered ×3 /.test(note()) && !/chosen automatically/.test(note()), 'a ratio chosen by hand');
+        const s2 = document.querySelector('#xs-aniso'); s2.value = 'auto'; s2.dispatchEvent(new Event('change', { bubbles: true })); await w(500); want(/chosen automatically/.test(note()), 'back to automatic');
+      } catch (e) { F.push('THREW ' + String(e.stack).slice(0, 300)); }
+      return F;
+    })()`);
+    expect(!r.length, r.join(' || '));
+  });
+
   await check('cross-section plume: 3D kriging in real metres, layered, uses boreholes near the line, hatches the unconfirmed, marks the undelineated', async run => {
     const r = await run(`(async () => {
       const w = ms => new Promise(r => setTimeout(r, ms)), F = [], want = (ok, msg) => { if (!ok) F.push(msg); };
@@ -1694,7 +1889,7 @@ app.whenReady().then(async () => {
         // the controls
         S.xs = { ...S.xs, only: false }; renderView(true); await w(300);
         { loadDlExample(); await w(300); S.secIds = new Set(); S.xs = { ...S.xs, medium: 'soil', param: 'benzene', interp: 'krige', only: false, date: '' }; goTab('xsec'); await w(300); const t0 = performance.now(); drawXsec(); const ms = performance.now() - t0; window.__ms = ms; want(ms < 2500, 'redraw time on the Dawn Lake example: ' + Math.round(ms) + ' ms'); S.sel = B[0].id; renderView(true); await w(300); }
-        const sel = document.querySelector('#xs-interp'); want(sel && [...sel.options].map(o => o.value).join() === 'krige,uk,ik,rst,rbf,idw,nn,near,tin' && document.querySelector('#xs-aniso'), 'interpolation and layering choices');
+        const sel = document.querySelector('#xs-interp'); want(sel && [...sel.options].map(o => o.value).join() === 'auto,krige,uk,ik,rst,rbf,idw,nn,near,tin' && document.querySelector('#xs-aniso'), 'interpolation and layering choices');
         // every method draws, honours the samples where it should, and says where it comes from
         const p3 = XS_GEOM.pos.find(p => p.b.id === B[2].id), p1 = XS_GEOM.pos.find(p => p.b.id === B[0].id);
         for (const k of ['krige', 'uk', 'ik', 'rst', 'rbf', 'idw', 'nn', 'near']) {
@@ -1994,9 +2189,9 @@ app.whenReady().then(async () => {
         const svg = () => document.querySelector('#xs-draw svg');
         setXs('style', 'graded'); await w(150);
         want(svg().querySelectorAll('path[data-contour="1"]').length >= 1, 'graded: a guideline contour');
-        want(svg().querySelectorAll('rect[data-cell]').length > 0 && !svg().querySelector('[data-band]'), 'graded: shaded cells, no bands');
+        want(svg().querySelectorAll('[data-cell]').length > 0 && !svg().querySelector('[data-band]'), 'graded: shaded cells, no bands');
         setXs('style', 'bands'); await w(150);
-        want(svg().querySelectorAll('[data-band]').length > 0 && !svg().querySelector('rect[data-cell]'), 'bands: bands, no shaded cells');
+        want(svg().querySelectorAll('[data-band]').length > 0 && !svg().querySelector('[data-cell]'), 'bands: bands, no shaded cells');
         setXs('style', 'lines'); await w(150);
         want([...svg().querySelectorAll('text[data-clabel]')].some(t => /0\.005/.test(t.textContent)), 'lines: a labelled guideline contour');
         want(svg().querySelector('text').textContent !== undefined && svg().textContent.includes('Interpreted: forecast shape matched to measured results'), 'guided label on the drawing');
@@ -2019,7 +2214,7 @@ app.whenReady().then(async () => {
         await pick('xs-layer', 'both'); let svg = document.querySelector('#xs-draw svg');
         const mc = [...svg.querySelectorAll('[data-model-contour]')];
         want(mc.length && mc.every(p => p.getAttribute('stroke-dasharray')) && !svg.querySelector('[data-model-fill]'), 'compare: forecast as dashed lines only');
-        want(svg.querySelector('[data-contour]') && svg.querySelector('rect[data-cell]'), 'compare: measured plume in its style');
+        want(svg.querySelector('[data-contour]') && svg.querySelector('[data-cell]'), 'compare: measured plume in its style');
         await pick('xs-layer', 'model'); svg = document.querySelector('#xs-draw svg');
         want(svg.querySelector('[data-model-fill]') && !svg.querySelector('[data-contour]'), 'forecast only: filled, no measured plume');
         await pick('xs-layer', 'meas'); svg = document.querySelector('#xs-draw svg');
@@ -2030,7 +2225,7 @@ app.whenReady().then(async () => {
         const G = XS_GEOM, cols = G.pos.map(p => G.X(p.d));
         const pts = [...svg.querySelectorAll('[data-pt]')]; want(pts.length >= 5, 'markers drawn');
         want(pts.every(c => cols.some(x => Math.abs(+c.getAttribute('cx') - x) < 1)), 'markers sit on the borehole column');
-        const order = [...svg.children], firstCell = order.findIndex(e => e.querySelector?.('rect[data-cell]')), lastCol = order.map((e, i) => e.matches('g[data-col]') ? i : -1).filter(i => i >= 0).pop();
+        const order = [...svg.children], firstCell = order.findIndex(e => e.querySelector?.('[data-cell]')), lastCol = order.map((e, i) => e.matches('g[data-col]') ? i : -1).filter(i => i >= 0).pop();
         want(firstCell >= 0 && lastCol > firstCell, 'columns are drawn over the plume shading');
         await pick('xs-shape', 'data'); svg = document.querySelector('#xs-draw svg');
         want(svg.textContent.includes('No data above or below the well screens'), 'data only labelled');
@@ -2086,9 +2281,8 @@ app.whenReady().then(async () => {
           want(pd && Math.abs(Math.log10(g.at(pd.d, mid(nb, pd))[0]) - Math.log10(.02)) < .01, 'I2 ' + shape + ': nested MW-3D keeps 0.02: ' + (pd && g.at(pd.d, mid(nb, pd))[0]) + ' ' + JSON.stringify(pd && [pd.d, pd.top, pd.bot, pd.v, nb.elevation, mid(nb, pd)]));
           want(Math.abs(Math.log10(g.at(ps.d, mid(b3, ps))[0]) - Math.log10(ps.v)) < .01, 'I2 ' + shape + ': MW-3 still matched'); }
         // I3: shaded cells do not overlap (no doubled stripes in print)
-        await fresh(); let svg = document.querySelector('#xs-draw svg'); const cells = [...svg.querySelectorAll('rect[data-cell]')];
-        const ys = [...new Set(cells.map(c => +c.getAttribute('y')))].sort((a, b) => a - b), h = +cells[0].getAttribute('height');
-        want(ys.length > 2 && ys[1] - ys[0] >= h - 1e-6 && cells[0].closest('g').getAttribute('shape-rendering') === 'crispEdges', 'I3: rows abut without overlap');
+        await fresh(); let svg = document.querySelector('#xs-draw svg'); const cells = [...svg.querySelectorAll('[data-cell]')];
+        want(cells.length === 1 && cells[0].tagName === 'image' && (cells[0].getAttribute('href') || '').startsWith('data:image/png') && +cells[0].getAttribute('width') > 100, 'I3: the shading is one smooth picture (no rows of rectangles to step or seam in print)');
         // I4: the shape note fits the drawing and touches no other text, at report width
         const d = document.querySelector('#xs-draw'); d.style.width = '700px'; drawXsec(); await w(150); svg = d.querySelector('svg');
         const note = svg.querySelector('[data-fnote]'), nb2 = note.getBBox(), sw = +svg.getAttribute('width');
