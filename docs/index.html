@@ -3,282 +3,336 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Borehole Field Log · Download for Mac and Windows</title>
-<meta name="description" content="Borehole Field Log turns what you see at the hole into CFEM / Modified USCS logs, PDFs, Excel and AGS 4 files. For geotechnical and environmental work in Alberta and Saskatchewan. Mac and Windows; works offline.">
+<title>Borehole Field Log · Download for Windows and Mac</title>
+<meta name="description" content="Borehole Field Log: CFEM / Modified USCS borehole logs, site maps, cross-sections with plumes and groundwater, and report-ready PDF figures, for geotechnical and environmental work in Alberta and Saskatchewan. Windows and Mac; works offline.">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-/* The download page. The newest release, its installers, checksums and notes come from GitHub when the page opens
-   (scripts/release.mjs publishes them), so the page never needs editing for a release. Pictures are the app's own
-   output, rendered from its fictional Dawn Lake example. */
+/* The download page, drawn like a figure sheet: paper, ink rules, a title block. The newest release, its installers,
+   checksums and notes come from GitHub when the page opens (scripts/release.mjs publishes them), so the page never needs
+   editing for a release. Pictures are the app's own output from its fictional examples. */
 :root {
-  --bg: #dfdedb; --surface: #d3d2ce; --stone: #bab8b1; --ink: #26251e; --muted: #57554d; --accent: #2456d6; --accent-ink: #fff; --accent-deep: #1b44ad;
-  --paper: #fbfaf7; --line-ui: #c9c7c0; --field: #26251e; --field-ink: #e6e5e1;
-  --step-small: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
-  --step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
-  --step-lead: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem);
-  --step-head: clamp(2rem, 1.3rem + 3.2vw, 4rem);
-  --step-hero: clamp(2.75rem, 1rem + 5.2vw, 5rem);
-  --m: clamp(20px, 3vw, 40px);
-  --ease: cubic-bezier(.16, 1, .3, 1);
+  --paper: #f7f6f1; --sheet: #ffffff; --ink: #1c2329; --muted: #5d6a75; --rule: #1c2329; --hair: #d6d9d4; --grid: #e9ebe6;
+  --accent: #1f4e6d; --accent-ink: #ffffff; --accent-deep: #163d57; --plume: #b42318; --tint: #eef3f6;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --m: clamp(16px, 3.2vw, 40px); --w: 1240px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #1a1a18; --surface: #252523; --stone: #34342f; --ink: #ececea; --muted: #b4b4ad; --accent: #6f97ff; --accent-ink: #0c1633; --accent-deep: #5a84f0; --paper: #2b2b25; --line-ui: #44443b; --field: #0d0d0c; --field-ink: #e8e8e5; color-scheme: dark; }
+  /* the dark page is a blueprint: blue paper, pale lines */
+  :root { --paper: #0f1d29; --sheet: #13293a; --ink: #e4edf3; --muted: #9db3c4; --rule: #b9cfdf; --hair: #2c4a61; --grid: #1a3448; --accent: #7fb6dc; --accent-ink: #0b1a26; --accent-deep: #a5cde8; --plume: #ff8f7a; --tint: #173246; color-scheme: dark; }
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 400 var(--step-body)/1.5 Archivo, system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 17px/1.55 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  /* the faint drafting grid behind the sheet */
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; }
 a { color: inherit; }
-img { display: block; max-width: 100%; }
-h1, h2, h3 { font-weight: 400; letter-spacing: -0.02em; line-height: 1.02; margin: 0; }
+img { display: block; max-width: 100%; height: auto; }
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.015em; line-height: 1.1; }
 p { margin: 0; }
-:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 ::selection { background: var(--accent); color: var(--accent-ink); }
-.btn { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 22px; background: var(--accent); color: var(--accent-ink); font: 600 var(--step-body)/1 Archivo, sans-serif; text-decoration: none; border: 0; cursor: pointer; transition: background .15s, transform .15s var(--ease); }
-.btn:hover { background: var(--accent-deep); }
-.btn:active { transform: translateY(1px); }
-.btn[aria-disabled="true"] { background: var(--stone); color: var(--muted); pointer-events: none; }
-.wrap { padding: 0 var(--m); }
+.mono { font-family: var(--mono); }
+.sheet { max-width: var(--w); margin: 0 auto; padding: 0 var(--m); }
+.frame { background: var(--sheet); border: 1.5px solid var(--rule); }
+.lbl { font: 500 12px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 46px; padding: 0 20px; background: var(--accent); color: var(--accent-ink); border: 1.5px solid var(--accent); font: 600 16px/1 var(--sans); text-decoration: none; cursor: pointer; transition: background .15s, border-color .15s; }
+.btn:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--rule); }
+.btn.ghost:hover { background: var(--tint); }
+.btn[aria-disabled="true"] { background: var(--hair); border-color: var(--hair); color: var(--muted); pointer-events: none; }
 
-/* navigation: wordmark and four plain links */
-.nav { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 28px var(--m) 0; position: relative; z-index: 2; }
-.mark { display: flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; font-size: var(--step-body); }
-.mark img { width: 30px; height: 30px; }
-.nav ul { display: flex; gap: 28px; list-style: none; margin: 0; padding: 0; font-size: var(--step-small); }
-.nav ul a { text-decoration: none; }
-.nav ul a:hover { text-decoration: underline; text-underline-offset: 4px; }
+/* the top: a title-block strip */
+.top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--paper) 92%, transparent); backdrop-filter: blur(6px); border-bottom: 1.5px solid var(--rule); }
+.top .sheet { display: grid; grid-template-columns: auto 1fr auto; align-items: stretch; min-height: 58px; }
+.mark { display: flex; align-items: center; gap: 10px; padding-right: 20px; font-weight: 600; text-decoration: none; border-right: 1px solid var(--hair); }
+.mark img { width: 26px; height: 26px; }
+.top nav { display: flex; align-items: stretch; }
+.top nav a { display: flex; align-items: center; padding: 0 18px; text-decoration: none; font-size: 14px; color: var(--muted); border-right: 1px solid var(--hair); }
+.top nav a:hover { color: var(--ink); background: var(--tint); }
+.top .get-it { display: flex; align-items: center; gap: 14px; padding-left: 18px; }
+.top .get-it .lbl { white-space: nowrap; }
+.top .btn { min-height: 38px; padding: 0 16px; font-size: 14px; }
 
-/* hero: headline upper left, the product on a blue stage cut with a borehole */
-.hero { position: relative; min-height: max(760px, 100svh); }
-.hero-text { position: relative; z-index: 2; padding: clamp(80px, 13vh, 150px) var(--m) 0; max-width: 46rem; }
-.hero h1 { font-size: var(--step-hero); font-weight: 500; }
-.hero h1 .ln { display: block; overflow: hidden; padding-bottom: .06em; }
-.hero h1 .ln > span { display: block; }
-.hero .sub { margin-top: 32px; max-width: 40ch; font-size: var(--step-body); }
-.hero .act { margin-top: 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
-.hero .meta { font-size: var(--step-small); color: var(--muted); }
+/* hero: the claim, then the figure it makes */
+.hero { padding-top: clamp(48px, 8vw, 96px); }
+.hero-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; align-items: end; }
+.hero h1 { font-size: clamp(2.3rem, 1.2rem + 3.6vw, 4.1rem); line-height: 1.02; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero .sub { margin-top: 22px; max-width: 46ch; font-size: 18px; color: var(--muted); }
+.hero .act { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.hero .meta { margin-top: 14px; font: 400 13px/1.5 var(--mono); color: var(--muted); }
 .hero .meta a { color: var(--ink); }
-.stage { position: absolute; left: 36%; top: 42%; right: 0; bottom: 0; background: var(--accent); overflow: hidden;
-  /* the stage's corner is cut like a borehole: a narrow shaft dropped from the top edge */
-  clip-path: polygon(0 0, 64px 0, 64px 96px, 112px 96px, 112px 0, 100% 0, 100% 100%, 0 100%); }
-.stage .frag { position: absolute; left: 160px; top: 56px; width: 1100px; background: #fff; }
-.stage .frag img { width: 1100px; height: auto; transform-origin: 0 0; }
+.fig { margin-top: 44px; }
+.fig .pic { padding: 14px; border-bottom: 1.5px solid var(--rule); overflow: hidden; background: #fff; }
+.fig .pic img { width: 100%; }
+/* the caption strip under a figure, in title-block cells */
+.cap { display: grid; grid-template-columns: auto 1fr auto; }
+.cap > * { padding: 10px 14px; border-right: 1px solid var(--hair); display: flex; align-items: center; }
+.cap > *:last-child { border-right: 0; }
+.cap b { font: 600 14px var(--sans); }
+.cap .n { font: 500 12px var(--mono); letter-spacing: .06em; color: var(--muted); }
 
-/* showcase: what you type, what the log shows */
-.split { display: grid; grid-template-columns: 1fr 1fr; min-height: 90svh; margin-top: clamp(120px, 14vw, 200px); }
-.split .in { background: var(--field); color: var(--field-ink); position: relative; padding: 18svh var(--m) 120px calc(var(--m) + 4vw); }
-.split .out { background: var(--paper); position: relative; padding: 18svh var(--m) 120px; }
-.split h2 { position: absolute; bottom: 32px; font-size: clamp(2.5rem, 1rem + 4vw, 5rem); }
-.split .in h2 { left: calc(var(--m) + 4vw); }
-.split .out h2 { right: var(--m); }
-.typing label { display: block; font-size: var(--step-small); color: var(--field-ink); margin-bottom: 14px; }
-.typing textarea { width: min(34ch, 100%); min-height: 7.8em; resize: vertical; background: transparent; color: var(--field-ink); border: 0; padding: 0; font: 400 clamp(1.25rem, 1rem + .6vw, 1.5rem)/1.45 Archivo, sans-serif; caret-color: var(--accent); }
-.typing textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 8px; }
-.typing .eg { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 8px; }
-.typing .eg button { background: color-mix(in srgb, var(--field-ink) 14%, transparent); color: var(--field-ink); border: 0; min-height: 40px; padding: 0 14px; font: 500 15px Archivo, sans-serif; cursor: pointer; transition: background .15s; }
-.typing .eg button:hover, .typing .eg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+/* the drawing index: six numbered cells */
+.index { margin-top: clamp(64px, 9vw, 112px); }
+.index-head { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 18px; }
+.index-head h2 { font-size: clamp(1.7rem, 1rem + 2vw, 2.5rem); }
+.cells { display: grid; grid-template-columns: repeat(3, 1fr); }
+.cell { padding: 22px 22px 24px; border-right: 1px solid var(--hair); border-bottom: 1px solid var(--hair); display: grid; gap: 10px; align-content: start; }
+.cell:nth-child(3n) { border-right: 0; }
+.cell:nth-last-child(-n+3) { border-bottom: 0; }
+.cell .no { font: 500 13px var(--mono); color: var(--accent); }
+.cell h3 { font-size: 19px; }
+.cell p { font-size: 15.5px; color: var(--muted); }
+
+/* sheets: a figure and what it shows, side by side */
+.sheets { margin-top: clamp(64px, 9vw, 112px); display: grid; gap: clamp(40px, 6vw, 72px); }
+.row { display: grid; grid-template-columns: 1.35fr 1fr; gap: clamp(24px, 4vw, 48px); align-items: center; }
+.row.flip { grid-template-columns: 1fr 1.35fr; }
+.row.flip .frame { order: 2; }
+.row .txt { display: grid; gap: 14px; align-content: center; }
+.row h2 { font-size: clamp(1.5rem, 1rem + 1.6vw, 2.2rem); }
+.row p { color: var(--muted); }
+.row ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0; border-top: 1px solid var(--hair); }
+.row li { padding: 9px 0; border-bottom: 1px solid var(--hair); font-size: 15.5px; display: grid; grid-template-columns: 22px 1fr; }
+.row li::before { content: "—"; color: var(--accent); font-family: var(--mono); }
+
+/* small details: four pictures in a strip */
+.details { margin-top: clamp(64px, 9vw, 112px); }
+.details h2 { font-size: clamp(1.5rem, 1rem + 1.6vw, 2.2rem); margin-bottom: 18px; }
+.strip { display: grid; grid-template-columns: repeat(4, 1fr); }
+.strip figure { margin: 0; border-right: 1px solid var(--hair); display: grid; grid-template-rows: 220px auto; }
+.strip figure:last-child { border-right: 0; }
+.strip .im { background: #fff; border-bottom: 1px solid var(--hair); display: flex; align-items: center; justify-content: center; padding: 12px; overflow: hidden; }
+.strip .im img { max-height: 196px; width: auto; object-fit: contain; }
+.strip figcaption { padding: 14px 16px 16px; display: grid; gap: 6px; }
+.strip figcaption b { font-size: 15.5px; }
+.strip figcaption span { font-size: 14.5px; color: var(--muted); }
+
+/* try it: type a layer, read the log line */
+.try { margin-top: clamp(64px, 9vw, 112px); }
+.try .frame { display: grid; grid-template-columns: 1fr 1fr; }
+.try .in { padding: 26px; border-right: 1.5px solid var(--rule); display: grid; gap: 14px; align-content: start; }
+.try h2 { font-size: clamp(1.5rem, 1rem + 1.6vw, 2.2rem); }
+.try label { font-size: 15px; color: var(--muted); }
+.try textarea { width: 100%; min-height: 6.5em; resize: vertical; background: var(--paper); color: var(--ink); border: 1px solid var(--hair); padding: 12px 14px; font: 400 16px/1.5 var(--mono); }
+.try .eg { display: flex; flex-wrap: wrap; gap: 8px; }
+.try .eg button { background: transparent; color: var(--ink); border: 1px solid var(--hair); min-height: 36px; padding: 0 12px; font: 500 13px var(--mono); cursor: pointer; }
+.try .eg button:hover, .try .eg button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.try .out { padding: 26px; background: var(--tint); display: grid; gap: 18px; align-content: start; }
 /* the log line, as the app draws it */
-.logline { width: min(520px, 100%); font: 400 14px/1.4 Archivo, sans-serif; color: #1c2329; background: #fff; border: 1px solid #c8ced3; }   /* taste-skill-ignore: the app's own fragment */
-.logline .hd { display: grid; grid-template-columns: 64px 76px 1fr; background: #f6f8fa; border-bottom: 1px solid #c8ced3; font-size: 13px; font-weight: 600; }   /* taste-skill-ignore: the app's own fragment */
+.logline { font: 400 14px/1.4 Arial, sans-serif; color: #1c2329; background: #fff; border: 1px solid #1c2329; }
+.logline .hd { display: grid; grid-template-columns: 64px 76px 1fr; background: #f6f8fa; border-bottom: 1px solid #1c2329; font-size: 13px; font-weight: 600; }
 .logline .hd span { padding: 8px 10px; }
 .logline .hd small { display: block; font-weight: 400; color: #5d6a75; }
-.logline .row { display: grid; grid-template-columns: 64px 76px 1fr; min-height: 168px; }
-.logline .dp { padding: 8px 10px; font-size: 13px; color: #5d6a75; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid #e8eaec; }   /* taste-skill-ignore: the app's own fragment */
-.logline .sym { border-left: 1px solid #1c2329; border-right: 1px solid #1c2329; }   /* taste-skill-ignore: the app's own fragment */
+.logline .row2 { display: grid; grid-template-columns: 64px 76px 1fr; min-height: 150px; }
+.logline .dp { padding: 8px 10px; font-size: 13px; color: #5d6a75; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid #e8eaec; }
+.logline .sym { border-left: 1px solid #1c2329; border-right: 1px solid #1c2329; }
 .logline .sym svg { width: 100%; height: 100%; display: block; }
 .logline .ds { padding: 8px 12px; }
-.logline .ds b { font-weight: 700; }
-.reads { margin-top: 24px; width: min(520px, 100%); display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 15px; }
-.reads dt { color: var(--muted); }
+.reads { margin: 0; display: grid; grid-template-columns: auto 1fr; font-size: 14.5px; border-top: 1px solid var(--hair); }
+.reads dt, .reads dd { padding: 6px 0; border-bottom: 1px solid var(--hair); }
+.reads dt { color: var(--muted); padding-right: 18px; font: 500 12px/1.9 var(--mono); text-transform: uppercase; letter-spacing: .05em; }
 .reads dd { margin: 0; }
 .reads dd.no { color: var(--muted); }
 
-/* how it works: one log, four stops */
-.stops { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: clamp(120px, 14vw, 200px); }
-.stop { min-height: 84svh; padding: 40px 28px 32px; position: relative; display: flex; flex-direction: column; }
-.stop:nth-child(1) { background: var(--surface); }
-.stop:nth-child(2) { background: var(--stone); }
-.stop:nth-child(3) { background: var(--field); color: var(--field-ink); }
-.stop:nth-child(4) { background: var(--accent); color: var(--accent-ink); }
-.stop h2 { position: absolute; top: 40px; left: 28px; right: 28px; font-size: var(--step-head); font-weight: 600; }
-.stop .card { margin-top: 30svh; transition: transform .15s var(--ease); }
-.stop:hover .card { transform: translateY(-6px); }
-.stop p { margin-top: auto; padding-top: 28px; font-size: var(--step-lead); line-height: 1.2; letter-spacing: -0.01em; }
-/* the borehole card: a cropped piece of the app */
-.bhc { width: min(300px, 100%); margin: 0 auto; background: #fff; color: #1c2329; border: 1px solid #c8ced3; font: 400 13px/1.35 Archivo, sans-serif; }   /* taste-skill-ignore: the app's own fragment */
-.bhc header { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 12px; background: #f6f8fa; border-bottom: 1px solid #c8ced3; }   /* taste-skill-ignore: the app's own fragment */
-.bhc header b { font-size: 15px; }
-.bhc .st { font-size: 12px; padding: 2px 8px; background: #fbf4d8; color: #6b5a14; }
-.bhc .st.ok { background: #e2f3e8; color: #1e5e36; }
-.bhc .lr { display: grid; grid-template-columns: 70px 1fr; border-bottom: 1px solid #e8eaec; }   /* taste-skill-ignore: the app's own fragment */
-.bhc .lr > span { padding: 7px 10px; }
-.bhc .lr > span:first-child { color: #5d6a75; }
-.bhc .lr i { font-style: normal; color: #5d6a75; }
-.bhc .sm { display: flex; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid #e8eaec; color: #1c2329; }   /* taste-skill-ignore: the app's own fragment */
-.bhc .sm em { font-style: normal; color: #8a5c22; }
-.bhc footer { padding: 10px 12px; color: #5d6a75; }
-.bhc .files { display: flex; gap: 6px; padding: 10px 12px; }
-.bhc .files span { padding: 4px 8px; background: #eef1f4; color: #1c2329; font-weight: 600; font-size: 12px; }
-
-/* what it does: the pictures stay while the list moves */
-.does { display: grid; grid-template-columns: 5fr 1fr 6fr; padding: 0 var(--m); margin-top: clamp(120px, 14vw, 200px); }
-.does .pic { grid-column: 1; position: sticky; top: 12vh; align-self: start; aspect-ratio: 4 / 5; background: var(--surface); }
-.does .pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 28px; opacity: 0; transition: opacity .3s; }
-.does .pic img.on { opacity: 1; }
-.does .list { grid-column: 3; padding: 12vh 0 6vh; max-width: 760px; }
-.does h2 { font-size: var(--step-head); margin-bottom: 48px; }
-.does ol { list-style: none; margin: 0; padding: 0; }
-.does li button { all: unset; box-sizing: border-box; width: 100%; min-height: 58px; display: flex; justify-content: space-between; align-items: center; gap: 16px; cursor: pointer; font-size: var(--step-lead); color: var(--muted); transition: color .2s; }
-.does li button small { font-size: 15px; color: var(--muted); text-align: right; }
-.does li.on button, .does li button:hover { color: var(--ink); }
-.does li button:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
-.does li .more { display: none; padding: 0 0 22px; max-width: 34ch; font-size: 16px; }
-.does li.on .more { display: block; }
-.does .mobile-pic { display: none; }
-
-/* download: the installer choice, already open */
-.get { background: var(--accent); color: var(--accent-ink); min-height: 90svh; margin-top: clamp(120px, 14vw, 200px); display: grid; grid-template-columns: 5fr 1fr 5fr; padding: 80px var(--m) 40px; align-items: end; }
-.get .close { grid-column: 1; padding-bottom: 8px; }
-.get h2 { font-size: clamp(3.5rem, 1rem + 7vw, 7rem); line-height: .92; }
-.get .close p { margin-top: 24px; max-width: 40ch; font-size: 17px; }
-.get .dlg { grid-column: 3; align-self: center; }
-/* the dialog, in the app's own look */
-.dlg-ui { width: min(460px, 100%); background: #fff; color: #1c2329; font: 400 14px/1.45 Archivo, sans-serif; box-shadow: 0 18px 50px rgba(8, 20, 60, .35); }   /* taste-skill-ignore: the app's own fragment */
-.dlg-ui h3 { font-size: 16px; font-weight: 600; letter-spacing: 0; padding: 16px 18px; border-bottom: 1px solid #e3e7eb; line-height: 1.3; }   /* taste-skill-ignore: the app's own fragment */
-.dlg-ui .bd { padding: 16px 18px; display: grid; gap: 14px; }
-.seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #b9c2cb; }   /* taste-skill-ignore: the app's own fragment */
-.seg button { min-height: 44px; border: 0; background: #fff; color: #1c2329; font: 500 14px Archivo, sans-serif; cursor: pointer; }
-.seg button + button { border-left: 1px solid #b9c2cb; }   /* taste-skill-ignore: the app's own fragment */
-.seg button[aria-pressed="true"] { background: #2f5d7c; color: #fff; }
-.seg button:hover:not([aria-pressed="true"]) { background: #eef3f7; }
-.dlg-ui dl { margin: 0; display: grid; grid-template-columns: 112px 1fr; gap: 6px 12px; }
-.dlg-ui dt { color: #5d6a75; }
-.dlg-ui dd { margin: 0; overflow-wrap: anywhere; }
-.dlg-ui code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
-.dlg-ui .note { color: #5d6a75; font-size: 13px; }
-.dlg-ui .ft { padding: 14px 18px; border-top: 1px solid #e3e7eb; display: flex; justify-content: flex-end; gap: 10px; align-items: center; }   /* taste-skill-ignore: the app's own fragment */
-.dlg-ui .go { min-height: 44px; padding: 0 18px; display: inline-flex; align-items: center; background: #1f4e6d; color: #fff; text-decoration: none; font-weight: 600; }
-.dlg-ui .go:hover { background: #163d57; }
-.dlg-ui .go[aria-disabled="true"] { background: #d7dde2; color: #5d6a75; pointer-events: none; }
-.dlg-ui details summary { cursor: pointer; font-weight: 600; }
-.dlg-ui details ul { margin: 8px 0 0; padding-left: 20px; }
-.dlg-ui details li { margin: 3px 0; }
+/* download: a title block */
+.get { margin-top: clamp(64px, 9vw, 112px); }
+.tb { display: grid; grid-template-columns: 1fr 1.1fr; }
+.tb .l { padding: 28px; border-right: 1.5px solid var(--rule); display: grid; gap: 16px; align-content: space-between; }
+.tb h2 { font-size: clamp(2rem, 1rem + 3vw, 3.4rem); line-height: 1; }
+.tb .l p { color: var(--muted); max-width: 42ch; }
+.tb .r { display: grid; grid-template-rows: auto 1fr auto; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1.5px solid var(--rule); }
+.seg button { min-height: 52px; border: 0; background: transparent; color: var(--muted); font: 600 15px var(--sans); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--hair); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.seg button:hover:not([aria-pressed="true"]) { background: var(--tint); color: var(--ink); }
+.facts { margin: 0; display: grid; grid-template-columns: 120px 1fr; }
+.facts dt, .facts dd { padding: 11px 16px; border-bottom: 1px solid var(--hair); }
+.facts dt { font: 500 12px/1.7 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-right: 1px solid var(--hair); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.facts code { font: 12.5px/1.5 var(--mono); }
+.tb .note { padding: 12px 16px; font-size: 14px; color: var(--muted); border-bottom: 1px solid var(--hair); }
+.tb details { padding: 12px 16px; border-bottom: 1px solid var(--hair); font-size: 15px; }
+.tb details summary { cursor: pointer; font-weight: 600; }
+.tb details ul { margin: 8px 0 0; padding-left: 20px; }
+.tb details li { margin: 3px 0; }
+.tb .go-row { padding: 16px; display: flex; justify-content: flex-end; }
+.tb .go-row .btn { min-width: 220px; }
 
 /* questions */
-.faq { display: grid; grid-template-columns: 4fr 8fr; gap: 32px; padding: 0 var(--m); margin-top: clamp(120px, 14vw, 200px); }
-.faq h2 { font-size: var(--step-head); position: sticky; top: 96px; align-self: start; }
-.faq .tiles { display: grid; gap: 8px; }
-.faq details { background: var(--surface); transition: background .2s; }
-.faq details[open] { background: var(--accent); color: var(--accent-ink); }
-.faq summary { list-style: none; min-height: 72px; padding: 22px 64px 22px 24px; position: relative; cursor: pointer; font-size: var(--step-body); font-weight: 500; }
+.faq { margin-top: clamp(64px, 9vw, 112px); display: grid; grid-template-columns: 1fr 2fr; gap: 32px; }
+.faq h2 { font-size: clamp(1.7rem, 1rem + 2vw, 2.5rem); position: sticky; top: 90px; align-self: start; }
+.faq .list { border-top: 1.5px solid var(--rule); }
+.faq details { border-bottom: 1px solid var(--hair); }
+.faq summary { list-style: none; cursor: pointer; padding: 18px 44px 18px 0; position: relative; font-weight: 500; }
 .faq summary::-webkit-details-marker { display: none; }
-.faq summary::before, .faq summary::after { content: ""; position: absolute; right: 24px; top: 34px; width: 16px; height: 3px; background: currentColor; transition: transform .2s var(--ease); }
-.faq summary::after { transform: rotate(90deg); }
-.faq details[open] summary::after { transform: rotate(0); }
-.faq summary:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
-.faq .ans { padding: 0 24px 24px; max-width: 56ch; font-size: 17px; display: grid; gap: 12px; }
+.faq summary::after { content: "+"; position: absolute; right: 6px; top: 14px; font: 400 22px var(--mono); color: var(--accent); }
+.faq details[open] summary::after { content: "−"; }
+.faq .ans { padding: 0 0 20px; max-width: 62ch; display: grid; gap: 12px; color: var(--muted); }
+.faq .ans b { color: var(--ink); }
 .faq .ans ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
-.faq .ans pre { margin: 0; padding: 12px 14px; background: color-mix(in srgb, var(--ink) 18%, transparent); overflow-x: auto; }
-.faq .ans code { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.faq pre { margin: 0; padding: 12px 14px; background: var(--sheet); border: 1px solid var(--hair); overflow-x: auto; }
+.faq code { font: 13.5px/1.5 var(--mono); color: var(--ink); }
 /* Windows' own warning, drawn so it is recognised */
 .ss { background: #1f6fbf; color: #fff; padding: 16px 18px; max-width: 420px; font-family: "Segoe UI", system-ui, sans-serif; }
 .ss .t { font-size: 20px; font-weight: 300; margin-bottom: 8px; }
 .ss .m { font-size: 13px; margin-bottom: 10px; }
-.ss .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.ss .row3 { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .ss .b { border: 2px solid #fff; padding: 4px 14px; font-size: 13px; }
 .ss .b.run { outline: 3px solid #ffd54a; outline-offset: 2px; }
 
-/* footer: one quiet line */
-.foot { display: grid; grid-template-columns: 1fr auto 1fr; gap: 24px; align-items: baseline; padding: 30svh var(--m) 30px; font-size: var(--step-small); color: var(--muted); }
-.foot nav { display: flex; gap: 24px; }
+/* the foot: the sheet's title block */
+.foot { margin: clamp(64px, 9vw, 112px) auto 40px; }
+.foot .frame { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; }
+.foot .frame > div { padding: 12px 16px; border-right: 1px solid var(--hair); display: grid; gap: 4px; font-size: 14px; }
+.foot .frame > div:last-child { border-right: 0; }
 .foot a { color: var(--ink); }
-.foot .r { text-align: right; }
 
-/* motion: the headline rises line by line; each section's parts come in once */
+/* motion: parts come in once, gently */
 @media (prefers-reduced-motion: no-preference) {
-  .js .hero h1 .ln > span { transform: translateY(105%); animation: rise .9s var(--ease) forwards; }
-  .js .hero h1 .ln:nth-child(2) > span { animation-delay: .11s; }
-  .js .hero .sub, .js .hero .act { opacity: 0; animation: fade .7s ease .55s forwards; }
-  .js .stage { transform: translateY(40px); opacity: 0; animation: up 1s var(--ease) .35s forwards; }
-  .js [data-in] { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s var(--ease); }
+  .js [data-in] { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s cubic-bezier(.16, 1, .3, 1); }
   .js [data-in].seen { opacity: 1; transform: none; }
-  .stage .frag img { animation: drift 30s ease-in-out infinite alternate; }
 }
-@keyframes rise { to { transform: none; } }
-@keyframes fade { to { opacity: 1; } }
-@keyframes up { to { transform: none; opacity: 1; } }
-@keyframes drift { from { transform: translateY(0); } to { transform: translateY(-260px); } }
 
-/* tablet: the four stops two by two */
-@media (min-width: 901px) and (max-width: 1180px) {
-  .stops { grid-template-columns: 1fr 1fr; }
-  .stop { min-height: 70svh; }
+/* tablet */
+@media (max-width: 1020px) {
+  .top nav a:nth-child(n+3) { display: none; }
+  .hero-grid { grid-template-columns: 1fr; gap: 24px; }
+  .cells { grid-template-columns: 1fr 1fr; }
+  .cell:nth-child(3n) { border-right: 1px solid var(--hair); }
+  .cell:nth-child(2n) { border-right: 0; }
+  .cell:nth-last-child(-n+3) { border-bottom: 1px solid var(--hair); }
+  .cell:nth-last-child(-n+2) { border-bottom: 0; }
+  .row, .row.flip { grid-template-columns: 1fr; }
+  .row.flip .frame { order: 0; }
+  .strip { grid-template-columns: 1fr 1fr; }
+  .strip figure:nth-child(2) { border-right: 0; }
+  .strip figure:nth-child(-n+2) { border-bottom: 1px solid var(--hair); }
 }
-/* phone and tablet */
-@media (max-width: 900px) {
-  .nav ul { display: none; }
-  .hero { min-height: 0; }
-  .hero-text { padding-top: 64px; }
-  .hero h1 { font-size: 10vw; }
-  .stage { position: relative; left: auto; top: auto; margin-top: 48px; height: 520px; clip-path: polygon(0 0, 40px 0, 40px 72px, 72px 72px, 72px 0, 100% 0, 100% 100%, 0 100%); }
-  .stage .frag { left: 16px; top: 96px; }
-  .split { grid-template-columns: 1fr; }
-  .split .in, .split .out { min-height: 62svh; padding: 64px 20px 110px; }
-  .split .out { padding-top: 96px; }
-  .split .in h2, .split .out h2 { font-size: 11vw; }
-  .split .out h2 { top: 24px; bottom: auto; left: 20px; right: auto; }
-  .stops { grid-template-columns: 1fr; }
-  .stop { min-height: 64svh; padding: 32px 20px; }
-  .stop h2 { position: static; margin-bottom: 24px; }
-  .stop .card { margin: 0; }
-  .stop .bhc { margin: 0; width: 100%; }
-  .stop p { order: -1; margin: 0 0 24px; padding: 0; }
-  .does { grid-template-columns: 1fr; }
-  .does .pic { display: none; }
-  .does .list { grid-column: 1; padding: 0; }
-  .does .mobile-pic { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: contain; padding: 12px; background: var(--surface); margin: 4px 0 18px; }
-  .get { grid-template-columns: 1fr; align-items: start; padding: 48px 16px 40px; min-height: 84svh; gap: 40px; }
-  .get .close, .get .dlg { grid-column: 1; }
-  .get h2 { font-size: 13vw; }
-  .dlg-ui .go { width: 100%; justify-content: center; min-height: 52px; }
-  .faq { grid-template-columns: 1fr; }
-  .faq h2 { position: static; font-size: 9vw; }
-  .faq summary { font-size: 18px; min-height: 64px; padding: 20px 56px 20px 20px; }
-  .faq .ans { padding: 0 20px 20px; font-size: 16px; }
-  .foot { grid-template-columns: 1fr; gap: 8px; padding-top: 20svh; }
-  .foot .r { text-align: left; }
-  .foot nav { flex-wrap: wrap; }
+/* phone */
+@media (max-width: 680px) {
+  body { font-size: 16px; }
+  .top nav { display: none; }
+  .top .sheet { grid-template-columns: 1fr auto; }
+  .mark { border-right: 0; }
+  .top .get-it .lbl { display: none; }
+  .cap { grid-template-columns: 1fr; }
+  .cap > * { border-right: 0; border-bottom: 1px solid var(--hair); }
+  .cap > *:last-child { border-bottom: 0; }
+  .cells { grid-template-columns: 1fr; }
+  .cell, .cell:nth-child(3n), .cell:nth-child(2n) { border-right: 0; border-bottom: 1px solid var(--hair); }
+  .cell:last-child { border-bottom: 0; }
+  .strip { grid-template-columns: 1fr; }
+  .strip figure { border-right: 0; border-bottom: 1px solid var(--hair); }
+  .strip figure:last-child { border-bottom: 0; }
+  .try .frame, .tb { grid-template-columns: 1fr; }
+  .try .in, .tb .l { border-right: 0; border-bottom: 1.5px solid var(--rule); }
+  .facts { grid-template-columns: 96px 1fr; }
+  .tb .go-row .btn { width: 100%; }
+  .faq { grid-template-columns: 1fr; gap: 12px; }
+  .faq h2 { position: static; }
+  .foot .frame { grid-template-columns: 1fr 1fr; }
+  .foot .frame > div:nth-child(2n) { border-right: 0; }
+  .foot .frame > div:nth-child(-n+2) { border-bottom: 1px solid var(--hair); }
 }
 </style>
 </head>
 <body>
 <script>document.documentElement.classList.add('js');</script>
 
-<section class="hero" aria-labelledby="h1">
-  <header class="nav">
-    <a class="mark" href="#top" id="top"><img src="icon.svg" alt="" width="30" height="30">Borehole Field Log</a>
-    <ul><li><a href="#type">Try it</a></li><li><a href="#stops">How it works</a></li><li><a href="#does">What it does</a></li><li><a href="#questions">Questions</a></li></ul>
-  </header>
-  <div class="hero-text">
-    <h1 id="h1"><span class="ln"><span>Borehole logs,</span></span><span class="ln"><span>done in the field.</span></span></h1>
-    <p class="sub">A desktop app that turns what you see at the hole into CFEM and Modified USCS logs, PDFs, Excel and AGS 4 files, for geotechnical and environmental work in Alberta and Saskatchewan. Mac and Windows; it works offline.</p>
-    <div class="act">
-      <a class="btn" id="hero-dl" href="#download">Download</a>
-      <span class="meta" id="hero-meta">Looking up the newest version… <a href="#download">Both installers</a></span>
+<header class="top">
+  <div class="sheet">
+    <a class="mark" href="#top"><img src="icon.svg" alt="" width="26" height="26">Borehole Field Log</a>
+    <nav aria-label="Sections"><a href="#index">What it makes</a><a href="#try">Try it</a><a href="#download">Download</a><a href="#questions">Questions</a></nav>
+    <div class="get-it"><span class="lbl" id="top-ver">Newest version</span><a class="btn" id="top-dl" href="#download">Download</a></div>
+  </div>
+</header>
+
+<main id="top">
+<section class="hero sheet" aria-labelledby="h1">
+  <div class="hero-grid">
+    <div>
+      <p class="lbl">For geotechnical and environmental work · Alberta and Saskatchewan</p>
+      <h1 id="h1" style="margin-top:16px">Logs, maps and cross-sections, <em>from the field to the figure.</em></h1>
+      <p class="sub">Log boreholes in CFEM and Modified USCS terms, map the results, draw cross-sections with the soil, the water table and the plume, and lay out report figures that print as clean PDFs. Windows and Mac; it works offline.</p>
+    </div>
+    <div>
+      <div class="act"><a class="btn" id="hero-dl" href="#download">Download</a><a class="btn ghost" href="#index">See what it makes</a></div>
+      <p class="meta" id="hero-meta">Looking up the newest version… <a href="#download">Both installers</a></p>
     </div>
   </div>
-  <div class="stage" aria-hidden="false">
-    <div class="frag" data-ui><img src="img/hero-log.jpg" width="1100" height="760" alt="A Borehole Field Log full log for borehole BH26-01: topsoil over poorly graded sand with depth and elevation scales, the soil symbol column, CFEM descriptions, observations, samples with SPT N, water content, VOC headspace and F2 graphs, and two water levels."></div>
+  <figure class="fig frame" style="margin-left:0;margin-right:0" data-in>
+    <div class="pic"><img src="img/section-plume.jpg" width="1400" height="534" alt="A cross-section through 19 boreholes and wells: the soil columns and their key, the water table drawn across the whole section, and a headspace vapour plume shaded on a log scale with contours at 10, 100 and 1,000 ppm, hatched where likely but unconfirmed and marked where not delineated below. The method line says it was chosen automatically."></div>
+    <figcaption class="cap"><span class="n">FIG. 1</span><b>Cross-section with a 3D headspace vapour plume; method and layering chosen automatically</b><span class="n">Fictional example</span></figcaption>
+  </figure>
+</section>
+
+<section class="index sheet" id="index" aria-labelledby="index-h">
+  <div class="index-head" data-in><h2 id="index-h">What it makes</h2><span class="lbl">Drawing index</span></div>
+  <div class="cells frame" data-in>
+    <div class="cell"><span class="no">01 · LOGS</span><h3>Borehole logs</h3><p>CFEM and Modified USCS descriptions in the order you write them, samples, SPT, VOC and lab results, water levels and wells, on your title block.</p></div>
+    <div class="cell"><span class="no">02 · MAPS</span><h3>Site and results maps</h3><p>Boreholes on imagery or your site drawing, VOC and lab results contoured between them by the most accurate method for the data, with clean labels at any zoom.</p></div>
+    <div class="cell"><span class="no">03 · SECTIONS</span><h3>Cross-sections</h3><p>Soil joined between boreholes in order, pinch-outs from thickness trends, the water table across the section, and 3D plumes from every borehole near the line.</p></div>
+    <div class="cell"><span class="no">04 · GROUNDWATER</span><h3>Flow and models</h3><p>Water-table contours and the flow direction with its range, hydrographs, and a MODFLOW 6 model run from the project for heads and flow paths.</p></div>
+    <div class="cell"><span class="no">05 · OUTPUTS</span><h3>Report figures</h3><p>Lay out figures with maps, sections, legends, north arrows and scale bars, save each to a library and export them as vector PDFs with clean lines.</p></div>
+    <div class="cell"><span class="no">06 · FILES</span><h3>Hand-over</h3><p>PDF, Excel, AGS 4 and GIS exports, and single-borehole files to share. No account, nothing leaves your computer.</p></div>
   </div>
 </section>
 
-<section class="split" id="type" aria-labelledby="type-h">
-  <div class="in">
-    <div class="typing" data-in>
-      <label for="lt">Type the layer the way you would say it</label>
+<section class="sheets sheet" aria-label="Figures">
+  <div class="row" data-in>
+    <figure class="frame" style="margin:0"><div class="pic" style="padding:12px;background:#fff"><img src="img/results-map.jpg" width="1220" height="884" alt="A VOC headspace map: classes shaded between boreholes on a log scale, a dashed 100 ppm outline, each borehole's value beside it, and the site drawing underneath." loading="lazy"></div>
+      <figcaption class="cap"><span class="n">FIG. 2</span><b>VOC headspace map</b><span class="n">Fictional example</span></figcaption></figure>
+    <div class="txt">
+      <span class="lbl">02 · Maps</span>
+      <h2>Results contoured the way the data supports</h2>
+      <p>Pick Automatic and each reading is predicted from the others with every method; the most accurate is used, and the map says which and how far to trust it.</p>
+      <ul><li>Calibrated kriging, spline, inverse distance or nearest borehole</li><li>Shading reaches around every borehole, not only between them</li><li>Names and values never overlap; point and label sizes your choice</li><li>North arrow and scale bar in the style and size you want</li></ul>
+    </div>
+  </div>
+  <div class="row flip" data-in>
+    <figure class="frame" style="margin:0"><div class="pic" style="padding:12px;background:#fff"><img src="img/hero-log.jpg" width="1100" height="760" alt="A full borehole log: depth and elevation scales, the soil symbol column, CFEM descriptions, observations, samples with SPT N, water content, VOC headspace and F2 graphs, and water levels." loading="lazy"></div>
+      <figcaption class="cap"><span class="n">FIG. 3</span><b>Borehole log, Letter, with your title block</b><span class="n">Fictional example</span></figcaption></figure>
+    <div class="txt">
+      <span class="lbl">01 · Logs</span>
+      <h2>The log, as you would draw it</h2>
+      <p>Type a layer the way you would say it and it is read into soil, modifiers, compactness or consistency, moisture, colour and origin, then drawn with its symbol.</p>
+      <ul><li>Thin layers keep their whole description on a leader</li><li>Observations at a depth or over a range</li><li>Samples as symbols, pictures or codes</li><li>Checked and issued with revisions</li></ul>
+    </div>
+  </div>
+  <div class="row" data-in>
+    <figure class="frame" style="margin:0"><div class="pic" style="padding:12px;background:#fff"><img src="img/site-plan.jpg" width="1220" height="824" alt="A site plan: boreholes and wells with water elevations, VOC results contoured, the inferred groundwater flow arrow, a section line A, a legend, north arrow and scale bar." loading="lazy"></div>
+      <figcaption class="cap"><span class="n">FIG. 4</span><b>Site plan with results, water levels and flow</b><span class="n">Fictional example</span></figcaption></figure>
+    <div class="txt">
+      <span class="lbl">04 · 05 · Groundwater and outputs</span>
+      <h2>Figures that match the map and print clean</h2>
+      <p>An output map follows the Map page, or keeps its own view, labels and symbols, and says which. Save each figure to the library as it is and export one or all.</p>
+      <ul><li>Groundwater flow with its range, from the wells you choose</li><li>Section lines A, B, C… saved with their figures</li><li>Extent and section location maps</li><li>Frames and borders joined into single lines in the PDF</li></ul>
+    </div>
+  </div>
+</section>
+
+<section class="details sheet" aria-labelledby="det-h">
+  <h2 id="det-h" data-in>In the details</h2>
+  <div class="strip frame" data-in>
+    <figure><div class="im"><img src="img/thin-layers.jpg" width="1480" height="1300" alt="Thin layers each keeping their full description on slanted leaders." loading="lazy"></div><figcaption><b>Thin layers kept whole</b><span>50 mm of topsoil keeps its words, on a leader.</span></figcaption></figure>
+    <figure><div class="im"><img src="img/observations.jpg" width="1320" height="1240" alt="Observations drawn at their depths beside the description." loading="lazy"></div><figcaption><b>Observations at any depth</b><span>Odour, staining, seepage, at a depth or over a range.</span></figcaption></figure>
+    <figure><div class="im"><img src="img/place-coords.jpg" width="600" height="760" alt="Typed coordinates read back as UTM before placing a borehole." loading="lazy"></div><figcaption><b>Place by coordinates</b><span>DMS, UTM or legal land, read back before placing.</span></figcaption></figure>
+    <figure><div class="im"><img src="img/soil-survey.jpg" width="1330" height="1140" alt="An EC map interpolated from soil survey points." loading="lazy"></div><figcaption><b>Soil survey maps</b><span>Texture, particle size and salinity, mapped and checked.</span></figcaption></figure>
+  </div>
+</section>
+
+<section class="try sheet" id="try" aria-labelledby="try-h">
+  <div class="frame" data-in>
+    <div class="in">
+      <span class="lbl">Try it</span>
+      <h2 id="try-h">Type a layer, read the log</h2>
+      <label for="lt">Write it the way you would say it in the field</label>
       <textarea id="lt" spellcheck="false" autocomplete="off">1.2-3.5 SP fine to medium grained, trace silt, compact, moist, brown, glaciofluvial</textarea>
       <div class="eg" role="group" aria-label="Examples">
         <button type="button" data-eg="0-0.05 topsoil, silty, some organics, moist, dark brown, rootlets">50 mm topsoil</button>
@@ -286,115 +340,61 @@ p { margin: 0; }
         <button type="button" data-eg="6-7.2 GW sandy, dense, wet, grey, cobbles">Wet gravel</button>
       </div>
     </div>
-    <h2 id="type-h">Type the layer,</h2>
-  </div>
-  <div class="out">
-    <div data-ui>
-      <div class="logline" aria-live="polite" data-in>
+    <div class="out">
+      <div class="logline" aria-live="polite">
         <div class="hd"><span>Depth<small>(m)</small></span><span>Symbol</span><span>Description<small>CFEM / Modified USCS</small></span></div>
-        <div class="row"><div class="dp"><span id="ll-top">1.20</span><span id="ll-bot">3.50</span></div><div class="sym" id="ll-sym"></div><div class="ds" id="ll-desc"></div></div>
+        <div class="row2"><div class="dp"><span id="ll-top">1.20</span><span id="ll-bot">3.50</span></div><div class="sym" id="ll-sym"></div><div class="ds" id="ll-desc"></div></div>
       </div>
-      <dl class="reads" id="ll-reads" data-in></dl>
+      <dl class="reads" id="ll-reads"></dl>
     </div>
-    <h2 aria-hidden="true">read the log.</h2>
   </div>
 </section>
 
-<section class="stops" id="stops" aria-labelledby="stops-h">
-  <div class="stop" data-in>
-    <h2 id="stops-h">One log, four stops</h2>
-    <div class="card" data-ui><div class="bhc"><header><b>BH26-01</b><span class="st">Draft</span></header>
-      <div class="lr"><span>0–0.20</span><span><i>Not described</i></span></div><div class="lr"><span>0.20–3.90</span><span><i>Not described</i></span></div><div class="lr"><span>3.90–4.50</span><span><i>Not described</i></span></div>
-      <footer>Solid-stem auger, 150 mm · 4.50 m · 2026-08-18</footer></div></div>
-    <p>First the hole is drilled.</p>
-  </div>
-  <div class="stop" data-in>
-    <div class="card" data-ui><div class="bhc"><header><b>BH26-01</b><span class="st">Draft</span></header>
-      <div class="lr"><span>0–0.20</span><span><b>TOPSOIL</b>, sandy, moist, black</span></div><div class="lr"><span>0.20–3.90</span><span><b>SAND (SP)</b>, fine to medium grained, compact, moist</span></div><div class="lr"><span>3.90–4.50</span><span><b>SAND (SM)</b>, gravelly, dense, moist, grey (TILL)</span></div>
-      <footer>3 layers described</footer></div></div>
-    <p>Then each layer is described.</p>
-  </div>
-  <div class="stop" data-in>
-    <div class="card" data-ui><div class="bhc"><header><b>BH26-01</b><span class="st">Draft</span></header>
-      <div class="lr"><span>0.20–3.90</span><span><b>SAND (SP)</b>, compact, moist</span></div>
-      <div class="sm"><span>A1 · 0.75 m</span><em>VOC 395 ppm</em></div><div class="sm"><span>SS2 · 1.75 m · N 19</span><em>VOC 650 ppm</em></div><div class="sm"><span>A3 · 2.30 m · F2 590</span><em>VOC 995 ppm</em></div><div class="sm"><span>Water</span><span>2.48 m, 2026-08-18</span></div>
-      <footer>5 samples · 2 water levels</footer></div></div>
-    <p>Then samples and readings go in.</p>
-  </div>
-  <div class="stop" data-in>
-    <div class="card" data-ui><div class="bhc"><header><b>BH26-01</b><span class="st ok">Issued · Rev 0</span></header>
-      <div class="lr"><span>Checked</span><span>L.M., P.Eng.</span></div><div class="lr"><span>Log</span><span>1 page, Letter, your title block</span></div>
-      <div class="files"><span>PDF</span><span>Excel</span><span>AGS 4</span><span>.bh</span></div></div></div>
-    <p>Then it is checked and issued.</p>
+<section class="get sheet" id="download" aria-labelledby="get-h">
+  <div class="tb frame" data-in>
+    <div class="l">
+      <span class="lbl">Download</span>
+      <h2 id="get-h"><span id="get-a">Get the</span><br><span id="get-b">newest version</span></h2>
+      <p>Pick your computer and download the installer. Your boreholes and settings stay on your computer, and earlier versions update in place.</p>
+    </div>
+    <div class="r" role="group" aria-labelledby="get-h">
+      <div class="seg" role="group" aria-label="Computer"><button type="button" data-os="win" aria-pressed="true">Windows</button><button type="button" data-os="mac" aria-pressed="false">Mac</button></div>
+      <div>
+        <dl class="facts"><dt>Version</dt><dd id="dl-ver">Looking it up…</dd><dt>Needs</dt><dd id="dl-needs">Windows 10 or 11, 64-bit</dd><dt>File</dt><dd id="dl-file">—</dd><dt>SHA-256</dt><dd><code id="dl-sum">—</code></dd></dl>
+        <p class="note"><span id="dl-note">Not code-signed yet, so Windows asks you to confirm it.</span> <a href="#q-win" id="dl-win-help">How to install on Windows</a></p>
+        <details id="dl-new"><summary>What’s new</summary><div id="dl-notes"><p>Loading…</p></div></details>
+      </div>
+      <div class="go-row"><a class="btn" id="dl-go" href="https://github.com/kschreiner03/borehole-field-log/releases" aria-disabled="true">Download</a></div>
+    </div>
   </div>
 </section>
 
-<section class="does" id="does" aria-labelledby="does-h">
-  <div class="pic" aria-hidden="true">
-    <img class="on" src="img/soil-survey.jpg" width="1330" height="1140" alt="" data-k="0">
-    <img src="img/layer-editor.jpg" width="1310" height="1200" alt="" data-k="1" loading="lazy">
-    <img src="img/thin-layers.jpg" width="1480" height="1300" alt="" data-k="2" loading="lazy">
-    <img src="img/observations.jpg" width="1320" height="1240" alt="" data-k="3" loading="lazy">
-    <img src="img/sample-icons.jpg" width="616" height="900" alt="" data-k="4" loading="lazy">
-    <img src="img/place-coords.jpg" width="600" height="760" alt="" data-k="5" loading="lazy">
-    <img src="img/file-menu.jpg" width="1060" height="1000" alt="" data-k="6" loading="lazy">
-    <img src="img/update.jpg" width="1290" height="720" alt="" data-k="7" loading="lazy">
-  </div>
+<section class="faq sheet" id="questions" aria-labelledby="faq-h">
+  <h2 id="faq-h">Questions</h2>
   <div class="list">
-    <h2 id="does-h" data-in>What it does</h2>
-    <ol id="does-list">
-      <li class="on" data-in><button type="button" aria-expanded="true">Soil survey maps<small>Interpolated, with warnings</small></button><div class="more"><img class="mobile-pic" src="img/soil-survey.jpg" width="1330" height="1140" alt="An EC map interpolated from twelve soil survey points, with the method and its check error stated above it." loading="lazy"><p>Points with full classification and lab results, mapped by inverse distance or kriging. The map says how it was made and how far to trust it; texture, particle size and salinity graphs sit beneath.</p></div></li>
-      <li data-in><button type="button" aria-expanded="false">Layers in classification order<small>VOC and LEL in the layer</small></button><div class="more"><img class="mobile-pic" src="img/layer-editor.jpg" width="1310" height="1200" alt="The layer editor: soil, modifiers, plasticity, compactness, moisture, colour, other features and origin, each folded once chosen, with the samples in the layer below." loading="lazy"><p>Soil, modifiers, plasticity, compactness, moisture, colour, other features and origin, in the order you write them. The samples taken in the layer, with their VOC and LEL, are right underneath.</p></div></li>
-      <li data-in><button type="button" aria-expanded="false">Thin layers kept whole<small>50 mm of topsoil</small></button><div class="more"><img class="mobile-pic" src="img/thin-layers.jpg" width="1480" height="1300" alt="A log where 50 mm of topsoil, fill and silty sand each keep their full description, joined to their depths by slanted leaders." loading="lazy"><p>A layer too thin for its words keeps its whole description, below it on a leader, with its thickness written after its name. Nothing is cut off with an ellipsis.</p></div></li>
-      <li data-in><button type="button" aria-expanded="false">Observations at any depth<small>Or a From–To range</small></button><div class="more"><img class="mobile-pic" src="img/observations.jpg" width="1320" height="1240" alt="Observations drawn at their own depths beside the description: slight staining over a range, seepage, moderate diesel odour and cobbles, stacked so none overlap." loading="lazy"><p>Odour, staining, seepage or cobbles, at the depth they were seen or over a range, drawn there on the log and added straight from it.</p></div></li>
-      <li data-in><button type="button" aria-expanded="false">Samples your way<small>Symbols, icons or codes</small></button><div class="more"><img class="mobile-pic" src="img/sample-icons.jpg" width="616" height="900" alt="The samples column of a PDF log with icons for split spoon, Shelby tube, jar, bag and grab samples beside their names and blow counts." loading="lazy"><p>Show samples as standard symbols, small pictures (split spoon, Shelby tube, jar, bag, trowel, auger) or their type codes, on the screen, the PDF and the key.</p></div></li>
-      <li data-in><button type="button" aria-expanded="false">Place by coordinates<small>DMS, UTM or legal land</small></button><div class="more"><img class="mobile-pic" src="img/place-coords.jpg" width="600" height="760" alt="The Place borehole panel reading typed coordinates back as UTM before the borehole is placed, with an elevation box." loading="lazy"><p>Type latitude and longitude, degrees-minutes-seconds, UTM or a legal land description with the elevation; it reads them back before placing, and flags a point that is in another zone or far from the site.</p></div></li>
-      <li data-in><button type="button" aria-expanded="false">Share and hand over<small>.bh, Excel and AGS 4</small></button><div class="more"><img class="mobile-pic" src="img/file-menu.jpg" width="1060" height="1000" alt="The File menu with Save borehole, Import borehole, Export all data, Export AGS 4 and Export GIS." loading="lazy"><p>Save one borehole as a file and import it into another project. Export all data to Excel or AGS 4 for other logging software, with every detail carried across.</p></div></li>
-      <li data-in><button type="button" aria-expanded="false">Tells you about updates<small>Once a day, if online</small></button><div class="more"><img class="mobile-pic" src="img/update.jpg" width="1290" height="720" alt="The app's update window: version 0.2.0 is available, what is new, and Skip, Later and Download buttons." loading="lazy"><p>When a new version is out, the app says so and brings you here. Nothing installs itself, and the check sends nothing about you or your projects.</p></div></li>
-    </ol>
-  </div>
-</section>
-
-<section class="get" id="download" aria-labelledby="get-h">
-  <div class="close" data-in>
-    <h2 id="get-h"><span id="get-a">Get the</span><br><span id="get-b">newest version</span></h2>
-    <p>Pick your computer and download the installer. Install it like any app; your boreholes and settings stay on your computer, and earlier versions update in place.</p>
-  </div>
-  <div class="dlg" data-in>
-    <div class="dlg-ui" data-ui role="group" aria-labelledby="dlg-h">
-      <h3 id="dlg-h">Download Borehole Field Log</h3>
-      <div class="bd">
-        <div class="seg" role="group" aria-label="Computer"><button type="button" data-os="mac" aria-pressed="true">Mac</button><button type="button" data-os="win" aria-pressed="false">Windows</button></div>
-        <dl id="dl-facts"><dt>Version</dt><dd id="dl-ver">Looking it up…</dd><dt>Needs</dt><dd id="dl-needs">Apple silicon (M1 or newer)</dd><dt>File</dt><dd id="dl-file">—</dd><dt>SHA-256</dt><dd><code id="dl-sum">—</code></dd></dl>
-        <p class="note"><span id="dl-note">Signed and notarized by Apple, so it opens without warnings.</span> <a href="#q-win" id="dl-win-help" hidden>How to install on Windows</a></p>
-        <details id="dl-new"><summary>What’s new</summary><div id="dl-notes"><p class="note">Loading…</p></div></details>
-      </div>
-      <div class="ft"><a class="go" id="dl-go" href="https://github.com/kschreiner03/borehole-field-log/releases" aria-disabled="true">Download</a></div>
-    </div>
-  </div>
-</section>
-
-<section class="faq" id="questions" aria-labelledby="faq-h">
-  <h2 id="faq-h" data-in>Questions</h2>
-  <div class="tiles">
-    <details data-in name="faq" id="q-win"><summary>Windows says it protected my PC. Is that right?</summary><div class="ans">
+    <details name="faq" id="q-win"><summary>Windows says it protected my PC. Is that right?</summary><div class="ans">
       <p>Yes, and it is expected: the Windows installer isn’t code-signed yet, so Windows and your browser warn about it, and each new version warns again.</p>
       <ol><li>If your browser says the file isn’t commonly downloaded, choose <b>Keep</b>.</li><li>Open the installer. On “Windows protected your PC”, choose <b>More info</b>, then <b>Run anyway</b>.</li><li>Accept the privacy policy and finish the installer.</li></ol>
-      <div class="ss" data-ui role="img" aria-label="The Windows protected your PC screen, with More info and then Run anyway"><div class="t">Windows protected your PC</div><div class="m">Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.</div><u>More info</u> ← choose this first<div class="row"><span class="b run">Run anyway</span><span class="b">Don’t run</span></div></div>
+      <div class="ss" role="img" aria-label="The Windows protected your PC screen, with More info and then Run anyway"><div class="t">Windows protected your PC</div><div class="m">Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.</div><u>More info</u> ← choose this first<div class="row3"><span class="b run">Run anyway</span><span class="b">Don’t run</span></div></div>
     </div></details>
-    <details data-in name="faq"><summary>How do I install it on a Mac?</summary><div class="ans"><p>Open the downloaded .dmg and drag Borehole Field Log to Applications, then open it from there. It is signed and notarized by Apple, so it opens without warnings. It needs a Mac with Apple silicon (M1 or newer).</p></div></details>
-    <details data-in name="faq"><summary>How do I know the file is genuine?</summary><div class="ans"><p>Compare its SHA-256 with the one shown with the download. On a Mac, in Terminal:</p><pre><code>shasum -a 256 ~/Downloads/Borehole-Field-Log-*.dmg</code></pre><p>On Windows, in PowerShell:</p><pre><code>Get-FileHash .\Borehole-Field-Log-Setup-*.exe</code></pre></div></details>
-    <details data-in name="faq"><summary>How do updates work?</summary><div class="ans"><p>Once a day when it starts, the app asks GitHub whether a newer version is out. If there is one, it shows what is new; Download brings you here, and you install it the same way. You can turn the daily check off under Help › Check for updates.</p></div></details>
-    <details data-in name="faq"><summary>Does it work without internet?</summary><div class="ans"><p>Yes. Logging, PDFs, Excel and AGS exports, groundwater and soil survey maps all work offline. Only map backgrounds and the update check use the internet.</p></div></details>
-    <details data-in name="faq"><summary>Where does my data go?</summary><div class="ans"><p>Nowhere: there is no account, no tracking and no analytics, and your boreholes stay on your computer and in the files you save. Map requests carry only the area in view. <a href="https://github.com/kschreiner03/borehole-field-log/blob/main/build/privacy-policy.txt">Read the privacy policy and terms of use</a>.</p></div></details>
-    <details data-in name="faq"><summary>Which computers does it run on?</summary><div class="ans"><p>Macs with Apple silicon (M1 or newer), and Windows 10 or 11, 64-bit.</p></div></details>
+    <details name="faq"><summary>How do I install it on a Mac?</summary><div class="ans"><p>Open the downloaded .dmg and drag Borehole Field Log to Applications, then open it from there. It is signed and notarized by Apple, so it opens without warnings. It needs a Mac with Apple silicon (M1 or newer).</p></div></details>
+    <details name="faq"><summary>How do I know the file is genuine?</summary><div class="ans"><p>Compare its SHA-256 with the one shown with the download. On Windows, in PowerShell:</p><pre><code>Get-FileHash .\Borehole-Field-Log-Setup-*.exe</code></pre><p>On a Mac, in Terminal:</p><pre><code>shasum -a 256 ~/Downloads/Borehole-Field-Log-*.dmg</code></pre></div></details>
+    <details name="faq"><summary>How do updates work?</summary><div class="ans"><p>Once a day when it starts, the app asks GitHub whether a newer version is out. If there is one, it shows what is new; Download brings you here, and you install it the same way. You can turn the daily check off under Help › Check for updates.</p></div></details>
+    <details name="faq"><summary>Does it work without internet?</summary><div class="ans"><p>Yes. Logging, maps, cross-sections, the groundwater model, PDFs, Excel and AGS exports all work offline. Only map backgrounds and the update check use the internet.</p></div></details>
+    <details name="faq"><summary>How far can I trust the plumes and contours?</summary><div class="ans"><p>Every interpolated map and plume says how it was made and checks itself: each reading is predicted from the others and the typical error is stated. Shading fades where few samples support it, unconfirmed areas are hatched, and the limits are written in the figure’s note. Between boreholes it is an estimate, not a measurement.</p></div></details>
+    <details name="faq"><summary>Where does my data go?</summary><div class="ans"><p>Nowhere: there is no account, no tracking and no analytics, and your boreholes stay on your computer and in the files you save. Map requests carry only the area in view. <a href="https://github.com/kschreiner03/borehole-field-log/blob/main/build/privacy-policy.txt">Read the privacy policy and terms of use</a>.</p></div></details>
+    <details name="faq"><summary>Which computers does it run on?</summary><div class="ans"><p>Windows 10 or 11, 64-bit, and Macs with Apple silicon (M1 or newer).</p></div></details>
   </div>
 </section>
+</main>
 
-<footer class="foot">
-  <span>Borehole logging for Alberta and Saskatchewan</span>
-  <nav aria-label="Links"><a href="https://github.com/kschreiner03/borehole-field-log/releases">All versions</a><a href="https://github.com/kschreiner03/borehole-field-log">Source</a><a href="#download">Download</a></nav>
-  <span class="r">© 2026 · <a href="https://github.com/kschreiner03/borehole-field-log/blob/main/build/privacy-policy.txt">Privacy</a> · Pictures show the app’s fictional example data</span>
+<footer class="foot sheet">
+  <div class="frame">
+    <div><span class="lbl">Title</span><span>Borehole Field Log · logging for Alberta and Saskatchewan</span></div>
+    <div><span class="lbl">Version</span><span id="foot-ver">—</span></div>
+    <div><span class="lbl">Links</span><span><a href="https://github.com/kschreiner03/borehole-field-log/releases">All versions</a> · <a href="https://github.com/kschreiner03/borehole-field-log">Source</a></span></div>
+    <div><span class="lbl">Notes</span><span>© 2026 · <a href="https://github.com/kschreiner03/borehole-field-log/blob/main/build/privacy-policy.txt">Privacy</a> · figures show fictional data</span></div>
+  </div>
 </footer>
 
 <script>
@@ -453,7 +453,7 @@ p { margin: 0; }
     const body = [...o.mods, s && s[1] && !o.mods.some(m => /graded|plastic/.test(m)) ? s[1] : '', o.state, o.moist, o.colour, ...o.other].filter(Boolean).join(', ') + (o.origin ? ` (${o.origin})` : '');
     document.getElementById('ll-desc').innerHTML = name ? `<b>${esc(name)}</b>${body ? '<br>' + esc(body) : ''}` : `<span style="color:#5d6a75">${body ? esc(body) : 'Start with the depths and the soil, e.g. 1.2-3.5 SP'}</span>`;
     const st = s && ['gravel', 'sand'].includes(kind) ? 'Compactness' : 'Consistency';
-    const rows = [['Soil', name], ['Modifiers', o.mods.join(', ')], [st, o.state], ['Moisture', o.moist], ['Colour', o.colour], ['Other features', o.other.join(', ')], ['Origin', o.origin && o.origin[0] + o.origin.slice(1).toLowerCase()]];
+    const rows = [['Soil', name], ['Modifiers', o.mods.join(', ')], [st, o.state], ['Moisture', o.moist], ['Colour', o.colour], ['Other', o.other.join(', ')], ['Origin', o.origin && o.origin[0] + o.origin.slice(1).toLowerCase()]];
     document.getElementById('ll-reads').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd class="${v ? '' : 'no'}">${v ? esc(v) : 'not given'}</dd>`).join('');
   }
   ta.addEventListener('input', draw);
@@ -461,25 +461,14 @@ p { margin: 0; }
   draw();
 })();
 
-/* ---------- what it does: the row in the middle of the screen, or under the pointer, is the one shown ---------- */
-(() => {
-  const items = [...document.querySelectorAll('#does-list li')], pics = [...document.querySelectorAll('.does .pic img')];
-  const pick = i => { items.forEach((li, k) => { li.classList.toggle('on', k === i); li.querySelector('button').setAttribute('aria-expanded', String(k === i)); }); pics.forEach((p, k) => p.classList.toggle('on', k === i)); };
-  items.forEach((li, i) => { const b = li.querySelector('button'); b.addEventListener('click', () => pick(i)); b.addEventListener('mouseenter', () => pick(i)); b.addEventListener('focus', () => pick(i)); });
-  if ('IntersectionObserver' in window && matchMedia('(min-width: 901px)').matches) {
-    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) pick(items.indexOf(e.target)); }), { rootMargin: '-45% 0px -45% 0px' });
-    items.forEach(li => io.observe(li));
-  }
-})();
-
 /* ---------- a link to a question opens it ---------- */
 document.addEventListener('click', e => { const a = e.target.closest('a[href^="#q-"]'); if (a) { const d = document.querySelector(a.getAttribute('href')); if (d) d.open = true; } });
 
-/* ---------- entrances: each part of a section comes in once ---------- */
+/* ---------- entrances: each part comes in once ---------- */
 (() => {
   const els = [...document.querySelectorAll('[data-in]')];
   if (!('IntersectionObserver' in window)) { els.forEach(e => e.classList.add('seen')); return; }
-  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { const sibs = [...e.target.parentElement.children].filter(x => x.hasAttribute('data-in')); setTimeout(() => e.target.classList.add('seen'), Math.max(0, sibs.indexOf(e.target)) * 80); io.unobserve(e.target); } }), { rootMargin: '0px 0px -10% 0px' });
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('seen'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' });
   els.forEach(e => io.observe(e));
 })();
 
@@ -488,7 +477,7 @@ document.addEventListener('click', e => { const a = e.target.closest('a[href^="#
   const REPO = 'kschreiner03/borehole-field-log', ALL = `https://github.com/${REPO}/releases`;
   const $ = id => document.getElementById(id), esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const plat = (navigator.userAgentData?.platform || navigator.platform || '') + ' ' + navigator.userAgent;
-  let os = /Win/i.test(plat) ? 'win' : 'mac', rel = null, failed = '';
+  let os = /Mac/i.test(plat) && !/Win/i.test(plat) ? 'mac' : 'win', rel = null, failed = '';
   try {
     const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } });
     if (res.status === 404) failed = 'none'; else if (!res.ok) failed = 'error'; else rel = await res.json();
@@ -512,16 +501,17 @@ document.addEventListener('click', e => { const a = e.target.closest('a[href^="#
     go.textContent = `Download for ${label(k)}`; go.href = a.browser_download_url; go.removeAttribute('aria-disabled');
   }
   document.querySelectorAll('[data-os]').forEach(b => b.addEventListener('click', () => show(b.dataset.os)));
-  // the hero button goes straight to this computer's installer when there is one
-  const hb = $('hero-dl'), hm = $('hero-meta'), mine = asset(os) ? os : asset('mac') ? 'mac' : asset('win') ? 'win' : null;
-  if (mine) { const a = asset(mine); hb.textContent = `Download for ${label(mine)}`; hb.href = a.browser_download_url; hm.innerHTML = `Version ${esc(version)} · ${mb(a.size)} · <a href="#download">${mine === os ? 'Other computers' : `${label(os)} coming soon`}</a>`; }
-  else { hb.textContent = 'See downloads'; hm.innerHTML = failed === 'none' ? 'The first release is on its way.' : `<a href="${ALL}">All versions on GitHub</a>`; }
-  if (version) { $('get-a').textContent = 'Get version'; $('get-b').textContent = version.replace(/\.0$/, ''); }
+  // the hero and top buttons go straight to this computer's installer when there is one
+  const mine = asset(os) ? os : asset('win') ? 'win' : asset('mac') ? 'mac' : null;
+  if (mine) { const a = asset(mine); for (const id of ['hero-dl', 'top-dl']) { $(id).textContent = `Download for ${label(mine)}`; $(id).href = a.browser_download_url; }
+    $('hero-meta').innerHTML = `Version ${esc(version)} · ${mb(a.size)} · <a href="#download">${mine === os ? 'Other computers and checksums' : `${label(os)} coming soon`}</a>`; }
+  else { $('hero-dl').textContent = 'See downloads'; $('hero-meta').innerHTML = failed === 'none' ? 'The first release is on its way.' : `<a href="${ALL}">All versions on GitHub</a>`; }
+  if (version) { $('get-a').textContent = 'Get version'; $('get-b').textContent = version.replace(/\.0$/, ''); $('top-ver').textContent = 'Version ' + version; $('foot-ver').textContent = version; }
   // what's new, from the release notes
   const out = []; let ul = [];
   const flush = () => { if (ul.length) out.push(`<ul>${ul.join('')}</ul>`); ul = []; };
   for (const ln of notes.split('\n').map(x => x.trim()).filter(Boolean)) { if (/^[-*] /.test(ln)) ul.push(`<li>${esc(ln.slice(2))}</li>`); else { flush(); out.push(`<p>${esc(ln.replace(/^#+\s*/, ''))}</p>`); } }
-  flush(); $('dl-notes').innerHTML = out.join('') || `<p class="note">See <a href="${ALL}">the release on GitHub</a>.</p>`;
+  flush(); $('dl-notes').innerHTML = out.join('') || `<p>See <a href="${ALL}">the release on GitHub</a>.</p>`;
   if (!rel) $('dl-new').hidden = true;
   show(os);
 })();
