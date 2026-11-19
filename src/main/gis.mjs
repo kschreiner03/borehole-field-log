@@ -35,10 +35,17 @@ export function driverPath(root) {
   return existsSync(un) ? un : p;
 }
 
-function run(cmd, args, { env, cwd, timeoutMs = 600000, onLine } = {}) {
+// ends a process and everything it started (GRASS runs its modules as child processes)
+export function killTree(p) {
+  if (!p || p.exitCode != null) return;
+  if (process.platform === 'win32') spawn('taskkill', ['/pid', String(p.pid), '/T', '/F'], { windowsHide: true }).on('error', () => p.kill());
+  else { try { process.kill(-p.pid, 'SIGTERM'); } catch { p.kill(); } }
+}
+function run(cmd, args, { env, cwd, timeoutMs = 600000, onLine, onSpawn } = {}) {
   return new Promise(resolve => {
-    const p = spawn(cmd, args, { cwd, env: { ...process.env, ...env }, windowsHide: true }); let out = '', timedOut = false, buf = '';
-    const kill = setTimeout(() => { timedOut = true; p.kill(); }, timeoutMs);
+    const p = spawn(cmd, args, { cwd, env: { ...process.env, ...env }, windowsHide: true, detached: process.platform !== 'win32' }); let out = '', timedOut = false, buf = '';
+    onSpawn?.(p);
+    const kill = setTimeout(() => { timedOut = true; killTree(p); }, timeoutMs);
     const take = d => { const s = String(d); out = (out + s).slice(-40000); if (onLine) { buf += s; const ls = buf.split(/\r?\n|\r/); buf = ls.pop(); for (const l of ls) if (l.trim()) onLine(l.trim()); } };
     p.stdout.on('data', take); p.stderr.on('data', take);
     p.on('error', e => { clearTimeout(kill); resolve({ code: -1, out: String(e.message), timedOut }); });
@@ -101,6 +108,7 @@ export async function gisRemove({ userData }) {
 const isNum = v => typeof v === 'number' && Number.isFinite(v), nums = (a, k) => Array.isArray(a) && a.every(p => Array.isArray(p) && p.length === k && p.every(isNum));
 export function checkJob(job) {
   if (!job || typeof job !== 'object') return 'No job.';
+  if (job.id != null && !/^[\w-]{1,40}$/.test(String(job.id))) return 'A plain job id is needed.';
   const { kind, method } = job;
   if (kind === 'versions') return '';
   if (kind === 'surface') {
@@ -121,14 +129,21 @@ export function checkJob(job) {
   return '';
 }
 
-export async function gisRun({ userData, root, job, timeoutMs = 600000 }) {
+const running = new Map(), cancelled = new Set();
+export function gisCancel(id) { const p = running.get(id); if (!p) return false; cancelled.add(id); killTree(p); return true; }
+export async function gisRun({ userData, root, job, timeoutMs = 600000, onProgress }) {
   const bad = checkJob(job); if (bad) return { ok: false, error: bad };
+  const id = job.id;
   const home = gisHome(userData), py = pythonOf(home);
   if (!existsSync(py)) return { ok: false, error: 'The GIS engines are not installed. Install them under Settings › GIS engines.' };
   const dir = await mkdtemp(join(tmpdir(), 'bfl-gis-'));
   try {
     const jf = join(dir, 'job.json'), rf = join(dir, 'result.json'); await writeFile(jf, JSON.stringify({ ...job, timeout: Math.round(timeoutMs / 1000) }));
-    const t0 = Date.now(), r = await run(py, ['-I', driverPath(root), jf, rf], { cwd: dir, timeoutMs, env: await engineEnv(home) });
+    const t0 = Date.now(), r = await run(py, ['-I', driverPath(root), jf, rf], { cwd: dir, timeoutMs, env: await engineEnv(home),
+      onSpawn: p => { if (id) running.set(id, p); },
+      onLine: l => { if (l.startsWith('@@') && onProgress) { try { onProgress({ id, ...JSON.parse(l.slice(2)) }); } catch { /* not a progress line */ } } } });
+    if (id) running.delete(id);
+    if (id && cancelled.delete(id)) return { ok: false, cancelled: true, error: 'Cancelled.' };
     if (!existsSync(rf) || (await stat(rf)).size > 256e6) return { ok: false, error: r.timedOut ? `The GIS tool did not finish within ${timeoutMs / 1000} s.` : 'The GIS tool stopped: ' + r.out.slice(-800) };
     const res = JSON.parse(await readFile(rf, 'utf8')); res.seconds = (Date.now() - t0) / 1000; return res;
   } catch (e) { return { ok: false, error: String(e.message || e) }; } finally { await rm(dir, { recursive: true, force: true }); }

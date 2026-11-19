@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { mf6Binary, runMf6 } from './mf6run.mjs';
-import { gisStatus, gisInstall, gisRemove, gisRun } from './gis.mjs';
+import { gisStatus, gisInstall, gisRemove, gisRun, gisCancel } from './gis.mjs';
 import { clearCreds, fetchSnapshot, loadCreds, saveCreds } from './applemaps.mjs';
 import { checkForUpdate, HUB } from './updates.mjs';
 import { fileGuard } from './guard.mjs';
@@ -104,7 +104,8 @@ const gisCtx = () => ({ userData: app.getPath('userData'), root: app.getAppPath(
 ipcMain.handle('gis:status', async e => e.sender !== win?.webContents ? null : gisStatus(gisCtx()));
 ipcMain.handle('gis:install', async e => { if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' }; const wc = e.sender; return gisInstall({ ...gisCtx(), onProgress: p => { if (!wc.isDestroyed()) wc.send('gis:progress', p); } }); });
 ipcMain.handle('gis:remove', async e => e.sender !== win?.webContents ? { ok: false, error: 'Not allowed.' } : gisRemove(gisCtx()));
-ipcMain.handle('gis:run', async (e, job: unknown) => e.sender !== win?.webContents ? { ok: false, error: 'Not allowed.' } : gisRun({ ...gisCtx(), job }));
+ipcMain.handle('gis:run', async (e, job: unknown) => { if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' }; const wc = e.sender; return gisRun({ ...gisCtx(), job, onProgress: p => { if (!wc.isDestroyed()) wc.send('gis:jobprogress', p); } }); });
+ipcMain.handle('gis:cancel', async (e, id: unknown) => e.sender === win?.webContents && typeof id === 'string' ? gisCancel(id) : false);
 
 /* Apple Maps: the key is set up and kept here (the app's own folder); the page asks for pictures of areas and gets images back */
 const appleFile = () => join(app.getPath('userData'), 'apple-maps.json');

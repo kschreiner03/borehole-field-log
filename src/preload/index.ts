@@ -22,6 +22,9 @@ const desktop = {
     remove: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('gis:remove'),
     run: (job: unknown): Promise<Record<string, unknown> & { ok: boolean; error?: string }> => ipcRenderer.invoke('gis:run', job),
     onProgress: (cb: (p: { step?: string; line?: string }) => void) => { ipcRenderer.on('gis:progress', (_e, p) => cb(p)); },
+    // a running job's progress (the share done and what it is doing), and stopping it
+    onJobProgress: (cb: (p: { id: string; p?: number; msg?: string }) => void) => { ipcRenderer.on('gis:jobprogress', (_e, p) => cb(p)); },
+    cancel: (id: string): Promise<boolean> => ipcRenderer.invoke('gis:cancel', id),
   },
   // updates: whether GitHub has a newer release (nothing about the user is sent), and the download page in the browser
   updates: {

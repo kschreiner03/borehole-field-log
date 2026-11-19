@@ -1360,6 +1360,36 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .ctl-gb .actions { flex-wrap: wrap; gap: 6px; }
 .ctl-gb #xs-corr-sec { display: flex; flex-direction: column; gap: 6px; }
 .ctl-gb .xs-corr-each table { width: 100%; } .ctl-gb .xs-corr-each td { padding: 2px 4px 2px 0; border: 0; font-size: 11.5px; } .ctl-gb .xs-corr-each select { width: 100%; min-height: 26px; font-size: 11.5px; }
+/* the GIS Toolbox: tools on the left, the tool's form in the middle, running and history in the panel */
+.gp { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 12px; align-items: start; }
+.gp-list .body { display: flex; flex-direction: column; gap: 8px; } .gp-list input[type="search"] { min-height: 32px; }
+.gp-tree, .gp-tree ul { list-style: none; margin: 0; padding: 0; } .gp-g > b { display: block; margin: 10px 0 4px; font: 600 10.5px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.gp-tree button { display: flex; flex-direction: column; align-items: flex-start; width: 100%; padding: 5px 8px; border: 0; border-radius: var(--r-sm); background: none; font: 13px var(--f-body); color: var(--ink); text-align: left; cursor: pointer; }
+.gp-tree button small { font-size: 11px; color: var(--muted); } .gp-tree button:hover { background: var(--hover); } .gp-tree button[aria-current="true"] { background: var(--sel); box-shadow: inset 3px 0 0 var(--accent); }
+.gp-tool .body { display: flex; flex-direction: column; gap: 8px; max-width: 640px; } .gp-tool h4 { margin: 10px 0 0; font: 600 10.5px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.gp-tool .cr { grid-template-columns: 140px minmax(0, 1fr); } .gp-tool .cr-c > select, .gp-tool .cr-c > input:not([type="number"]) { max-width: 320px; }
+.gp-warn { padding: 8px 10px; border: 1px solid var(--warn-line, #e5c07b); border-radius: var(--r-sm); background: var(--warn-bg, #fff8e6); font-size: 13px; }
+.gp-run { display: flex; gap: 8px; margin-top: 6px; } .gp-run .btn { min-width: 96px; justify-content: center; }
+.gp-job { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: var(--r-sm); background: var(--panel-2, var(--panel)); }
+.gp-job.failed { border-color: var(--negative, #c4242a); } .gp-jh { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; }
+.gp-bar { position: relative; height: 10px; border-radius: 5px; background: var(--rule); overflow: hidden; }
+.gp-bar > span { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 5px; transition: width .4s ease; }
+.gp-bar.done > span { background: var(--positive, #2e7d32); } .gp-bar.failed > span { background: var(--negative, #c4242a); } .gp-bar.cancelled > span { background: var(--muted); }
+.gp-bar.ind > span { background: repeating-linear-gradient(-45deg, var(--accent) 0 10px, color-mix(in srgb, var(--accent) 60%, #fff) 10px 20px); background-size: 28px 28px; animation: gp-ind 1s linear infinite; }
+@keyframes gp-ind { to { background-position: 28px 0; } }
+.gp-msg { font-size: 12px; } .gp-out { color: var(--ink); }
+.gp-log { max-height: 180px; overflow: auto; margin: 4px 0 0; padding: 6px 8px; list-style: none; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-sm); font: 11.5px var(--f-mono, ui-monospace, monospace); }
+.gp-log li span { color: var(--muted); margin-right: 8px; }
+.gp-cmp { width: 100%; min-width: 0 !important; table-layout: fixed; } .gp-cmp th:nth-child(1), .gp-cmp td:nth-child(1) { width: 28px; } .gp-cmp th:nth-child(3), .gp-cmp td:nth-child(3) { width: 110px; } .gp-cmp th:nth-child(4), .gp-cmp td:nth-child(4) { width: 56px; }
+.gp-cmp td { white-space: normal !important; } .gp-cmp tr.best td { font-weight: 600; } .gp-cmp td { font-size: 12.5px; }
+.gp-hist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.gp-hist button { display: flex; gap: 8px; width: 100%; padding: 5px 4px; border: 0; border-radius: var(--r-sm); background: none; text-align: left; cursor: pointer; font: 12px var(--f-body); color: var(--ink); }
+.gp-hist button:hover { background: var(--hover); } .gp-hist small { display: block; color: var(--muted); font-size: 11px; }
+.gp-st { flex: none; width: 16px; text-align: center; font-weight: 700; } .gp-hist .done .gp-st { color: var(--positive, #2e7d32); } .gp-hist .failed .gp-st { color: var(--negative, #c4242a); }
+.sb-gp { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 0; background: none; font: inherit; color: var(--ink); cursor: pointer; } .sb-gp[hidden] { display: none; }
+.gp-mini { position: relative; width: 70px; height: 6px; border-radius: 3px; background: var(--rule); overflow: hidden; } .gp-mini > span { position: absolute; inset: 0 auto 0 0; background: var(--accent); }
+.gp-mini > span.ind { background: repeating-linear-gradient(-45deg, var(--accent) 0 6px, transparent 6px 12px); animation: gp-ind 1s linear infinite; }
+@media (max-width: 1100px) { .gp { grid-template-columns: minmax(0, 1fr); } }
 /* the Map page: the map is the page */
 .ctl-gb #gwm-setup .fld { display: grid; grid-template-columns: minmax(0, 1fr) 128px; align-items: center; gap: 8px; } .ctl-gb #gwm-setup .fld label { font: 400 12.5px var(--f-body); color: var(--muted); } .ctl-gb #gwm-setup .fld select, .ctl-gb #gwm-setup .fld input { width: 100%; }
 .site-only { display: block; } .site-map > .body { padding: 8px; } .site-map .map-tip { margin: 6px 2px 0; font-size: 11.5px; }
@@ -1476,6 +1506,7 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
   <span id="sb-bh"></span>
   <button type="button" id="sb-iss" class="sb-iss" data-act="show-issues" hidden></button>
   <span class="sb-grow"></span>
+  <button type="button" id="sb-gp" class="sb-gp" data-tab="gp" hidden title="GIS tools running"></button>
   <span id="sb-units" class="sb-opt"></span>
   <span id="sb-count" class="sb-opt"></span>
 </footer>
@@ -2196,8 +2227,8 @@ function treeGroup(key, label, count, kids, extra = '') {
   return `<li class="tg${open ? ' open' : ''}"><div class="tr">${extra}<button class="tw" data-fold="${key}" aria-expanded="${open}" title="${open ? 'Collapse' : 'Expand'} ${esc(label)}">${TW}<span>${esc(label)}</span></button>${count != null ? `<span class="tc">${count}</span>` : ''}</div>${open ? `<ul class="tk">${kids}</ul>` : ''}</li>`;
 }
 const BH_TABS = ['log', 'edit', 'report'];
-const NAV_LABEL = { v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Outputs', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
-const NAV_ICON = { soil: '<path d="M3 9l9-5 9 5-9 5z"/><path d="M3 14l9 5 9-5"/>', v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
+const NAV_LABEL = { gp: 'GIS Toolbox', v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Outputs', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
+const NAV_ICON = { gp: '<path d="M4 8h16v11H4z"/><path d="M9 8V5h6v3M4 12h16M11 12v2h2v-2"/>', soil: '<path d="M3 9l9-5 9 5-9 5z"/><path d="M3 14l9 5 9-5"/>', v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
 /* a row in the settings panel: its label, then the control (and its unit) on the same line; the same on every page */
 const crow = (l, c, id) => `<div class="cr">${id ? `<label class="cr-l" for="${id}">${l}</label>` : `<span class="cr-l">${l}</span>`}<span class="cr-c">${c}</span></div>`;
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -2243,7 +2274,7 @@ document.addEventListener('pointerdown', e => {
 const bhGlyph = well => `<svg class="bhg" viewBox="0 0 16 16" aria-hidden="true">${well ? '<circle cx="8" cy="8" r="4.6" fill="#fff" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/>' : '<circle cx="8" cy="8" r="4.6" fill="currentColor"/>'}</svg>`;
 /* the sidebar is the project as a tree: project pages, and each borehole with its own pages nested under it when chosen */
 /* the left side: a rail of project pages, then the project's boreholes as a list with a filter, status chips and a sort */
-const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['soil', 'Soil'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['compose', 'Outputs']];
+const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['soil', 'Soil'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['gp', 'Toolbox'], ['compose', 'Outputs']];
 const BH_ICON = '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M8 9h8M8 14h8"/>';
 S.bl = { q: '', st: lsGet('bhlog.blSt') || 'all', sort: lsGet('bhlog.blSort') || 'name' };
 const blMeta = b => { const w = latestWater(b), v = vapourMax(b, null, null); return { d: depthOf(b), w: w ? w.depth : null, v: v ? v.cvc : null }; };
@@ -2377,6 +2408,20 @@ function mapGoTo(q) {
   const [e, n] = llToUtm(ll[0], ll[1], crsZone()), W = S._plan?.W || 800, H = S._plan?.H || 460;
   S.mv = { cx: e, cy: n, sc: Math.min(W, H) / 800 }; S.mvProj = projKey(projList()[0]); renderView(true);
 }
+/* the Toolbox's form and lists */
+document.addEventListener('click', e => {
+  const tl = e.target.closest?.('[data-gptool]'); if (tl) { S.gp.tool = tl.dataset.gptool; gpSave(); renderView(true); return; }
+  const h = e.target.closest?.('[data-gphist]'); if (h) { const j = GIS.jobs.get(h.dataset.gphist); if (j) { S.gp.tool = j.tool && GP_TOOLS[j.tool] ? j.tool : j.job?.method && GP_TOOLS[j.job.method] ? j.job.method : S.gp.tool; if (j.p0) S.gp.p = j.p0; if (j.prm) S.gp.prm = { ...S.gp.prm, [S.gp.tool]: { ...j.prm } }; gpSave(); if (S.tab !== 'gp') goTab('gp'); else renderView(true); } }
+});
+document.addEventListener('change', e => {
+  const t = e.target, f = t.dataset?.gpf, n = t.dataset?.gpprm; if (!f && !n) return;
+  if (n) { const k = S.gp.tool; S.gp.prm = { ...S.gp.prm, [k]: { ...(S.gp.prm[k] || {}), [n]: t.value } }; }
+  else if (f === 'use' || f === 'save') S.gp[f] = t.checked;
+  else if (f === 'd0' || f === 'd1') S.gp[f] = t.value === '' ? null : fromD(+t.value);
+  else S.gp[f] = t.value;
+  gpSave(); if (f === 'p' || f === 'd0' || f === 'd1') renderView(true);
+});
+document.addEventListener('input', e => { if (e.target.id === 'gp-q') { S.gp.q = e.target.value; const pos = e.target.selectionStart; renderView(true); const q = $('#gp-q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } } });
 document.addEventListener('submit', e => { const f = e.target.closest?.('[data-mapgo]'); if (!f) return; e.preventDefault(); mapGoTo(f.querySelector('input').value); });
 /* map layers and which boreholes the maps draw: a panel beside the map */
 const CTL_I = { base: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 15l5-5 4 4 3-3 6 6"/>', lbl: '<path d="M5 7V5h14v2M12 5v14M9 19h6"/>', furn: '<path d="M12 3l3.5 8h-7z"/><path d="M4 20h16M4 17v3M12 17v3M20 17v3"/>', style: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/>', draw: '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M8 5v14M16 5v14"/>' };
@@ -2524,7 +2569,7 @@ const RAIL = [
   ['log', 'Log', '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="1.5"/><path d="M7 8h10M7 13h10M7 17h10"/></svg>'],
   ['edit', 'Data', '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16M9 6v12"/></svg>'],
   ['report', 'PDF preview', '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 13h6M9 17h6"/></svg>']];
-const PROJECT_TABS = ['home', 'site', 'table', 'gw', 'contam', 'soil', 'reports', 'compose'];
+const PROJECT_TABS = ['home', 'site', 'table', 'gw', 'contam', 'soil', 'reports', 'compose', 'gp'];
 function renderRail() {
   const el = $('#rail'); if (!el) return; el.hidden = true; return; const b = cur();
   el.innerHTML = RAIL.map(x => typeof x === 'string' ? `<span class="rl">${x === 'Borehole' && b ? esc(b.name) : x}</span>` : `<button data-tab="${x[0]}" aria-current="${S.tab === x[0] ? 'page' : 'false'}" ${b ? '' : 'disabled'}>${x[2]}<span>${x[1]}</span></button>`).join('')
@@ -3049,6 +3094,7 @@ function renderView(full) {
   else if (S.tab === 'gwm') { v.innerHTML = gwmHTML(); gwEnsure(); }
   else if (S.tab === 'v3d') { v.innerHTML = v3dHTML(); v3dBuild(); gwAutoEnsure(); }
   else if (S.tab === 'home') { v.innerHTML = homeHTML(); }
+  else if (S.tab === 'gp') { v.innerHTML = gpHTML(); }
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
   else if (S.tab === 'soil') { v.innerHTML = soilHTML(); drawSoil(); }
   else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); drawPlasticity(); }
@@ -4882,14 +4928,14 @@ function plume3dField(G, xs, medium, param, lv, how) {
    sent to the tool; its values (and kriging variance) come back for each node */
 function gisPlume3d(G, xs, medium, param, lv, how, P) {
   const em = how.slice(4), autoK = xs.aniso == null || xs.aniso === 'auto' || !(+xs.aniso > 0), k = autoK ? (XS_ANISO_PICK || 10) : +xs.aniso;
-  const nx = Math.max(8, Math.ceil(G.plotW / 10)), ny = Math.max(6, Math.ceil(G.plotH / 10)), T = [];
+  const nx = 120, ny = 48, T = [];   // the same grid whatever the drawing's size, so a result is reused wherever the section is drawn
   for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { const d = G.maxD * i / nx, e = G.e1 - (G.e1 - G.e0) * j / ny, [E, N] = G.pos.at(d); T.push([+E.toFixed(3), +N.toFixed(3), +(e * k).toFixed(3)]); }
   const Ps = P.map(p => [p[0], p[1], p[2] * k, p[3]]);
   const job = { kind: 'points3d', method: em, pts: Ps, targets: T };
   if (em === 'grass_vol_rst') { const all = [...Ps, ...T], mn = i => Math.min(...all.map(q => q[i])), mx = i => Math.max(...all.map(q => q[i])), pd = i => (mx(i) - mn(i)) * .05 + 1;
     job.box3 = [mn(0) - pd(0), mn(1) - pd(1), mn(2) - pd(2), mx(0) + pd(0), mx(1) + pd(1), mx(2) + pd(2)]; job.nx = 40; job.ny = 40; job.nz = 30; }
-  const key = gisKey(em, Ps, G.maxD.toFixed(1) + '|' + nx + 'x' + ny + '|' + G.e0.toFixed(2) + ',' + G.e1.toFixed(2) + '|' + T.length), r = Ps.length >= 4 ? gisGet(key, job) : null;
-  if (!r) { const f = plume3dField(G, xs, medium, param, lv, 'krige'); if (f) { const w = Ps.length < 4 ? XS_METHODS[how][0] + ' needs four or more samples.' : gisNote(how, key); f.note = w + ' ' + f.note; f.short = (GIS.busy.has(key) ? 'Running ' + XS_METHODS[how][0] + '… ' : '') + f.short; } return f; }
+  const key = gisKey(em, Ps, G.maxD.toFixed(1) + '|' + nx + 'x' + ny + '|' + G.e0.toFixed(2) + ',' + G.e1.toFixed(2) + '|' + T.length), r = Ps.length >= 4 ? gisGet(key, job, null, 'Section ' + secLetters() + ', ' + (medium === 'vapour' ? 'headspace vapour' : LAB_PARAMS[param]?.label || param) + ', layered ×' + k) : null; GIS_LAST.xs = key;
+  if (!r) { const f = plume3dField(G, xs, medium, param, lv, 'krige'); if (f) { const w = Ps.length < 4 ? XS_METHODS[how][0] + ' needs four or more samples.' : gisNote(how, key); f.note = w + ' ' + f.note; f.short = (GIS.prom.has(key) ? 'Running ' + XS_METHODS[how][0] + '… ' : '') + f.short; } return f; }
   const W = nx + 1, vals = Float32Array.from(r.values.map(v => v == null ? NaN : v)), sill = r.sill || 1;
   const h3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]), nn = Ps.map((p, i) => Math.min(...Ps.filter((_, j) => j !== i).map(q => h3(p, q) || Infinity))).filter(isFinite).sort((a, b) => a - b), sp = Math.max(1, nn[Math.floor(nn.length / 2)] || 1) * 2.5;
   const sup = Float32Array.from(T.map((t, n) => { const c = r.var?.[n] != null ? 1 - r.var[n] / sill : 1 - Math.min(1, (Math.min(...Ps.map(p => h3(t, p))) / sp) ** 2); return Math.max(0, Math.min(1, (c - .1) / .6)); }));
@@ -10486,7 +10532,7 @@ function resAuto(P) {
 /* ---------- GIS engines: real GIS software (GRASS GIS, GDAL, PyKrige, GSTools from conda-forge), optional, installed per user on
    the desktop and run as separate programs. A map or section asks for a surface; it is drawn with the built-in method while the
    tool runs, then redrawn from the tool's own grid. Notes name the tool, its version, its settings and its own leave-one-out check. ---------- */
-const GIS = { st: null, cache: new Map(), busy: new Map(), err: new Map(), prog: '', log: [] };
+const GIS = { st: null, cache: new Map(), prom: new Map(), err: new Map(), jobs: new Map(), prog: '', log: [] };
 const GIS_2D = {
   grass_rst: ['GRASS GIS v.surf.rst: spline with tension', 'Regularized spline with tension (Mitasova and Mitas 1993), the GRASS GIS module, run as published: tension 40, smoothing 0.1.'],
   grass_idw: ['GRASS GIS v.surf.idw: inverse distance', 'The GRASS GIS module: inverse distance squared from the 12 nearest readings.'],
@@ -10509,6 +10555,7 @@ const gisOn = () => !!GIS.st?.installed && !GIS.st?.broken;
 const gisVer = () => GIS.st?.versions || {};
 function gisInit() {
   if (!window.desktop?.gis) return;
+  window.desktop.gis.onJobProgress?.(p => { const j = [...GIS.jobs.values()].find(x => x.id === p.id); if (!j || j.status !== 'running') return; if (p.p != null) j.p = p.p; if (p.msg) { j.msg = p.msg; j.msgs = [...(j.msgs || []), [Date.now(), p.msg]].slice(-200); } gisJobsUI(); });
   window.desktop.gis.onProgress(p => { if (p.step) GIS.prog = p.step; if (p.line) GIS.log = [...GIS.log, p.line].slice(-4); const el = $('#gis-prog'); if (el) el.innerHTML = gisProgHTML(); });
   window.desktop.gis.status().then(st => { GIS.st = st; gisMethods(); if (gisOn() && MAP_TABS.includes(S.tab)) renderView(true); });
 }
@@ -10516,15 +10563,42 @@ function gisInit() {
 function gisMethods() { if (!gisOn()) return; for (const [k, v] of Object.entries(GIS_3D)) { if (desktopWin() && GIS_NO_WIN.has(k)) continue; XS_METHODS[k] = v; XS_3D.add(k); } }
 const desktopWin = () => window.desktop?.platform === 'win32';
 const gisKey = (m, P, extra = '') => m + '|' + extra + '|' + P.map(p => p.map(v => (+v).toFixed(3)).join(',')).join(';');
-let gisT; const gisRedraw = () => { clearTimeout(gisT); gisT = setTimeout(() => { if (MAP_TABS.includes(S.tab)) renderView(true); }, 60); };
-function gisGet(key, job) {
+let gisT; const gisRedraw = () => { clearTimeout(gisT); gisT = setTimeout(() => { if (MAP_TABS.includes(S.tab) || S.tab === 'gp') renderView(true); }, 60); };
+let gisSeq = 0;
+/* start a job (once per key): it is listed with its progress in the Toolbox and the status bar, and can be cancelled */
+function gisStart(key, job, label, input = '') {
+  if (GIS.cache.has(key)) return Promise.resolve(GIS.cache.get(key));
+  if (GIS.prom.has(key)) return GIS.prom.get(key);
+  const id = 'j' + Date.now().toString(36) + (++gisSeq), j = { id, key, label: label || gisLabel(job), input, p: 0, msg: 'Starting…', msgs: [], t0: Date.now(), status: 'running', job: { kind: job.kind, method: job.method, params: job.params } };
+  GIS.jobs.set(id, j); GIS.err.delete(key); gisJobsUI();
+  const pr = window.desktop.gis.run({ ...job, id }).then(r => r, e => ({ ok: false, error: String(e?.message || e) })).then(r => {
+    GIS.prom.delete(key); j.t1 = Date.now(); j.res = r;
+    if (r?.ok) { j.status = 'done'; j.p = 1; j.msg = 'Completed'; if (GIS.cache.size > 60) GIS.cache.delete(GIS.cache.keys().next().value); if (!job.nocache) GIS.cache.set(key, r); }
+    else { j.status = r?.cancelled ? 'cancelled' : 'failed'; j.msg = r?.cancelled ? 'Cancelled' : r?.error || 'The tool stopped.'; if (!r?.cancelled) GIS.err.set(key, j.msg); }
+    if (GIS.jobs.size > 80) GIS.jobs.delete(GIS.jobs.keys().next().value);
+    gisJobsUI(); gisRedraw(); return r;
+  });
+  GIS.prom.set(key, pr); return pr;
+}
+function gisGet(key, job, label, input) {
   if (GIS.cache.has(key)) return GIS.cache.get(key);
-  if (!GIS.busy.has(key) && !GIS.err.has(key) && gisOn()) {
-    GIS.busy.set(key, Date.now());
-    window.desktop.gis.run(job).then(r => { GIS.busy.delete(key); if (r?.ok) { if (GIS.cache.size > 60) GIS.cache.clear(); GIS.cache.set(key, r); } else GIS.err.set(key, r?.error || 'The tool stopped.'); gisRedraw(); },
-      e => { GIS.busy.delete(key); GIS.err.set(key, String(e?.message || e)); gisRedraw(); });
-  }
+  if (!GIS.prom.has(key) && !GIS.err.has(key) && gisOn()) gisStart(key, job, label, input);
   return null;
+}
+const gisLabel = job => (GP_TOOLS[job.method]?.name ? GP_TOOLS[job.method].name + ' (' + GP_TOOLS[job.method].by + ')' : job.kind === 'export' ? 'Export to GeoTIFF and GeoPackage (GDAL)' : job.method || job.kind);
+const gisRunning = () => [...GIS.jobs.values()].filter(j => j.status === 'running');
+const gisElapsed = j => { const t = Math.round(((j.t1 || Date.now()) - j.t0) / 1000); return t < 60 ? t + ' s' : Math.floor(t / 60) + ' min ' + (t % 60) + ' s'; };
+/* the progress bar of one job: the share done when the tool reports it, else moving stripes */
+const gpBarHTML = j => `<div class="gp-bar ${j.status}${j.p > 0 ? '' : ' ind'}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(j.p * 100)}"><span style="width:${j.status === 'running' && !(j.p > 0) ? 100 : Math.round(j.p * 100)}%"></span></div>`;
+let gisTick = null;
+function gisJobsUI() {
+  for (const el of document.querySelectorAll('[data-gpjob]')) { const j = [...GIS.jobs.values()].find(x => x.id === el.dataset.gpjob); if (!j) continue;
+    const bar = el.querySelector('.gp-bar'); if (bar) bar.outerHTML = gpBarHTML(j);
+    const m = el.querySelector('.gp-msg'); if (m) m.textContent = j.msg || ''; const t = el.querySelector('.gp-time'); if (t) t.textContent = (j.status === 'running' ? Math.round(j.p * 100) + ' % · ' : '') + gisElapsed(j);
+    const lg = el.querySelector('.gp-log'); if (lg && j.msgs?.length) { lg.innerHTML = j.msgs.slice(-60).map(([t, m]) => `<li><span>${new Date(t).toLocaleTimeString()}</span>${esc(m)}</li>`).join(''); lg.scrollTop = lg.scrollHeight; } }
+  const run = gisRunning(), chip = $('#sb-gp');
+  if (chip) { chip.hidden = !run.length; if (run.length) { const j = run[0]; chip.innerHTML = `<span class="gp-mini"><span style="width:${j.p > 0 ? Math.round(j.p * 100) : 100}%"${j.p > 0 ? '' : ' class="ind"'}></span></span>${esc((GP_TOOLS[j.job.method]?.name || j.label).slice(0, 34))}${j.p > 0 ? ' ' + Math.round(j.p * 100) + ' %' : '…'}${run.length > 1 ? ' (+' + (run.length - 1) + ')' : ''}`; chip.title = run.map(x => x.label + ': ' + x.msg).join('\n'); } }
+  if (run.length && !gisTick) gisTick = setInterval(() => { if (!gisRunning().length) { clearInterval(gisTick); gisTick = null; } gisJobsUI(); }, 1000);
 }
 const gisX = v => '×' + (10 ** v < 10 ? (10 ** v).toFixed(1) : Math.round(10 ** v));
 /* where a 2D surface is asked for: the readings' extent and a third more on each side, about 120 cells across */
@@ -10534,8 +10608,14 @@ function gisBox(P) {
   return { box, nx, ny };
 }
 const GIS_LAST = {};   // per map result: the key of the surface last drawn
+/* a surface job: the method, its settings and the cell size (blank: about 120 cells across) */
+function gisJob2d(m, P, prm = {}, cell = null) {
+  const g = gisBox(P); if (+cell > 0) { g.nx = Math.max(10, Math.min(1000, Math.round((g.box[2] - g.box[0]) / cell))); g.ny = Math.max(10, Math.min(1000, Math.round((g.box[3] - g.box[1]) / cell))); }
+  const params = Object.fromEntries(Object.entries(prm || {}).filter(([, v]) => v !== '' && v != null && v !== 'auto'));
+  return { g, key: gisKey(m + JSON.stringify(params) + '|' + g.nx + 'x' + g.ny, P), job: { kind: 'surface', method: m, pts: P, box: g.box, nx: g.nx, ny: g.ny, params } };
+}
 function gisFit2d(m, P, p) {
-  const g = gisBox(P), key = gisKey(m, P), r = gisGet(key, { kind: 'surface', method: m, pts: P, box: g.box, nx: g.nx, ny: g.ny }); if (p) GIS_LAST[p] = { key, m };
+  const st = p ? resStyle(p) : {}, { g, key, job } = gisJob2d(m, P, st.gisPrm, st.gisCell), r = gisGet(key, job, null, p ? resLabel(p) : ''); if (p) GIS_LAST[p] = { key, m };
   if (!r) return null;
   const { box, nx, ny } = g, dx = (box[2] - box[0]) / nx, dy = (box[3] - box[1]) / ny, V = r.values;
   const near = (x, y) => { let b = P[0], d = Infinity; for (const q of P) { const e = (q[0] - x) ** 2 + (q[1] - y) ** 2; if (e < d) { d = e; b = q; } } return b[2]; };
@@ -10546,13 +10626,18 @@ function gisFit2d(m, P, p) {
   };
 }
 /* what the panel says about an engine method: running, failed (and what is shown instead), or the tool's own check */
+function resPts(p, d0, d1) {
+  const vals = mapList().filter(b => b.easting != null && b.northing != null).map(b => ({ b, r: resultAt(b, p, d0, d1) })).filter(x => x.r && !x.b.resOff);
+  const pos = vals.map(x => x.r.v).filter(v => v > 0), floor = p === 'cvc' ? 1 : pos.length ? Math.min(...pos) / 10 : 1e-6, lg = v => Math.log10(Math.max(floor, v));
+  return { vals, lg, P: vals.map(x => [x.b.easting, x.b.northing, lg(x.r.lt ? x.r.v / 2 : x.r.v)]) };
+}
 function gisNote(m, key) {
   const name = (GIS_2D[m] || GIS_3D['gis_' + m] || GIS_3D[m] || [m])[0];
   if (!window.desktop?.gis) return name + ' needs the desktop app; shown with built-in kriging.';
   if (!gisOn()) return name + ' needs the GIS engines (Settings › GIS engines); shown with built-in kriging until they are installed.';
   if (key && GIS.err.has(key)) return name + ' did not run: ' + GIS.err.get(key) + ' Shown with built-in kriging.';
   const r = key && GIS.cache.get(key);
-  if (!r) return 'Running ' + name + '… shown with built-in kriging until it finishes.';
+  if (!r) { const j = [...GIS.jobs.values()].find(x => x.key === key && x.status === 'running'); return 'Running ' + name + (j?.p > 0 ? ' (' + Math.round(j.p * 100) + ' %)' : '') + '… shown with built-in kriging until it finishes. Progress is in the Toolbox.'; }
   return r.tool + (r.detail ? ': ' + r.detail : '') + '.' + (r.loo != null ? ' Each reading predicted from the others is typically within ' + gisX(r.loo) + ' (' + (r.loo_by || 'leave-one-out') + ').' : '') + ' ' + (r.seconds ? r.seconds.toFixed(1) + ' s.' : '');
 }
 /* the EPSG code of the project's coordinate system (UTM north), for GeoTIFF and GeoPackage files */
@@ -10564,21 +10649,21 @@ function projEpsg() {
 }
 /* the results map's surface as GIS files: a GeoTIFF of the values (in the result's own units) and a GeoPackage with the contours,
    boreholes and section lines, in the project's coordinate system; written by GDAL */
-async function gisExport(p) {
+async function gisExport(p, d0 = S.mres.d0, d1 = S.mres.d1) {
   if (!gisOn()) { toast('Exporting GIS files needs the GIS engines (Settings › GIS engines).'); return; }
-  const list = mapList(), s = resStyle(p), vals = list.map(b => ({ b, r: resultAt(b, p, S.mres.d0, S.mres.d1) })).filter(x => x.r && x.b.easting != null && !x.b.resOff);
+  const list = mapList(), s = resStyle(p), vals = list.map(b => ({ b, r: resultAt(b, p, d0, d1) })).filter(x => x.r && x.b.easting != null && !x.b.resOff);
   if (vals.length < 3) { toast('Three or more boreholes with results are needed for a surface.'); return; }
   const pos = vals.map(x => x.r.v).filter(v => v > 0), floor = p === 'cvc' ? 1 : pos.length ? Math.min(...pos) / 10 : 1e-6, lg = v => Math.log10(Math.max(floor, v));
-  const P = vals.map(x => [x.b.easting, x.b.northing, lg(x.r.lt ? x.r.v / 2 : x.r.v)]), g = gisBox(P), fit = resFit(s, P);
+  const P = vals.map(x => [x.b.easting, x.b.northing, lg(x.r.lt ? x.r.v / 2 : x.r.v)]), g = gisBox(P), fit = resFit(s, P, p);
   const dx = (g.box[2] - g.box[0]) / g.nx, dy = (g.box[3] - g.box[1]) / g.ny, values = [];
   for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) { const v = fit(g.box[0] + dx * (i + .5), g.box[3] - dy * (j + .5)); values.push(isFinite(v) ? +v.toFixed(5) : null); }
   const method = s.interp?.startsWith('gis:') ? (GIS.cache.get(GIS_LAST[p]?.key)?.tool || GIS_2D[s.interp.slice(4)]?.[0]) : s.interp === 'auto' ? 'Built-in automatic: ' + (RES_AUTO_NAMES[RES_AUTO_LAST[p]?.key] || 'kriging') : 'Built-in ' + (RES_INTERP[s.interp] || 'kriging').replace(/\s*\(.*$/, '');
   const name = ((projList()[0]?.projNo || 'site') + ' ' + resLabel(p).replace(/\s*\(.*$/, '')).replace(/[^\w .-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
   const lines = { section_lines: secLinesOf().map(l => ({ name: secLetters(l.name), pts: l.pts })) };
   toast('Writing the GeoTIFF and GeoPackage with GDAL…');
-  const r = await window.desktop.gis.run({ kind: 'export', box: g.box, nx: g.nx, ny: g.ny, values, levels: s.breaks.map(lg), unlog: true, epsg: projEpsg(), name, band: resLabel(p), source: 'Borehole Field Log; ' + method,
-    points: list.filter(b => b.easting != null).map(b => { const r0 = resultAt(b, p, S.mres.d0, S.mres.d1); return { x: b.easting, y: b.northing, name: gwName(b) || b.name || '', value: r0 ? r0.v : null, used: !!r0 && !b.resOff }; }), lines });
-  if (!r?.ok) { toast('GDAL could not write the files: ' + (r?.error || 'unknown error')); return; }
+  const r = await gisStart('export|' + Date.now(), { nocache: true, kind: 'export', box: g.box, nx: g.nx, ny: g.ny, values, levels: s.breaks.map(lg), unlog: true, epsg: projEpsg(), name, band: resLabel(p), source: 'Borehole Field Log; ' + method,
+    points: list.filter(b => b.easting != null).map(b => { const r0 = resultAt(b, p, d0, d1); return { x: b.easting, y: b.northing, name: gwName(b) || b.name || '', value: r0 ? r0.v : null, used: !!r0 && !b.resOff }; }), lines }, 'Export to GeoTIFF and GeoPackage (GDAL)', resLabel(p));
+  if (!r?.ok) { if (!r?.cancelled) toast('GDAL could not write the files: ' + (r?.error || 'unknown error')); return; }
   // contour levels in the file are log10; the GeoTIFF holds the values themselves
   for (const [fn, b64] of Object.entries(r.files)) { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); await saveBytes(fn, bin, fn.endsWith('.tif') ? 'image/tiff' : 'application/geopackage+sqlite3'); }
   toast('Saved ' + Object.keys(r.files).join(' and ') + ' (EPSG:' + projEpsg() + '). Contour values in the GeoPackage are log₁₀ of ' + resUnit(p) + '.');
@@ -10606,6 +10691,121 @@ async function gisInstall() {
   if (!r.ok) { GIS.prog = ''; toast('The GIS engines did not install: ' + r.error); re(); return; }
   GIS.prog = ''; GIS.st = await window.desktop.gis.status(); gisMethods(); re(); toast(gisOn() ? 'GIS engines installed: GRASS GIS ' + (gisVer().grass || '') + ', GDAL ' + (gisVer().gdal || '') + '.' : 'Installed, but they did not start: ' + (GIS.st?.broken || ''));
 }
+/* ---------- GIS Toolbox: pick a tool, set its input and parameters, Run; progress, messages and the history of runs, as in a
+   desktop GIS. Every run is the real tool (GRASS GIS, GDAL, PyKrige, GSTools) through the GIS engines. ---------- */
+const GP_TOOLS = {
+  grass_rst: { group: 'Interpolation', name: 'Spline with tension', by: 'GRASS GIS v.surf.rst', kind: 'surface', desc: 'A smooth surface that passes near every reading, its stiffness set by the tension (Mitasova and Mitas 1993).', prm: [['tension', 'Tension', 40, 'Higher: stiffer, closer to straight lines; lower: smoother, can overshoot.'], ['smooth', 'Smoothing', 0.1, '0 passes exactly through the readings; more lets it pass near them.']] },
+  grass_idw: { group: 'Interpolation', name: 'Inverse distance', by: 'GRASS GIS v.surf.idw', kind: 'surface', desc: 'Each place is a weighted average of the nearest readings; closer readings count more.', prm: [['npoints', 'Nearest readings', 12, 'How many readings each place averages.'], ['power', 'Power', 2, 'Higher: the nearest reading dominates.']] },
+  pykrige_ok: { group: 'Interpolation', name: 'Ordinary kriging', by: 'PyKrige', kind: 'surface', desc: 'The standard geostatistical estimate, with its error. The variogram model, range and nugget are calibrated: the ones that best predict each reading from the others.', prm: [['model', 'Variogram', 'auto', 'Automatic tries spherical, exponential and Gaussian.', ['auto', 'spherical', 'exponential', 'gaussian']]] },
+  pykrige_uk: { group: 'Interpolation', name: 'Universal kriging', by: 'PyKrige', kind: 'surface', desc: 'Kriging with a linear trend across the site, for a plume that grades one way.', prm: [['model', 'Variogram', 'auto', '', ['auto', 'spherical', 'exponential', 'gaussian']]] },
+  gstools_ok: { group: 'Interpolation', name: 'Ordinary kriging (fitted variogram)', by: 'GSTools', kind: 'surface', desc: 'Kriging with an exponential, spherical or Gaussian variogram fitted to the experimental variogram.', prm: [] },
+  gdal_invdist: { group: 'Interpolation', name: 'Inverse distance', by: 'GDAL gdal_grid', kind: 'surface', desc: 'gdal_grid -a invdist: every reading, weighted by distance.', prm: [['power', 'Power', 2, ''], ['smoothing', 'Smoothing', 0, '']] },
+  gdal_invdistnn: { group: 'Interpolation', name: 'Inverse distance, nearest readings', by: 'GDAL gdal_grid', kind: 'surface', desc: 'gdal_grid -a invdistnn: only the nearest readings.', prm: [['power', 'Power', 2, ''], ['max_points', 'Nearest readings', 12, '']] },
+  gdal_linear: { group: 'Interpolation', name: 'Linear (triangles)', by: 'GDAL gdal_grid', kind: 'surface', desc: 'gdal_grid -a linear: straight lines between readings on a Delaunay triangulation; nothing past the outer boreholes.', prm: [] },
+  gdal_nearest: { group: 'Interpolation', name: 'Nearest reading', by: 'GDAL gdal_grid', kind: 'surface', desc: 'gdal_grid -a nearest: each place takes the nearest reading. Nothing is invented between boreholes.', prm: [] },
+  pykrige_ok3d: { group: 'Interpolation 3D (cross-section)', name: 'Ordinary kriging, 3D', by: 'PyKrige', kind: 'points3d', desc: 'A plume through the section line from every sample near it, in plan and depth together. Variogram calibrated by leave-one-out.', prm: [['k', 'Layering', 'auto', 'How much further a plume reaches sideways than down.', ['auto', '1', '3', '10', '30', '100']]] },
+  gstools_ok3d: { group: 'Interpolation 3D (cross-section)', name: 'Ordinary kriging, 3D (fitted variogram)', by: 'GSTools', kind: 'points3d', desc: 'GSTools 3D kriging with a variogram fitted to the samples.', prm: [['k', 'Layering', 'auto', '', ['auto', '1', '3', '10', '30', '100']]] },
+  compare: { group: 'Analysis', name: 'Compare interpolation methods', by: 'every 2D tool, leave-one-out', kind: 'compare', desc: 'Runs each interpolation tool on the same readings and ranks them by how well each predicts every reading from the others.', prm: [] },
+  export: { group: 'Conversion', name: 'Surface to GeoTIFF and GeoPackage', by: 'GDAL', kind: 'export', desc: 'The map\'s surface (as its method draws it) as a GeoTIFF, and its contours, boreholes and section lines as a GeoPackage, in the project\'s coordinate system.', prm: [] },
+};
+S.gp = { tool: 'grass_rst', p: '', d0: null, d1: null, prm: {}, cell: '', use: true, save: false, q: '', ...jsonLS('bhlog.gp', {}) };
+const gpSave = () => lsSet('bhlog.gp', JSON.stringify({ ...S.gp, run: undefined }));
+const gpTools = () => Object.entries(GP_TOOLS).filter(([k]) => !(desktopWin() && GIS_NO_WIN.has(k)));
+function gpHTML() {
+  const T = GP_TOOLS[S.gp.tool] || GP_TOOLS.grass_rst, k = GP_TOOLS[S.gp.tool] ? S.gp.tool : 'grass_rst', q = (S.gp.q || '').toLowerCase();
+  const groups = [...new Set(gpTools().map(([, t]) => t.group))];
+  const list = groups.map(g => { const items = gpTools().filter(([id, t]) => t.group === g && (!q || (t.name + ' ' + t.by + ' ' + t.desc).toLowerCase().includes(q))); return items.length ? `<li class="gp-g"><b>${esc(g)}</b><ul>${items.map(([id, t]) => `<li><button type="button" data-gptool="${id}" aria-current="${id === k}"><span>${esc(t.name)}</span><small>${esc(t.by)}</small></button></li>`).join('')}</ul></li>` : ''; }).join('');
+  const off = !gisOn(), j = [...GIS.jobs.values()].filter(x => x.tool === k).pop();
+  return `<div class="gp">
+    <aside class="sec gp-list"><header><h3>Tools</h3></header><div class="body"><input id="gp-q" type="search" placeholder="Find a tool" value="${esc(S.gp.q || '')}" aria-label="Find a tool"><ul class="gp-tree">${list || '<li class="note">No tool matches.</li>'}</ul></div></aside>
+    <section class="sec gp-tool"><header><h3>${esc(T.name)}</h3><span class="note">${esc(T.by)}</span></header><div class="body">
+      ${off ? `<div class="gp-warn">${window.desktop?.gis ? 'The tools need the GIS engines (GRASS GIS, GDAL, PyKrige, GSTools). <button class="btn" data-act="gis-install">Install GIS engines…</button>' : 'The tools run on the desktop app.'}</div>` : ''}
+      <p class="note">${esc(T.desc)}</p>
+      ${gpFormHTML(k, T)}
+      <div class="gp-run"><button class="btn primary" data-act="gp-run" ${off || (j && j.status === 'running') ? 'disabled' : ''}>Run</button>${j && j.status === 'running' ? `<button class="btn" data-act="gp-cancel" data-id="${j.id}">Cancel</button>` : ''}</div>
+      ${j ? gpJobHTML(j, true) : ''}
+    </div></section></div>`;
+}
+function gpFormHTML(k, T) {
+  const ps = resultParams(), L = LEN(), g = S.gp, ro = S.readOnly ? 'disabled' : '';
+  if (!g.p || !ps.some(([v]) => v === g.p)) g.p = ps[0]?.[0] || 'cvc';
+  const prm = (T.prm || []).map(([n, l, d, tip, opts]) => crow(esc(l), opts ? `<select data-gpprm="${n}" title="${esc(tip || '')}">${opts.map(o => `<option value="${o}" ${String(g.prm[k]?.[n] ?? d) === o ? 'selected' : ''}>${o === 'auto' ? 'Automatic' : n === 'k' ? (o === '1' ? 'Same sideways as down' : '×' + o + ' further sideways') : o.charAt(0).toUpperCase() + o.slice(1)}</option>`).join('')}</select>` : `<input type="number" step="any" data-gpprm="${n}" value="${esc(g.prm[k]?.[n] ?? '')}" placeholder="${d}" title="${esc(tip || '')}">`)).join('');
+  if (T.kind === 'points3d') {
+    const xs = S.xs, med = { soil: 'Soil (lab)', groundwater: 'Groundwater (lab)', vapour: 'Headspace vapour' }[xs.medium] || xs.medium;
+    return `<h4>Input</h4>${crow('Section', esc(secLetters()) + ` <span class="note">${sectionList().length} boreholes · <button class="btn link" data-tab="xsec">change on the Section page</button></span>`)}${crow('Results', esc(med) + (xs.medium !== 'vapour' && xs.param ? ', ' + esc(LAB_PARAMS[xs.param]?.label || xs.param) : ''))}
+      <h4>Parameters</h4>${prm}<h4>Output</h4><label class="check"><input type="checkbox" data-gpf="use" ${g.use ? 'checked' : ''}> Use on the cross-section when done</label>`;
+  }
+  const pick = `<select data-gpf="p">${ps.map(([v, l]) => `<option value="${v}" ${v === g.p ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  const n = ps.length ? resPts(g.p, g.d0, g.d1).P.length : 0;
+  const input = `<h4>Input</h4>${crow('Result', pick)}${crow('Depth (' + L + ')', `<input type="number" step="any" data-gpf="d0" placeholder="top" value="${g.d0 != null ? +toD(g.d0).toFixed(2) : ''}"><span class="note">to</span><input type="number" step="any" data-gpf="d1" placeholder="bottom" value="${g.d1 != null ? +toD(g.d1).toFixed(2) : ''}">`)}${crow('Boreholes', `<span>${n} with results${n < 3 ? ' <b>(three or more needed)</b>' : ''}</span>`)}`;
+  if (T.kind === 'export') return input + `<h4>Output</h4>${crow('Surface', esc(resStyle(g.p).interp?.startsWith('gis:') ? GIS_2D[resStyle(g.p).interp.slice(4)]?.[0] || '' : 'Built-in: ' + (RES_INTERP[resStyle(g.p).interp] || '').replace(/\s*\(.*$/, '')))}${crow('Coordinates', 'EPSG:' + projEpsg())}<p class="note">The surface is the one the maps draw for this result; change it under Method on the Map page or with an interpolation tool here.</p>`;
+  if (T.kind === 'compare') return input + '<p class="note">Each tool runs in turn; the table ranks them by their typical error predicting each reading from the others.</p>' + gpCompareHTML();
+  return input + (prm ? '<h4>Parameters</h4>' + prm : '') + `<h4>Grid</h4>${crow('Cell size (m)', `<input type="number" step="any" min="0" data-gpf="cell" value="${esc(g.cell || '')}" placeholder="auto">`)}
+    <h4>Output</h4><label class="check"><input type="checkbox" data-gpf="use" ${g.use ? 'checked' : ''}> Use on the maps for this result when done</label><label class="check"><input type="checkbox" data-gpf="save" ${g.save ? 'checked' : ''}> Save a GeoTIFF and GeoPackage too</label>`;
+}
+/* one run: its bar, what it is doing, its messages and, when done, what came out */
+function gpJobHTML(j, full) {
+  const r = j.res, ok = j.status === 'done';
+  return `<div class="gp-job ${j.status}" data-gpjob="${j.id}">
+    <div class="gp-jh"><b>${esc(j.label)}</b><span class="gp-time note">${j.status === 'running' ? Math.round(j.p * 100) + ' % · ' : ''}${gisElapsed(j)}</span></div>
+    ${gpBarHTML(j)}<div class="gp-msg note">${esc(j.msg || '')}</div>
+    ${full ? `<details class="gp-det" ${j.status === 'running' ? 'open' : ''}><summary>Messages</summary><ul class="gp-log">${(j.msgs || []).slice(-60).map(([t, m]) => `<li><span>${new Date(t).toLocaleTimeString()}</span>${esc(m)}</li>`).join('')}</ul></details>` : ''}
+    ${ok && r?.tool ? `<p class="note gp-out">${esc(r.tool)}${r.detail ? ': ' + esc(r.detail) : ''}.${r.loo != null ? ' Each reading predicted from the others typically within ' + gisX(r.loo) + ' (' + esc(r.loo_by || 'leave-one-out') + ').' : ''}</p>` : ''}
+    ${full && ok && j.kind === 'surface' ? `<div class="actions"><button class="btn" data-act="gp-use" data-id="${j.id}">Use on the maps</button><button class="btn" data-act="gp-show" data-id="${j.id}">Show on the map</button></div>` : ''}
+    ${full && ok && j.kind === 'points3d' ? `<div class="actions"><button class="btn" data-act="gp-use" data-id="${j.id}">Use on the cross-section</button><button class="btn" data-tab="xsec">Open the cross-section</button></div>` : ''}
+  </div>`;
+}
+function gpCompareHTML() {
+  const rows = (S.gp.cmp || []).map(c => ({ ...c, r: GIS.cache.get(c.key), j: [...GIS.jobs.values()].find(x => x.key === c.key) }));
+  if (!rows.length) return '';
+  const done = rows.filter(x => x.r?.loo != null).sort((a, b) => a.r.loo - b.r.loo);
+  return `<table class="sum gp-cmp"><thead><tr><th>#</th><th>Tool</th><th class="r">Typical error</th><th></th></tr></thead><tbody>${[...done, ...rows.filter(x => !(x.r?.loo != null))].map((x, i) => `<tr${i === 0 && x.r ? ' class="best"' : ''}><td>${x.r ? i + 1 : ''}</td><td>${esc(GP_TOOLS[x.m].name)} <span class="note">${esc(GP_TOOLS[x.m].by)}</span></td><td class="r">${x.r?.loo != null ? gisX(x.r.loo) : x.j?.status === 'running' ? Math.round(x.j.p * 100) + ' %' : x.j?.status === 'failed' ? 'failed' : '…'}</td><td>${x.r ? `<button class="btn link" data-act="gp-cmp-use" data-m="${x.m}">Use</button>` : ''}</td></tr>`).join('')}</tbody></table>
+    <p class="note">Typical error: how far off each reading is, as a factor, when the tool predicts it from the others (leave-one-out, in log₁₀). Smaller is better.</p>`;
+}
+const gpParams = k => { const o = {}; for (const [n, , d, , opts] of GP_TOOLS[k].prm || []) { const v = S.gp.prm[k]?.[n]; o[n] = v == null || v === '' ? (opts ? d : null) : opts ? v : +v; } return o; };
+/* Run: build the job from the form, start it (it shows in the bar and the history), then act on what was ticked */
+async function gpRun() {
+  const k = GP_TOOLS[S.gp.tool] ? S.gp.tool : 'grass_rst', T = GP_TOOLS[k], g = S.gp;
+  if (!gisOn()) { toast('Install the GIS engines first (Settings › GIS engines).'); return; }
+  if (T.kind === 'export') { await gisExport(g.p, g.d0, g.d1); renderView(true); return; }
+  if (T.kind === 'points3d') {
+    const prm = gpParams(k), kk = prm.k === 'auto' ? (XS_ANISO_PICK || 10) : +prm.k;
+    S.xs = { ...S.xs, interp: 'gis_' + k, aniso: kk }; lsSet('bhlog.xs', JSON.stringify(S.xs)); gisMethods();
+    // the section is drawn off screen to set its geometry; the job starts from there
+    const d = document.createElement('div'), n = document.createElement('p'); d.style.cssText = 'position:absolute;left:-9999px;width:1100px'; document.body.append(d);
+    try { withRO({ xs: S.xs }, () => drawSection(d, n, 1100, sectionList())); } finally { d.remove(); }
+    const j = [...GIS.jobs.values()].filter(x => x.key === GIS_LAST.xs).pop(); if (j) { j.tool = k; j.kind = 'points3d'; }
+    if (!j && GIS.cache.has(GIS_LAST.xs)) toast('Already run with these settings: the result is on the cross-section.');
+    renderView(true); return;
+  }
+  const { P } = resPts(g.p, g.d0, g.d1);
+  if (P.length < 3) { toast('Three or more boreholes with results are needed.'); return; }
+  if (T.kind === 'compare') {
+    const ms = Object.keys(GIS_2D).filter(m => !(desktopWin() && GIS_NO_WIN.has(m)));
+    g.cmp = ms.map(m => ({ m, key: gisJob2d(m, P, {}, g.cell).key })); renderView(true);
+    for (const m of ms) { const { key, job } = gisJob2d(m, P, {}, g.cell), pr = gisStart(key, job, GP_TOOLS[m].name + ' (' + GP_TOOLS[m].by + ')', resLabel(g.p)); const j = [...GIS.jobs.values()].find(x => x.key === key); if (j) { j.tool = 'compare'; j.kind = 'surface'; } await pr; if (S.tab === 'gp') renderView(true); }
+    return;
+  }
+  const prm = gpParams(k), { key, job } = gisJob2d(k, P, prm, g.cell);
+  if (GIS.cache.has(key)) GIS.cache.delete(key);   // Run always runs
+  const pr = gisStart(key, job, T.name + ' (' + T.by + ')', resLabel(g.p)), j = [...GIS.jobs.values()].find(x => x.key === key && x.status === 'running');
+  if (j) { j.tool = k; j.kind = 'surface'; j.p0 = g.p; j.prm = prm; j.cell = g.cell; }
+  renderView(true);
+  const r = await pr;
+  if (r?.ok && g.use) { gpUse(j); }
+  if (r?.ok && g.save) await gisExport(g.p, g.d0, g.d1);
+}
+function gpUse(j) {
+  if (!j) return;
+  if (j.kind === 'points3d' || j.job?.kind === 'points3d') { S.xs = { ...S.xs, interp: 'gis_' + j.job.method }; lsSet('bhlog.xs', JSON.stringify(S.xs)); toast('The cross-section now uses ' + j.label + '.'); return; }
+  const p = j.p0 || S.gp.p, prm = Object.fromEntries(Object.entries(j.prm || {}).filter(([, v]) => v != null && v !== '' && v !== 'auto'));
+  setResStyle(p, { interp: 'gis:' + j.job.method, gisPrm: prm, gisCell: +j.cell > 0 ? +j.cell : null }); S.mres = { ...S.mres, p, d0: S.gp.d0, d1: S.gp.d1 }; S.lyr.res = true; lsSet('bhlog.lyr', JSON.stringify(S.lyr));
+  toast('Maps of ' + resLabel(p) + ' now use ' + j.label + '.');
+}
+/* the panel beside the Toolbox: what is running, and every run this session (click one to set the tool up the same way again) */
+CTL.gp = () => { const all = [...GIS.jobs.values()].reverse(), run = all.filter(j => j.status === 'running'); return [
+  { id: 'gp-running', title: 'Running', icon: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>', sum: run.length ? String(run.length) : 'Nothing', html: run.length ? run.map(j => gpJobHTML(j, false) + `<button class="btn link" data-act="gp-cancel" data-id="${j.id}">Cancel</button>`).join('') : '<p class="note">No tool is running.</p>' },
+  { id: 'gp-hist', title: 'History', icon: '<path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v4h4"/>', sum: all.length ? String(all.length) : '', html: all.length ? '<ul class="gp-hist">' + all.map(j => `<li class="${j.status}"><button type="button" data-gphist="${j.id}" title="${esc(j.msg || '')}"><span class="gp-st">${{ done: '✓', failed: '✕', cancelled: '–', running: '…' }[j.status]}</span><span><b>${esc(j.label)}</b><small>${esc(j.input || '')} · ${new Date(j.t0).toLocaleTimeString()} · ${gisElapsed(j)}${j.res?.loo != null ? ' · within ' + gisX(j.res.loo) : ''}</small></span></button></li>`).join('') + '</ul>' : '<p class="note">Runs appear here: every tool you run, and the ones the maps and sections start.</p>' }]; };
 function resAutoText(r) { if (!r) return ''; const x = v => '×' + (10 ** v < 10 ? (10 ** v).toFixed(1) : Math.round(10 ** v));
   return 'Picked ' + RES_AUTO_NAMES[r.key] + (r.key === 'krige' && r.cal ? ' (' + r.cal.model + ', range ' + Math.round(r.cal.range) + ' m' + (r.cal.nug ? ', nugget ' + Math.round(r.cal.nug * 100) + ' %' : '') + ')' : '') + ': each reading predicted from the others within ' + x(r.rmse) + ' on average' + Object.entries(r.all).filter(([k, v]) => k !== r.key && v != null).map(([k, v], i) => (i ? ', ' : '; ') + RES_AUTO_NAMES[k] + ' ' + x(v)).join('') + '.'; }
 /* the spline held to the range of the readings, so it cannot invent a value higher or lower than any measured */
@@ -13125,6 +13325,11 @@ document.addEventListener('click', e => {
     case 'gis-check': GIS.st = null; window.desktop?.gis?.status().then(st => { GIS.st = st; gisMethods(); const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); toast(gisOn() ? 'The GIS engines start and answer.' : 'They did not start: ' + (st?.broken || 'not installed')); }); break;
     case 'gis-remove': if (confirm('Remove the GIS engines (about 1.6 GB)? Maps set to a GIS method go back to the built-in ones until they are installed again.')) window.desktop.gis.remove().then(r => { GIS.st = { installed: false }; GIS.cache.clear(); const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); toast(r.ok ? 'The GIS engines were removed.' : r.error); }); break;
     case 'gis-export': gisExport(t.dataset.p || 'cvc'); break;
+    case 'gp-run': gpRun(); break;
+    case 'gp-cancel': window.desktop?.gis?.cancel(t.dataset.id); break;
+    case 'gp-use': gpUse(GIS.jobs.get(t.dataset.id)); break;
+    case 'gp-show': { gpUse(GIS.jobs.get(t.dataset.id)); goTab('site'); break; }
+    case 'gp-cmp-use': { const m = t.dataset.m; S.gp.tool = m; gpSave(); gpUse({ job: { method: m }, p0: S.gp.p, prm: {}, cell: S.gp.cell, label: GP_TOOLS[m].name + ' (' + GP_TOOLS[m].by + ')' }); renderView(true); break; }
     case 'new-project': openNewProject(); break;
     case 'np-save': {
       const name = $('#np-name').value.trim(); if (!name) { $('#np-name').classList.add('bad'); $('#np-name').focus(); return; }

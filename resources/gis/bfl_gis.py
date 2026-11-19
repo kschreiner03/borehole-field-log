@@ -39,6 +39,12 @@ def grass_exe():
     return shutil.which('grass')
 
 # ---------- helpers ----------
+def prog(p, msg=None):
+    """a progress line for the app's progress bar (the share done, 0 to 1, and what is happening)"""
+    d = {'p': round(max(0.0, min(1.0, p)), 4)}
+    if msg: d['msg'] = msg
+    print('@@' + json.dumps(d), flush=True)
+
 def grid_axes(job):
     x0, y0, x1, y1 = job['box']; nx, ny = int(job['nx']), int(job['ny'])
     dx, dy = (x1 - x0) / nx, (y1 - y0) / ny
@@ -50,10 +56,11 @@ def as_list(a):
     a = np.asarray(a, dtype=float)
     return [None if not math.isfinite(v) else round(float(v), 6) for v in a.ravel()]
 
-def loo_rmse(P, fit_pred):
+def loo_rmse(P, fit_pred, report=None):
     """leave-one-out: each point predicted from the others with the same method and settings"""
     se, n = 0.0, 0
     for i in range(len(P)):
+        if report: report(i, len(P))
         rest = P[:i] + P[i + 1:]
         try: v = fit_pred(rest, P[i])
         except Exception: return None
@@ -82,7 +89,8 @@ def gdal_grid(P, method, prm, box, nx, ny):
     from osgeo import gdal
     gdal.UseExceptions()
     o = {**GDAL_DEF, **{k: v for k, v in prm.items() if k in GDAL_DEF}}
-    if not o['radius'] and method in ('gdal_invdistnn', 'gdal_average'): o['radius'] = 2 * math.hypot(box[2] - box[0], box[3] - box[1])   # every point within reach
+    if not o['radius'] and method in ('gdal_invdistnn', 'gdal_average'):   # every reading within reach: from the readings' own extent, not the grid's
+        xs_, ys_ = [p[0] for p in P], [p[1] for p in P]; o['radius'] = 2 * math.hypot(max(xs_) - min(xs_), max(ys_) - min(ys_)) + 1
     alg = GDAL_ALG[method].format(**o)
     src = gdal_points_ds(P)
     x0, y0, x1, y1 = box
@@ -98,11 +106,15 @@ def gdal_grid(P, method, prm, box, nx, ny):
 def gdal_surface(job):
     P, m, prm = job['pts'], job['method'], job.get('params', {})
     xs, ys, dx, dy, nx, ny = grid_axes(job)
+    prog(0.05, 'gdal_grid: %d points onto %d × %d cells' % (len(P), nx, ny))
     arr, alg = gdal_grid(P, m, prm, job['box'], nx, ny)
+    prog(0.3, 'Grid made; checking it: each point left out in turn')
     def pred(rest, p):   # a one-cell grid on the point itself, from the others
         a, _ = gdal_grid(rest, m, prm, [p[0] - .5, p[1] - .5, p[0] + .5, p[1] + .5], 1, 1); return float(a[0, 0])
     from osgeo import gdal
-    return {'values': as_list(arr), 'loo': loo_rmse(P, pred), 'tool': 'GDAL %s gdal_grid' % gdal.__version__, 'detail': '-a ' + alg}
+    loo = loo_rmse(P, pred, lambda i, n: prog(0.3 + 0.65 * i / n, 'Leave-one-out %d of %d' % (i + 1, n)))
+    prog(0.98, 'Writing the result')
+    return {'values': as_list(arr), 'loo': loo, 'tool': 'GDAL %s gdal_grid' % gdal.__version__, 'detail': '-a ' + alg}
 
 # ---------- PyKrige ----------
 VARIO = ('spherical', 'exponential', 'gaussian')
@@ -125,7 +137,8 @@ def pykrige_best(P, make, predict, dim, prm):
     if prm.get('model') in VARIO: cands = [c for c in cands if c[0] == prm['model']]
     if len(P) > 80: cands = cands[::3]   # many points: a coarser search keeps it quick
     best = None
-    for model, vp in cands:
+    for c, (model, vp) in enumerate(cands):
+        prog(0.05 + 0.85 * c / len(cands), 'Variogram %d of %d: %s, range %.3g m (each point left out in turn)' % (c + 1, len(cands), model, vp['range']))
         def pred(rest, p): r = np.array(rest, float); return predict(make(r, model, vp), p)
         e = loo_rmse(P, pred)
         if e is not None and (best is None or e < best[2]): best = (model, vp, e)
@@ -143,6 +156,7 @@ def pykrige_surface(job):
         return OrdinaryKriging(r[:, 0], r[:, 1], r[:, 2], variogram_model=model, variogram_parameters=vp)
     def predict(k, p): z, _ = k.execute('points', np.array([p[0]], float), np.array([p[1]], float)); return float(np.asarray(z)[0])
     (model, vp, e), n = pykrige_best(P, make, predict, 2, prm)
+    prog(0.92, 'Kriging the grid with the %s variogram' % model)
     k = make(np.array(P, float), model, vp); z, ss = k.execute('grid', np.array(xs, float), np.array(ys[::-1], float))
     z, ss = np.asarray(z)[::-1], np.asarray(ss)[::-1]
     return {'values': as_list(z), 'var': as_list(ss), 'loo': e, 'loo_by': 'leave-one-out', 'sill': vp['sill'],
@@ -156,6 +170,7 @@ def pykrige_points3d(job):
     def make(r, model, vp): return OrdinaryKriging3D(r[:, 0], r[:, 1], r[:, 2], r[:, 3], variogram_model=model, variogram_parameters=vp)
     def predict(k, p): z, _ = k.execute('points', np.array([p[0]], float), np.array([p[1]], float), np.array([p[2]], float)); return float(np.asarray(z)[0])
     (model, vp, e), n = pykrige_best(P, make, predict, 3, prm)
+    prog(0.92, 'Kriging %d section points with the %s variogram' % (len(T), model))
     Tt = np.array(T, float); k = make(np.array(P, float), model, vp); z, ss = k.execute('points', Tt[:, 0], Tt[:, 1], Tt[:, 2])
     return {'values': as_list(z), 'var': as_list(ss), 'loo': e, 'loo_by': 'leave-one-out', 'sill': vp['sill'],
             'tool': 'PyKrige %s OrdinaryKriging3D' % pykrige.__version__,
@@ -189,9 +204,11 @@ def gstools_job(job, dim):
     if dim == 2:
         xs, ys, dx, dy, nx, ny = grid_axes(job); T = [[x, y] for y in ys for x in xs]
     else: T = job['targets']
+    prog(0.05, 'Fitting the variogram (GSTools vario_estimate, fit_variogram)')
     fld, var, mod, r2 = gstools_krige(P, T, dim)
+    prog(0.3, 'Kriged with a %s variogram; checking it: each point left out in turn' % type(mod).__name__)
     def pred(rest, p): f, _, _, _ = gstools_krige(rest, [p[:dim]], dim); return float(f[0])
-    loo = loo_rmse(P, pred)
+    loo = loo_rmse(P, pred, lambda i, n: prog(0.3 + 0.65 * i / n, 'Leave-one-out %d of %d' % (i + 1, n)))
     return {'values': as_list(fld), 'var': as_list(var), 'loo': loo, 'sill': float(mod.sill) or 1.0,
             'tool': 'GSTools %s krige.Ordinary%s' % (gs.__version__, ' (3D)' if dim == 3 else ''),
             'detail': '%s variogram fitted to the experimental variogram (r² %.2f): variance %.4g, length scale %.4g, nugget %.4g' % (type(mod).__name__, r2, mod.var, mod.len_scale, mod.nugget)}
@@ -205,8 +222,16 @@ def grass_run(job):
     try:
         jf, rf = os.path.join(tmp, 'job.json'), os.path.join(tmp, 'res.json')
         with open(jf, 'w') as f: json.dump(job, f)
-        r = subprocess.run([g, '--tmp-project', 'XY', '--exec', sys.executable, os.path.abspath(__file__), '--in-grass', jf, rf], capture_output=True, text=True, timeout=int(job.get('timeout', 600)))
-        if not os.path.exists(rf): raise RuntimeError('GRASS GIS stopped: ' + (r.stderr or r.stdout)[-1500:])
+        prog(0.02, 'Starting GRASS GIS in a temporary project')
+        pr = subprocess.Popen([g, '--tmp-project', 'XY', '--exec', sys.executable, os.path.abspath(__file__), '--in-grass', jf, rf], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
+        out = []
+        for line in pr.stdout:
+            if line.startswith('@@'): print(line.rstrip(), flush=True)
+            else: out.append(line)
+        pr.wait(timeout=int(job.get('timeout', 600)))
+        class R: stdout = ''.join(out)[-20000:]; stderr = ''
+        r = R()
+        if not os.path.exists(rf): raise RuntimeError('GRASS GIS stopped: ' + r.stdout[-1500:])
         with open(rf) as f: res = json.load(f)
         if not res.get('ok', True) and 'db_open_database' in (r.stdout + r.stderr):
             raise RuntimeError('This GRASS tool needs GRASS\'s attribute database, which does not open in the Windows build of GRASS 8.5 from conda-forge. v.surf.rst and v.surf.idw work without it; for 3D, use PyKrige or GSTools.')
@@ -232,6 +257,7 @@ def in_grass(job):
         x0, y0, z0, x1, y1, z1 = job['box3']; nx, ny, nz = int(job['nx']), int(job['ny']), int(job['nz'])
         gs.run_command('g.region', w=x0, e=x1, s=y0, n=y1, b=z0, t=z1, cols=nx, rows=ny, depths=nz, quiet=True)
         ten, smo = float(prm.get('tension', 40)), float(prm.get('smooth', 0.1))
+        prog(0.1, 'Running v.vol.rst on %d samples, %d × %d × %d cells' % (len(P), nx, ny, nz))
         gs.run_command('v.vol.rst', input='pts', wcolumn='v', elevation='out', tension=ten, smooth=smo, overwrite=True, quiet=True)
         try:   # GRASS's own cross-validation: each point left out in turn
             gs.run_command('v.vol.rst', input='pts', wcolumn='v', cvdev='cv', tension=ten, smooth=smo, flags='c', overwrite=True, quiet=True)
@@ -264,10 +290,13 @@ def in_grass(job):
                 npts, pw = int(prm.get('npoints', 12)), float(prm.get('power', 2))
                 gs.run_command('v.surf.idw', input=src, output=out, npoints=min(npts, len(P) - 1), power=pw, overwrite=True, quiet=True); return '%d nearest points, power %g' % (npts, pw)
             raise RuntimeError('Unknown GRASS method ' + m)
+        prog(0.08, 'Running %s on %d points, %d × %d cells' % ({'grass_rst': 'v.surf.rst', 'grass_bspline': 'v.surf.bspline', 'grass_idw': 'v.surf.idw'}[m], len(P), nx, ny))
         detail = surf('pts', 'out')
+        prog(0.25, 'Surface made; checking it: each point left out in turn')
         if job.get('loo', True) and len(P) <= 120:   # each point left out in turn, the same tool rerun, read back at the point (r.what)
             dev = []
             for i in range(len(P)):
+                prog(0.25 + 0.7 * i / len(P), 'Leave-one-out %d of %d (the same GRASS tool rerun)' % (i + 1, len(P)))
                 sf = os.path.join(tmp, 'loo.csv')
                 with open(sf, 'w') as f:
                     for j, p in enumerate(P):
@@ -296,6 +325,7 @@ def export(job):
     xs, ys, dx, dy, nx, ny = grid_axes(job); x0, y0, x1, y1 = job['box']
     srs = osr.SpatialReference(); srs.ImportFromEPSG(int(job['epsg']))
     tmp = tempfile.mkdtemp(prefix='bfl-exp-'); files = {}
+    prog(0.1, 'Writing the GeoTIFF (EPSG:%s)' % job['epsg'])
     try:
         tif = os.path.join(tmp, job.get('name', 'surface') + '.tif')
         ds = gdal.GetDriverByName('GTiff').Create(tif, nx, ny, 1, gdal.GDT_Float32, ['COMPRESS=DEFLATE', 'TILED=YES'])
@@ -304,6 +334,7 @@ def export(job):
         a = np.array([(-9999 if v is None else v) for v in job['values']], float).reshape(ny, nx)
         if job.get('unlog'): a = np.where(a == -9999, -9999, 10 ** a)
         b.WriteArray(a); b.SetDescription(job.get('band', 'value')); ds.SetMetadataItem('SOURCE', job.get('source', ''))
+        prog(0.5, 'Contours (gdal_contour) and the GeoPackage')
         gpkg = os.path.join(tmp, job.get('name', 'surface') + '.gpkg')
         vd = ogr.GetDriverByName('GPKG').CreateDataSource(gpkg)
         cl = vd.CreateLayer('contours', srs, ogr.wkbLineString); cl.CreateField(ogr.FieldDefn('ID', ogr.OFTInteger)); cl.CreateField(ogr.FieldDefn('value', ogr.OFTReal))
