@@ -257,10 +257,12 @@ def in_grass_hydro(job, gs, tmp):
         return [None if t in ('nan', '*') else float(t) for t in gs.read_command('r.out.ascii', input=r, null_value='nan', flags='h', precision=8).split()]
     if m == 'terrain':
         surf(P, 'h', 'ground surface')
-        prog(0.6, 'r.relief: hillshade; r.slope.aspect: slope')
-        gs.run_command('r.relief', input='h_r', output='rel', altitude=45, azimuth=315, overwrite=True, quiet=True)
-        gs.run_command('r.slope.aspect', elevation='h_r', slope='sl', format='degrees', overwrite=True, quiet=True)
-        return {'values': read('h_r'), 'hill': read('rel'), 'slope': read('sl'), 'tool': 'GRASS GIS %s v.surf.rst, r.relief, r.slope.aspect' % ver, 'detail': 'ground surface from %d points, ' % len(P) + 'v.surf.rst (tension %g, smoothing %g)' % (ten, smo)}
+        prog(0.5, 'r.out.gdal: the surface to GDAL for hillshade, slope and contours')
+        tif = os.path.join(tmp, 'ground.tif')
+        gs.run_command('r.out.gdal', input='h_r', output=tif, format='GTiff', type='Float32', flags='c', overwrite=True, quiet=True)
+        from osgeo import gdal
+        gdal.UseExceptions(); ds = gdal.Open(tif); out = terrain_products(ds, ds.GetRasterBand(1), prm); ds = None
+        return {**out, 'tool': 'GRASS GIS %s v.surf.rst; GDAL %s gdaldem, gdal_contour' % (ver, gdal.__version__), 'detail': 'ground surface from %d points, ' % len(P) + 'v.surf.rst (tension %g, smoothing %g)' % (ten, smo)}
     surf(P, 'h', 'water table')
     base = 'v.surf.rst (tension %g, smoothing %g)' % (ten, smo)
     if m == 'gw_gradient':
@@ -528,46 +530,87 @@ def prob_over(job):
 
 
 # ---------- terrain ----------
-def dem(job):
-    """an elevation model from a file (GeoTIFF, ASCII grid, …): reprojected to the project (gdalwarp), clipped to the site,
-    with hillshade and slope (gdaldem) and contours (gdal_contour)"""
-    from osgeo import gdal, osr, ogr
+# ---------- terrain ----------
+def b64f(a):
+    """a grid as little-endian float32 in base64 (NaN for no data): compact for large grids"""
     import numpy as np
-    gdal.UseExceptions(); osr.UseExceptions(); ogr.UseExceptions()
+    return base64.b64encode(np.ascontiguousarray(np.asarray(a, dtype='<f4')).tobytes()).decode()
+
+def b64u8(a):
+    import numpy as np
+    return base64.b64encode(np.ascontiguousarray(np.nan_to_num(np.clip(np.asarray(a, float), 0, 255), nan=0).astype(np.uint8)).tobytes()).decode()
+
+def nice_step(rng, n=8):
+    raw = max(rng, 1e-6) / n; p = 10 ** math.floor(math.log10(raw)); m = raw / p
+    return (1 if m < 1.5 else 2 if m < 3.5 else 5 if m < 7.5 else 10) * p
+
+def terrain_products(ds, band, prm, P_contours=True):
+    """hillshade, slope and contours of an elevation grid (gdaldem, gdal_contour), with the options chosen"""
+    from osgeo import gdal, ogr
+    import numpy as np
+    a = band.ReadAsArray().astype(float); nd = band.GetNoDataValue()
+    if nd is not None: a[a == nd] = np.nan
+    z = float(prm.get('zfactor', 1) or 1)
+    opts = dict(computeEdges=True, zFactor=z)
+    if str(prm.get('shade', 'single')) == 'multi': opts['multiDirectional'] = True
+    else: opts.update(azimuth=float(prm.get('azimuth', 315)), altitude=float(prm.get('altitude', 45)))
+    prog(0.6, 'gdaldem hillshade%s, slope' % (' (multidirectional)' if opts.get('multiDirectional') else ' (sun %g°, %g° high)' % (opts['azimuth'], opts['altitude'])))
+    hds = gdal.DEMProcessing('/vsimem/bfl_hs.tif', ds, 'hillshade', **opts); h = hds.GetRasterBand(1).ReadAsArray().astype(float); hds = None
+    sds = gdal.DEMProcessing('/vsimem/bfl_sl.tif', ds, 'slope', computeEdges=True); sl = sds.GetRasterBand(1).ReadAsArray().astype(float); sds = None
+    gdal.Unlink('/vsimem/bfl_hs.tif'); gdal.Unlink('/vsimem/bfl_sl.tif')
+    fin = a[np.isfinite(a)]; lo, hi = float(fin.min()), float(fin.max())
+    step = float(prm.get('interval') or 0) or nice_step(hi - lo, 8)
+    levels = [round(v, 6) for v in np.arange(math.ceil(lo / step) * step, hi + 1e-9, step)][:500]
+    lines = []
+    if levels:
+        prog(0.8, 'gdal_contour: every %g m' % step)
+        vd = ogr.GetDriverByName('Memory').CreateDataSource('c'); cl = vd.CreateLayer('c', None, ogr.wkbLineString)
+        cl.CreateField(ogr.FieldDefn('ID', ogr.OFTInteger)); cl.CreateField(ogr.FieldDefn('v', ogr.OFTReal))
+        gdal.ContourGenerateEx(band, cl, options=['FIXED_LEVELS=' + ','.join(str(v) for v in levels), 'ID_FIELD=0', 'ELEV_FIELD=1'])
+        for f in cl:
+            g = f.GetGeometryRef(); lines.append([round(f.GetField('v'), 6), [[round(g.GetX(i), 2), round(g.GetY(i), 2)] for i in range(g.GetPointCount())]])
+    m = np.isfinite(a)
+    return {'values_b64': b64f(a), 'hill_b64': b64u8(np.where(m, h, 0)), 'slope_b64': b64f(np.where(m, sl, np.nan)), 'lines': lines, 'step': step, 'min': lo, 'max': hi}
+
+def dem(job):
+    """an elevation model from a file (GeoTIFF, ASCII grid, …): reprojected to the project (gdalwarp: averaging when it is made
+    coarser, bilinear when finer), clipped to the area, with hillshade and slope (gdaldem) and contours (gdal_contour)"""
+    from osgeo import gdal, osr
+    import numpy as np
+    gdal.UseExceptions(); osr.UseExceptions()
+    prm = job.get('params', {})
     prog(0.05, 'Opening the file with GDAL')
     src = gdal.Open(job['path'])
     if src is None or src.RasterCount < 1: raise RuntimeError('GDAL could not read an elevation grid from this file.')
-    drv = src.GetDriver().ShortName; gt = src.GetGeoTransform(); sres = abs(gt[1]) if gt else None
-    wkt = src.GetProjection(); s_srs = None; assumed = False
-    if wkt:
-        sr = osr.SpatialReference(wkt=wkt); sname = sr.GetName()
-    else:
-        sname = 'none in the file: taken as the project coordinate system'; assumed = True; s_srs = 'EPSG:%d' % job['epsg']
-    x0, y0, x1, y1 = job['box']; n = int(job['maxcells'])
-    res = max((x1 - x0) / n, (y1 - y0) / n)
-    if sres and not assumed and sr.IsProjected(): res = max(res, sres * sr.GetLinearUnits())
-    prog(0.25, 'gdalwarp: to EPSG:%d, clipped to the site, %.2f m cells' % (job['epsg'], res))
-    w = gdal.Warp('/vsimem/bfl_dem.tif', src, format='GTiff', dstSRS='EPSG:%d' % job['epsg'], srcSRS=s_srs, outputBounds=[x0, y0, x1, y1], xRes=res, yRes=res, resampleAlg='bilinear', dstNodata=-99999, outputType=gdal.GDT_Float32)
-    b = w.GetRasterBand(1); a = b.ReadAsArray().astype(float); a[a <= -99998] = np.nan
-    if not np.isfinite(a).any(): w = None; gdal.Unlink('/vsimem/bfl_dem.tif'); raise RuntimeError('The file does not cover the site (after reprojecting it to EPSG:%d).' % job['epsg'])
+    drv = src.GetDriver().ShortName; gt = src.GetGeoTransform(); wkt = src.GetProjection(); assumed = not wkt
+    sr = osr.SpatialReference(wkt=wkt) if wkt else None; sname = sr.GetName() if sr else 'none in the file: taken as the project coordinate system'
+    # the file's own cell size in metres (for a geographic file, at this latitude)
+    x0, y0, x1, y1 = job['box']
+    if sr is None: sres = abs(gt[1])
+    elif sr.IsProjected(): sres = abs(gt[1]) * sr.GetLinearUnits()
+    else:   # geographic (degrees): measure a cell once warped to the project's coordinates
+        tmp = gdal.Warp('/vsimem/bfl_probe.vrt', src, format='VRT', dstSRS='EPSG:%d' % job['epsg']); sres = abs(tmp.GetGeoTransform()[1]); tmp = None; gdal.Unlink('/vsimem/bfl_probe.vrt')
+    span = max(x1 - x0, y1 - y0)
+    if prm.get('cellsize'): res = float(prm['cellsize'])
+    elif str(prm.get('cells', '400')) == 'source': res = sres
+    else: res = span / float(prm.get('cells', 400))
+    capped = False
+    while (x1 - x0) / res * (y1 - y0) / res > 4.2e6: res *= 1.25; capped = True
+    alg = 'average' if res > sres * 1.05 else 'bilinear'
+    prog(0.2, 'gdalwarp: to EPSG:%d at %.2f m (%s; the file is %.2f m)' % (job['epsg'], res, alg, sres))
+    w = gdal.Warp('/vsimem/bfl_dem.tif', src, format='GTiff', dstSRS='EPSG:%d' % job['epsg'], srcSRS=('EPSG:%d' % job['epsg']) if assumed else None, outputBounds=[x0, y0, x1, y1], xRes=res, yRes=res, resampleAlg=alg, dstNodata=-99999, outputType=gdal.GDT_Float32)
+    b = w.GetRasterBand(1)
+    shift = float(prm.get('shift') or 0)
+    if shift:   # onto the boreholes' datum
+        a = b.ReadAsArray().astype(float); a[a > -99998] += shift; b.WriteArray(a)
+    a = b.ReadAsArray()
+    if not (a > -99998).any(): w = None; gdal.Unlink('/vsimem/bfl_dem.tif'); raise RuntimeError('The file does not cover this area (after reprojecting it to EPSG:%d).' % job['epsg'])
     ny, nx = a.shape; gt2 = w.GetGeoTransform()
-    prog(0.55, 'gdaldem: hillshade and slope')
-    hds = gdal.DEMProcessing('/vsimem/bfl_hs.tif', w, 'hillshade', azimuth=315, altitude=45, computeEdges=True); h = hds.GetRasterBand(1).ReadAsArray().astype(float); hds = None
-    sds = gdal.DEMProcessing('/vsimem/bfl_sl.tif', w, 'slope', computeEdges=True); sl = sds.GetRasterBand(1).ReadAsArray().astype(float); sds = None
-    lines = []
-    if job.get('levels'):
-        prog(0.8, 'gdal_contour: %d levels' % len(job['levels']))
-        vd = ogr.GetDriverByName('Memory').CreateDataSource('c'); cl = vd.CreateLayer('c', None, ogr.wkbLineString)
-        cl.CreateField(ogr.FieldDefn('ID', ogr.OFTInteger)); cl.CreateField(ogr.FieldDefn('v', ogr.OFTReal))
-        gdal.ContourGenerateEx(b, cl, options=['FIXED_LEVELS=' + ','.join(str(v) for v in job['levels']), 'ID_FIELD=0', 'ELEV_FIELD=1'])
-        for f in cl:
-            g = f.GetGeometryRef(); lines.append([f.GetField('v'), [[round(g.GetX(i), 2), round(g.GetY(i), 2)] for i in range(g.GetPointCount())]])
-    for v in ('/vsimem/bfl_dem.tif', '/vsimem/bfl_hs.tif', '/vsimem/bfl_sl.tif'): gdal.Unlink(v)
-    fin = a[np.isfinite(a)]
-    return {'values': as_list(a), 'hill': as_list(np.where(np.isfinite(a), h, np.nan)), 'slope': as_list(np.where(np.isfinite(a), sl, np.nan)), 'lines': lines,
-            'box': [gt2[0], gt2[3] + gt2[5] * ny, gt2[0] + gt2[1] * nx, gt2[3]], 'nx': nx, 'ny': ny, 'res': res, 'min': float(fin.min()), 'max': float(fin.max()),
+    out = terrain_products(w, b, prm)
+    w = None; gdal.Unlink('/vsimem/bfl_dem.tif')
+    return {**out, 'box': [gt2[0], gt2[3] + gt2[5] * ny, gt2[0] + gt2[1] * nx, gt2[3]], 'nx': nx, 'ny': ny, 'res': res, 'src_res': sres, 'capped': capped, 'resample': alg, 'shift': shift,
             'tool': 'GDAL %s gdalwarp, gdaldem, gdal_contour' % gdal.__version__,
-            'detail': '%s file, %s, %s cells; reprojected to EPSG:%d at %.2f m' % (drv, sname, ('%.2f m' % (sres * sr.GetLinearUnits())) if sres and not assumed and sr.IsProjected() else ('%.6g°' % sres if sres else '?'), job['epsg'], res), 'assumed': assumed}
+            'detail': '%s file, %s, %.2f m cells; reprojected to EPSG:%d at %.2f m (%s)%s' % (drv, sname, sres, job['epsg'], res, 'averaged' if alg == 'average' else 'bilinear', ', shifted %+.2f m onto the boreholes\' datum' % shift if shift else ''), 'assumed': assumed}
 
 def area_over(job):
     """the part of a surface at or over a level: a mask polygonized by GDAL (gdal.Polygonize), its area from OGR"""
