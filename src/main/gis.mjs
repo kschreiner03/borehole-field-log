@@ -107,7 +107,9 @@ export async function gisRemove({ userData }) {
 
 // a job from the window: one known kind and method, numbers only, sizes held to what a site needs
 const CRS_CODE = /^(EPSG|ESRI|IGNF|OGC|CRS):\w{1,12}$|^\d{4,6}$/;
+const CALC_WORDS = new Set(['A', 'B', 'C', 'abs', 'sqrt', 'exp', 'log', 'if', 'isnull', 'null', 'min', 'max', 'round', 'int', 'float', 'double', 'pow', 'sin', 'cos', 'tan', 'atan', 'median', 'mode', 'not', 'eval', 'nmin', 'nmax', 'nmedian', 'xor']);
 const isNum = v => typeof v === 'number' && Number.isFinite(v), nums = (a, k) => Array.isArray(a) && a.every(p => Array.isArray(p) && p.length === k && p.every(isNum));
+const gridOk = g => g && typeof g.b64 === 'string' && g.b64.length <= 24e6 && Number.isInteger(g.nx) && Number.isInteger(g.ny) && g.nx >= 3 && g.ny >= 3 && g.nx * g.ny <= 4.5e6 && Math.ceil(g.nx * g.ny * 4 / 3) * 4 === g.b64.length && nums([g.box], 4);
 export function checkJob(job) {
   if (!job || typeof job !== 'object') return 'No job.';
   if (job.id != null && !/^[\w-]{1,40}$/.test(String(job.id))) return 'A plain job id is needed.';
@@ -147,12 +149,31 @@ export function checkJob(job) {
     if (cs != null && !(+cs >= 0.05)) return 'The cell size must be 0.05 m or more.';
     if (job.levels != null && (!Array.isArray(job.levels) || job.levels.length > 400 || !job.levels.every(isNum))) return 'Contour levels must be numbers.';
   } else if (kind === 'rast') {
-    if (!['profile', 'cutfill', 'watershed', 'diff', 'griddist'].includes(method)) return 'Unknown method.';
-    const grid = g => g && typeof g.b64 === 'string' && g.b64.length <= 24e6 && Number.isInteger(g.nx) && Number.isInteger(g.ny) && g.nx >= 3 && g.ny >= 3 && g.nx * g.ny <= 4.5e6 && Math.ceil(g.nx * g.ny * 4 / 3) * 4 === g.b64.length && nums([g.box], 4);
-    if (!grid(job.rasters?.a) || (job.rasters.b != null && !grid(job.rasters.b))) return 'A layer grid is missing or does not match its size.';
+    if (!['profile', 'cutfill', 'watershed', 'diff', 'griddist', 'calc', 'reclass', 'zonal', 'filter'].includes(method)) return 'Unknown method.';
+    if (!gridOk(job.rasters?.a) || (job.rasters.b != null && !gridOk(job.rasters.b)) || (job.rasters.c != null && !gridOk(job.rasters.c))) return 'A layer grid is missing or does not match its size.';
+    if (method === 'calc') {   // r.mapcalc's language only: the layers A, B, C, numbers, operators and a fixed set of its functions
+      const e = String(job.expr || ''), words = e.match(/[A-Za-z_]+/g) || [];
+      if (!e || e.length > 500 || /[^\w\s+\-*/%^().,<>=!&|?:]/.test(e) || !words.every(w => CALC_WORDS.has(w))) return 'The expression may use A, B, C, numbers, + - * / ^ % ( ) < > = ! & | ? : and the functions ' + [...CALC_WORDS].filter(w => w.length > 1).join(', ') + '.';
+    }
+    if (method === 'reclass' && (!Array.isArray(job.breaks) || job.breaks.length < 1 || job.breaks.length > 30 || !job.breaks.every(isNum))) return 'Class breaks must be 1 to 30 numbers.';
+    if (method === 'zonal' && (!Array.isArray(job.polys) || !job.polys.length)) return 'Areas are needed.';
     if (method === 'profile' && (!nums(job.line, 2) || job.line.length < 2 || job.line.length > 500)) return 'A line of 2 to 500 points is needed.';
     if (method === 'griddist' && (!nums(job.points, 2) || job.points.length < 1 || job.points.length > 5000)) return 'Points are needed.';
     if (job.polys != null && (!Array.isArray(job.polys) || job.polys.length > 500 || !job.polys.every(p => Array.isArray(p) && p.every(r => nums(r, 2))))) return 'Areas must be rings of [x, y].';
+  } else if (kind === 'rgdal') {
+    if (!['warp', 'clip', 'dem', 'contour'].includes(method)) return 'Unknown method.';
+    if (!gridOk(job.raster) || !CRS_CODE.test(String(job.epsg)) || (job.to != null && !CRS_CODE.test(String(job.to)))) return 'A layer grid and coordinate systems are needed.';
+    if (method === 'clip' && (!Array.isArray(job.polys) || !job.polys.length || job.polys.length > 500 || !job.polys.every(p => Array.isArray(p) && p.every(r => nums(r, 2))))) return 'An area is needed.';
+    if (job.name && !/^[\w .-]{1,60}$/.test(job.name)) return 'A plain file name is needed.';
+  } else if (kind === 'importrast' || kind === 'imgprev' || kind === 'georef') {
+    if (!/^f[0-9a-f]{20}$/.test(String(job.file))) return 'Choose a file.';
+    if (kind !== 'imgprev' && !CRS_CODE.test(String(job.epsg))) return 'A coordinate system is needed.';
+    if (kind === 'georef') {
+      if (!(Array.isArray(job.gcps) && job.gcps.length >= 3 && job.gcps.length <= 200 && job.gcps.every(q => Array.isArray(q) && q.length === 4 && q.every(isNum)))) return 'Three or more control points [pixel, line, x, y] are needed.';
+      if (!['affine', 'poly2', 'tps'].includes(job.method)) return 'Unknown fit.';
+      if (job.method === 'poly2' && job.gcps.length < 6) return 'A 2nd-order polynomial needs six or more control points.';
+      if (job.name && !/^[\w .-]{1,60}$/.test(job.name)) return 'A plain file name is needed.';
+    }
   } else if (kind === 'thiessen') {
     if (!Array.isArray(job.points) || job.points.length < 2 || job.points.length > 5000 || !job.points.every(p => Array.isArray(p) && isNum(p[0]) && isNum(p[1]) && (p[2] == null || typeof p[2] === 'string'))) return 'Points [x, y, name] are needed.';
     if (!nums(job.outline, 2) || job.outline.length < 3) return 'An outline is needed.';
@@ -198,7 +219,7 @@ const picked = new Map();
 export function gisRegisterFile(path, name, size) { const token = 'f' + createHash('sha256').update(path + Date.now() + Math.random()).digest('hex').slice(0, 20); picked.set(token, path); return { token, name, size }; }
 export async function gisRun({ userData, root, job, timeoutMs = 600000, onProgress }) {
   const bad = checkJob(job); if (bad) return { ok: false, error: bad };
-  if (job.kind === 'dem' || job.kind === 'importvec') { const p = picked.get(job.file); if (!p || !existsSync(p)) return { ok: false, error: 'Choose the file again.' }; job = { ...job, path: p }; }
+  if (['dem', 'importvec', 'importrast', 'imgprev', 'georef'].includes(job.kind)) { const p = picked.get(job.file); if (!p || !existsSync(p)) return { ok: false, error: 'Choose the file again.' }; job = { ...job, path: p }; }
   const id = job.id;
   const home = gisHome(userData), py = pythonOf(home);
   if (!existsSync(py)) return { ok: false, error: 'The GIS engines are not installed. Install them under Settings › GIS engines.' };

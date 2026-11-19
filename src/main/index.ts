@@ -112,6 +112,8 @@ ipcMain.handle('gis:pick', async (e, what: unknown) => {
   if (e.sender !== win?.webContents || !win) return null;
   const r = await dialog.showOpenDialog(win, what === 'vector'
     ? { title: 'Open a GIS layer', properties: ['openFile'], filters: [{ name: 'GIS layers', extensions: ['shp', 'gpkg', 'kml', 'kmz', 'geojson', 'json', 'dxf', 'csv', 'gml', 'tab', 'mif', 'gpx', 'fgb'] }, { name: 'All files', extensions: ['*'] }] }
+    : what === 'image' ? { title: 'Open an image to georeference', properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'tif', 'tiff', 'bmp', 'gif', 'webp', 'jp2'] }, { name: 'All files', extensions: ['*'] }] }
+    : what === 'raster' ? { title: 'Open a raster', properties: ['openFile'], filters: [{ name: 'Rasters', extensions: ['tif', 'tiff', 'img', 'asc', 'vrt', 'jp2', 'ecw', 'sid', 'nc', 'bil', 'flt', 'png', 'jpg'] }, { name: 'All files', extensions: ['*'] }] }
     : { title: 'Open an elevation model', properties: ['openFile'], filters: [{ name: 'Elevation models', extensions: ['tif', 'tiff', 'asc', 'img', 'dem', 'vrt', 'bil', 'flt', 'nc', 'xyz'] }, { name: 'All files', extensions: ['*'] }] });
   if (r.canceled || !r.filePaths[0]) return null;
   const p = r.filePaths[0], st = await stat(p).catch(() => null);

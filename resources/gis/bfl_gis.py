@@ -474,6 +474,51 @@ def in_grass_rast(job, gs, tmp):
         gs.run_command('r.mapcalc', expression='d = a - b', overwrite=True, quiet=True)
         u = univar('d')
         return {'values_b64': b64f(read('d')), 'stats': u, 'tool': 'GRASS GIS %s r.mapcalc; GDAL gdalwarp' % ver, 'detail': 'first minus second, on the first layer\'s %.2f m cells' % abs(gt[1])}
+    if m == 'calc':
+        # the user's expression, in r.mapcalc's own language, on layers A, B and C (already checked: only names, numbers, operators and functions)
+        for nm in ('b', 'c'):
+            if job['rasters'].get(nm):
+                R, gr = grid_of(job['rasters'][nm]); w = gdal.Warp('', mem_ds(R, gr), format='MEM', outputBounds=[gt[0], gt[3] + gt[5] * ny, gt[0] + gt[1] * nx, gt[3]], width=nx, height=ny, resampleAlg='bilinear', srcNodata=-99999, dstNodata=-99999)
+                Rw = w.GetRasterBand(1).ReadAsArray().astype(float); Rw[Rw <= -99998] = np.nan; to_grass(Rw, nm)
+        expr = job['expr'].replace('A', 'a').replace('B', 'b').replace('C', 'c')
+        prog(0.4, 'r.mapcalc: out = ' + job['expr'])
+        gs.run_command('r.mapcalc', expression='out = ' + expr, overwrite=True, quiet=True)
+        u = univar('out')
+        return {'values_b64': b64f(read('out')), 'stats': u, 'tool': 'GRASS GIS %s r.mapcalc' % ver, 'detail': 'out = ' + job['expr']}
+    if m == 'reclass':
+        br = sorted(float(v) for v in job['breaks']); rules = os.path.join(tmp, 'rules.txt')
+        u0 = univar('a'); lo, hi = u0.get('min', 0) - 1, u0.get('max', 0) + 1
+        edges = [lo] + br + [hi]
+        with open(rules, 'w') as f:
+            for i in range(len(edges) - 1): f.write('%.10g:%.10g:%d\n' % (edges[i], edges[i + 1], i + 1))
+        prog(0.4, 'r.recode: %d classes' % (len(edges) - 1))
+        gs.run_command('r.recode', input='a', output='cls', rules=rules, overwrite=True, quiet=True)
+        prog(0.7, 'r.stats: the area of each class')
+        cnt = {}
+        for l in gs.read_command('r.stats', input='cls', flags='cn').strip().splitlines():
+            q = l.split()
+            if len(q) == 2 and q[0] != '*': cnt[int(float(q[0]))] = int(q[1])
+        return {'values_b64': b64f(read('cls')), 'classes': [{'k': i + 1, 'from': edges[i] if i else None, 'to': edges[i + 1] if i + 1 < len(edges) - 1 else None, 'area': cnt.get(i + 1, 0) * cell} for i in range(len(edges) - 1)],
+                'tool': 'GRASS GIS %s r.recode, r.stats' % ver, 'detail': '%d classes at %s' % (len(edges) - 1, ', '.join('%g' % v for v in br))}
+    if m == 'zonal':
+        Z = np.full((ny, nx), np.nan)
+        for i, rings in enumerate(job['polys']):
+            mk = rasterize_polys([rings], gt, nx, ny); Z[mk & np.isnan(Z)] = i + 1
+        to_grass(Z, 'z'); gs.run_command('r.mapcalc', expression='zi = int(z)', overwrite=True, quiet=True)
+        prog(0.5, 'r.univar -t: statistics of the layer in each of %d areas' % len(job['polys']))
+        txt = gs.read_command('r.univar', map='a', zones='zi', flags='t', separator='|')
+        lines = [l.split('|') for l in txt.strip().splitlines()]
+        hdr = lines[0] if lines else []; rows = []
+        for q in lines[1:]:
+            d = dict(zip(hdr, q))
+            try: rows.append({'zone': int(float(d.get('zone', 0))), 'n': int(float(d.get('non_null_cells', 0))), 'min': float(d['min']), 'max': float(d['max']), 'mean': float(d['mean']), 'sum': float(d['sum']), 'stddev': float(d.get('stddev', 'nan'))})
+            except (KeyError, ValueError): pass
+        return {'rows': rows, 'cell_area': cell, 'tool': 'GRASS GIS %s r.univar (zones)' % ver, 'detail': '%d areas' % len(job['polys'])}
+    if m == 'filter':
+        meth, size = str(prm.get('method', 'average')), int(prm.get('size', 3)); size += (size + 1) % 2
+        prog(0.4, 'r.neighbors: %s of every %d × %d window' % (meth, size, size))
+        gs.run_command('r.neighbors', input='a', output='f', method=meth, size=size, flags='c' if prm.get('circle') == 'yes' else '', overwrite=True, quiet=True)
+        return {'values_b64': b64f(read('f')), 'tool': 'GRASS GIS %s r.neighbors' % ver, 'detail': '%s of %d × %d cells%s' % (meth, size, size, ', circular' if prm.get('circle') == 'yes' else '')}
     if m == 'griddist':
         P = np.zeros((ny, nx)); P[:] = np.nan
         for x, y in job['points']:
@@ -708,6 +753,162 @@ def import_vector(job):
     xs = [q[0] for f in feats for q in (f['pts'] if f['type'] != 'polygon' else f['pts'][0])]; ys = [q[1] for f in feats for q in (f['pts'] if f['type'] != 'polygon' else f['pts'][0])]
     return {'features': feats[:20000], 'layers': layers, 'srcs': sorted(srcs), 'skipped': skipped, 'truncated': len(feats) > 20000, 'bounds': [min(xs), min(ys), max(xs), max(ys)],
             'driver': ds.GetDriver().ShortName, 'tool': 'GDAL %s OGR, PROJ %d.%d' % (gdal.__version__, osr.GetPROJVersionMajor(), osr.GetPROJVersionMinor())}
+
+def rast_gdal(job):
+    """GDAL on a layer the app sends: gdalwarp (reproject, resample, clip to an area), gdaldem (terrain indices), gdal_contour"""
+    from osgeo import gdal, ogr, osr
+    import numpy as np
+    gdal.UseExceptions(); ogr.UseExceptions()
+    m, prm = job['method'], job.get('params', {})
+    A, gt = grid_of(job['raster']); ny, nx = A.shape; src = mem_ds(A, gt); src.SetProjection(srs_of(job['epsg']).ExportToWkt())
+    def back(ds, extra):
+        b = ds.GetRasterBand(1); a = b.ReadAsArray().astype(float); nd = b.GetNoDataValue()
+        if nd is not None: a[a == nd] = np.nan
+        a[a <= -99998] = np.nan; g = ds.GetGeoTransform(); h, w = a.shape
+        return {'values_b64': b64f(a), 'nx': w, 'ny': h, 'box': [g[0], g[3] + g[5] * h, g[0] + g[1] * w, g[3]], **extra}
+    if m == 'warp':
+        to = job.get('to') or job['epsg']; res = float(prm.get('cell') or 0) or None; alg = str(prm.get('resample', 'bilinear'))
+        prog(0.3, 'gdalwarp: to %s%s, %s' % (to, ' at %.3g m' % res if res else '', alg))
+        w = gdal.Warp('', src, format='MEM', dstSRS=srs_of(to).ExportToWkt(), xRes=res, yRes=res, resampleAlg=alg, srcNodata=-99999, dstNodata=-99999)
+        out = back(w, {'tool': 'GDAL %s gdalwarp' % gdal.__version__, 'detail': 'to %s, %s cells, %s' % (to, '%.3g m' % abs(w.GetGeoTransform()[1]) if srs_of(to).IsProjected() else '%.3g°' % abs(w.GetGeoTransform()[1]), alg)})
+        if job.get('save'):
+            f = os.path.join(tempfile.mkdtemp(prefix='bfl-w-'), job.get('name', 'layer') + '.tif'); d = gdal.GetDriverByName('GTiff').CreateCopy(f, w, options=['COMPRESS=DEFLATE', 'TILED=YES']); d = None
+            with open(f, 'rb') as fh: out['files'] = {os.path.basename(f): base64.b64encode(fh.read()).decode()}
+            shutil.rmtree(os.path.dirname(f), ignore_errors=True)
+        return out
+    if m == 'clip':
+        prog(0.3, 'gdalwarp -cutline: keeping the layer inside %d area%s' % (len(job['polys']), '' if len(job['polys']) == 1 else 's'))
+        vd = ogr.GetDriverByName('Memory').CreateDataSource('c'); ly = vd.CreateLayer('c', srs_of(job['epsg']), ogr.wkbPolygon)
+        for rings in job['polys']:
+            g = ogr.Geometry(ogr.wkbPolygon)
+            for r in rings:
+                lr = ogr.Geometry(ogr.wkbLinearRing); [lr.AddPoint_2D(x, y) for x, y in r]; lr.CloseRings(); g.AddGeometry(lr)
+            f = ogr.Feature(ly.GetLayerDefn()); f.SetGeometry(g); ly.CreateFeature(f)
+        fn = '/vsimem/bfl_cut.gpkg'; gdal.VectorTranslate(fn, vd, format='GPKG')
+        w = gdal.Warp('', src, format='MEM', cutlineDSName=fn, cropToCutline=prm.get('crop', 'yes') == 'yes', srcNodata=-99999, dstNodata=-99999)
+        gdal.Unlink(fn)
+        return back(w, {'tool': 'GDAL %s gdalwarp (cutline)' % gdal.__version__, 'detail': 'inside the area%s' % (', cropped to it' if prm.get('crop', 'yes') == 'yes' else '')})
+    if m == 'dem':
+        what = str(prm.get('index', 'aspect')); opts = {'computeEdges': True}
+        if what == 'aspect': opts['zeroForFlat'] = True
+        prog(0.4, 'gdaldem %s' % what)
+        d = gdal.DEMProcessing('/vsimem/bfl_ix.tif', src, {'tri': 'TRI', 'tpi': 'TPI', 'roughness': 'Roughness', 'aspect': 'aspect', 'slope': 'slope'}[what], **opts)
+        out = back(d, {'tool': 'GDAL %s gdaldem %s' % (gdal.__version__, what), 'detail': {'aspect': 'the compass direction each slope faces (0 north, clockwise)', 'slope': 'slope in degrees', 'tri': 'terrain ruggedness index: mean difference to the 8 neighbours', 'tpi': 'topographic position: higher than the neighbours (ridges, mounds) above 0, lower (hollows, channels) below', 'roughness': 'the largest difference within each 3 × 3 window'}[what]})
+        d = None; gdal.Unlink('/vsimem/bfl_ix.tif'); return out
+    if m == 'contour':
+        b = src.GetRasterBand(1); fin = A[np.isfinite(A)]; lo, hi = float(fin.min()), float(fin.max())
+        step = float(prm.get('interval') or 0) or nice_step(hi - lo, 8); base = float(prm.get('base') or 0)
+        levels = [round(v, 6) for v in np.arange(math.ceil((lo - base) / step) * step + base, hi + 1e-9, step)][:600]
+        prog(0.4, 'gdal_contour: every %g from %g' % (step, base))
+        vd = ogr.GetDriverByName('Memory').CreateDataSource('c'); cl = vd.CreateLayer('c', None, ogr.wkbLineString)
+        cl.CreateField(ogr.FieldDefn('ID', ogr.OFTInteger)); cl.CreateField(ogr.FieldDefn('v', ogr.OFTReal))
+        gdal.ContourGenerateEx(b, cl, options=['FIXED_LEVELS=' + ','.join(str(v) for v in levels), 'ID_FIELD=0', 'ELEV_FIELD=1'])
+        lines = []
+        for f in cl:
+            g = f.GetGeometryRef(); lines.append([round(f.GetField('v'), 6), [[round(g.GetX(i), 2), round(g.GetY(i), 2)] for i in range(g.GetPointCount())]])
+        return {'lines': lines, 'step': step, 'tool': 'GDAL %s gdal_contour' % gdal.__version__, 'detail': 'every %g' % step}
+    raise RuntimeError('Unknown raster tool')
+
+def png_b64(rgba):
+    """an RGBA array (h, w, 4) as PNG in base64, written by GDAL"""
+    from osgeo import gdal
+    import numpy as np
+    h, w = rgba.shape[:2]; m = gdal.GetDriverByName('MEM').Create('', w, h, 4, gdal.GDT_Byte)
+    for i in range(4): m.GetRasterBand(i + 1).WriteArray(rgba[:, :, i])
+    gdal.GetDriverByName('PNG').CreateCopy('/vsimem/bfl.png', m); f = gdal.VSIFOpenL('/vsimem/bfl.png', 'rb'); gdal.VSIFSeekL(f, 0, 2); n = gdal.VSIFTellL(f); gdal.VSIFSeekL(f, 0, 0)
+    data = gdal.VSIFReadL(1, n, f); gdal.VSIFCloseL(f); gdal.Unlink('/vsimem/bfl.png'); return base64.b64encode(data).decode()
+
+def rgba_of(ds, maxpx=None):
+    """a raster's picture as RGBA (8-bit): RGB(A) bands as they are, one band stretched to grey, a palette expanded"""
+    from osgeo import gdal
+    import numpy as np
+    n = ds.RasterCount; w, h = ds.RasterXSize, ds.RasterYSize
+    sc = min(1.0, (maxpx or max(w, h)) / max(w, h)); W, H = max(1, int(w * sc)), max(1, int(h * sc))
+    rd = lambda b: b.ReadAsArray(buf_xsize=W, buf_ysize=H).astype(float)
+    b1 = ds.GetRasterBand(1); ct = b1.GetColorTable()
+    out = np.zeros((H, W, 4), np.uint8); out[:, :, 3] = 255
+    if ct is not None and n == 1:
+        a = rd(b1).astype(int); lut = np.array([ct.GetColorEntry(i) if i < ct.GetCount() else (0, 0, 0, 0) for i in range(256)], np.uint8); out = lut[np.clip(a, 0, 255)]
+    elif n >= 3:
+        for i in range(3):
+            a = rd(ds.GetRasterBand(i + 1)); lo, hi = (0, 255) if ds.GetRasterBand(i + 1).DataType == gdal.GDT_Byte else np.nanpercentile(a, [1, 99]); out[:, :, i] = np.clip((a - lo) / ((hi - lo) or 1) * 255, 0, 255)
+        if n >= 4: out[:, :, 3] = rd(ds.GetRasterBand(4)).astype(np.uint8)
+    else:
+        a = rd(b1); nd = b1.GetNoDataValue(); ok = np.isfinite(a) & (a != nd if nd is not None else True)
+        lo, hi = np.nanpercentile(a[ok], [1, 99]) if ok.any() else (0, 1); g = np.clip((a - lo) / ((hi - lo) or 1) * 255, 0, 255)
+        for i in range(3): out[:, :, i] = g
+        out[:, :, 3] = np.where(ok, 255, 0)
+    for k in range(1, n + 1):
+        nd = ds.GetRasterBand(k).GetNoDataValue()
+        if nd is not None and n >= 3 and k <= 3: pass
+    return out, sc
+
+def import_raster(job):
+    """any raster GDAL reads, in any coordinate system: a grid of values (one band) back as values, or an image (photo,
+    orthophoto, scanned map already georeferenced) back as a picture, reprojected to the project"""
+    from osgeo import gdal, osr
+    import numpy as np
+    gdal.UseExceptions()
+    prm = job.get('params', {}); src = gdal.Open(job['path'])
+    if src is None: raise RuntimeError('GDAL could not read this file.')
+    wkt = src.GetProjection(); gt = src.GetGeoTransform(can_return_null=True)
+    if prm.get('srcepsg'): src = gdal.Translate('/vsimem/bfl_s.vrt', src, format='VRT', outputSRS=srs_of(prm['srcepsg']).ExportToWkt()); wkt = src.GetProjection()
+    if not wkt or gt is None: raise RuntimeError('The file has no position on the ground: it is not georeferenced. Use Georeference an image to place it, or set its coordinate system if only that is missing.')
+    image = src.RasterCount >= 3 or src.GetRasterBand(1).GetColorTable() is not None or str(prm.get('as', 'auto')) == 'image'
+    maxpx = int(prm.get('maxpx') or 2000)
+    prog(0.3, 'gdalwarp: to EPSG:%s' % job['epsg'])
+    w = gdal.Warp('', src, format='MEM', dstSRS=srs_of(job['epsg']).ExportToWkt(), resampleAlg='bilinear' if not image else 'cubic', dstAlpha=image and src.RasterCount in (1, 3), width=0, height=0)
+    g = w.GetGeoTransform(); W, H = w.RasterXSize, w.RasterYSize; box = [g[0], g[3] + g[5] * H, g[0] + g[1] * W, g[3]]
+    if image:
+        rgba, sc = rgba_of(w, maxpx); return {'image': png_b64(rgba), 'box': box, 'w': rgba.shape[1], 'h': rgba.shape[0], 'tool': 'GDAL %s gdalwarp' % gdal.__version__, 'detail': '%s, %d × %d px from %s' % (src.GetDriver().ShortName, W, H, osr.SpatialReference(wkt=wkt).GetName())}
+    b = w.GetRasterBand(1); sc = min(1.0, maxpx / max(W, H)); W2, H2 = max(2, int(W * sc)), max(2, int(H * sc))
+    a = b.ReadAsArray(buf_xsize=W2, buf_ysize=H2).astype(float); nd = b.GetNoDataValue()
+    if nd is not None: a[a == nd] = np.nan
+    fin = a[np.isfinite(a)]
+    return {'values_b64': b64f(a), 'nx': W2, 'ny': H2, 'box': box, 'min': float(fin.min()) if fin.size else 0, 'max': float(fin.max()) if fin.size else 1, 'band': b.GetDescription() or '', 'tool': 'GDAL %s gdalwarp' % gdal.__version__, 'detail': '%s band 1 of %d, from %s' % (src.GetDriver().ShortName, src.RasterCount, osr.SpatialReference(wkt=wkt).GetName())}
+
+def img_preview(job):
+    """a picture of an image file to place control points on: at most maxpx across, and its full size"""
+    from osgeo import gdal
+    gdal.UseExceptions(); ds = gdal.Open(job['path'])
+    if ds is None: raise RuntimeError('GDAL could not read this image.')
+    rgba, sc = rgba_of(ds, int(job.get('maxpx') or 1800))
+    return {'image': png_b64(rgba), 'w': ds.RasterXSize, 'h': ds.RasterYSize, 'pw': rgba.shape[1], 'ph': rgba.shape[0], 'tool': 'GDAL %s' % gdal.__version__}
+
+def georef(job):
+    """an image placed by control points (pixel -> map): GCPs on the image (gdal_translate), warped to the project (gdalwarp)
+    with an affine, 2nd-order polynomial or thin-plate-spline fit; each point's error from the fit"""
+    from osgeo import gdal, osr
+    import numpy as np
+    gdal.UseExceptions()
+    ds = gdal.Open(job['path']); P = job['gcps']; how = str(job.get('method', 'affine'))
+    gcps = [gdal.GCP(float(q[2]), float(q[3]), 0, float(q[0]), float(q[1])) for q in P]   # x, y on the map; pixel, line on the image
+    wkt = srs_of(job['epsg']).ExportToWkt()
+    prog(0.2, 'gdal_translate: %d control points on the image' % len(gcps))
+    t = gdal.Translate('/vsimem/bfl_g.vrt', ds, format='VRT', GCPs=gcps, outputSRS=wkt)
+    # each point's error: the fit made from all the points, evaluated at each (in metres)
+    px = np.array([[q[0], q[1]] for q in P], float); xy = np.array([[q[2], q[3]] for q in P], float)
+    def design(u, order): return np.c_[np.ones(len(u)), u] if order == 1 else np.c_[np.ones(len(u)), u, u[:, 0] ** 2, u[:, 0] * u[:, 1], u[:, 1] ** 2]
+    order = 2 if how == 'poly2' else 1
+    if how != 'tps':
+        D = design(px, order); cf, *_ = np.linalg.lstsq(D, xy, rcond=None); res = np.hypot(*(D @ cf - xy).T)
+    else: res = np.zeros(len(P))
+    prog(0.5, 'gdalwarp: %s to EPSG:%s' % ({'affine': 'affine', 'poly2': '2nd-order polynomial', 'tps': 'thin-plate spline'}[how], job['epsg']))
+    opts = dict(format='MEM', dstSRS=wkt, resampleAlg='cubic', dstAlpha=True)
+    if how == 'tps': opts['tps'] = True
+    else: opts['polynomialOrder'] = order
+    try: w = gdal.Warp('', t, **opts)
+    except RuntimeError as e:
+        raise RuntimeError('The control points cannot fit a %s: %s Spread them over the whole picture (not along one line), or use the affine fit.' % ({'affine': 'flat transformation', 'poly2': '2nd-order polynomial', 'tps': 'thin-plate spline'}[how], str(e).split(':')[-1].strip().rstrip('.') + '.'))
+    g = w.GetGeoTransform(); W, H = w.RasterXSize, w.RasterYSize; box = [g[0], g[3] + g[5] * H, g[0] + g[1] * W, g[3]]
+    rgba, sc = rgba_of(w, int(job.get('maxpx') or 2400))
+    out = {'image': png_b64(rgba), 'box': box, 'w': rgba.shape[1], 'h': rgba.shape[0], 'residuals': [float(r) for r in res], 'rms': float(np.sqrt(np.mean(res ** 2))) if len(res) else 0.0, 'cell': abs(g[1]),
+           'tool': 'GDAL %s gdal_translate (GCPs), gdalwarp' % gdal.__version__, 'detail': '%d control points, %s' % (len(P), {'affine': 'affine (shift, scale, rotation, skew)', 'poly2': '2nd-order polynomial', 'tps': 'thin-plate spline (passes through every point)'}[how])}
+    if job.get('save'):
+        f = os.path.join(tempfile.mkdtemp(prefix='bfl-g-'), job.get('name', 'georeferenced') + '.tif'); d = gdal.Warp(f, t, format='GTiff', creationOptions=['COMPRESS=DEFLATE', 'TILED=YES'], **{k: v for k, v in opts.items() if k != 'format'}); d = None
+        with open(f, 'rb') as fh: out['files'] = {os.path.basename(f): base64.b64encode(fh.read()).decode()}
+        shutil.rmtree(os.path.dirname(f), ignore_errors=True)
+    gdal.Unlink('/vsimem/bfl_g.vrt'); return out
 
 def in_grass(job):
     job = floats(job)
@@ -1056,6 +1257,10 @@ def run(job):
         cache = os.path.join(os.path.dirname(sys.prefix), 'proj-grids'); os.makedirs(cache, exist_ok=True); os.environ['PROJ_USER_WRITABLE_DIRECTORY'] = cache
     if job.get('kind') == 'crs': return crs_job(job)
     if job.get('kind') == 'importvec': return import_vector(job)
+    if job.get('kind') == 'rgdal': return rast_gdal(job)
+    if job.get('kind') == 'importrast': return import_raster(job)
+    if job.get('kind') == 'imgprev': return img_preview(job)
+    if job.get('kind') == 'georef': return georef(job)
     if job.get('kind') in ('hydro', 'demfix', 'rast'): return grass_run(job)
     if job.get('kind') == 'thiessen': return thiessen(job)
     if job.get('kind') == 'setback': return setback(job)

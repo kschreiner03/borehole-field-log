@@ -26,7 +26,7 @@ const desktop = {
     onJobProgress: (cb: (p: { id: string; p?: number; msg?: string }) => void) => { ipcRenderer.on('gis:jobprogress', (_e, p) => cb(p)); },
     cancel: (id: string): Promise<boolean> => ipcRenderer.invoke('gis:cancel', id),
     // an elevation model chosen in an Open dialog: a token for the file (its name and size to show), never its path
-    pick: (what?: 'vector'): Promise<{ token: string; name: string; size: number } | null> => ipcRenderer.invoke('gis:pick', what),
+    pick: (what?: 'vector' | 'image' | 'raster'): Promise<{ token: string; name: string; size: number } | null> => ipcRenderer.invoke('gis:pick', what),
   },
   // updates: whether GitHub has a newer release (nothing about the user is sent), and the download page in the browser
   updates: {

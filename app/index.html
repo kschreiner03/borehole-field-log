@@ -1407,6 +1407,12 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .crs-row:hover { background: var(--hover); } .crs-row[aria-pressed="true"] { background: var(--sel); } .crs-row b { font: 600 12px var(--f-mono, ui-monospace, monospace); } .crs-row small { display: block; color: var(--muted); font-size: 11.5px; }
 .crs-f { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; } .crs-f b { font: 600 12px var(--f-mono, ui-monospace, monospace); } .crs-b { display: flex; gap: 6px; width: 100%; }
 .crs-tbl td { font: 11.5px var(--f-mono, ui-monospace, monospace); } .gp-tool textarea, .gp-pane textarea { width: 100%; font: 12px var(--f-mono, ui-monospace, monospace); }
+#georef { position: fixed; inset: 0; z-index: 60; background: var(--surface); display: flex; flex-direction: column; } #georef[hidden] { display: none; }
+.geo-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--rule); } .geo-top .sp { flex: 1; } .geo-top select { min-height: 30px; }
+.geo-body { display: flex; gap: 8px; padding: 8px; flex: 1; min-height: 0; } .geo-pane { position: relative; overflow: hidden; border: 1px solid var(--rule); border-radius: var(--r-sm); background: #eceff1; cursor: crosshair; touch-action: none; user-select: none; }
+.geo-pane svg { display: block; } .geo-side { flex: 1; min-width: 260px; overflow-y: auto; padding: 0 6px; } .geo-side h4 { margin: 8px 0 4px; font: 600 10.5px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.geo-type { display: flex; gap: 6px; margin-bottom: 6px; } .geo-type input { flex: 1; min-height: 30px; font: 12px var(--f-mono, monospace); }
+.cls-sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(0,0,0,.2); }
 .gp-chart { width: 100%; max-width: 420px; height: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-sm); margin-top: 4px; }
 .gis-fixkey { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin-top: 3px; font-size: 10.5px; color: var(--muted); } .gis-fixkey i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: -3px; }
 .gis-li { display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
@@ -2486,7 +2492,7 @@ document.addEventListener('change', e => {
   else if (f === 'use' || f === 'save' || f === 'cShow') S.gp[f] = t.checked;
   else if (f === 'd0' || f === 'd1') S.gp[f] = t.value === '' ? null : fromD(+t.value);
   else S.gp[f] = t.value;
-  gpSave(); if (['p', 'd0', 'd1', 'r1', 'r2', 'unit', 'gL', 'gL2', 'gA', 'sbFrom', 'exL', 'fixL', 'bGrp'].includes(f)) renderView(true);
+  gpSave(); if (['p', 'd0', 'd1', 'r1', 'r2', 'unit', 'gL', 'gL2', 'gL3', 'gA', 'sbFrom', 'exL', 'fixL', 'bGrp'].includes(f)) renderView(true);
 });
 document.addEventListener('input', e => { if (e.target.id === 'gp-q') { S.gp.q = e.target.value; const pos = e.target.selectionStart; renderView(true); const q = $('#gp-q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } } });
 document.addEventListener('submit', e => { const f = e.target.closest?.('[data-mapgo]'); if (!f) return; e.preventDefault(); mapGoTo(f.querySelector('input').value); });
@@ -2581,6 +2587,7 @@ const GP_CATS = [
   ['soil', 'Soil', NAV_ICON.soil, ['Soil']],
   ['terrain', 'Terrain', '<path d="M3 19l6-9 4 5 3-4 5 8z"/>', ['Terrain']],
   ['analysis', 'Analysis', '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', ['Analysis']],
+  ['raster', 'Raster', '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>', ['Raster']],
   ['coords', 'Coordinates', '<circle cx="12" cy="12" r="8"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="1.5"/>', ['Coordinates']],
   ['export', 'Export', '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/>', ['Export']]];
 const gpCatOf = id => GP_CATS.find(c => c[3].includes(GP_TOOLS[id]?.group))?.[0] || 'analysis';
@@ -10879,6 +10886,16 @@ const GP_TOOLS = {
   drill_next: { group: 'Sampling', name: 'Where to drill next', by: 'PyKrige kriging variance', kind: 'drillnext', desc: 'Where the kriged estimate is least certain, and the next places to drill to cut that most: each is picked after the one before is added. Kept inside the outer boreholes.', prm: [['n', 'Locations', 3, 'How many to suggest (1 to 10).']] },
   unit_map: { group: 'Soil', name: 'Soil unit thickness and top', by: 'GRASS GIS v.surf.rst, GDAL gdal_contour', kind: 'unit', desc: 'For one soil unit from the logs: its thickness (isopach), the elevation of its top (structure contours) or the depth to it, between the boreholes.', prm: [['mode', 'Show', 'thickness', '', ['thickness', 'top', 'depth']], ['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, '']] },
   area_over: { group: 'Analysis', name: 'Area over a level', by: 'GDAL Polygonize', kind: 'area', desc: 'The area where the map\'s surface of a result is at or over a level (a guideline or screening level), as polygons with their area. The surface is the one the maps draw for that result.', prm: [['level', 'Level', 'guideline', 'In the result\'s units. Blank: the guideline, or the screening level for headspace vapour.']] },
+  georef: { group: 'Raster', name: 'Georeference an image', by: 'GDAL gdal_translate, gdalwarp', kind: 'georef', desc: 'Put a scanned site plan, an old drawing, a PDF page saved as an image or an air photo without coordinates on the map: click matching points on the picture and on the map, see each point\'s error, and GDAL warps it into place.', prm: [] },
+  rast_import: { group: 'Raster', name: 'Add a raster layer from a file', by: 'GDAL gdalwarp', kind: 'rast2', desc: 'Any georeferenced raster in any coordinate system: an orthophoto or scanned map (as a picture), or a grid of values such as a geophysics survey, a model result or a classified map (shaded, with values).', prm: [['as', 'Read as', 'auto', '', ['auto', 'image', 'grid'], { auto: 'Automatic (colour: picture; one band: values)', image: 'A picture', grid: 'Values (band 1)' }], ['maxpx', 'Detail', '2000', 'Pixels across, at most.', ['1000', '2000', '4000'], { 1000: '1,000 px', 2000: '2,000 px', 4000: '4,000 px (large files)' }]] },
+  rast_warp: { group: 'Raster', name: 'Reproject or resample a layer', by: 'GDAL gdalwarp', kind: 'rast2', desc: 'A grid layer to another coordinate system (saved as a GeoTIFF) or the project\'s at another cell size and resampling: coarser by averaging, finer by bilinear or cubic.', prm: [['cell', 'Cell size', 'same', 'In the target system\'s units (metres, or degrees for latitude and longitude). Blank: as near the layer\'s as possible.'], ['resample', 'Resampling', 'bilinear', '', ['near', 'bilinear', 'cubic', 'average', 'min', 'max', 'med'], { near: 'Nearest (classes, codes)', bilinear: 'Bilinear', cubic: 'Cubic', average: 'Average (coarser cells)', min: 'Minimum', max: 'Maximum', med: 'Median' }]] },
+  rast_clip: { group: 'Raster', name: 'Clip a layer to an area', by: 'GDAL gdalwarp (cutline)', kind: 'rast2', desc: 'Keep a grid layer only inside an area: an area over a level, a buffer, Thiessen polygons, or polygons from an added GIS layer (a lease, a property).', prm: [['crop', 'Crop to the area', 'yes', '', ['yes', 'no'], { yes: 'Yes', no: 'No: keep the layer\'s extent' }]] },
+  rast_calc: { group: 'Raster', name: 'Raster calculator', by: 'GRASS GIS r.mapcalc', kind: 'rast2', desc: 'A new layer from up to three layers A, B and C with r.mapcalc: arithmetic, comparisons and functions. A − B; if(A > 100, 1, 0); log(A); max(A, B); A * 0.3048.', prm: [] },
+  rast_reclass: { group: 'Raster', name: 'Reclassify into classes', by: 'GRASS GIS r.recode, r.stats', kind: 'rast2', desc: 'A layer cut into classes at the values you give (under 10, 10 to 100, 100 to 1,000, over), with the area of each class.', prm: [] },
+  rast_zonal: { group: 'Raster', name: 'Statistics within areas', by: 'GRASS GIS r.univar (zones)', kind: 'rast2', desc: 'For each area (Thiessen polygons, buffers, imported lots or excavation cells): the count, mean, minimum, maximum and sum of a layer inside it. Sum × cell area gives a volume for thickness layers.', prm: [] },
+  rast_filter: { group: 'Raster', name: 'Smooth or filter', by: 'GRASS GIS r.neighbors', kind: 'rast2', desc: 'Each cell replaced by a statistic of its neighbourhood: average or median to smooth noise, minimum or maximum to find lows and highs, standard deviation or range for roughness.', prm: [['method', 'Statistic', 'average', '', ['average', 'median', 'mode', 'minimum', 'maximum', 'stddev', 'range'], { average: 'Average', median: 'Median', mode: 'Most common', minimum: 'Minimum', maximum: 'Maximum', stddev: 'Standard deviation', range: 'Range' }], ['size', 'Window', '3', '', ['3', '5', '7', '9', '15', '25'], { 3: '3 × 3 cells', 5: '5 × 5 cells', 7: '7 × 7 cells', 9: '9 × 9 cells', 15: '15 × 15 cells', 25: '25 × 25 cells' }], ['circle', 'Shape', 'no', '', ['no', 'yes'], { no: 'Square', yes: 'Circle' }]] },
+  rast_terrain: { group: 'Raster', name: 'Slope, aspect and terrain indices', by: 'GDAL gdaldem', kind: 'rast2', desc: 'From an elevation layer: slope, the direction slopes face, how rugged the ground is, or where it sits high (mounds, berms) or low (hollows, channels) against its neighbours.', prm: [['index', 'Make', 'slope', '', ['slope', 'aspect', 'tpi', 'tri', 'roughness'], { slope: 'Slope (degrees)', aspect: 'Aspect (direction it faces)', tpi: 'Topographic position (high or low)', tri: 'Terrain ruggedness', roughness: 'Roughness' }]] },
+  rast_contour: { group: 'Raster', name: 'Contours from any layer', by: 'GDAL gdal_contour', kind: 'rast2', desc: 'Contour lines on any grid layer (a difference, a calculation, an imported grid) at the interval you choose; they are added to that layer, labels editable.', prm: [['interval', 'Interval', 'auto', ''], ['base', 'Starting from', 0, 'Contours at base + n × interval.']] },
   crs_convert: { group: 'Coordinates', name: 'Convert coordinates', by: 'PROJ', kind: 'crs', desc: 'Paste coordinates in one system (GPS latitude and longitude, NAD27 surveys, Alberta 10-TM, another UTM zone, …) and get them in another, with the transformation PROJ used and how accurate it is.', prm: [] },
   crs_import: { group: 'Coordinates', name: 'Add a GIS layer from a file', by: 'GDAL/OGR, PROJ', kind: 'crs', desc: 'A Shapefile, GeoPackage, KML, GeoJSON, DXF, GPX or CSV in any coordinate system, reprojected onto the map: property lines, pipelines, creeks, buildings, earlier investigations.', prm: [] },
   crs_boreholes: { group: 'Coordinates', name: 'Check and convert borehole coordinates', by: 'PROJ', kind: 'crs', desc: 'Finds boreholes recorded in a different system from the project (another UTM zone, NAD27, latitude and longitude), shows where they move to, and converts them when you agree.', prm: [] },
@@ -10935,6 +10952,19 @@ function gpFormHTML(k, T) {
   if (k === 'smp_dist' || k === 'smp_thiessen') { const n = projList().filter(b => b.easting != null).length; return `<h4>Input</h4>${crow('Boreholes', n + ' located' + (n < 2 ? ' <b>(two or more needed)</b>' : ''))}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">${k === 'smp_dist' ? 'A layer shaded by distance, with contours.' : 'The polygons on the map, each labelled with its borehole and area.'}</p>`; }
   if (k === 'an_setback') { const fs = featsOf(); if (!['bh', ...GIS.layers.filter(L => isArea(L) || L.kind === 'path' || L.kind === 'feats').map(L => L.id)].includes(g.sbFrom)) g.sbFrom = 'bh';
     return `<h4>Input</h4>${crow('Around', `<select data-gpf="sbFrom"><option value="bh">The boreholes</option>${GIS.layers.filter(L => isArea(L) || L.kind === 'path' || L.kind === 'feats').map(L => `<option value="${L.id}" ${g.sbFrom === L.id ? 'selected' : ''}>${esc(L.name)}</option>`).join('')}</select>`)}${(() => { const nf = GIS.layers.filter(L => L.kind === 'feats' && L.id !== g.sbFrom).reduce((a, L) => a + L.features.length, 0); return crow('Distances to', fs.length + nf ? [fs.length ? fs.length + ' site shape' + (fs.length === 1 ? '' : 's') : '', nf ? nf + ' shape' + (nf === 1 ? '' : 's') + ' from added GIS layers' : ''].filter(Boolean).join(' and ') : '<span class="note">no site shapes yet (Edit map draws them, or Add a GIS layer from a file)</span>'); })()}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">The buffer on the map; the distances in the result.</p>`; }
+  if (T.kind === 'rast2' || T.kind === 'georef') {
+    const area = L => L.kind === 'polys' || (L.kind === 'feats' && L.features.some(f => f.type === 'polygon'));
+    if (k === 'georef') return `<h4>Image</h4>${crow('File', `<span class="gp-file">${g.imgName ? `<b>${esc(g.imgName)}</b><br>` : ''}<button class="btn" data-act="gp-pickimg">${g.imgFile ? 'Choose another…' : 'Choose an image…'}</button></span>`)}
+      <p class="note">PNG, JPEG, TIFF, BMP. For a PDF drawing, save the page as a PNG first.</p><h4>Next</h4><button class="btn primary" data-act="geo-open" ${g.imgFile && gisOn() ? '' : 'disabled'}>Place control points…</button><p class="note">Opens the picture beside the map: click a point on the picture, then the same point on the map (a corner, a borehole, a road crossing, a grid line), at least three, spread out.</p>`;
+    if (k === 'rast_import') return `<h4>Input</h4>${crow('File', `<span class="gp-file">${g.rasName ? `<b>${esc(g.rasName)}</b><br>` : ''}<button class="btn" data-act="gp-pickras">${g.rasFile ? 'Choose another…' : 'Choose file…'}</button></span>`)}${crsField('rSrc', 'File\'s system', '', 'As the file says')}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">A layer in the project system. A file with no position on the ground needs Georeference an image instead.</p>`;
+    if (k === 'rast_calc') return `<h4>Layers</h4>${crow('A', lsel('gL', isGrid))}${crow('B', lsel('gL2', isGrid, 'none'))}${crow('C', lsel('gL3', isGrid, 'none'))}<h4>Expression</h4>${crow('Result =', `<input data-gpf="expr" value="${esc(g.expr || 'A - B')}" spellcheck="false" style="font-family:var(--f-mono, monospace)">`)}
+      <p class="note">Examples: A - B · A * 0.3048 · if(A > 100, 1, 0) · log(A) · max(A, B) · if(isnull(B), A, B). B and C are put on A's cells.</p><h4>Output</h4><p class="note">A new layer.</p>`;
+    if (k === 'rast_reclass') return `<h4>Input</h4>${crow('Layer', lsel('gL', isGrid))}${crow('Breaks', `<input data-gpf="breaks" value="${esc(g.breaks || '10, 100, 1000')}" placeholder="10, 100, 1000">`)}<p class="note">Class 1 is under the first break, the last class over the last.</p><h4>Output</h4><p class="note">A layer of classes and the area of each.</p>`;
+    if (k === 'rast_zonal') return `<h4>Input</h4>${crow('Layer', lsel('gL', isGrid))}${crow('Areas', lsel('gA', area))}<h4>Output</h4><p class="note">A table, to copy into Excel.</p>`;
+    if (k === 'rast_clip') return `<h4>Input</h4>${crow('Layer', lsel('gL', isGrid))}${crow('Area', lsel('gA', area))}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">A new layer, the original kept.</p>`;
+    if (k === 'rast_warp') return `<h4>Input</h4>${crow('Layer', lsel('gL', isGrid))}${crsField('wTo', 'To', 'EPSG:' + projEpsg())}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">To the project system: a new layer. To another system: a GeoTIFF saved where you choose (the map stays in the project system).</p>`;
+    return `<h4>Input</h4>${crow(k === 'rast_terrain' ? 'Elevation' : 'Layer', lsel('gL', k === 'rast_terrain' ? L => isGrid(L) && L.terrain : isGrid))}${prm ? '<h4>Parameters</h4>' + prm : ''}<h4>Output</h4><p class="note">${k === 'rast_contour' ? 'The contours are added to the layer.' : 'A new layer, the original kept.'}</p>`;
+  }
   if (k === 'crs_convert') return `<h4>Input</h4>${crsField('cFrom', 'From', 'EPSG:4326')}${crsField('cTo', 'To', 'EPSG:' + projEpsg())}
     ${crow('Points', `<textarea data-gpf="cPts" rows="6" placeholder="One per line: x y, or name x y.\nLatitude and longitude in either order: 53.1931, -110.0997\nE N: 560152.0 5894126.0">${esc(g.cPts || '')}</textarea>`)}
     <p class="note">Spaces, commas or tabs between the numbers; a height as a third number is converted too. Paste straight from Excel.</p><h4>Output</h4><label class="check"><input type="checkbox" data-gpf="cShow" ${g.cShow !== false ? 'checked' : ''}> Show them on the map (when To is the project system)</label>`;
@@ -11015,6 +11045,8 @@ async function gpRun() {
   if (T.kind === 'demfix') { await gpFix(gpParams(k)); return; }
   if (['rast', 'thiessen', 'setback', 'export2'].includes(T.kind)) { await gpMore(k, T, gpParams(k)); return; }
   if (T.kind === 'crs') { await gpCrs(k, T); return; }
+  if (T.kind === 'rast2') { await gpRast(k, T, gpParams(k)); return; }
+  if (T.kind === 'georef') { geoOpen(); return; }
   if (T.kind === 'points3d') {
     const prm = gpParams(k), kk = prm.k === 'auto' ? (XS_ANISO_PICK || 10) : +prm.k;
     S.xs = { ...S.xs, interp: 'gis_' + k, aniso: kk }; lsSet('bhlog.xs', JSON.stringify(S.xs)); gisMethods();
@@ -11385,6 +11417,173 @@ function crsApply() {
   let n = 0; p.ids.forEach((id, i) => { const b = S.bh.get(id), o = p.pts[i]; if (!b || !o || !editable(b)) return; b.easting = +o[0].toFixed(3); b.northing = +o[1].toFixed(3); b.crs = 'EPSG:' + projEpsg() + ' ' + (crsName('EPSG:' + projEpsg()) || p.label); logChange(b, 'Location'); store.save(b); n++; });
   S.crsPending = null; toast(n + ' borehole' + (n === 1 ? '' : 's') + ' converted to the project system.'); renderList(sortedList()); renderView(true);
 }
+/* the areas a layer holds: [{ name, rings }] (Toolbox areas, Thiessen cells, polygons from an added GIS layer) */
+function areasOf(L) {
+  if (!L) return [];
+  if (L.kind === 'polys') return L.polys.map((rings, i) => ({ name: (L.lab?.texts?.[i] ?? L.plabels?.[i]?.[2] ?? (L.polys.length > 1 ? L.name + ' ' + (i + 1) : L.name)).replace(/:.*$/, ''), rings }));
+  if (L.kind === 'feats') return L.features.filter(f => f.type === 'polygon').map((f, i) => ({ name: f.name || L.name + ' ' + (i + 1), rings: f.pts }));
+  return [];
+}
+const CLASS_COLS = ['#2c7bb6', '#abd9e9', '#ffffbf', '#fdae61', '#d7191c', '#7b3294', '#1a9641', '#a6611a', '#636363', '#e7298a'];
+async function gpRast(k, T, prm) {
+  const g = S.gp, lab = T.name + ' (' + T.by + ')', P = 'EPSG:' + projEpsg(), A = GIS.layers.find(L => L.id === g.gL), B = GIS.layers.find(L => L.id === g.gL2), C = GIS.layers.find(L => L.id === g.gL3), Ar = GIS.layers.find(L => L.id === g.gA);
+  const go = async (job, input) => { const key = k + '|' + Date.now(), pr = gisStart(key, { ...job, nocache: true }, lab, input), j = [...GIS.jobs.values()].find(x => x.key === key); if (j) { j.tool = k; j.kind = 'hydro'; } renderView(true); return { r: await pr, j }; };
+  const fin = (j, sum, L, chart) => { if (j) { j.sum = sum; if (chart) j.chart = chart; } if (L) { L.tool = k; gisAddLayer(L); } renderView(true); };
+  const grid = r => { const v = b64f32(r.values_b64); let lo = Infinity, hi = -Infinity; for (const x of v) if (isFinite(x)) { if (x < lo) lo = x; if (x > hi) hi = x; } return { v, lo: isFinite(lo) ? lo : 0, hi: isFinite(hi) ? hi : 1 }; };
+  const layer = (r, name, extra = {}) => { const q = grid(r); return { name, kind: 'raster', ramp: 'viridis', box: r.box || A.box, nx: r.nx || A.nx, ny: r.ny || A.ny, values: q.v, range: [q.lo, q.hi], op: .78, note: q.lo.toFixed(2) + ' – ' + q.hi.toFixed(2), ...extra }; };
+  if (k === 'rast_import') {
+    if (!g.rasFile) { toast('Choose a file first.'); return; }
+    const { r, j } = await go({ kind: 'importrast', file: g.rasFile, epsg: P, params: { as: prm.as || 'auto', maxpx: +(prm.maxpx || 2000), ...(g.rSrc ? { srcepsg: g.rSrc } : {}) } }, g.rasName);
+    if (!r?.ok) { if (r?.error && /again/.test(r.error)) { g.rasFile = null; gpSave(); } return; }
+    if (r.image) { fin(j, `${g.rasName}: a picture ${r.w} × ${r.h} px on the map (${r.detail}).`, { name: g.rasName.replace(/\.[^.]+$/, ''), kind: 'image', url: URL.createObjectURL(new Blob([b64bytes(r.image)], { type: 'image/png' })), box: r.box, op: .9, under: true, note: r.w + ' × ' + r.h + ' px' }); return; }
+    fin(j, `${g.rasName}: ${r.nx} × ${r.ny} cells, values ${r.min.toFixed(3)} to ${r.max.toFixed(3)}${r.band ? ' (' + r.band + ')' : ''} (${r.detail}).`, { ...layer(r, g.rasName.replace(/\.[^.]+$/, '')), box: r.box, nx: r.nx, ny: r.ny });
+    return;
+  }
+  if (!A) { toast('Choose a layer first (make one with a Toolbox tool, or Add a raster layer from a file).'); return; }
+  if (k === 'rast_warp') {
+    const to = g.wTo || P, cell = prm.cell > 0 ? +prm.cell : null, away = to !== P, nm = A.name.replace(/[^\w .-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 50) || 'layer';
+    const { r, j } = await go({ kind: 'rgdal', method: 'warp', raster: gridOf(A), epsg: P, to, params: { resample: prm.resample || 'bilinear', ...(cell ? { cell } : {}) }, ...(away ? { save: true, name: nm + ' ' + to.replace(':', '-') } : {}) }, A.name + ' to ' + to);
+    if (!r?.ok) return;
+    if (away) { for (const [fn, b] of Object.entries(r.files || {})) await saveBytes(fn, b64bytes(b), 'image/tiff'); fin(j, `${A.name} reprojected to ${[to, crsName(to)].filter(Boolean).join(' ')} (${r.detail}), ${r.nx} × ${r.ny} cells; saved ${Object.keys(r.files || {}).join(', ')}. The map stays in the project system.`); return; }
+    fin(j, `${A.name} resampled (${r.detail}): ${r.nx} × ${r.ny} cells.`, { ...layer(r, A.name + ' (' + ((r.box[2] - r.box[0]) / r.nx).toFixed(2) + ' m)'), ramp: A.ramp || 'viridis', terrain: A.terrain, show: A.terrain ? 'elev' : undefined, hill: null, slope: null });
+    return;
+  }
+  if (k === 'rast_clip') {
+    const ar = areasOf(Ar); if (!ar.length) { toast('Choose a layer of areas (Area over a level, a buffer, Thiessen polygons, or an added GIS layer with polygons).'); return; }
+    const { r, j } = await go({ kind: 'rgdal', method: 'clip', raster: gridOf(A), epsg: P, polys: ar.map(a => a.rings), params: { crop: prm.crop || 'yes' } }, A.name + ' inside ' + Ar.name);
+    if (!r?.ok) return; const q = grid(r);
+    fin(j, `${A.name} inside ${Ar.name}: ${r.nx} × ${r.ny} cells, ${q.lo.toFixed(2)} to ${q.hi.toFixed(2)}.`, { ...layer(r, A.name + ' (clipped)'), ramp: A.ramp || 'viridis', box: r.box, nx: r.nx, ny: r.ny, terrain: A.terrain, show: A.terrain ? 'elev' : undefined });
+    return;
+  }
+  if (k === 'rast_calc') {
+    const e = (g.expr || 'A - B').trim(); if (/\bB\b/.test(e) && !B) { toast('The expression uses B: choose layer B.'); return; } if (/\bC\b/.test(e) && !C) { toast('The expression uses C: choose layer C.'); return; }
+    const { r, j } = await go({ kind: 'rast', method: 'calc', rasters: { a: gridOf(A), ...(B ? { b: gridOf(B) } : {}), ...(C ? { c: gridOf(C) } : {}) }, expr: e }, e + ' (A ' + A.name + (B ? ', B ' + B.name : '') + (C ? ', C ' + C.name : '') + ')');
+    if (!r?.ok) return; const q = grid(r), sym = q.lo < 0 && q.hi > 0;
+    fin(j, `${e}: ${q.lo.toFixed(3)} to ${q.hi.toFixed(3)}${r.stats?.mean != null ? ', mean ' + r.stats.mean.toFixed(3) : ''}, on ${A.name}'s cells.`, layer(r, e, sym ? { ramp: 'cutfill', range: [-Math.max(-q.lo, q.hi), Math.max(-q.lo, q.hi)] } : {}));
+    return;
+  }
+  if (k === 'rast_reclass') {
+    const br = String(g.breaks || '10, 100, 1000').split(/[\s,;]+/).map(Number).filter(isFinite).sort((a, b) => a - b); if (!br.length) { toast('Give one or more break values.'); return; }
+    const { r, j } = await go({ kind: 'rast', method: 'reclass', rasters: { a: gridOf(A) }, breaks: br }, A.name + ' at ' + br.join(', '));
+    if (!r?.ok) return; const tot = r.classes.reduce((a, c) => a + c.area, 0) || 1, nm = c => c.from == null ? 'under ' + nfmt(c.to) : c.to == null ? nfmt(c.from) + ' and over' : nfmt(c.from) + ' to ' + nfmt(c.to);
+    GIS.copy = ['Class\tRange\tArea (m²)\tShare', ...r.classes.map(c => [c.k, nm(c), Math.round(c.area), (c.area / tot * 100).toFixed(1) + ' %'].join('\t'))].join('\n');
+    fin(j, `${A.name} in ${r.classes.length} classes: ${r.classes.map(c => nm(c) + ' ' + Math.round(c.area).toLocaleString('en-CA') + ' m²').join('; ')}.`,
+      { ...layer(r, A.name + ': classes'), ramp: 'classes' + r.classes.length, range: [1, r.classes.length], op: .8, classes: r.classes.map(nm), note: r.classes.length + ' classes' },
+      `<table class="sum gp-cmp"><thead><tr><th></th><th>Class</th><th class="r">Area (m²)</th><th class="r">Share</th></tr></thead><tbody>${r.classes.map((c, i) => `<tr><td><i class="cls-sw" style="background:${CLASS_COLS[i % 10]}"></i></td><td>${esc(nm(c))}</td><td class="r">${Math.round(c.area).toLocaleString('en-CA')}</td><td class="r">${(c.area / tot * 100).toFixed(1)} %</td></tr>`).join('')}</tbody></table><button class="btn" data-act="gp-copy">Copy as a table</button>`);
+    return;
+  }
+  if (k === 'rast_zonal') {
+    const ar = areasOf(Ar); if (!ar.length) { toast('Choose a layer of areas.'); return; }
+    const { r, j } = await go({ kind: 'rast', method: 'zonal', rasters: { a: gridOf(A) }, polys: ar.map(a => a.rings) }, A.name + ' in ' + Ar.name);
+    if (!r?.ok) return; const ca = r.cell_area, f3 = v => isFinite(v) ? (+v.toFixed(3)).toLocaleString('en-CA') : '—';
+    const rows = r.rows.map(q => ({ ...q, name: ar[q.zone - 1]?.name || 'area ' + q.zone }));
+    GIS.copy = ['Area\tCells\tArea (m²)\tMinimum\tMean\tMaximum\tSum\tSum × cell area', ...rows.map(q => [q.name, q.n, (q.n * ca).toFixed(1), q.min, q.mean, q.max, q.sum, (q.sum * ca).toFixed(3)].join('\t'))].join('\n');
+    fin(j, `${A.name} in ${rows.length} of the ${ar.length} areas of ${Ar.name} (the others have no cells of the layer). Sum × cell area gives a volume when the layer is a thickness or a depth.`, null,
+      `<table class="sum gp-cmp crs-tbl"><thead><tr><th>Area</th><th class="r">m²</th><th class="r">Min</th><th class="r">Mean</th><th class="r">Max</th><th class="r">Sum×m²</th></tr></thead><tbody>${rows.map(q => `<tr><td>${esc(q.name)}</td><td class="r">${Math.round(q.n * ca).toLocaleString('en-CA')}</td><td class="r">${f3(q.min)}</td><td class="r">${f3(q.mean)}</td><td class="r">${f3(q.max)}</td><td class="r">${f3(q.sum * ca)}</td></tr>`).join('')}</tbody></table><button class="btn" data-act="gp-copy">Copy as a table</button>`);
+    return;
+  }
+  if (k === 'rast_filter') {
+    const { r, j } = await go({ kind: 'rast', method: 'filter', rasters: { a: gridOf(A) }, params: { method: prm.method || 'average', size: +(prm.size || 3), circle: prm.circle || 'no' } }, A.name);
+    if (!r?.ok) return;
+    fin(j, `${A.name}: ${r.detail}.`, { ...layer(r, A.name + ' (' + (prm.method || 'average') + ' ' + (prm.size || 3) + '×' + (prm.size || 3) + ')'), ramp: ['stddev', 'range'].includes(prm.method) ? 'slope' : A.ramp || 'viridis' });
+    return;
+  }
+  if (k === 'rast_terrain') {
+    const ix = prm.index || 'slope', { r, j } = await go({ kind: 'rgdal', method: 'dem', raster: gridOf(A), epsg: P, params: { index: ix } }, A.name);
+    if (!r?.ok) return; const q = grid(r), names = { slope: 'Slope (°)', aspect: 'Aspect (°)', tpi: 'Topographic position', tri: 'Ruggedness', roughness: 'Roughness' };
+    fin(j, `${names[ix]} of ${A.name}: ${q.lo.toFixed(2)} to ${q.hi.toFixed(2)}; ${r.detail}.`, { ...layer(r, names[ix] + ': ' + A.name.replace(/^Elevation: /, '')), ...(ix === 'tpi' ? { ramp: 'cutfill', range: [-Math.max(-q.lo, q.hi), Math.max(-q.lo, q.hi)] } : ix === 'aspect' ? { ramp: 'aspect', range: [0, 360] } : { ramp: 'slope' }) });
+    return;
+  }
+  if (k === 'rast_contour') {
+    const { r, j } = await go({ kind: 'rgdal', method: 'contour', raster: gridOf(A), epsg: P, params: { ...(prm.interval > 0 ? { interval: +prm.interval } : {}), base: +(prm.base || 0) } }, A.name);
+    if (!r?.ok) return; A.contours = r.lines; A.step = r.step; A.dec = r.step < .1 ? 2 : r.step < 1 ? 1 : 0; A.on = true;
+    fin(j, `${r.lines.length} contour lines every ${r.step} on ${A.name}; their labels are editable under Tool outputs › Labels.`);
+  }
+}
+/* the workspace: S.geo = { prev (picture), w, h (full size), pts: [[px, py, E, N]], pend: picture point waiting for its map point, iv (picture view), mv (map view) } */
+async function geoOpen() {
+  const g = S.gp; if (!g.imgFile) { toast('Choose an image first.'); return; }
+  if (!S.geo || S.geo.file !== g.imgFile) {
+    toast('Reading the picture with GDAL…');
+    const r = await window.desktop.gis.run({ kind: 'imgprev', file: g.imgFile, maxpx: 1800 });
+    if (!r?.ok) { toast('GDAL could not read the image: ' + (r?.error || '')); if (/again/.test(r?.error || '')) { g.imgFile = null; gpSave(); } return; }
+    const B = projList().filter(b => b.easting != null), xs = B.map(b => b.easting), ys = B.map(b => b.northing);
+    const cx = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : S._plan?.cx || 0, cy = ys.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : S._plan?.cy || 0, span = xs.length ? Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 60) * 1.6 : 400;
+    S.geo = { file: g.imgFile, name: g.imgName, url: URL.createObjectURL(new Blob([b64bytes(r.image)], { type: 'image/png' })), w: r.w, h: r.h, pw: r.pw, ph: r.ph, pts: [], pend: null, method: 'affine', iv: null, mv: { cx, cy, span } };
+  }
+  let el = $('#georef'); if (!el) { el = document.createElement('div'); el.id = 'georef'; document.body.append(el); }
+  el.hidden = false; geoDraw();
+}
+/* the fit from picture to map (least squares, affine) for the live check: each point's miss in metres */
+function geoFit(pts) {
+  if (pts.length < 3) return null; const n = pts.length, M = [], bx = [], by = [];
+  for (const [u, v, x, y] of pts) { M.push([1, u, v]); bx.push(x); by.push(y); }
+  const sol = rhs => { const A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], b = [0, 0, 0]; M.forEach((r, i) => { for (let a = 0; a < 3; a++) { b[a] += r[a] * rhs[i]; for (let c = 0; c < 3; c++) A[a][c] += r[a] * r[c]; } });
+    const I = invertSym(A); return I ? I.map(r => r.reduce((t, x, c) => t + x * b[c], 0)) : null; };
+  const cx = sol(bx), cy = sol(by); if (!cx || !cy) return null;
+  const f = (u, v) => [cx[0] + cx[1] * u + cx[2] * v, cy[0] + cy[1] * u + cy[2] * v], res = pts.map(([u, v, x, y]) => { const [X, Y] = f(u, v); return Math.hypot(X - x, Y - y); });
+  return { f, res, rms: Math.sqrt(res.reduce((a, r) => a + r * r, 0) / n), m: Math.sqrt(Math.abs(cx[1] * cy[2] - cx[2] * cy[1])) };
+}
+function geoDraw() {
+  const G = S.geo, el = $('#georef'); if (!G || !el) return;
+  const fit = geoFit(G.pts), W = Math.max(400, Math.floor((innerWidth - 340) / 2)), H = Math.max(300, innerHeight - 150);
+  // the picture: fitted to its pane, zoomed and panned with the wheel and dragging
+  G.iv ||= { s: Math.min(W / G.pw, H / G.ph), x: 0, y: 0 };
+  const ps = G.iv.s, k = G.pw / G.w;   // screen px per preview px; preview px per full-size px
+  const IX = u => G.iv.x + u * k * ps, IY = v => G.iv.y + v * k * ps;
+  const marks = (pts, pend) => pts.map(([u, v], i) => `<g transform="translate(${IX(u).toFixed(1)} ${IY(v).toFixed(1)})"><circle r="7" fill="none" stroke="#fff" stroke-width="4"/><circle r="7" fill="none" stroke="${fit && fit.res[i] > 3 * (fit.rms || 1) && fit.res[i] > .5 ? '#c4242a' : '#0a7c3e'}" stroke-width="2"/><path d="M-11 0h22M0 -11v22" stroke="#0a7c3e" stroke-width="1"/><text x="10" y="-8" font-size="12" font-weight="700" fill="#0a7c3e" stroke="#fff" stroke-width="3" paint-order="stroke">${i + 1}</text></g>`).join('')
+    + (pend ? `<g transform="translate(${IX(pend[0]).toFixed(1)} ${IY(pend[1]).toFixed(1)})"><circle r="8" fill="none" stroke="#fff" stroke-width="4"/><circle r="8" fill="none" stroke="#d97706" stroke-width="2.4" stroke-dasharray="3 2"/><path d="M-12 0h24M0 -12v24" stroke="#d97706" stroke-width="1.2"/></g>` : '');
+  // the map: the site at the workspace's own view
+  const sc = Math.min(W, H) / G.mv.span, map = withRO({ cx: G.mv.cx, cy: G.mv.cy, scale: PX_PER_M / sc }, () => planSVG(W, H, false));
+  const MX = e => W / 2 + (e - G.mv.cx) * sc, MY = n => H / 2 - (n - G.mv.cy) * sc;
+  const mmarks = G.pts.map(([, , x, y], i) => `<g transform="translate(${MX(x).toFixed(1)} ${MY(y).toFixed(1)})"><circle r="7" fill="none" stroke="#fff" stroke-width="4"/><circle r="7" fill="none" stroke="#0a7c3e" stroke-width="2"/><path d="M-11 0h22M0 -11v22" stroke="#0a7c3e"/><text x="10" y="-8" font-size="12" font-weight="700" fill="#0a7c3e" stroke="#fff" stroke-width="3" paint-order="stroke">${i + 1}</text></g>`).join('')
+    + (G.pend && fit ? (() => { const [x, y] = fit.f(G.pend[0], G.pend[1]); return `<circle cx="${MX(x).toFixed(1)}" cy="${MY(y).toFixed(1)}" r="12" fill="rgba(217,119,6,.15)" stroke="#d97706" stroke-dasharray="3 2"><title>Where the fit so far puts it</title></circle>`; })() : '');
+  const ov = G.preview ? `<image href="${G.preview.url}" x="${MX(G.preview.box[0]).toFixed(1)}" y="${MY(G.preview.box[3]).toFixed(1)}" width="${((G.preview.box[2] - G.preview.box[0]) * sc).toFixed(1)}" height="${((G.preview.box[3] - G.preview.box[1]) * sc).toFixed(1)}" opacity="${G.op ?? .6}" preserveAspectRatio="none"/>` : '';
+  const can = G.pts.length >= (G.method === 'poly2' ? 6 : 3);
+  el.innerHTML = `<div class="geo-top"><b>Georeference: ${esc(G.name)}</b><span class="note">${G.pend ? 'Now click the same point on the map, or type its coordinates →' : 'Click a point on the picture, then the same point on the map. Wheel to zoom, drag to pan.'}</span>
+      <span class="sp"></span><label class="note">Fit <select id="geo-m">${[['affine', 'Affine (3+ points)'], ['poly2', '2nd-order polynomial (6+)'], ['tps', 'Thin-plate spline (3+)']].map(([v, l]) => `<option value="${v}" ${G.method === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <button class="btn primary" data-act="geo-run" ${can ? '' : 'disabled'}>Georeference</button><button class="btn" data-act="geo-save" ${can ? '' : 'disabled'} title="Also save it as a GeoTIFF">Georeference and save GeoTIFF</button><button class="btn" data-act="geo-close">Close</button></div>
+    <div class="geo-body"><div class="geo-pane" id="geo-img" style="width:${W}px;height:${H}px"><svg width="${W}" height="${H}"><image href="${G.url}" x="${G.iv.x}" y="${G.iv.y}" width="${G.pw * ps}" height="${G.ph * ps}"/>${marks(G.pts, G.pend)}</svg></div>
+      <div class="geo-pane" id="geo-map" style="width:${W}px;height:${H}px">${map.replace('</svg>', ov + mmarks + '</svg>')}</div>
+      <aside class="geo-side"><h4>Control points</h4>${G.pend ? `<div class="geo-type"><input id="geo-xy" placeholder="E N, e.g. 560150 5894120" autocomplete="off"><button class="btn" data-act="geo-xy">Add</button></div>` : ''}
+        ${G.pts.length ? `<table class="sum gp-cmp crs-tbl"><thead><tr><th>#</th><th class="r">Easting</th><th class="r">Northing</th><th class="r">Error</th><th></th></tr></thead><tbody>${G.pts.map((q, i) => `<tr><td>${i + 1}</td><td class="r">${q[2].toFixed(2)}</td><td class="r">${q[3].toFixed(2)}</td><td class="r">${fit ? fit.res[i].toFixed(2) + ' m' : '—'}</td><td><button class="tb" data-geodel="${i}" title="Remove this point">✕</button></td></tr>`).join('')}</tbody></table>` : '<p class="note">None yet.</p>'}
+        ${fit ? `<p class="note">Affine check: RMS error ${fit.rms.toFixed(2)} m over ${G.pts.length} points; the picture is about ${(1 / (fit.m || 1) * k).toFixed(2)} px per metre. A point well off the others (red) is probably mis-clicked: remove it.</p>` : '<p class="note">Three or more points spread over the picture: corners, boreholes, fence or road corners, grid crossings.</p>'}
+        ${G.pend ? '<button class="btn link" data-act="geo-cancel-pt">Cancel this point</button>' : ''}${G.preview ? `<h4>Result</h4><p class="note">${esc(G.preview.sum)}</p><label class="note">Opacity <input type="range" min="0.1" max="1" step="0.05" value="${G.op ?? .6}" id="geo-op"></label>` : ''}</aside></div>`;
+}
+function geoView(pane, e, zoom) {
+  const G = S.geo, r = pane.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  if (pane.id === 'geo-img') { const s0 = G.iv.s, s1 = Math.max(.02, Math.min(40, s0 * zoom)); G.iv.x = px - (px - G.iv.x) * s1 / s0; G.iv.y = py - (py - G.iv.y) * s1 / s0; G.iv.s = s1; }
+  else { const W = r.width, H = r.height, sc = Math.min(W, H) / G.mv.span, wx = G.mv.cx + (px - W / 2) / sc, wy = G.mv.cy - (py - H / 2) / sc; G.mv.span = Math.max(2, G.mv.span / zoom); const s2 = Math.min(W, H) / G.mv.span; G.mv.cx = wx - (px - W / 2) / s2; G.mv.cy = wy + (py - H / 2) / s2; }
+  geoDraw();
+}
+let geoDrag = null;
+document.addEventListener('wheel', e => { const p = e.target.closest?.('#geo-img, #geo-map'); if (!p || !S.geo) return; e.preventDefault(); geoView(p, e, Math.exp(-e.deltaY * (e.deltaMode ? .05 : .0016))); }, { passive: false });
+document.addEventListener('pointerdown', e => { const p = e.target.closest?.('#geo-img, #geo-map'); if (!p || !S.geo || e.button !== 0) return; geoDrag = { p: p.id, x: e.clientX, y: e.clientY, moved: false }; });
+document.addEventListener('pointermove', e => { if (!geoDrag || !S.geo) return; const dx = e.clientX - geoDrag.x, dy = e.clientY - geoDrag.y; if (!geoDrag.moved && Math.hypot(dx, dy) < 4) return; geoDrag.moved = true; geoDrag.x = e.clientX; geoDrag.y = e.clientY;
+  const G = S.geo; if (geoDrag.p === 'geo-img') { G.iv.x += dx; G.iv.y += dy; } else { const r = $('#geo-map').getBoundingClientRect(), sc = Math.min(r.width, r.height) / G.mv.span; G.mv.cx -= dx / sc; G.mv.cy += dy / sc; } geoDraw(); });
+document.addEventListener('pointerup', e => {
+  const d = geoDrag; geoDrag = null; if (!d || d.moved || !S.geo) return; const G = S.geo, pane = $('#' + d.p); if (!pane) return; const r = pane.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  if (d.p === 'geo-img') { const k = G.pw / G.w, u = (px - G.iv.x) / (G.iv.s * k), v = (py - G.iv.y) / (G.iv.s * k); if (u < 0 || v < 0 || u > G.w || v > G.h) return; G.pend = [+u.toFixed(2), +v.toFixed(2)]; geoDraw(); $('#geo-xy')?.focus(); }
+  else if (G.pend) { const sc = Math.min(r.width, r.height) / G.mv.span; const b = e.target.closest?.('[data-bhsym]') && S.bh.get(e.target.closest('[data-bhsym]').dataset.bhsym); const x = b?.easting ?? G.mv.cx + (px - r.width / 2) / sc, y = b?.northing ?? G.mv.cy - (py - r.height / 2) / sc; G.pts.push([G.pend[0], G.pend[1], +x.toFixed(3), +y.toFixed(3)]); G.pend = null; geoDraw(); }
+  else toast('Click the point on the picture first.');
+});
+document.addEventListener('change', e => { if (e.target.id === 'geo-m' && S.geo) { S.geo.method = e.target.value; geoDraw(); } });
+document.addEventListener('input', e => { if (e.target.id === 'geo-op' && S.geo) { S.geo.op = +e.target.value; const im = $('#geo-map image:last-of-type'); geoDraw(); } });
+document.addEventListener('keydown', e => { if (e.target.id === 'geo-xy' && e.key === 'Enter') { e.preventDefault(); geoTyped(); } if (e.key === 'Escape' && S.geo?.pend && !$('#georef')?.hidden) { S.geo.pend = null; geoDraw(); } });
+document.addEventListener('click', e => { const d = e.target.closest?.('[data-geodel]'); if (d && S.geo) { S.geo.pts.splice(+d.dataset.geodel, 1); geoDraw(); } });
+function geoTyped() { const v = ($('#geo-xy')?.value || '').split(/[\s,;]+/).map(Number).filter(isFinite); if (v.length < 2 || !S.geo?.pend) { toast('Type the easting and northing, e.g. 560150 5894120.'); return; } S.geo.pts.push([S.geo.pend[0], S.geo.pend[1], v[0], v[1]]); S.geo.pend = null; geoDraw(); }
+async function geoRun(save) {
+  const G = S.geo; if (!G) return; const how = G.method, key = 'georef|' + Date.now(), nm = (G.name || 'image').replace(/\.[^.]+$/, '').replace(/[^\w .-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 50) || 'image';
+  toast('GDAL is warping the picture…');
+  const pr = gisStart(key, { nocache: true, kind: 'georef', file: G.file, epsg: 'EPSG:' + projEpsg(), method: how, gcps: G.pts, ...(save ? { save: true, name: nm + ' georeferenced' } : {}) }, 'Georeference an image (GDAL gdal_translate, gdalwarp)', G.name + ', ' + G.pts.length + ' points');
+  const j = [...GIS.jobs.values()].find(x => x.key === key); if (j) { j.tool = 'georef'; j.kind = 'hydro'; }
+  const r = await pr; if (!r?.ok) { toast('Not placed: ' + (r?.error || '')); return; }
+  if (save) for (const [fn, b] of Object.entries(r.files || {})) await saveBytes(fn, b64bytes(b), 'image/tiff');
+  const url = URL.createObjectURL(new Blob([b64bytes(r.image)], { type: 'image/png' })), sum = `${G.pts.length} control points, ${{ affine: 'affine', poly2: '2nd-order polynomial', tps: 'thin-plate spline' }[how]}: ${how === 'tps' ? 'the spline passes through every point, so it shows no error; check the picture against the map between them' : 'RMS error ' + r.rms.toFixed(2) + ' m, largest ' + Math.max(...r.residuals).toFixed(2) + ' m (point ' + (r.residuals.indexOf(Math.max(...r.residuals)) + 1) + ')'}. ${r.w} × ${r.h} px, ${r.cell.toFixed(2)} m cells.${save ? ' Saved ' + Object.keys(r.files || {}).join(', ') + '.' : ''}`;
+  G.preview = { url, box: r.box, sum }; if (j) j.sum = sum;
+  gisAddLayer({ name: nm + ' (georeferenced)', kind: 'image', url, box: r.box, op: .85, under: true, tool: 'georef', note: how + ', RMS ' + r.rms.toFixed(2) + ' m' });
+  geoDraw();
+}
 /* the soil results by sample: [E, N, depth, log10 value] (a zero is the bottom of the range; a non-detect half its limit) */
 function samplePts(p, d0, d1) {
   const raw = [];
@@ -11462,6 +11661,8 @@ async function gpSoil(k, prm, go, done) {
 const GIS_RAMPS = { water: [[230, 242, 255], [158, 202, 225], [66, 146, 198], [8, 69, 148]], depth: [[255, 245, 177], [161, 217, 155], [65, 171, 93], [8, 81, 156]],
   impact: [[255, 247, 188], [254, 196, 79], [236, 112, 20], [153, 52, 4]], prob: [[255, 255, 255], [253, 208, 162], [241, 105, 19], [127, 39, 4]], uncert: [[247, 244, 249], [212, 185, 218], [201, 148, 199], [129, 15, 124]],
   slope: [[255, 255, 229], [254, 227, 145], [254, 153, 41], [204, 76, 2], [102, 37, 6]], grey: [[30, 30, 30], [235, 235, 235]], spectral: [[43, 131, 186], [171, 221, 164], [255, 255, 191], [253, 174, 97], [215, 25, 28]], viridis: [[68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]],
+  aspect: [[220, 50, 50], [240, 200, 40], [60, 180, 75], [40, 120, 220], [220, 50, 50]],
+  ...Object.fromEntries([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => ['classes' + n, ['#2c7bb6', '#abd9e9', '#ffffbf', '#fdae61', '#d7191c', '#7b3294', '#1a9641', '#a6611a', '#636363', '#e7298a', '#66a61e', '#e6ab02'].slice(0, n).map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)])])),
   cutfill: [[33, 102, 172], [146, 197, 222], [247, 247, 247], [244, 165, 130], [178, 24, 43]], drain: [[107, 174, 214], [33, 113, 181], [8, 48, 107]], distance: [[255, 255, 255], [253, 208, 162], [241, 105, 19], [127, 39, 4]],
   terrain: [[56, 130, 72], [160, 190, 90], [232, 222, 140], [196, 146, 84], [150, 110, 80], [240, 236, 230]],
   soil: [[246, 232, 195], [223, 194, 125], [191, 129, 45], [140, 81, 10]], change: [[178, 24, 43], [244, 165, 130], [247, 247, 247], [146, 197, 222], [33, 102, 172]] };
@@ -11479,7 +11680,8 @@ function gisRasterURL(L) {
     const slope = L.terrain && L.show === 'slope' && L.slope, V = slope ? L.slope : L.values, R = GIS_RAMPS[slope ? 'slope' : L.ramp] || GIS_RAMPS.water;
     let [lo, hi] = L.range; if (slope) { const s2 = Array.from(L.slope).filter(isFinite).sort((a, b) => a - b); lo = 0; hi = s2[Math.floor(s2.length * .98)] || 1; L.srange = [lo, hi]; }
     const shade = !slope && L.hill;
-    V.forEach((v, n) => { if (v == null || !isFinite(v)) return; const t = Math.max(0, Math.min(1, (v - lo) / ((hi - lo) || 1))) * (R.length - 1), i = Math.min(R.length - 2, Math.floor(t)), u = t - i, sh = shade ? .35 + .65 * Math.min(1, L.hill[n] / 255 * 1.15) : 1; for (let k = 0; k < 3; k++) im.data[n * 4 + k] = Math.min(255, (R[i][k] + (R[i + 1][k] - R[i][k]) * u) * sh); im.data[n * 4 + 3] = 255; });
+    if (/^classes/.test(L.ramp)) { V.forEach((v, n) => { if (!isFinite(v)) return; const c = R[Math.max(0, Math.min(R.length - 1, Math.round(v) - 1))]; for (let q = 0; q < 3; q++) im.data[n * 4 + q] = c[q]; im.data[n * 4 + 3] = 255; }); }
+    else V.forEach((v, n) => { if (v == null || !isFinite(v)) return; const t = Math.max(0, Math.min(1, (v - lo) / ((hi - lo) || 1))) * (R.length - 1), i = Math.min(R.length - 2, Math.floor(t)), u = t - i, sh = shade ? .35 + .65 * Math.min(1, L.hill[n] / 255 * 1.15) : 1; for (let k = 0; k < 3; k++) im.data[n * 4 + k] = Math.min(255, (R[i][k] + (R[i + 1][k] - R[i][k]) * u) * sh); im.data[n * 4 + 3] = 255; });
   }
   x.putImageData(im, 0, 0); const d = c.toDataURL('image/png');
   return (L.url = URL.createObjectURL(new Blob([b64bytes(d.slice(d.indexOf(',') + 1))], { type: 'image/png' })));
@@ -11492,6 +11694,7 @@ const ringCentre = r => { let a = 0, cx = 0, cy = 0; for (let i = 0, j = r.lengt
 function gisLayersSVG(X, Y) {
   return (GIS.layers || []).filter(L => L.on).slice().reverse().sort((a, b) => (b.under ? 1 : 0) - (a.under ? 1 : 0)).map(L => {
     const o = [], P = q => q.map(p => X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join('L'), lb = gisLab(L);
+    if (L.kind === 'image') { const [x0, y0, x1, y1] = L.box; o.push(`<image href="${L.url}" x="${X(x0).toFixed(1)}" y="${Y(y1).toFixed(1)}" width="${(X(x1) - X(x0)).toFixed(1)}" height="${(Y(y0) - Y(y1)).toFixed(1)}" preserveAspectRatio="none" opacity="${L.op ?? .85}"/>`); }
     if (L.kind === 'raster') {
       const [x0, y0, x1, y1] = L.box, cid = 'gcl' + L.id + Math.random().toString(36).slice(2, 7);   // one id per drawing: a page can hold several maps
       if (L.hull) o.push(`<clipPath id="${cid}"><path d="M${P(L.hull)}Z"/></clipPath>`);
@@ -11546,7 +11749,7 @@ function gisLabelsHTML(L) {
   return `<details class="gis-lbl" ${S.gisLblOpen === id ? 'open' : ''} data-gislbl="${id}"><summary>Labels</summary><div class="gis-lbl-b">${body}<button class="btn link" data-gisldef="${id}">Back to the tool's labels</button></div></details>`;
 }
 function gisLayersHTML() {
-  return '<ul class="lyr-list">' + GIS.layers.map(L => `<li class="gis-li"><label class="lyr" title="${esc(L.name)}"><input type="checkbox" data-gislay="${L.id}" ${L.on ? 'checked' : ''}><svg class="sw" viewBox="0 0 16 16" aria-hidden="true">${{ raster: '<rect x="2" y="3" width="12" height="10" fill="#9ecae1" stroke="#08519c"/>', arrows: '<path d="M3 13L13 3M8 3h5v5" fill="none" stroke="#1565c0" stroke-width="1.6"/>', path: '<path d="M2 13C6 12 8 6 14 3" fill="none" stroke="#0b62c4" stroke-width="2" stroke-dasharray="4 2"/>', polys: '<path d="M3 4h9l2 8H5z" fill="rgba(196,36,42,.2)" stroke="#c4242a"/>', feats: '<path d="M2 12l5-6 4 4 5-7" fill="none" stroke="#5b2c83" stroke-width="1.6"/><circle cx="12" cy="13" r="2" fill="#5b2c83"/>' }[L.kind] || ''}</svg><span>${esc(L.name)}<small class="note" style="display:block;margin:0">${esc(L.note || '')}</small>${L.kind === 'raster' && L.show !== 'fix' ? `<i class="gis-ramp" style="background:${gisRampCSS(L.terrain && L.show === 'slope' ? 'slope' : L.terrain && L.show === 'hill' ? 'grey' : L.ramp)}"></i>` : ''}${L.show === 'fix' ? '<span class="gis-fixkey"><i style="background:#dc2828"></i>spike<i style="background:#1e5adc"></i>pit<i style="background:#eba000"></i>hole<i style="background:#009696"></i>hollow<i style="background:#8c3caa"></i>marked</span>' : ''}</span><button class="tb" data-gisdel="${L.id}" title="Remove this layer" aria-label="Remove ${esc(L.name)}">✕</button></label>${L.terrain ? `<span class="gis-disp"><select data-gisshow="${L.id}" aria-label="Show"><option value="elev" ${L.show === 'elev' ? 'selected' : ''}>Elevation</option><option value="slope" ${L.show === 'slope' ? 'selected' : ''}>Slope</option>${L.hill ? `<option value="hill" ${L.show === 'hill' ? 'selected' : ''}>Hillshade only</option>` : ''}${L.fixcode ? `<option value="fix" ${L.show === 'fix' ? 'selected' : ''}>What was fixed</option>` : ''}</select>${L.show === 'elev' ? `<select data-gisramp="${L.id}" aria-label="Colours">${['terrain', 'spectral', 'viridis', 'grey'].map(r => `<option value="${r}" ${L.ramp === r ? 'selected' : ''}>${{ terrain: 'Terrain', spectral: 'Spectral', viridis: 'Viridis', grey: 'Grey' }[r]}</option>`).join('')}</select>` : ''}</span>` : ''}${gisLabelsHTML(L)}</li>`).join('') + '<\/ul><p class="note">Made with the Toolbox; drawn inside the outer wells. They are kept until the app is closed.</p>';
+  return '<ul class="lyr-list">' + GIS.layers.map(L => `<li class="gis-li"><label class="lyr" title="${esc(L.name)}"><input type="checkbox" data-gislay="${L.id}" ${L.on ? 'checked' : ''}><svg class="sw" viewBox="0 0 16 16" aria-hidden="true">${{ raster: '<rect x="2" y="3" width="12" height="10" fill="#9ecae1" stroke="#08519c"/>', arrows: '<path d="M3 13L13 3M8 3h5v5" fill="none" stroke="#1565c0" stroke-width="1.6"/>', path: '<path d="M2 13C6 12 8 6 14 3" fill="none" stroke="#0b62c4" stroke-width="2" stroke-dasharray="4 2"/>', polys: '<path d="M3 4h9l2 8H5z" fill="rgba(196,36,42,.2)" stroke="#c4242a"/>', feats: '<path d="M2 12l5-6 4 4 5-7" fill="none" stroke="#5b2c83" stroke-width="1.6"/><circle cx="12" cy="13" r="2" fill="#5b2c83"/>', image: '<rect x="2" y="3" width="12" height="10" fill="#cfd8dc" stroke="#546e7a"/><path d="M3 12l4-4 3 3 2-2 2 3" fill="none" stroke="#546e7a"/>' }[L.kind] || ''}</svg><span>${esc(L.name)}<small class="note" style="display:block;margin:0">${esc(L.note || '')}</small>${L.kind === 'raster' && L.show !== 'fix' ? `<i class="gis-ramp" style="background:${gisRampCSS(L.terrain && L.show === 'slope' ? 'slope' : L.terrain && L.show === 'hill' ? 'grey' : L.ramp)}"></i>` : ''}${L.show === 'fix' ? '<span class="gis-fixkey"><i style="background:#dc2828"></i>spike<i style="background:#1e5adc"></i>pit<i style="background:#eba000"></i>hole<i style="background:#009696"></i>hollow<i style="background:#8c3caa"></i>marked</span>' : ''}</span><button class="tb" data-gisdel="${L.id}" title="Remove this layer" aria-label="Remove ${esc(L.name)}">✕</button></label>${L.terrain ? `<span class="gis-disp"><select data-gisshow="${L.id}" aria-label="Show"><option value="elev" ${L.show === 'elev' ? 'selected' : ''}>Elevation</option><option value="slope" ${L.show === 'slope' ? 'selected' : ''}>Slope</option>${L.hill ? `<option value="hill" ${L.show === 'hill' ? 'selected' : ''}>Hillshade only</option>` : ''}${L.fixcode ? `<option value="fix" ${L.show === 'fix' ? 'selected' : ''}>What was fixed</option>` : ''}</select>${L.show === 'elev' ? `<select data-gisramp="${L.id}" aria-label="Colours">${['terrain', 'spectral', 'viridis', 'grey'].map(r => `<option value="${r}" ${L.ramp === r ? 'selected' : ''}>${{ terrain: 'Terrain', spectral: 'Spectral', viridis: 'Viridis', grey: 'Grey' }[r]}</option>`).join('')}</select>` : ''}</span>` : ''}${gisLabelsHTML(L)}</li>`).join('') + '<\/ul><p class="note">Made with the Toolbox; drawn inside the outer wells. They are kept until the app is closed.</p>';
 }
 function gpUse(j) {
   if (!j) return;
@@ -14083,6 +14286,14 @@ document.addEventListener('click', e => {
     case 'crs-project-auto': { const st = { ...(siteOf() || {}) }; delete st.epsg; setSite(st); renderView(true); break; }
     case 'gp-crs': { const f = t.dataset.f; crsPick(t.dataset.t || 'Coordinate system', S.gp[f], c => { S.gp[f] = c; gpSave(); renderView(true); }); break; }
     case 'gp-crs-clear': S.gp[t.dataset.f] = ''; gpSave(); renderView(true); break;
+    case 'gp-pickimg': window.desktop?.gis?.pick?.('image').then(f => { if (!f) return; S.gp.imgFile = f.token; S.gp.imgName = f.name; S.geo = null; gpSave(); renderView(true); }); break;
+    case 'gp-pickras': window.desktop?.gis?.pick?.('raster').then(f => { if (!f) return; S.gp.rasFile = f.token; S.gp.rasName = f.name; gpSave(); renderView(true); }); break;
+    case 'geo-open': geoOpen(); break;
+    case 'geo-run': geoRun(false); break;
+    case 'geo-save': geoRun(true); break;
+    case 'geo-xy': geoTyped(); break;
+    case 'geo-cancel-pt': if (S.geo) { S.geo.pend = null; geoDraw(); } break;
+    case 'geo-close': { const el = $('#georef'); if (el) el.hidden = true; renderView(true); break; }
     case 'gp-pickvec': window.desktop?.gis?.pick?.('vector').then(f => { if (!f) return; S.gp.vecFile = f.token; S.gp.vecName = f.name; gpSave(); renderView(true); }); break;
     case 'gp-copy': navigator.clipboard?.writeText(GIS.copy || '').then(() => toast('Copied: paste into Excel or a text file.'), () => toast('Could not copy.')); break;
     case 'crs-apply': crsApply(); break;
