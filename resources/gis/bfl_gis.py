@@ -135,7 +135,8 @@ def pykrige_best(P, make, predict, dim, prm):
     import numpy as np
     A = np.array(P, float); cands = vario_grid(A, dim)
     if prm.get('model') in VARIO: cands = [c for c in cands if c[0] == prm['model']]
-    if len(P) > 80: cands = cands[::3]   # many points: a coarser search keeps it quick
+    elif prm.get('models'): cands = [c for c in cands if c[0] in prm['models']]
+    if len(P) > 80 or prm.get('coarse'): cands = cands[::3]   # many points (or a block model): a coarser search keeps it quick
     best = None
     for c, (model, vp) in enumerate(cands):
         prog(0.05 + 0.85 * c / len(cands), 'Variogram %d of %d: %s, range %.3g m (each point left out in turn)' % (c + 1, len(cands), model, vp['range']))
@@ -266,9 +267,11 @@ def in_grass_hydro(job, gs, tmp):
         sx, sy = job['start']
         prog(0.6, 'r.drain: steepest descent on the water table from %.1f E, %.1f N' % (sx, sy))
         src, filled = 'h_r', ''
+        if str(prm.get('up', 'no')) == 'yes':   # upgradient: the same steepest descent on the water table turned upside down
+            gs.run_command('r.mapcalc', expression='hu = -h_r', overwrite=True, quiet=True); src = 'hu'
         if str(prm.get('fill', 'yes')) != 'no':   # small hollows in the surface would stop the path: r.fill.dir fills them first
             prog(0.5, 'r.fill.dir: filling local lows in the water table so the path is not trapped')
-            gs.run_command('r.fill.dir', input='h_r', output='h_f', direction='h_dir', overwrite=True, quiet=True); src, filled = 'h_f', ', local lows filled (r.fill.dir)'
+            gs.run_command('r.fill.dir', input=src, output='h_f', direction='h_dir', overwrite=True, quiet=True); src, filled = 'h_f', ', local lows filled (r.fill.dir)'
         gs.run_command('r.drain', input=src, output='path', start_coordinates='%.6f,%.6f' % (sx, sy), flags='n', overwrite=True, quiet=True)
         cells = []
         for line in gs.read_command('r.out.xyz', input='path', separator=',').strip().splitlines():
@@ -282,6 +285,11 @@ def in_grass_hydro(job, gs, tmp):
             out = gs.read_command('r.what', map='h_r', coordinates=','.join('%.6f,%.6f' % (a, b) for a, b in chunk), null_value='nan')
             heads += [float(l.split('|')[-1]) if l.split('|')[-1] not in ('nan', '*') else None for l in out.strip().splitlines()]
         return {'path': pts, 'heads': heads, 'tool': 'GRASS GIS %s r.drain' % ver, 'detail': 'steepest descent on the water table from ' + base + filled}
+    if m == 'gw_change':
+        surf(job['pts2'], 'g', 'later water table')
+        prog(0.7, 'r.mapcalc: change = later minus earlier water table')
+        gs.run_command('r.mapcalc', expression='d = g_r - h_r', overwrite=True, quiet=True)
+        return {'values': read('d'), 'tool': 'GRASS GIS %s r.mapcalc' % ver, 'detail': 'each round of water levels made into a surface with ' + base}
     if m == 'gw_depth':
         surf(job['ground'], 'g', 'ground surface')
         prog(0.7, 'r.mapcalc: depth = ground surface − water table')
@@ -430,9 +438,87 @@ def contours(job):
     return {'lines': out, 'tool': 'GDAL %s gdal_contour' % gdal.__version__}
 
 def floats(job):
-    for k in ('pts', 'targets', 'ground'):
+    for k in ('pts', 'targets', 'ground', 'pts2'):
         if k in job: job[k] = [[float(v) for v in p] for p in job[k]]
     return job
+
+
+# ---------- contamination and sampling tools (PyKrige) ----------
+def in_poly(x, y, poly):
+    """points (arrays) inside a polygon [[x, y], ...], by ray casting"""
+    import numpy as np
+    x, y = np.asarray(x, float), np.asarray(y, float); inside = np.zeros(x.shape, bool)
+    n = len(poly)
+    for i in range(n):
+        x1, y1 = poly[i]; x2, y2 = poly[(i + 1) % n]
+        cross = ((y1 > y) != (y2 > y)) & (x < (x2 - x1) * (y - y1) / ((y2 - y1) or 1e-12) + x1)
+        inside ^= cross
+    return inside
+
+def soil_volume(job):
+    """3D ordinary kriging (PyKrige OrdinaryKriging3D) of the samples on a block grid; the app counts the blocks over the level"""
+    import numpy as np, pykrige
+    from pykrige.ok3d import OrdinaryKriging3D
+    P, prm = job['pts'], dict(job.get('params', {}), coarse=1, models=('spherical', 'exponential'))
+    def make(r, model, vp): return OrdinaryKriging3D(r[:, 0], r[:, 1], r[:, 2], r[:, 3], variogram_model=model, variogram_parameters=vp)
+    def predict(k, p): z, _ = k.execute('points', np.array([p[0]], float), np.array([p[1]], float), np.array([p[2]], float)); return float(np.asarray(z)[0])
+    (model, vp, e), n = pykrige_best(P, make, predict, 3, prm)
+    x0, y0, z0, x1, y1, z1 = job['box3']; nx, ny, nz = int(job['nx']), int(job['ny']), int(job['nz'])
+    gx = np.array([x0 + (x1 - x0) / nx * (i + .5) for i in range(nx)]); gy = np.array([y0 + (y1 - y0) / ny * (j + .5) for j in range(ny)]); gz = np.array([z0 + (z1 - z0) / nz * (k + .5) for k in range(nz)])
+    prog(0.92, 'Kriging %d blocks with the %s variogram' % (nx * ny * nz, model))
+    k = make(np.array(P, float), model, vp); z, ss = k.execute('grid', gx, gy, gz)
+    z, ss = np.asarray(z)[:, ::-1, :], np.asarray(ss)[:, ::-1, :]   # depth slices from the top, rows north first
+    vals = np.array(P, float)[:, 3]; z = np.clip(z, vals.min(), vals.max())   # held between the lowest and highest sample
+    return {'values': as_list(z), 'var': as_list(ss), 'loo': e, 'loo_by': 'leave-one-out', 'sill': vp['sill'], 'tool': 'PyKrige %s OrdinaryKriging3D' % pykrige.__version__,
+            'detail': '%s variogram, range %.3g m (layered), nugget %d %% (the best of %d spherical and exponential variograms by leave-one-out); estimates held between the lowest and highest sample' % (model, vp['range'], round(100 * vp['nugget'] / vp['sill']), n)}
+
+def ok2d_fit(P, prm):
+    import numpy as np
+    from pykrige.ok import OrdinaryKriging
+    def make(r, model, vp): return OrdinaryKriging(r[:, 0], r[:, 1], r[:, 2], variogram_model=model, variogram_parameters=vp)
+    def predict(k, p): z, _ = k.execute('points', np.array([p[0]], float), np.array([p[1]], float)); return float(np.asarray(z)[0])
+    return pykrige_best(P, make, predict, 2, prm), make
+
+def drill_next(job):
+    """where the kriging estimate is least certain: the kriging standard error, and the next places to drill picked one at a
+    time, each added before the next is chosen (the kriging variance depends on where samples are, not on their values)"""
+    import numpy as np, pykrige
+    P, prm = job['pts'], job.get('params', {})
+    ((model, vp, e), n), make = ok2d_fit(P, prm)
+    xs, ys, dx, dy, nx, ny = grid_axes(job); X, Y = np.meshgrid(np.array(xs), np.array(ys))
+    mask = in_poly(X, Y, job['hull']) if job.get('hull') else np.ones(X.shape, bool)
+    pts = np.array(P, float); picks, first, N = [], None, int(job.get('n', 3))
+    from scipy.spatial.distance import cdist
+    nn = np.sort(cdist(pts[:, :2], pts[:, :2]), axis=1)[:, 1] if len(pts) > 1 else np.array([10.0])
+    gap = float(prm.get('gap', 0)) or 0.5 * float(np.median(nn))   # at least half the typical spacing from any borehole or other suggestion
+    for t in range(N + 1):
+        prog(0.6 + 0.35 * t / (N + 1), 'Kriging variance with %d samples' % len(pts))
+        k = make(pts, model, vp); _, ss = k.execute('grid', np.array(xs, float), np.array(ys[::-1], float)); ss = np.asarray(ss)[::-1]
+        if first is None: first = ss.copy()
+        if t == N: break
+        far = cdist(np.c_[X.ravel(), Y.ravel()], pts[:, :2]).min(axis=1).reshape(X.shape) >= gap
+        c = np.where(mask & far, ss, -np.inf)
+        if not np.isfinite(c).any(): break
+        j, i = np.unravel_index(np.argmax(c), c.shape)
+        picks.append([float(X[j, i]), float(Y[j, i]), float(np.sqrt(max(0, ss[j, i])))])
+        pts = np.vstack([pts, [X[j, i], Y[j, i], float(np.mean(pts[:, 2]))]])
+    return {'values': as_list(np.sqrt(np.maximum(first, 0))), 'after': as_list(np.sqrt(np.maximum(ss, 0))), 'picks': picks, 'loo': e, 'tool': 'PyKrige %s OrdinaryKriging (kriging variance)' % pykrige.__version__,
+            'gap': gap, 'detail': '%s variogram, range %.3g m, nugget %d %% (the best of %d by leave-one-out); suggestions at least %.0f m from any borehole and each other' % (model, vp['range'], round(100 * vp['nugget'] / vp['sill']), n, gap)}
+
+def prob_over(job):
+    """indicator kriging: 1 where a reading is at or over the level, 0 below; kriged, the chance of being over at each place"""
+    import numpy as np, pykrige
+    lv = float(job['level']); I = [[p[0], p[1], 1.0 if p[2] >= lv else 0.0] for p in job['pts']]
+    xs, ys, dx, dy, nx, ny = grid_axes(job)
+    n1 = int(sum(p[2] for p in I))
+    if n1 in (0, len(I)):
+        return {'values': [float(n1 > 0)] * (nx * ny), 'tool': 'PyKrige %s (indicator)' % pykrige.__version__, 'detail': 'every reading is on the same side of the level', 'constant': True}
+    ((model, vp, e), n), make = ok2d_fit(I, job.get('params', {}))
+    prog(0.92, 'Kriging the indicator with the %s variogram' % model)
+    k = make(np.array(I, float), model, vp); z, _ = k.execute('grid', np.array(xs, float), np.array(ys[::-1], float))
+    z = np.clip(np.asarray(z)[::-1], 0, 1)
+    return {'values': as_list(z), 'loo': e, 'n_over': n1, 'tool': 'PyKrige %s OrdinaryKriging of indicators' % pykrige.__version__,
+            'detail': 'indicator kriging: %d of %d readings at or over the level; %s variogram, range %.3g m (the best of %d by leave-one-out)' % (n1, len(I), model, vp['range'], n)}
 
 def area_over(job):
     """the part of a surface at or over a level: a mask polygonized by GDAL (gdal.Polygonize), its area from OGR"""
@@ -461,6 +547,9 @@ def run(job):
     job = floats(job)
     if job.get('kind') == 'hydro': return grass_run(job)
     if job.get('kind') == 'area': return area_over(job)
+    if job.get('kind') == 'volume': return soil_volume(job)
+    if job.get('kind') == 'drillnext': return drill_next(job)
+    if job.get('kind') == 'prob': return prob_over(job)
     k, m = job.get('kind'), job.get('method', '')
     if k == 'versions': return versions()
     if k == 'export': return export(job)
