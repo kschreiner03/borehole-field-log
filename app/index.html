@@ -1413,6 +1413,8 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .geo-pane svg { display: block; } .geo-side { flex: 1; min-width: 260px; overflow-y: auto; padding: 0 6px; } .geo-side h4 { margin: 8px 0 4px; font: 600 10.5px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .geo-type { display: flex; gap: 6px; margin-bottom: 6px; } .geo-type input { flex: 1; min-height: 30px; font: 12px var(--f-mono, monospace); }
 .cls-sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(0,0,0,.2); }
+#plan .vtx { fill: #fff; stroke: var(--accent); stroke-width: 2; cursor: move; } #plan .vmid { fill: var(--accent); opacity: .5; cursor: copy; } #plan .vmid:hover { opacity: .9; }
+.map-canvas[data-tool="rect"], .map-canvas[data-tool="circle"], .map-canvas[data-tool="measure"] { cursor: crosshair; } .map-canvas[data-tool="rect"] > svg, .map-canvas[data-tool="circle"] > svg, .map-canvas[data-tool="measure"] > svg { cursor: crosshair; }
 .gp-chart { width: 100%; max-width: 420px; height: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-sm); margin-top: 4px; }
 .gis-fixkey { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin-top: 3px; font-size: 10.5px; color: var(--muted); } .gis-fixkey i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: -3px; }
 .gis-li { display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
@@ -8930,6 +8932,11 @@ function featuresSVG(X, Y, opts = {}) {
     if (f.type === 'point') { const x = X(f.pts[0][0]), y = Y(f.pts[0][1]); o.push(`<g ${hit} style="${cur}"><circle cx="${x}" cy="${y}" r="${sel ? 5 : 3}" style="fill:${stroke}"/>${f.name ? `<text x="${x + 6}" y="${y + 4}" style="font:italic 11px var(--f-body, Arial);fill:${stroke}">${esc(f.name)}</text>` : ''}</g>`); continue; }
     const d = f.pts.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)} ${Y(p[1]).toFixed(1)}`).join('') + (f.type === 'polygon' ? 'Z' : '');
     o.push(`<path ${hit} d="${d}" style="${cur}fill:${f.type === 'polygon' ? fill : 'none'};stroke:${sel ? 'var(--accent)' : stroke}" fill-opacity=".85" stroke-width="${sel ? 3 : f.kind === 'boundary' ? 1.8 : 1.2}" ${dash ? `stroke-dasharray="${dash}"` : ''}><title>${esc(f.name || FEAT_KINDS[f.kind]?.[0] || '')}</title></path>`);
+    if (opts.edit && sel && f.type !== 'point') {   // handles: drag a corner, drag a + to add one, right-click a corner to remove it
+      const n = f.pts.length, closed = f.type === 'polygon';
+      for (let i = 0; i < (closed ? n : n - 1); i++) { const a = f.pts[i], b = f.pts[(i + 1) % n]; o.push(`<circle class="vmid" data-vmid="${i}" cx="${X((a[0] + b[0]) / 2).toFixed(1)}" cy="${Y((a[1] + b[1]) / 2).toFixed(1)}" r="4"><title>Drag to add a corner here</title></circle>`); }
+      f.pts.forEach((p, i) => o.push(`<circle class="vtx" data-vtx="${i}" cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="5.5"><title>Corner ${i + 1}: drag to move, right-click to remove</title></circle>`));
+    }
     if (f.name && f.type === 'polygon' && f.pts.length > 2) { const cx = f.pts.reduce((a, p) => a + p[0], 0) / f.pts.length, cy = f.pts.reduce((a, p) => a + p[1], 0) / f.pts.length; o.push(`<text x="${X(cx)}" y="${Y(cy) + 4}" text-anchor="middle" style="font:11px var(--f-body, Arial);fill:${stroke}">${esc(f.name)}</text>`); }
   }
   return o.join('');
@@ -9100,7 +9107,8 @@ function importShapesGo() {
 /* the editor itself */
 S.mapEdit = false; S.mapTool = 'select'; S.mapSel = null; S.draft = null; S.placeId = '';
 const nextToPlace = () => projList().find(x => x.easting == null && editable(x))?.id || (S.readOnly ? '' : 'new');
-const MAP_TOOLS = { select: ['Select', 'Click a shape to rename it, change its type or delete it.'], area: ['Draw area', 'Click each corner; double-click (or press Enter) to finish. Esc cancels.'], line: ['Draw line', 'Click each point; double-click (or press Enter) to finish. Esc cancels.'],
+const MAP_TOOLS = { select: ['Select', 'Click a shape to rename it, change its type or delete it.'], area: ['Draw area', 'Click each corner; click the first corner, double-click or press Enter to finish. Snaps to boreholes and corners (Alt: no snapping); Shift keeps 15° steps; Backspace takes back a point; Esc cancels.'], line: ['Draw line', 'Click each point; double-click or press Enter to finish. Snaps to boreholes and corners (Alt: no snapping); Shift keeps 15° steps; Backspace takes back a point; Esc cancels.'],
+  rect: ['Rectangle', 'Click two opposite corners.'], circle: ['Circle', 'Click the centre, then a point on the edge (or type the radius on the right).'], measure: ['Measure', 'Click points to measure distance, bearing and area; double-click or Enter to finish. Nothing is saved; Esc clears it.'],
   label: ['Add label', 'Click where the label goes, then type its text on the right.'], place: ['Place borehole', 'Click the plan to place the borehole chosen on the right. Once every borehole has a location, each click adds a new one.'], move: ['Move boreholes', 'Drag a borehole to its correct location. Issued logs cannot be moved.'] };
 function mapEditorHTML() {
   const fs = featsOf(), f = fs.find(x => x.id === S.mapSel), noLoc = projList().filter(b => b.easting == null);
@@ -9108,12 +9116,16 @@ function mapEditorHTML() {
       <label class="cmp-lbl" for="mf-name">Name ${f.type === 'point' ? '(label text)' : '(shown on the plan)'}</label><input id="mf-name" data-mfeat="name" value="${esc(f.name || '')}">
       <label class="cmp-lbl" for="mf-kind">Type</label><select id="mf-kind" data-mfeat="kind">${Object.entries(FEAT_KINDS).map(([k, [t]]) => `<option value="${k}" ${f.kind === k ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>
       ${f.type !== 'point' ? `<p class="note">${f.pts.length} points${f.type === 'polygon' ? ` · area ${Math.abs(f.pts.reduce((a, p, i) => { const q = f.pts[(i + 1) % f.pts.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0) / 2).toLocaleString('en-CA', { maximumFractionDigits: 0 })} m²` : ` · length ${f.pts.slice(1).reduce((a, p, i) => a + Math.hypot(p[0] - f.pts[i][0], p[1] - f.pts[i][1]), 0).toFixed(1)} m`}</p>` : ''}
-      <div class="cmp-row"><button class="btn" data-act="mf-done">Done</button><button class="btn danger-text" data-act="mf-del">Delete</button></div>`
+      ${f.type !== 'point' ? `<p class="note">${f.type === 'polygon' ? 'Perimeter ' + (pathLen(f.pts) + Math.hypot(f.pts[0][0] - f.pts[f.pts.length - 1][0], f.pts[0][1] - f.pts[f.pts.length - 1][1])).toFixed(2) + ' m' : 'Bearing of the first segment ' + bearing(f.pts[0], f.pts[1]).toFixed(1) + '°'}. Drag a corner to move it (it snaps), drag a + to add a corner, right-click a corner to remove it.</p>` : ''}
+      <div class="cmp-row"><button class="btn" data-act="mf-done">Done</button>${f.type !== 'point' ? '<button class="btn" data-mfcopy>Copy coordinates</button>' : ''}<button class="btn danger-text" data-act="mf-del">Delete</button></div>`
     : S.mapTool === 'place' ? `<h4>Place borehole</h4><label class="cmp-lbl" for="mf-place">Borehole</label><select id="mf-place">${S.readOnly ? '' : `<option value="new" ${S.placeId === 'new' ? 'selected' : ''}>New borehole (${nextName()})</option>`}${projList().map(b => `<option value="${esc(b.id)}" ${S.placeId === b.id ? 'selected' : ''} ${editable(b) ? '' : 'disabled'}>${esc(b.name)}${b.easting == null ? ' (no location yet)' : ''}</option>`).join('')}</select>
       <label class="cmp-lbl" for="mf-coord">Coordinates</label><input id="mf-coord" autocomplete="off" spellcheck="false" placeholder="53.52, -113.52 · 13U 559400 6418000">
       <p class="note" id="mf-coord-read">${esc(coordsRead(''))}</p>
       <label class="cmp-lbl" for="mf-elev">Ground elevation (${LEN()}), optional</label><input id="mf-elev" inputmode="decimal" autocomplete="off">
       <div class="cmp-row"><button class="btn" data-act="place-xy" ${S.readOnly ? 'disabled' : ''}>Place</button></div><p class="note">${noLoc.length ? `${noLoc.length} borehole${noLoc.length === 1 ? ' has' : 's have'} no location yet.` : 'Every borehole has a location. Each click adds a new borehole; choose an existing one to move it.'}</p>`
+    : ['area', 'line', 'measure', 'rect', 'circle'].includes(S.mapTool) ? `<h4>${esc(MAP_TOOLS[S.mapTool][0])}</h4><label class="cmp-lbl" for="mf-next">${S.mapTool === 'circle' ? 'Centre (E N), then the radius in metres' : S.mapTool === 'rect' ? 'Corners (E N)' : 'Next point'}</label><input id="mf-next" autocomplete="off" spellcheck="false" placeholder="${S.mapTool === 'circle' ? '560150 5894120, then 15' : '25@45 · +5 -10 · 560150 5894120'}" style="font-family:var(--f-mono, monospace)">
+      <p class="note">${S.mapTool === 'circle' || S.mapTool === 'rect' ? 'Or click on the map.' : '25@45: 25 m at a bearing of 45° from the last point. +5 -10: 5 m east and 10 m south of it. Or an easting and northing. Enter adds it.'}</p>
+      <p class="note">Snaps to boreholes, corners and imported shapes within a few pixels (hold Alt to place freely); Shift keeps bearings to 15° steps; Backspace takes back the last point.</p>${S.measure ? '<button class="btn" data-mfclear>Clear the measurement</button>' : ''}`
     : `${imageryOf().length ? `<h4>Imagery</h4><ul class="mf-list">${imageryOf().map(i => `<li class="im-row"><span>${esc(i.name)}${S.imgCache.has(i.id) ? '' : ' <span class="note">(not in this browser)</span>'}</span><label class="note">Opacity <input type="range" min="0.1" max="1" step="0.05" value="${i.op ?? 1}" data-imop="${i.id}"></label><span class="cmp-row"><button class="btn link" data-imzoom="${i.id}">Zoom to</button><button class="btn link" data-imclear="${i.id}" title="Make the white border around the picture see-through">Clear white edges</button><button class="btn link danger-text" data-imdel="${i.id}">Remove</button></span></li>`).join('')}</ul>` : ''}<h4>Shapes on this plan</h4>${fs.length ? `<ul class="mf-list">${fs.map(x => `<li><button class="tl-btn" data-mfsel="${x.id}">${esc(x.name || FEAT_KINDS[x.kind]?.[0] || 'Shape')}<span>${x.type === 'polygon' ? 'area' : x.type}</span></button></li>`).join('')}</ul><button class="btn link" data-act="mf-clear">Remove all shapes</button>` : '<p class="note">None yet. Draw areas and lines with the tools above, or import a GeoJSON, KML, DXF or CSV file.</p>'}`;
   return `<div class="map-ed">
     <div class="map-bar"><span class="seg" role="group" aria-label="Map tool">${Object.entries(MAP_TOOLS).map(([k, [t]]) => `<button data-mtool="${k}" aria-pressed="${S.mapTool === k}">${t}</button>`).join('')}</span>
@@ -9127,19 +9139,104 @@ function planWorld(e) {   // client point -> [easting, northing] on the drawn pl
   return [t.cx + (px - t.W / 2) / t.sc, t.cy - (py - t.H / 2) / t.sc];
 }
 const refreshMapEd = () => { const box = $('#map-ed-wrap'); if (box) { box.innerHTML = mapEditorHTML(); drawPlan(); } };
-function drawDraft(cursor) {
-  const svg = $('#plan svg'), t = S._plan; if (!svg || !t || !S.draft) return;
-  const X = e => t.W / 2 + (e - t.cx) * t.sc, Y = n => t.H / 2 - (n - t.cy) * t.sc, pts = cursor ? [...S.draft.pts, cursor] : S.draft.pts;
-  let p = svg.querySelector('#map-draft'); if (!p) { p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.id = 'map-draft'; p.setAttribute('style', 'fill:rgba(27,108,128,.12);stroke:var(--accent);stroke-width:2;stroke-dasharray:6 3'); svg.append(p); }
-  p.setAttribute('d', pts.map((q, i) => `${i ? 'L' : 'M'}${X(q[0])} ${Y(q[1])}`).join('') + (S.draft.type === 'polygon' && pts.length > 2 ? 'Z' : ''));
-  if (S.draft.type === 'line') p.style.fill = 'none';
+/* the nearest borehole, corner or imported shape point within 11 px (Alt: none); skip: the corner being dragged */
+function snapPt(w, e, skip) {
+  const t = S._plan; if (!t || e?.altKey) return null; const tol = 11 / t.sc; let best = null;
+  const test = (p, what) => { const d = Math.hypot(p[0] - w[0], p[1] - w[1]); if (d < tol && (!best || d < best.d)) best = { d, pt: [p[0], p[1]], what }; };
+  if (S.draft?.type === 'polygon' && S.draft.pts.length > 2) test(S.draft.pts[0], 'the first corner: closes the area');
+  for (const b of mapList()) if (b.easting != null) test([b.easting, b.northing], gwName(b) || b.name);
+  for (const f of featsOf()) f.pts.forEach((p, i) => { if (!(skip && skip.id === f.id && skip.i === i)) test(p, f.name || 'a corner'); });
+  for (const L of GIS.layers || []) if (L.on && L.kind === 'feats') for (const f of L.features.slice(0, 3000)) (f.type === 'polygon' ? f.pts.flat() : f.pts).forEach(p => test(p, f.name || L.name));
+  return best;
+}
+/* the point a click or the cursor makes: snapped, or with Shift held to a 15° step from the last point */
+function draftPoint(e, w) {
+  const sn = snapPt(w, e); if (sn) return { pt: sn.pt, snap: sn };
+  const last = S.draft?.pts?.[S.draft.pts.length - 1];
+  if (e?.shiftKey && last) { const d = Math.hypot(w[0] - last[0], w[1] - last[1]), b = Math.round(Math.atan2(w[0] - last[0], w[1] - last[1]) * 180 / Math.PI / 15) * 15 * Math.PI / 180; return { pt: [last[0] + d * Math.sin(b), last[1] + d * Math.cos(b)], step: true }; }
+  return { pt: w };
+}
+const ringArea = P => Math.abs(P.reduce((a, p, i) => { const q = P[(i + 1) % P.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0) / 2);
+const pathLen = P => P.slice(1).reduce((a, p, i) => a + Math.hypot(p[0] - P[i][0], p[1] - P[i][1]), 0);
+const bearing = (a, b) => (Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI + 360) % 360;
+const m2 = v => v >= 1e5 ? (v / 1e4).toFixed(2) + ' ha' : Math.round(v).toLocaleString('en-CA') + ' m²';
+/* what the shape being drawn measures, shown beside the cursor's coordinates */
+function draftReadout(cursor) {
+  const xy = $('#map-xy'), d = S.draft; if (!xy) return;
+  const at = cursor ? `${cursor[0].toFixed(2)} E, ${cursor[1].toFixed(2)} N` : '';
+  if (!d) { xy.textContent = at; return; }
+  const P = cursor ? [...d.pts, cursor] : d.pts, last = P.length > 1 ? [P[P.length - 2], P[P.length - 1]] : null, parts = [at];
+  if (d.type === 'rect' && P.length === 2) { const w = Math.abs(P[1][0] - P[0][0]), h = Math.abs(P[1][1] - P[0][1]); parts.push(`${w.toFixed(2)} × ${h.toFixed(2)} m, ${m2(w * h)}`); }
+  else if (d.type === 'circle' && P.length === 2) { const r = Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1]); parts.push(`radius ${r.toFixed(2)} m, ${m2(Math.PI * r * r)}`); }
+  else { if (last) parts.push(`segment ${Math.hypot(last[1][0] - last[0][0], last[1][1] - last[0][1]).toFixed(2)} m at ${bearing(last[0], last[1]).toFixed(1)}°`); if (P.length > 2) parts.push((d.type === 'polygon' ? 'perimeter ' + (pathLen(P) + Math.hypot(P[0][0] - P[P.length - 1][0], P[0][1] - P[P.length - 1][1])).toFixed(2) : 'total ' + pathLen(P).toFixed(2)) + ' m'); if ((d.type === 'polygon' || d.type === 'measure') && P.length > 2) parts.push('area ' + m2(ringArea(P))); }
+  xy.textContent = parts.filter(Boolean).join(' · ');
+}
+function drawDraft(cursor, snap) {
+  const svg = $('#plan svg'), t = S._plan; if (!svg || !t) return;
+  const X = e => t.W / 2 + (e - t.cx) * t.sc, Y = n => t.H / 2 - (n - t.cy) * t.sc;
+  let g = svg.querySelector('#map-draft-g'); if (!g) { g = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g.id = 'map-draft-g'; svg.append(g); }
+  const d = S.draft; if (!d) { g.innerHTML = ''; return; }
+  const P = cursor ? [...d.pts, cursor] : d.pts, col = d.type === 'measure' ? '#d97706' : 'var(--accent)', fl = 'rgba(27,108,128,.12)'; let path = '', fill = 'none';
+  if (d.type === 'rect' && P.length === 2) { const [a, b] = P; path = `M${X(a[0])} ${Y(a[1])}L${X(b[0])} ${Y(a[1])}L${X(b[0])} ${Y(b[1])}L${X(a[0])} ${Y(b[1])}Z`; fill = fl; }
+  else if (d.type === 'circle' && P.length === 2) { const r = Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1]) * t.sc, cx = X(P[0][0]), cy = Y(P[0][1]); path = `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`; fill = fl; }
+  else { path = P.map((q, i) => `${i ? 'L' : 'M'}${X(q[0]).toFixed(1)} ${Y(q[1]).toFixed(1)}`).join('') + ((d.type === 'polygon' || d.type === 'measure' && P.length > 2 && d.closed) && P.length > 2 ? 'Z' : ''); if (d.type === 'polygon') fill = fl; }
+  g.innerHTML = `<path d="${path}" style="fill:${fill};stroke:${col};stroke-width:2;stroke-dasharray:6 3"/>`
+    + d.pts.map(q => `<circle cx="${X(q[0]).toFixed(1)}" cy="${Y(q[1]).toFixed(1)}" r="3.5" fill="#fff" stroke="${col}" stroke-width="1.6"/>`).join('')
+    + (snap ? `<circle cx="${X(snap.pt[0]).toFixed(1)}" cy="${Y(snap.pt[1]).toFixed(1)}" r="8" fill="none" stroke="#e11d48" stroke-width="2"/><text x="${(X(snap.pt[0]) + 11).toFixed(1)}" y="${(Y(snap.pt[1]) - 9).toFixed(1)}" font-size="11" fill="#e11d48" stroke="#fff" stroke-width="3" paint-order="stroke">${esc(snap.what)}</text>` : '');
+}
+/* a click while drawing: a point, a rectangle's corners, a circle's centre and edge */
+function draftClick(e, w, tool) {
+  const q = draftPoint(e, w), p = q.pt;
+  if (tool === 'rect') { if (!S.draft) { S.draft = { type: 'rect', pts: [p] }; drawDraft(); return; } const a = S.draft.pts[0]; S.draft = { type: 'polygon', pts: [[a[0], a[1]], [p[0], a[1]], [p[0], p[1]], [a[0], p[1]]] }; finishDraft(); return; }
+  if (tool === 'circle') { if (!S.draft) { S.draft = { type: 'circle', pts: [p] }; drawDraft(); draftReadout(); return; } circleDone(S.draft.pts[0], Math.hypot(p[0] - S.draft.pts[0][0], p[1] - S.draft.pts[0][1])); return; }
+  S.draft ||= { type: tool === 'area' ? 'polygon' : tool === 'line' ? 'line' : 'measure', pts: [] };
+  if (S.draft.type === 'polygon' && q.snap?.what?.startsWith('the first corner')) { finishDraft(); return; }
+  S.draft.pts.push(p); drawDraft(null, q.snap); draftReadout(p);
+}
+function circleDone(c, r) { if (!(r > 0)) return; const pts = []; for (let i = 0; i < 64; i++) { const a = i / 64 * 2 * Math.PI; pts.push([c[0] + r * Math.sin(a), c[1] + r * Math.cos(a)]); } S.draft = { type: 'polygon', pts }; finishDraft(); }
+/* a point typed while drawing: 25@45 (25 m at 45° from the last point), +5 -10 (from the last point), or an easting and northing; for a circle, its radius */
+function draftTyped(v) {
+  const tx = String(v || '').trim(), last = S.draft?.pts?.[S.draft.pts.length - 1]; let p = null, m;
+  if (S.draft?.type === 'circle' && /^[\d.]+$/.test(tx)) { circleDone(S.draft.pts[0], +tx); return; }
+  if ((m = /^(-?[\d.]+)\s*@\s*(-?[\d.]+)$/.exec(tx)) && last) { const dd = +m[1], b = +m[2] * Math.PI / 180; p = [last[0] + dd * Math.sin(b), last[1] + dd * Math.cos(b)]; }
+  else if ((m = /^\+?(-?[\d.]+)[\s,]+\+?(-?[\d.]+)$/.exec(tx)) && last && tx.startsWith('+')) p = [last[0] + +m[1], last[1] + +m[2]];
+  else { const q = tx.split(/[\s,;]+/).map(Number); if (q.length >= 2 && q.every(isFinite)) p = [q[0], q[1]]; }
+  if (!p) { toast(last ? 'Type 25@45 (25 m at 45° from the last point), +5 -10 (from the last point), or an easting and northing.' : 'Type the first point as an easting and northing.'); return; }
+  const tool = S.mapTool; if (tool === 'rect' || tool === 'circle') { draftClick({}, p, tool); return; }
+  S.draft ||= { type: tool === 'area' ? 'polygon' : tool === 'line' ? 'line' : 'measure', pts: [] }; S.draft.pts.push(p); drawDraft(); draftReadout(p);
+  const inp = $('#mf-next'); if (inp) { inp.value = ''; inp.focus(); }
+}
+/* a finished measurement stays on the map until Esc */
+function measureSVG(X, Y) {
+  const P = S.measure?.pts; if (!P || P.length < 2) return ''; const e = P[P.length - 1], area = P.length > 2 ? ringArea(P) : 0;
+  return `<g pointer-events="none"><path d="${P.map((q, i) => (i ? 'L' : 'M') + X(q[0]).toFixed(1) + ' ' + Y(q[1]).toFixed(1)).join('')}" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="6 3"/>${P.map(q => `<circle cx="${X(q[0]).toFixed(1)}" cy="${Y(q[1]).toFixed(1)}" r="3" fill="#d97706"/>`).join('')}
+    <text x="${(X(e[0]) + 8).toFixed(1)}" y="${(Y(e[1]) - 8).toFixed(1)}" font-size="12" font-weight="600" fill="#9a3412" stroke="#fff" stroke-width="3" paint-order="stroke">${pathLen(P).toFixed(2)} m${area ? ' · if closed ' + m2(area) : ''}</text></g>`;
 }
 function finishDraft() {
   const d = S.draft; S.draft = null; if (!d) return;
+  if (d.type === 'measure') { S.measure = d.pts.length > 1 ? { pts: d.pts } : null; if (S.measure) toast(`${pathLen(d.pts).toFixed(2)} m over ${d.pts.length} points${d.pts.length > 2 ? '; closed, the area would be ' + m2(ringArea(d.pts)) : ''}. Esc clears it.`); drawPlan(); return; }
+  if (d.type === 'rect' || d.type === 'circle') { drawPlan(); return; }
   if (d.pts.length < (d.type === 'polygon' ? 3 : 2)) { drawPlan(); return; }
   const f = { id: uid('f'), name: '', type: d.type, kind: d.type === 'line' ? 'pipeline' : 'other', pts: d.pts.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]) };
   saveFeats([...featsOf(), f]); S.mapSel = f.id; S.mapTool = 'select'; refreshMapEd(); $('#mf-name')?.focus();
 }
+let vDrag = null;
+document.addEventListener('pointerdown', e => {
+  if (!S.mapEdit || S.mapTool !== 'select' || !S.mapSel || S.readOnly) return; const h = e.target.closest?.('[data-vtx], [data-vmid]'); if (!h || !h.closest('#plan svg') || e.button !== 0) return;
+  e.stopImmediatePropagation(); e.preventDefault(); const f = featsOf().find(x => x.id === S.mapSel); if (!f) return;
+  const pts = f.pts.map(p => [...p]); let i;
+  if (h.dataset.vtx != null) i = +h.dataset.vtx; else { const a = +h.dataset.vmid, b = (a + 1) % pts.length; pts.splice(a + 1, 0, [(pts[a][0] + pts[b][0]) / 2, (pts[a][1] + pts[b][1]) / 2]); i = a + 1; }
+  vDrag = { id: f.id, i, pts, type: f.type };
+}, true);
+document.addEventListener('pointermove', e => {
+  if (!vDrag) return; const w = planWorld(e); if (!w) return; const sn = snapPt(w, e, { id: vDrag.id, i: vDrag.i }); vDrag.pts[vDrag.i] = sn ? sn.pt : w; vDrag.moved = true;
+  const t = S._plan, X = x => t.W / 2 + (x - t.cx) * t.sc, Y = y => t.H / 2 - (y - t.cy) * t.sc, p = document.querySelector(`#plan path[data-feat="${vDrag.id}"]`);
+  if (p) p.setAttribute('d', vDrag.pts.map((q, k) => `${k ? 'L' : 'M'}${X(q[0]).toFixed(1)} ${Y(q[1]).toFixed(1)}`).join('') + (vDrag.type === 'polygon' ? 'Z' : ''));
+  const xy = $('#map-xy'); if (xy) xy.textContent = `${vDrag.pts[vDrag.i][0].toFixed(2)} E, ${vDrag.pts[vDrag.i][1].toFixed(2)} N${sn ? ' (on ' + sn.what + ')' : ''} · ${vDrag.type === 'polygon' ? 'area ' + m2(ringArea(vDrag.pts)) : 'length ' + pathLen(vDrag.pts).toFixed(2) + ' m'}`;
+});
+document.addEventListener('pointerup', () => { if (!vDrag) return; const d = vDrag; vDrag = null; if (!d.moved && d.pts.length === (featsOf().find(f => f.id === d.id)?.pts.length || 0)) return; saveFeats(featsOf().map(f => f.id === d.id ? { ...f, pts: d.pts.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]) } : f)); refreshMapEd(); });
+document.addEventListener('contextmenu', e => { const h = e.target.closest?.('#plan [data-vtx]'); if (!h || !S.mapSel || !S.mapEdit) return; e.preventDefault(); const f = featsOf().find(x => x.id === S.mapSel); if (!f) return; const min = f.type === 'polygon' ? 3 : 2; if (f.pts.length <= min) { toast('An ' + (f.type === 'polygon' ? 'area' : 'line') + ' needs at least ' + min + ' corners.'); return; } saveFeats(featsOf().map(x => x.id === f.id ? { ...x, pts: x.pts.filter((_, i) => i !== +h.dataset.vtx) } : x)); refreshMapEd(); });
+document.addEventListener('click', e => { const c = e.target.closest?.('[data-mfcopy]'); if (!c) return; const f = featsOf().find(x => x.id === S.mapSel); if (!f) return; navigator.clipboard?.writeText(['Point\tEasting\tNorthing', ...f.pts.map((p, i) => [i + 1, p[0].toFixed(3), p[1].toFixed(3)].join('\t'))].join('\n')).then(() => toast('Copied ' + f.pts.length + ' corners: paste into Excel.')); });
 /* the borehole chosen in the Place borehole panel, made when it is the new one */
 function placeTarget() {
   let b = S.bh.get(S.placeId);
@@ -9167,7 +9264,7 @@ document.addEventListener('pointerdown', e => {
   if (!S.mapEdit || !e.target.closest('#plan svg')) return;
   const w = planWorld(e); if (!w) return;
   const tool = S.mapTool;
-  if (tool === 'area' || tool === 'line') { (S.draft ||= { type: tool === 'area' ? 'polygon' : 'line', pts: [] }).pts.push(w); drawDraft(); return; }
+  if (['area', 'line', 'rect', 'circle', 'measure'].includes(tool)) { draftClick(e, w, tool); return; }
   if (tool === 'label') { const f = { id: uid('f'), name: 'Label', type: 'point', kind: 'other', pts: [[+w[0].toFixed(2), +w[1].toFixed(2)]] }; saveFeats([...featsOf(), f]); S.mapSel = f.id; S.mapTool = 'select'; refreshMapEd(); $('#mf-name')?.select(); return; }
   if (tool === 'place') {
     const b = placeTarget(); if (!b) return; b.easting = +w[0].toFixed(2); b.northing = +w[1].toFixed(2); if (!b.crs) b.crs = `UTM NAD83(CSRS) Zone ${crsZone()}`; logChange(b, 'Location placed on the site plan'); store.save(b); toast(`${b.name} placed at ${b.easting.toFixed(1)} E, ${b.northing.toFixed(1)} N.`); S.placeId = nextToPlace(); render(); return; }
@@ -9178,7 +9275,7 @@ document.addEventListener('pointermove', e => {
   if (!S.mapEdit || !$('#plan svg')) return;
   const w = planWorld(e); if (!w) return;
   const xy = $('#map-xy'); if (xy && e.target.closest('#plan')) xy.textContent = `${w[0].toFixed(1)} E, ${w[1].toFixed(1)} N`;
-  if (S.draft) drawDraft(w);
+  if (S.draft) { const q = draftPoint(e, w); drawDraft(q.pt, q.snap); draftReadout(q.pt); } else if (['area', 'line', 'rect', 'circle', 'measure'].includes(S.mapTool)) { const sn = snapPt(w, e); drawDraft(); if (sn) { const svg = $('#plan svg'), t = S._plan, g = svg?.querySelector('#map-draft-g'); if (g) g.innerHTML = `<circle cx="${(t.W / 2 + (sn.pt[0] - t.cx) * t.sc).toFixed(1)}" cy="${(t.H / 2 - (sn.pt[1] - t.cy) * t.sc).toFixed(1)}" r="8" fill="none" stroke="#e11d48" stroke-width="2"/>`; } }
   if (mDrag) { const t = S._plan; mDrag.g.setAttribute('transform', `translate(${(w[0] - mDrag.w0[0]) * t.sc} ${-(w[1] - mDrag.w0[1]) * t.sc})`); mDrag.w = w; }
 });
 document.addEventListener('pointerup', () => {
@@ -9186,11 +9283,15 @@ document.addEventListener('pointerup', () => {
   d.b.easting = +(d.e0 + d.w[0] - d.w0[0]).toFixed(2); d.b.northing = +(d.n0 + d.w[1] - d.w0[1]).toFixed(2);
   logChange(d.b, 'Location moved on the site plan'); store.save(d.b); toast(`${d.b.name} moved to ${d.b.easting.toFixed(1)} E, ${d.b.northing.toFixed(1)} N.`); drawPlan();
 });
-document.addEventListener('dblclick', e => { if (S.mapEdit && S.draft && e.target.closest('#plan')) { S.draft.pts.pop(); finishDraft(); } });
+document.addEventListener('dblclick', e => { if (S.mapEdit && S.draft && e.target.closest('#plan') && !['rect', 'circle'].includes(S.draft.type)) { S.draft.pts.pop(); finishDraft(); } });
+document.addEventListener('keydown', e => { if (e.target.id === 'mf-next' && e.key === 'Enter') { e.preventDefault(); draftTyped(e.target.value); } else if (e.target.id === 'mf-next' && e.key === 'Escape') { S.draft = null; drawPlan(); } });
+document.addEventListener('click', e => { if (e.target.closest?.('[data-mfclear]')) { S.measure = null; refreshMapEd(); } });
 document.addEventListener('keydown', e => {
   if (!S.mapEdit || e.target.closest?.('input, textarea, select')) return;
   if (S.draft && e.key === 'Enter') { e.preventDefault(); finishDraft(); }
   else if (S.draft && e.key === 'Escape') { e.stopPropagation(); S.draft = null; drawPlan(); }
+  else if (S.draft && e.key === 'Backspace') { e.preventDefault(); S.draft.pts.pop(); if (!S.draft.pts.length) S.draft = null; drawDraft(); draftReadout(); }
+  else if (S.measure && e.key === 'Escape') { e.stopPropagation(); S.measure = null; drawPlan(); }
   else if (S.mapSel && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); mapAct('mf-del'); }
 }, true);
 function mapAct(act) {
@@ -9362,7 +9463,7 @@ addEventListener('keydown', e => { if (e.code === 'Space' && !e.target.closest?.
 addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; });
 document.addEventListener('pointerdown', e => {
   if (!e.target.closest?.('#plan svg') || !S._plan) return;
-  const onThing = e.target.closest('[data-secpick], [data-bhpt], [data-feat]');
+  const onThing = e.target.closest('[data-secpick], [data-bhpt], [data-feat], [data-vtx], [data-vmid]');
   const drawing = (S.mapEdit && S.mapTool !== 'select') || !!S.secDraw || !!S.gpSpot;
   if (!(e.button === 1 || spaceDown || (!onThing && !drawing && e.button === 0))) return;
   mPan = { x: e.clientX, y: e.clientY, v: { cx: S._plan.cx, cy: S._plan.cy, sc: S._plan.sc }, moved: false };
@@ -9889,6 +9990,7 @@ function planSVG(W, H, interactive) {
   if (S.lyr.grid !== false) for (let n = Math.ceil((cy - H / 2 / sc) / gs) * gs; n < cy + H / 2 / sc; n += gs) o.push(`<line x1="0" x2="${W}" y1="${Y(n)}" y2="${Y(n)}" style="stroke:var(--grid)" opacity="${site?.img ? .5 : 1}"/>`);
   o.push(featuresSVG(X, Y, { edit: interactive && S.mapEdit, sel: S.mapSel }));
   o.push(gisLayersSVG(X, Y));   // what the Toolbox made: water table, flow arrows and paths, depth to water, areas
+  if (interactive && S.mapEdit && S.measure) o.push(measureSVG(X, Y));
   if (interactive && S.gpPanel === 'elev_fix' && (S.gp.spots || []).length) { const rr = (S.gp.prm?.elev_fix?.spotr > 0 ? +S.gp.prm.elev_fix.spotr : 5) * sc; o.push(S.gp.spots.map(([x, y], i) => `<g><circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="${Math.max(4, rr).toFixed(1)}" fill="rgba(140,60,170,.18)" stroke="#8c3caa" stroke-width="2" stroke-dasharray="4 2"/><text x="${X(x).toFixed(1)}" y="${(Y(y) + 4).toFixed(1)}" font-size="11" font-weight="700" text-anchor="middle" fill="#6a1b9a">${i + 1}</text></g>`).join('')); }
   const gb = interactive && (site?.gotoBox || (empty && !site?.goto && dlsToLL(projList().find(b => parseDLS(b.location))?.location)));
   if (gb?.poly && S.lyr.feat !== false) { const z = crsZone(), pts = gb.poly.map(([la, lo]) => llToUtm(la, lo, z)).map(([e, n]) => [X(e), Y(n)]); o.push(`<g><path d="M${pts.map(p => p.map(v => v.toFixed(1)).join(' ')).join('L')}Z" style="fill:none;stroke:#e8a33d" stroke-width="2.5" stroke-dasharray="8 5"/><text x="${pts[3][0] + 6}" y="${pts[3][1] + 16}" style="font:600 12px var(--f-body);fill:#fff;paint-order:stroke;stroke:#5b3a00;stroke-width:3px">${esc(gb.label)}</text></g>`); }
