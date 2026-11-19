@@ -186,7 +186,7 @@ export function checkJob(job) {
       if (job.features != null && !list(job.features, 50000)) return 'Features must be points, lines or areas.';
       if (job.raster != null && !(typeof job.raster.b64 === 'string' && Math.ceil(job.raster.nx * job.raster.ny * 4 / 3) * 4 === job.raster.b64.length && nums([job.raster.box], 4))) return 'The grid does not match its size.';
     }
-  } else if (kind === 'demfix') {
+  } else if (kind === 'demfix' || kind === 'trees') {
     if (typeof job.values_b64 !== 'string' || !/^[A-Za-z0-9+/=]+$/.test(job.values_b64.slice(0, 200)) || job.values_b64.length > 24e6) return 'The elevation grid is missing or too large.';
     if (!(Number.isInteger(job.nx) && Number.isInteger(job.ny) && job.nx >= 3 && job.ny >= 3 && job.nx * job.ny <= 4.5e6) || Math.ceil(job.nx * job.ny * 4 / 3) * 4 !== job.values_b64.length) return 'The grid does not match its size.';
     if (!nums([job.box], 4)) return 'No area.';

@@ -380,6 +380,84 @@ def in_grass_demfix(job, gs, tmp):
     return {**out, 'code_b64': b64u8(code), 'counts': cnt, 'cell_area': dx * dy, 'maxchange': float(chg.max()) if chg.size else 0.0, 'notes': notes,
             'tool': 'GRASS GIS %s r.neighbors%s; GDAL %s FillNodata, gdaldem' % (ver, ', r.fill.dir' if str(prm.get('sinks', 'no')) == 'yes' else '', gdal.__version__), 'detail': '; '.join(notes)}
 
+# ---------- trees in a surface model ----------
+def find_trees(job):
+    """trees in a surface model (lidar first returns, a photogrammetry DSM): the bare ground under them, and each tree's top,
+    height and crown. 1. ground: a morphological opening (SciPy grey_opening, a disc wider than the widest crown) keeps the ground's
+    shape and removes what stands on it; cells more than a threshold above it are vegetation, taken out and refilled from the ground
+    around (GDAL FillNodata), then lightly smoothed. 2. canopy height model = surface - ground. 3. treetops: local maxima of the
+    smoothed canopy with a window that grows with the tree's height (the variable-window filter of Popescu & Wynne 2004), with a
+    crown-width rule for jack pine. 4. crowns: a marker-controlled watershed (SciPy watershed_ift) from the tops down the canopy,
+    cut where it falls below half the tree's height; the crown radius is that of a circle of the same area."""
+    import numpy as np
+    import scipy
+    from scipy import ndimage
+    from osgeo import gdal
+    gdal.UseExceptions()
+    prm = job.get('params', {}); nx, ny = int(job['nx']), int(job['ny']); x0, y0, x1, y1 = job['box']; dx, dy = (x1 - x0) / nx, (y1 - y0) / ny; cell = (dx + dy) / 2
+    a = np.frombuffer(base64.b64decode(job['values_b64']), dtype='<f4').astype(float).reshape(ny, nx); fin = np.isfinite(a)
+    if not fin.any(): raise RuntimeError('The elevation layer has no values.')
+    hmin = float(prm.get('hmin') or 2); gwin = float(prm.get('ground') or 12); notes = []
+    if cell > 2.5: notes.append('the cells are %.1f m: single trees need cells of about 1 m or finer, so crowns run together and fewer trees are found' % cell)
+    def disc(r):
+        r = max(1, int(round(r))); yy, xx = np.mgrid[-r:r + 1, -r:r + 1]; return (xx * xx + yy * yy) <= r * r
+    # 1. the bare ground
+    prog(0.1, 'SciPy grey_opening: the ground under the trees (a %.0f m disc)' % gwin)
+    f = np.where(fin, a, np.nanmax(a))
+    op = ndimage.grey_opening(f, footprint=disc(gwin / 2 / cell))
+    op = ndimage.uniform_filter(op, size=max(3, int(round(gwin / 2 / cell)) | 1))   # the opening's flat steps rounded off
+    thr = max(0.3, min(1.0, hmin * 0.4))
+    veg = fin & (a - op > thr)
+    prog(0.35, 'GDAL FillNodata: refilling %d vegetation cells from the ground around them' % int(veg.sum()))
+    ds = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); bd = ds.GetRasterBand(1); bd.SetNoDataValue(-99999)
+    bd.WriteArray(np.where(fin & ~veg, a, -99999))
+    gdal.FillNodata(targetBand=bd, maskBand=None, maxSearchDist=max(10, int(gwin * 2 / cell)), smoothingIterations=2)
+    g = bd.ReadAsArray().astype(float); g[g <= -99998] = np.nan; g = np.where(np.isfinite(g), g, op)
+    gsm = ndimage.gaussian_filter(g, sigma=max(1, 1.0 / cell))
+    g = np.where(veg, np.minimum(gsm, a), np.minimum(g, a)); g[~fin] = np.nan
+    # 2. the canopy height model
+    chm = np.where(fin, np.maximum(a - np.nan_to_num(g), 0), 0)
+    sig = {'fine': 0.35, 'medium': 0.6, 'coarse': 1.0}.get(str(prm.get('separate', 'medium')), 0.6)
+    cs = ndimage.gaussian_filter(chm, sigma=max(0.5, sig / cell))
+    # 3. treetops: a variable window; jack pine crown width (m) about 1 + 0.17 x height, searched over half of it
+    prog(0.55, 'Local maxima of the canopy with a window sized to each tree\'s height')
+    cw = lambda h: 1.0 + 0.17 * h
+    top = np.zeros(cs.shape, bool)
+    if (cs >= hmin).any():
+        rc = np.maximum(1, np.rint(cw(cs) / 2 / cell)).astype(int)
+        for r in sorted(set(rc[cs >= hmin].tolist())):
+            mx = ndimage.maximum_filter(cs, footprint=disc(r))
+            top |= (rc == r) & (cs >= hmin) & (cs >= mx - 1e-6)
+    # a flat top gives a cluster of equal cells: one tree at its middle
+    lab, n = ndimage.label(top, structure=np.ones((3, 3)))
+    if n > 200000: raise RuntimeError('More than 200,000 trees: use a smaller area.')
+    cen = np.array(ndimage.center_of_mass(top, lab, range(1, n + 1))).reshape(-1, 2)
+    tops = np.clip(np.rint(cen).astype(int), 0, [ny - 1, nx - 1]) if n else np.zeros((0, 2), int)
+    # 4. crowns: a watershed from the tops down the canopy
+    prog(0.75, 'SciPy watershed_ift: each crown from its top (%d trees)' % n)
+    trees = []
+    if n:
+        mk = np.zeros(cs.shape, np.int32); mk[tops[:, 0], tops[:, 1]] = np.arange(1, n + 1)
+        mk[(cs < max(0.5, hmin * 0.5)) & (mk == 0)] = -1
+        img = np.clip((cs.max() - cs) / (cs.max() or 1) * 65000, 0, 65000).astype(np.uint16)
+        seg = ndimage.watershed_ift(img, mk, structure=np.ones((3, 3), int)); seg = np.where(seg > 0, seg, 0)
+        hh = np.array(ndimage.maximum(chm, seg, range(1, n + 1)), float)
+        h_of = np.concatenate([[np.inf], hh])[seg]
+        seg2 = np.where((seg > 0) & (cs >= 0.5 * h_of), seg, 0)
+        area = np.array(ndimage.sum(np.ones(cs.shape), seg2, range(1, n + 1)), float) * dx * dy
+        for k in range(n):
+            r_, c_ = tops[k]; h = float(hh[k])
+            if not np.isfinite(h) or h < hmin or not np.isfinite(g[r_, c_]): continue
+            rad = float(np.sqrt(max(area[k], cell * cell) / np.pi)); rad = min(max(rad, 0.35 * cw(h) / 2), 1.6 * cw(h) / 2)
+            trees.append([round(x0 + dx * (c_ + .5), 2), round(y1 - dy * (r_ + .5), 2), round(float(g[r_, c_]), 2), round(h, 2), round(rad, 2)])
+    prog(0.9, 'gdaldem: hillshade, slope and contours of the bare ground')
+    ds2 = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds2.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); b2 = ds2.GetRasterBand(1); b2.SetNoDataValue(-99999); b2.WriteArray(np.where(np.isfinite(g), g, -99999))
+    out = terrain_products(ds2, b2, prm)
+    can = fin & (chm >= hmin)
+    return {**out, 'trees': trees, 'veg_cells': int(veg.sum()), 'canopy_area': float(can.sum() * dx * dy), 'area': float(fin.sum() * dx * dy), 'cell': cell, 'notes': notes,
+            'tool': 'SciPy %s ndimage (grey_opening, maximum_filter, watershed_ift); GDAL %s FillNodata, gdaldem' % (scipy.__version__, gdal.__version__),
+            'detail': 'ground: opening with a %.0f m disc, cells more than %.2f m above it refilled; trees: tops at least %.1f m tall, window from crown width 1 + 0.17 x height (jack pine)' % (gwin, thr, hmin)}
+
 # ---------- raster tools on the app's layers (in a temporary GRASS project) ----------
 def grid_of(r):
     """a layer sent by the app: {b64, nx, ny, box} -> (array north-first, geotransform)"""
@@ -1262,6 +1340,7 @@ def run(job):
     if job.get('kind') == 'imgprev': return img_preview(job)
     if job.get('kind') == 'georef': return georef(job)
     if job.get('kind') in ('hydro', 'demfix', 'rast'): return grass_run(job)
+    if job.get('kind') == 'trees': return find_trees(job)
     if job.get('kind') == 'thiessen': return thiessen(job)
     if job.get('kind') == 'setback': return setback(job)
     if job.get('kind') == 'exportlayer': return export_layer(job)
