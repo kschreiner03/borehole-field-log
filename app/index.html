@@ -2494,7 +2494,7 @@ document.addEventListener('change', e => {
   else if (f === 'use' || f === 'save' || f === 'cShow') S.gp[f] = t.checked;
   else if (f === 'd0' || f === 'd1') S.gp[f] = t.value === '' ? null : fromD(+t.value);
   else S.gp[f] = t.value;
-  gpSave(); if (['p', 'd0', 'd1', 'r1', 'r2', 'unit', 'gL', 'gL2', 'gL3', 'gA', 'sbFrom', 'exL', 'fixL', 'bGrp'].includes(f)) renderView(true);
+  gpSave(); if (['p', 'd0', 'd1', 'r1', 'r2', 'unit', 'gL', 'gL2', 'gL3', 'gA', 'sbFrom', 'exL', 'fixL', 'bGrp', 'tL'].includes(f)) renderView(true);
 });
 document.addEventListener('input', e => { if (e.target.id === 'gp-q') { S.gp.q = e.target.value; const pos = e.target.selectionStart; renderView(true); const q = $('#gp-q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } } });
 document.addEventListener('submit', e => { const f = e.target.closest?.('[data-mapgo]'); if (!f) return; e.preventDefault(); mapGoTo(f.querySelector('input').value); });
@@ -6120,7 +6120,7 @@ function plumeField3d(list, date, param) {
   const E = spots.map(p => p.E), N = spots.map(p => p.N), all = spots.flatMap(s => s.all);
   return { src: 'interpreted', date: date || '', at, bbox: { e0: Math.min(...E) - 5, e1: Math.max(...E) + 5, n0: Math.min(...N) - 5, n1: Math.max(...N) + 5, z0: Math.min(...all.map(p => p.zb)) - .4, z1: Math.max(...all.map(p => p.zt)) + .4 } };
 }
-const V3D_LAYERS = [['boreholes', 'Boreholes'], ['wells', 'Wells'], ['samples', 'Results'], ['ground', 'Ground'], ['layers', 'Unit surfaces'], ['water', 'Water table'], ['plume', 'Plume'], ['paths', 'Flow paths'], ['labels', 'Names']];
+const V3D_LAYERS = [['terrain', 'Elevation model'], ['boreholes', 'Boreholes'], ['wells', 'Wells'], ['samples', 'Results'], ['ground', 'Ground'], ['layers', 'Unit surfaces'], ['water', 'Water table'], ['plume', 'Plume'], ['paths', 'Flow paths'], ['labels', 'Names']];
 function v3dHTML() {
   const off = S.v3dOff || {};
   return `<div class="v3d-page"><section class="sec"><header><h3>3D view</h3><span class="note">drag to rotate · shift-drag to pan · scroll to zoom</span><span class="sp"></span><button class="btn" data-act="v3d-reset">Reset view</button></header>
@@ -6201,8 +6201,36 @@ async function v3dBuild() {
   // names
   for (const b of list) { const cv = document.createElement('canvas'), ctx = cv.getContext('2d'); cv.width = 256; cv.height = 64; ctx.font = '600 30px Arial'; ctx.fillStyle = '#1c2329'; ctx.textAlign = 'center'; ctx.fillText(b.name, 128, 42);
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false })); sp.scale.set(span / 14, span / 56, 1); sp.position.copy(P(b.easting, b.northing, b.elevation + (b.well?.stickup || 0) + 1.2 / Math.max(1, ve / 2))); groups.labels.add(sp); }
-  const camera = new THREE.PerspectiveCamera(40, W / H, .1, span * 50);
-  S.v3d = { ok: true, renderer, scene, camera, groups, ve, span, target: new THREE.Vector3(0, (zTop - Z0) * ve / 2, 0), orbit: prev?.orbit && prev.ok && prev.span === span ? prev.orbit : null };
+  // the elevation model from the Toolbox: a lit surface in its colours, grey, or with a georeferenced picture draped on it
+  let vspan = span, vtarget = null;
+  { const TL = gisTerrainLayer(), O = S.v3dTerrain || {};
+    if (TL) {
+      const st = Math.max(1, Math.ceil(Math.max(TL.nx, TL.ny) / 320)), nx = Math.floor((TL.nx - 1) / st) + 1, ny = Math.floor((TL.ny - 1) / st) + 1, dx = (TL.box[2] - TL.box[0]) / TL.nx, dy = (TL.box[3] - TL.box[1]) / TL.ny;
+      const IM = O.drape === 'image' ? GIS.layers.find(L => L.kind === 'image' && (L.id === O.image || !O.image)) : null, R = GIS_RAMPS[O.drape === 'grey' ? 'grey' : TL.ramp || 'terrain'] || GIS_RAMPS.terrain, [lo, hi] = TL.range;
+      const pos = new Float32Array(nx * ny * 3), col = new Float32Array(nx * ny * 3), uv = new Float32Array(nx * ny * 2), ok = new Uint8Array(nx * ny), idx = [];
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+        const n = j * nx + i, si = Math.min(TL.nx - 1, i * st), sj = Math.min(TL.ny - 1, j * st), z = TL.values[sj * TL.nx + si], E = TL.box[0] + dx * (si + .5), N = TL.box[3] - dy * (sj + .5), fin = isFinite(z) && z != null;
+        ok[n] = fin ? 1 : 0; const v = P(E, N, fin ? z : lo); pos.set([v.x, v.y, v.z], n * 3);
+        const t = Math.max(0, Math.min(1, ((fin ? z : lo) - lo) / ((hi - lo) || 1))) * (R.length - 1), a = Math.min(R.length - 2, Math.floor(t)), u = t - a; for (let k = 0; k < 3; k++) col[n * 3 + k] = (R[a][k] + (R[a + 1][k] - R[a][k]) * u) / 255;
+        if (IM) { uv[n * 2] = (E - TL.box[0]) / (TL.box[2] - TL.box[0]); uv[n * 2 + 1] = (N - TL.box[1]) / (TL.box[3] - TL.box[1]); }
+      }
+      for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1; if (ok[a] && ok[b] && ok[c] && ok[d]) idx.push(a, c, b, b, c, d); }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); if (IM) geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+      let tex = null;
+      if (IM) {   // the picture over the elevation colours, so ground the picture doesn't cover keeps its colours; redrawn once both have loaded
+        const k = Math.min(1, 2048 / Math.max(TL.nx, TL.ny)) * Math.max(1, Math.min(4, 1024 / Math.max(TL.nx, TL.ny))), cv = document.createElement('canvas'); cv.width = Math.round(TL.nx * k); cv.height = Math.round(TL.ny * k); tex = new THREE.CanvasTexture(cv);
+        const ld = u => new Promise(r => { const im = new Image(); im.onload = () => r(im); im.onerror = () => r(null); im.src = u; }), bw = TL.box[2] - TL.box[0], bh = TL.box[3] - TL.box[1];
+        Promise.all([ld(gisRasterURL(TL)), ld(IM.url)]).then(([a, b]) => { const g = cv.getContext('2d'); if (a) g.drawImage(a, 0, 0, cv.width, cv.height); if (b) g.drawImage(b, (IM.box[0] - TL.box[0]) / bw * cv.width, (TL.box[3] - IM.box[3]) / bh * cv.height, (IM.box[2] - IM.box[0]) / bw * cv.width, (IM.box[3] - IM.box[1]) / bh * cv.height); tex.needsUpdate = true; v3dRender(); });
+      }
+      const op = +(O.op ?? 1), mt = IM ? new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide, transparent: op < 1, opacity: op }) : new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: op < 1, opacity: op, depthWrite: op >= 1 });
+      const mesh = new THREE.Mesh(geo, mt); mesh.name = TL.name; groups.terrain.add(mesh);
+      geo.computeBoundingBox(); const bb = geo.boundingBox; vspan = Math.max(span, Math.hypot(bb.max.x - bb.min.x, bb.max.z - bb.min.z) * 1.4, (bb.max.y - bb.min.y) * 2); if (vspan > span) vtarget = new THREE.Vector3((bb.min.x + bb.max.x) / 2, (bb.min.y + bb.max.y) / 2, (bb.min.z + bb.max.z) / 2);
+      if (!(S.v3dOff || {}).ground && O.hideGround !== false) groups.ground.visible = false;   // the borehole-only ground would fight the real one
+      S.v3dShown = { ...(S.v3dShown || {}), terrain: TL.name + ' (' + nx + ' × ' + ny + ' points' + (IM ? ', ' + IM.name + ' draped' : '') + ')' };
+    } else groups.terrain.visible = false;
+  }
+  const camera = new THREE.PerspectiveCamera(40, W / H, .1, vspan * 50);
+  S.v3d = { ok: true, renderer, scene, camera, groups, ve, span: vspan, target: vtarget || new THREE.Vector3(0, (zTop - Z0) * ve / 2, 0), orbit: prev?.orbit && prev.ok && prev.span === vspan ? prev.orbit : null };
   S.v3d.plume = plume;
   { // the section line's direction: the picked boreholes' ends, else the best-fit line through all (principal axis)
     const pk = [...S.secIds].map(id => list.find(b => b.id === id)).filter(Boolean), SL3 = secLineOf(); let ux, uy;
@@ -10980,6 +11008,8 @@ const GP_TOOLS = {
   gw_depth: { group: 'Groundwater', name: 'Depth to groundwater', by: 'GRASS GIS r.mapcalc', kind: 'hydro', desc: 'Ground surface minus the water table, at every place between the wells. The ground is the boreholes\' ground elevations, or an elevation model opened with Elevation map from a file.', prm: [['ground', 'Ground from', 'boreholes', '', ['boreholes', 'model']], ['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, '']] },
   elev_dem: { group: 'Terrain', name: 'Elevation map from a file', by: 'GDAL gdalwarp, gdaldem, gdal_contour', kind: 'terrain', desc: 'An elevation model you have (lidar or NRCan HRDEM GeoTIFF, an ASCII grid, …), reprojected to the project, cut to the area, shaded by elevation with hillshade, and contoured. Depth to groundwater can then use it as the ground surface.', prm: [['res', 'Resolution', '400', 'Cells across the area. Finer is slower and, past the file\'s own cells, smoother but no more detailed.', ['50', '100', '200', '400', '800', '1200', '2000', 'source'], { 50: '50 across (very coarse)', 100: '100 across', 200: '200 across', 400: '400 across', 800: '800 across', 1200: '1,200 across', 2000: '2,000 across (very fine)', source: 'The file\'s own cells' }], ['cellsize', 'Or cell size (m)', 'auto', 'An exact cell size; overrides Resolution.'], ['area', 'Area', 'boreholes', '', ['boreholes', 'view'], { boreholes: 'The boreholes and a margin', view: 'The map as it is in view' }], ['margin', 'Margin (m)', 60, 'Around the outer boreholes.'], ['datum', 'Datum', 'file', '', ['file', 'match'], { file: 'As the file', match: 'Shift onto the boreholes' }], ['interval', 'Contour interval (m)', 'auto', ''], ['index', 'Index contour', '5', 'Every so many contours is bold and labelled.', ['1', '2', '4', '5', '10'], { 1: 'Every contour', 2: 'Every 2nd', 4: 'Every 4th', 5: 'Every 5th', 10: 'Every 10th' }], ['shade', 'Hillshade', 'single', '', ['single', 'multi', 'none'], { single: 'One sun', multi: 'Several suns (multidirectional)', none: 'None' }], ['azimuth', 'Sun from (°)', 315, 'Compass direction of the light: 315 is the north-west, the cartographic standard.'], ['altitude', 'Sun height (°)', 45, 'Lower: longer shadows, more relief.'], ['zfactor', 'Exaggeration', 1, 'Vertical exaggeration of the hillshade and slope: 2 to 5 brings out low relief.']] },
   elev_fix: { group: 'Terrain', name: 'Fix bad spots in an elevation map', by: 'GRASS GIS r.neighbors, r.fill.dir; GDAL FillNodata', kind: 'demfix', desc: 'Finds cells that do not make sense against the ground around them (spikes from birds, wires, vehicles or stockpiles; pits from water or noise), removes them with any spots you mark on the map and any holes in the data, and refills them from the good ground around. Optionally fills false depressions and smooths lightly. Makes a corrected layer; the original is kept.', prm: [['spikes', 'Find spikes and pits', 'yes', '', ['yes', 'no'], { yes: 'Yes', no: 'No: only marked spots and holes' }], ['window', 'Compare with', '5', 'The neighbourhood each cell is compared with. Larger finds bigger objects but can clip real ridges.', ['3', '5', '9', '15', '25'], { 3: '3 × 3 cells', 5: '5 × 5 cells', 9: '9 × 9 cells', 15: '15 × 15 cells', 25: '25 × 25 cells' }], ['sense', 'Sensitivity', 'medium', 'How far from its neighbours (in local variation) a cell must be to count as bad.', ['low', 'medium', 'high'], { low: 'Low: only the obvious', medium: 'Medium', high: 'High: also small bumps' }], ['height', 'At least (m)', 0.2, 'Never flag a difference smaller than this.'], ['holes', 'Fill holes in the data', 'yes', '', ['yes', 'no'], { yes: 'Yes', no: 'No' }], ['maxfill', 'Fill reach (cells)', 'auto', 'How far to look for good ground when refilling.'], ['sinks', 'Fill false depressions', 'no', 'For drainage work: removes closed hollows so water can flow off (r.fill.dir). Real ponds are filled too.', ['no', 'yes'], { no: 'No', yes: 'Yes' }], ['smooth', 'Smooth', '0', 'A light average after fixing.', ['0', '3', '5'], { 0: 'No', 3: '3 × 3 average', 5: '5 × 5 average' }], ['spotr', 'Marked spot radius (m)', 5, 'The size of each spot you mark on the map.']] },
+  terr_3d: { group: 'Terrain', name: '3D view of the elevation', by: 'three.js (WebGL)', kind: 'terr3d', desc: 'The elevation model as a lit 3D surface with the boreholes, wells, plume and water table in it; in its colours, grey, or with a georeferenced picture or orthophoto draped over it. Drag to turn, scroll to zoom.', prm: [['drape', 'Surface', 'colours', '', ['colours', 'grey', 'image'], { colours: 'Elevation colours', grey: 'Grey', image: 'A picture layer (georeferenced or imported)' }], ['ve', 'Vertical exaggeration', 'auto', '', ['auto', '1', '2', '3', '5', '10'], { auto: 'Automatic', 1: 'None (true scale)', 2: '× 2', 3: '× 3', 5: '× 5', 10: '× 10' }], ['op', 'Surface', '1', '', ['1', '0.75', '0.5'], { 1: 'Solid', 0.75: 'Slightly see-through', 0.5: 'See-through (boreholes below show)' }]] },
+  terr_model: { group: 'Terrain', name: 'Elevation as a 3D model (STL, OBJ)', by: 'STL and OBJ writers', kind: 'terr3d', desc: 'The elevation layer as a 3D file: STL, a closed solid with a flat base for 3D printing a site model; or OBJ with elevation colours for Blender, MeshLab or SketchUp. In metres from the south-west corner.', prm: [['format', 'Format', 'stl', '', ['stl', 'obj'], { stl: 'STL (3D printing)', obj: 'OBJ with colours' }], ['ve', 'Vertical exaggeration', '3', 'Low ground needs it to show in a print.', ['1', '2', '3', '5', '10'], { 1: 'None', 2: '× 2', 3: '× 3', 5: '× 5', 10: '× 10' }], ['base', 'Base (m)', 2, 'Solid below the lowest point (STL).'], ['maxn', 'Detail', '250', 'Points across, at most.', ['100', '250', '500'], { 100: '100 (small file)', 250: '250', 500: '500 (large file)' }]] },
   elev_points: { group: 'Terrain', name: 'Elevation map from the boreholes', by: 'GRASS GIS v.surf.rst; GDAL gdaldem', kind: 'terrain', desc: 'The ground surface between the boreholes from their surveyed ground elevations, shaded with hillshade, and contoured. Only as good as the number of boreholes: for real terrain, use an elevation model file.', prm: [['res', 'Resolution', '200', 'Cells across the area. Finer is slower and, past the file\'s own cells, smoother but no more detailed.', ['50', '100', '200', '400', '800', '1200', '2000'], { 50: '50 across (very coarse)', 100: '100 across', 200: '200 across', 400: '400 across', 800: '800 across', 1200: '1,200 across', 2000: '2,000 across (very fine)', source: 'The file\'s own cells' }], ['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, ''], ['interval', 'Contour interval (m)', 'auto', ''], ['index', 'Index contour', '5', 'Every so many contours is bold and labelled.', ['1', '2', '4', '5', '10'], { 1: 'Every contour', 2: 'Every 2nd', 4: 'Every 4th', 5: 'Every 5th', 10: 'Every 10th' }], ['shade', 'Hillshade', 'single', '', ['single', 'multi', 'none'], { single: 'One sun', multi: 'Several suns (multidirectional)', none: 'None' }], ['azimuth', 'Sun from (°)', 315, 'Compass direction of the light: 315 is the north-west, the cartographic standard.'], ['altitude', 'Sun height (°)', 45, 'Lower: longer shadows, more relief.'], ['zfactor', 'Exaggeration', 1, 'Vertical exaggeration of the hillshade and slope: 2 to 5 brings out low relief.']] },
   gw_upgrad: { group: 'Groundwater', name: 'Where did it come from? (upgradient path)', by: 'GRASS GIS r.drain', kind: 'hydro', desc: 'Traces back up the water table from a borehole (steepest ascent): the direction a dissolved plume most likely came from, if it moved with the groundwater.', prm: [['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, ''], ['fill', 'Fill local highs', 'yes', '', ['yes', 'no']]] },
   gw_change: { group: 'Groundwater', name: 'Water-level change between rounds', by: 'GRASS GIS r.mapcalc', kind: 'hydro', desc: 'The water table of a later round minus an earlier one: where it rose and where it fell, from the wells read in both rounds.', prm: [['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, '']] },
@@ -11086,6 +11116,8 @@ function gpFormHTML(k, T) {
       <div class="actions"><button class="btn${S.gpSpot ? ' primary' : ''}" data-act="gp-spot">${S.gpSpot ? 'Done marking' : 'Mark spots on the map'}</button>${sp.length ? '<button class="btn link" data-act="gp-spot-clear">Clear them</button>' : ''}</div>
       <h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">A corrected layer, with Show › What was fixed to see each change. The original layer is kept, turned off.</p>`;
   }
+  if (T.kind === 'terr3d') { const ts = GIS.layers.filter(L => L.kind === 'raster' && L.values); if (!ts.some(L => L.id === g.tL)) g.tL = (ts.find(L => L.terrain) || ts[0])?.id || '';
+    return `<h4>Input</h4>${ts.length ? crow('Elevation layer', `<select data-gpf="tL">${ts.map(L => `<option value="${L.id}" ${L.id === g.tL ? 'selected' : ''}>${esc(L.name)}</option>`).join('')}</select>`) : '<p class="note">Make an elevation layer first: Elevation map from a file, or from the boreholes.</p>'}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">${k === 'terr_3d' ? 'Opens the 3D page with the surface; its Layers list turns it on and off.' : 'Saved where you choose.'}</p>`; }
   if (T.kind === 'terrain') {
     const nb = projList().filter(b => b.easting != null && b.elevation != null).length;
     const inp = k === 'elev_dem' ? crow('File', `<span class="gp-file">${g.demName ? `<b>${esc(g.demName)}</b>${g.demSize ? ' <span class="note">' + (g.demSize / 1048576).toFixed(1) + ' MB</span>' : ''}<br>` : ''}<button class="btn" data-act="gp-pick">${g.demFile ? 'Choose another…' : 'Choose file…'}</button></span>`) + crsField('dSrc', 'File\'s system', '', 'As the file says') + crow('Area', 'the boreholes and the margin below') + crow('Coordinates', 'to EPSG:' + projEpsg())
@@ -11149,6 +11181,16 @@ async function gpRun() {
   if (T.kind === 'crs') { await gpCrs(k, T); return; }
   if (T.kind === 'rast2') { await gpRast(k, T, gpParams(k)); return; }
   if (T.kind === 'georef') { geoOpen(); return; }
+  if (T.kind === 'terr3d') {
+    const L = GIS.layers.find(x => x.id === S.gp.tL && x.values) || gisTerrainLayer(), prm = gpParams(k); if (!L) { toast('Make an elevation layer first.'); return; }
+    if (k === 'terr_3d') { S.v3dTerrain = { layer: L.id, drape: prm.drape || 'colours', op: +(prm.op || 1), image: (GIS.layers.find(x => x.kind === 'image') || {}).id }; S.v3dVe = prm.ve && prm.ve !== 'auto' ? +prm.ve : null; S.v3dOff = { ...(S.v3dOff || {}), terrain: false };
+      if (prm.drape === 'image' && !GIS.layers.some(x => x.kind === 'image')) toast('There is no picture layer: georeference an image or add a raster as a picture first. Showing elevation colours.');
+      S.gpPanel = null; goTab('v3d'); return; }
+    const fmt = prm.format || 'stl', m = terrainModel(L, fmt, +(prm.ve || 3), prm.base >= 0 && prm.base !== '' && prm.base != null ? +prm.base : 2, +(prm.maxn || 250)), nm = L.name.replace(/[^\w .-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 50) + '.' + fmt;
+    await saveBytes(nm, m.bytes, fmt === 'stl' ? 'model/stl' : 'model/obj');
+    const key = 'model|' + Date.now(); GIS.jobs.set('m' + key, { id: 'm' + key, key, label: 'Elevation as a 3D model', tool: k, kind: 'hydro', status: 'done', p: 1, t0: Date.now(), t1: Date.now(), msg: 'Saved', input: L.name, job: {}, res: { ok: true }, sum: `Saved ${nm}: ${m.tris.toLocaleString('en-CA')} triangles, ${m.w.toFixed(0)} × ${m.h.toFixed(0)} m, up to ${m.top.toFixed(1)} m high (vertical × ${prm.ve || 3}${fmt === 'stl' ? ', on a ' + (prm.base ?? 2) + ' m base' : ''}), ${(m.bytes.length / 1048576).toFixed(1)} MB. Units are metres: scale it in the slicer (e.g. 1:1000 makes ${(m.w / 1000 * 1000).toFixed(0)} mm across).` });
+    gisJobsUI(); renderView(true); return;
+  }
   if (T.kind === 'points3d') {
     const prm = gpParams(k), kk = prm.k === 'auto' ? (XS_ANISO_PICK || 10) : +prm.k;
     S.xs = { ...S.xs, interp: 'gis_' + k, aniso: kk }; lsSet('bhlog.xs', JSON.stringify(S.xs)); gisMethods();
@@ -11685,6 +11727,31 @@ async function geoRun(save) {
   G.preview = { url, box: r.box, sum }; if (j) j.sum = sum;
   gisAddLayer({ name: nm + ' (georeferenced)', kind: 'image', url, box: r.box, op: .85, under: true, tool: 'georef', note: how + ', RMS ' + r.rms.toFixed(2) + ' m' });
   geoDraw();
+}
+/* the elevation layer the 3D view shows: the one chosen with 3D view of the elevation, else the newest one turned on */
+function gisTerrainLayer() { const id = S.v3dTerrain?.layer; return GIS.layers.find(L => L.id === id && L.values) || GIS.layers.find(L => L.terrain && L.on && L.values) || GIS.layers.find(L => L.terrain && L.values) || null; }
+/* an elevation layer as a 3D model: STL (a closed solid with a base, for 3D printing) or OBJ with vertex colours */
+function terrainModel(L, fmt, ve, base, maxn) {
+  const st = Math.max(1, Math.ceil(Math.max(L.nx, L.ny) / maxn)), nx = Math.floor((L.nx - 1) / st) + 1, ny = Math.floor((L.ny - 1) / st) + 1, dx = (L.box[2] - L.box[0]) / L.nx * st, dy = (L.box[3] - L.box[1]) / L.ny * st, lo = L.range[0];
+  const Z = new Float32Array(nx * ny); for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const z = L.values[Math.min(L.ny - 1, j * st) * L.nx + Math.min(L.nx - 1, i * st)]; Z[j * nx + i] = ((isFinite(z) && z != null ? z : lo) - lo) * ve + base; }
+  const V = (i, j, top) => [i * dx, (ny - 1 - j) * dy, top ? Z[j * nx + i] : 0];   // x east, y north from the south-west corner, z up from the base
+  const tris = [];
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) { tris.push([V(i, j, 1), V(i, j + 1, 1), V(i + 1, j, 1)], [V(i + 1, j, 1), V(i, j + 1, 1), V(i + 1, j + 1, 1)]); }
+  if (fmt === 'stl') {   // walls round the edge and a flat base close the solid
+    const C = [(nx - 1) * dx / 2, (ny - 1) * dy / 2, 0], wall = (a, b) => { const a0 = [...a.slice(0, 2), 0], b0 = [...b.slice(0, 2), 0]; tris.push([a0, b0, b], [a0, b, a], [b0, a0, C]); };   // each wall segment also fans the base to its centre, so every edge is shared by two triangles
+    for (let i = 0; i < nx - 1; i++) { wall(V(i + 1, ny - 1, 1), V(i, ny - 1, 1)); wall(V(i, 0, 1), V(i + 1, 0, 1)); }
+    for (let j = 0; j < ny - 1; j++) { wall(V(0, j + 1, 1), V(0, j, 1)); wall(V(nx - 1, j, 1), V(nx - 1, j + 1, 1)); }
+    const w = (nx - 1) * dx, h = (ny - 1) * dy;
+    const buf = new ArrayBuffer(84 + tris.length * 50), dv = new DataView(buf), hd = 'Borehole Field Log terrain: ' + L.name + ', metres, vertical x' + ve; for (let k = 0; k < Math.min(80, hd.length); k++) dv.setUint8(k, hd.charCodeAt(k) & 127);
+    dv.setUint32(80, tris.length, true); let o = 84;
+    for (const [a, b, c] of tris) { const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2]; let nX = uy * vz - uz * vy, nY = uz * vx - ux * vz, nZ = ux * vy - uy * vx; const m = Math.hypot(nX, nY, nZ) || 1;
+      for (const v of [nX / m, nY / m, nZ / m, ...a, ...b, ...c]) { dv.setFloat32(o, v, true); o += 4; } dv.setUint16(o, 0, true); o += 2; }
+    return { bytes: new Uint8Array(buf), tris: tris.length, w, h, top: Math.max(...Z) };
+  }
+  const R = GIS_RAMPS[L.ramp] || GIS_RAMPS.terrain, hi = L.range[1], out = ['# Borehole Field Log terrain: ' + L.name, '# metres from the south-west corner ' + L.box[0].toFixed(2) + ' E, ' + L.box[1].toFixed(2) + ' N; z from ' + lo.toFixed(2) + ' m less ' + base + ' m; vertical x' + ve];
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const p = V(i, j, 1), z = lo + (p[2] - base) / ve, t = Math.max(0, Math.min(1, (z - lo) / ((hi - lo) || 1))) * (R.length - 1), a = Math.min(R.length - 2, Math.floor(t)), u = t - a, c = [0, 1, 2].map(k => ((R[a][k] + (R[a + 1][k] - R[a][k]) * u) / 255).toFixed(3)); out.push(`v ${p[0].toFixed(3)} ${p[2].toFixed(3)} ${(-p[1]).toFixed(3)} ${c.join(' ')}`); }
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i + 1, b = a + 1, c = a + nx, d = c + 1; out.push(`f ${a} ${c} ${b}`, `f ${b} ${c} ${d}`); }
+  return { bytes: new TextEncoder().encode(out.join('\n') + '\n'), tris: (nx - 1) * (ny - 1) * 2, w: (nx - 1) * dx, h: (ny - 1) * dy, top: Math.max(...Z) };
 }
 /* the soil results by sample: [E, N, depth, log10 value] (a zero is the bottom of the range; a non-detect half its limit) */
 function samplePts(p, d0, d1) {
