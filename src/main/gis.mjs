@@ -136,6 +136,11 @@ export function checkJob(job) {
     if (pc != null && pc !== 'source' && !(+pc >= 25 && +pc <= 3000)) return 'Cells across must be 25 to 3000.';
     if (cs != null && !(+cs >= 0.05)) return 'The cell size must be 0.05 m or more.';
     if (job.levels != null && (!Array.isArray(job.levels) || job.levels.length > 400 || !job.levels.every(isNum))) return 'Contour levels must be numbers.';
+  } else if (kind === 'demfix') {
+    if (typeof job.values_b64 !== 'string' || !/^[A-Za-z0-9+/=]+$/.test(job.values_b64.slice(0, 200)) || job.values_b64.length > 24e6) return 'The elevation grid is missing or too large.';
+    if (!(Number.isInteger(job.nx) && Number.isInteger(job.ny) && job.nx >= 3 && job.ny >= 3 && job.nx * job.ny <= 4.5e6) || Math.ceil(job.nx * job.ny * 4 / 3) * 4 !== job.values_b64.length) return 'The grid does not match its size.';
+    if (!nums([job.box], 4)) return 'No area.';
+    if (job.spots != null && (!nums(job.spots, 3) || job.spots.length > 300)) return 'Spots must be [x, y, radius].';
   } else if (kind === 'volume') {
     if (!nums(job.pts, 4) || job.pts.length < 4 || job.pts.length > 2000) return 'Samples must be 4 to 2000 [x, y, depth, value].';
     if (!nums([job.box3], 6) || !(job.nx >= 2 && job.ny >= 2 && job.nz >= 1 && job.nx * job.ny * job.nz <= 200000)) return 'Block grid outside the limits.';

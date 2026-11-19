@@ -306,8 +306,87 @@ def in_grass_hydro(job, gs, tmp):
         return {'values': read('d'), 'head': read('h_r'), 'tool': 'GRASS GIS %s r.mapcalc' % ver, 'detail': 'ground surface and water table each from ' + base}
     raise RuntimeError('Unknown groundwater tool ' + m)
 
+def in_grass_demfix(job, gs, tmp):
+    """fix bad spots in an elevation grid: spikes and pits against the local median (GRASS r.neighbors, a robust MAD test),
+    spots the user marked, holes in the data; refilled from the good ground around them (GDAL FillNodata); optionally false
+    depressions filled (GRASS r.fill.dir) and light smoothing (r.neighbors average). Codes: 1 spike, 2 pit, 3 hole, 4 sink, 5 marked"""
+    import numpy as np
+    from osgeo import gdal
+    gdal.UseExceptions()
+    prm = job.get('params', {}); nx, ny = int(job['nx']), int(job['ny']); x0, y0, x1, y1 = job['box']; dx, dy = (x1 - x0) / nx, (y1 - y0) / ny
+    ver = gs.version().get('version', '')
+    a = np.frombuffer(base64.b64decode(job['values_b64']), dtype='<f4').astype(float).reshape(ny, nx)
+    def write(arr, name):
+        f = os.path.join(tmp, name + '.tif'); ds = gdal.GetDriverByName('GTiff').Create(f, nx, ny, 1, gdal.GDT_Float32)
+        ds.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); b = ds.GetRasterBand(1); b.SetNoDataValue(-99999); b.WriteArray(np.where(np.isfinite(arr), arr, -99999)); ds = None; return f
+    def to_grass(arr, name): gs.run_command('r.in.gdal', input=write(arr, name), output=name, flags='o', overwrite=True, quiet=True)
+    def read(name):
+        f = os.path.join(tmp, name + '_out.tif'); gs.run_command('r.out.gdal', input=name, output=f, format='GTiff', type='Float32', flags='cf', nodata=-99999, overwrite=True, quiet=True)
+        ds = gdal.Open(f); r = ds.GetRasterBand(1).ReadAsArray().astype(float); ds = None; r[r <= -99998] = np.nan; return r
+    prog(0.05, 'r.in.gdal: the elevation grid into GRASS, %d × %d cells' % (nx, ny))
+    to_grass(a, 'z'); gs.run_command('g.region', raster='z', quiet=True)
+    code = np.zeros((ny, nx), np.uint8); notes = []
+    win = int(prm.get('window', 5)); win += (win + 1) % 2
+    if str(prm.get('spikes', 'yes')) != 'no':
+        prog(0.15, 'r.neighbors: the median of every %d × %d window' % (win, win))
+        gs.run_command('r.neighbors', input='z', output='med', method='median', size=win, overwrite=True, quiet=True)
+        gs.run_command('r.mapcalc', expression='dev = z - med', overwrite=True, quiet=True)
+        gs.run_command('r.mapcalc', expression='adev = abs(dev)', overwrite=True, quiet=True)
+        prog(0.3, 'r.neighbors: the local variation (median absolute deviation)')
+        gs.run_command('r.neighbors', input='adev', output='mad', method='median', size=max(win, 7) + (max(win, 7) + 1) % 2, overwrite=True, quiet=True)
+        dev, mad = read('dev'), read('mad')
+        k = {'low': 8.0, 'medium': 5.0, 'high': 3.5}.get(str(prm.get('sense', 'medium')), 5.0)
+        floor = float(prm.get('height') or 0) or 0.2
+        lim = np.maximum(floor, k * 1.4826 * np.nan_to_num(mad))
+        ok = np.isfinite(a) & np.isfinite(dev)
+        code[ok & (dev > lim)] = 1; code[ok & (dev < -lim)] = 2
+        notes.append('spikes and pits: more than %.2f m, or %g× the local variation, from the median of %d × %d cells' % (floor, k, win, win))
+    for sx, sy, sr in job.get('spots') or []:   # spots marked on the map
+        X, Y = np.meshgrid(x0 + dx * (np.arange(nx) + .5), y1 - dy * (np.arange(ny) + .5))
+        code[(np.hypot(X - sx, Y - sy) <= sr) & np.isfinite(a)] = 5
+    b = a.copy(); b[(code == 1) | (code == 2) | (code == 5)] = np.nan
+    holes0 = ~np.isfinite(a)
+    # only holes inside the data are filled: no-data that reaches the edge of the grid is where the file stops, not a gap in it
+    from scipy import ndimage
+    labs, nl = ndimage.label(holes0)
+    edge = set(np.unique(np.concatenate([labs[0, :], labs[-1, :], labs[:, 0], labs[:, -1]]))) - {0}
+    outside = np.isin(labs, list(edge)) if edge else np.zeros(holes0.shape, bool)
+    holes0 = holes0 & ~outside
+    fill = str(prm.get('holes', 'yes')) != 'no'
+    prog(0.5, 'GDAL FillNodata: refilling %d cells from the ground around them' % int(np.isnan(b).sum() - (0 if fill else holes0.sum())))
+    ds = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); bd = ds.GetRasterBand(1); bd.SetNoDataValue(-99999)
+    bd.WriteArray(np.where(np.isfinite(b), b, -99999))
+    maxd = float(prm.get('maxfill') or 0) or max(10, round(max(nx, ny) / 10))
+    gdal.FillNodata(targetBand=bd, maskBand=None, maxSearchDist=maxd, smoothingIterations=int(prm.get('smoothit', 1)))
+    c = bd.ReadAsArray().astype(float); c[c <= -99998] = np.nan
+    if not fill: c[holes0] = np.nan
+    c[outside] = np.nan   # beyond the file stays empty
+    code[holes0 & np.isfinite(c)] = 3
+    still = (np.isnan(c) & ((code == 1) | (code == 2) | (code == 5)))
+    if still.any(): c[still] = a[still]; code[still] = 0; notes.append('%d flagged cells were too far from good ground to refill and were left' % int(still.sum()))
+    if str(prm.get('sinks', 'no')) == 'yes':
+        prog(0.7, 'r.fill.dir: filling false depressions')
+        to_grass(c, 'c1'); gs.run_command('r.fill.dir', input='c1', output='c2', direction='cdir', overwrite=True, quiet=True)
+        c2 = read('c2'); ch = np.isfinite(c2) & np.isfinite(c) & (c2 - c > 1e-4); code[ch & (code == 0)] = 4; c = np.where(np.isfinite(c2), c2, c)
+    sm = int(prm.get('smooth', 0) or 0)
+    if sm in (3, 5, 7):
+        prog(0.78, 'r.neighbors: light smoothing (average of %d × %d)' % (sm, sm))
+        to_grass(c, 'c3'); gs.run_command('r.neighbors', input='c3', output='c4', method='average', size=sm, overwrite=True, quiet=True)
+        c4 = read('c4'); c = np.where(np.isfinite(c4) & np.isfinite(c), c4, c); notes.append('smoothed with a %d × %d average' % (sm, sm))
+    ds2 = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds2.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); b2 = ds2.GetRasterBand(1); b2.SetNoDataValue(-99999); b2.WriteArray(np.where(np.isfinite(c), c, -99999))
+    out = terrain_products(ds2, b2, prm)
+    both = np.isfinite(a) & np.isfinite(c); chg = np.abs(c - a)[both]
+    cnt = {k: int((code == v).sum()) for k, v in (('spikes', 1), ('pits', 2), ('holes', 3), ('sinks', 4), ('marked', 5))}
+    return {**out, 'code_b64': b64u8(code), 'counts': cnt, 'cell_area': dx * dy, 'maxchange': float(chg.max()) if chg.size else 0.0, 'notes': notes,
+            'tool': 'GRASS GIS %s r.neighbors%s; GDAL %s FillNodata, gdaldem' % (ver, ', r.fill.dir' if str(prm.get('sinks', 'no')) == 'yes' else '', gdal.__version__), 'detail': '; '.join(notes)}
+
 def in_grass(job):
     job = floats(job)
+    if job.get('kind') == 'demfix':
+        import grass.script as gs
+        tmp = tempfile.mkdtemp(prefix='bfl-gin-')
+        try: return in_grass_demfix(job, gs, tmp)
+        finally: shutil.rmtree(tmp, ignore_errors=True)
     if job.get('kind') == 'hydro':
         import grass.script as gs
         tmp = tempfile.mkdtemp(prefix='bfl-gin-')
@@ -637,7 +716,7 @@ def area_over(job):
 
 def run(job):
     job = floats(job)
-    if job.get('kind') == 'hydro': return grass_run(job)
+    if job.get('kind') in ('hydro', 'demfix'): return grass_run(job)
     if job.get('kind') == 'area': return area_over(job)
     if job.get('kind') == 'dem': return dem(job)
     if job.get('kind') == 'volume': return soil_volume(job)
