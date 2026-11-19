@@ -1,0 +1,9 @@
+export const GIS_SPECS: string[];
+export const GIS_METHODS: { surface: string[]; points3d: string[] };
+export function gisHome(userData: string): string;
+export function driverPath(root: string): string;
+export function checkJob(job: unknown): string;
+export function gisStatus(o: { userData: string; root: string }): Promise<{ installed: boolean; supported?: boolean; home?: string; versions?: Record<string, string>; broken?: string }>;
+export function gisInstall(o: { userData: string; onProgress?: (p: { step?: string; line?: string }) => void }): Promise<{ ok: boolean; error?: string; home?: string }>;
+export function gisRemove(o: { userData: string }): Promise<{ ok: boolean; error?: string }>;
+export function gisRun(o: { userData: string; root: string; job: unknown; timeoutMs?: number }): Promise<Record<string, unknown> & { ok: boolean; error?: string }>;

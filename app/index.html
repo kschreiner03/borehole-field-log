@@ -2578,7 +2578,7 @@ function openPrefs() {
       <div class="fld"><label>Depth per PDF page</label>${mirror('page-depth')}</div>
       <div class="fld"><label>Soil symbols</label>${mirror('symset')}</div>
       <div class="fld"><label>Log graphics</label>${mirror('logstyle')}</div></div>
-    <div class="actions" style="margin-top:6px"><button class="btn" data-act="settings">Company, logo &amp; initials…</button><button class="btn" data-act="buttons">Your buttons…</button><button class="btn" data-act="log-cols">Log columns…</button><button class="btn" data-act="field">${document.body.classList.contains('field') ? 'Turn off' : 'Turn on'} large controls</button></div>`,
+    <div class="actions" style="margin-top:6px"><button class="btn" data-act="settings">Company, logo &amp; initials…</button><button class="btn" data-act="buttons">Your buttons…</button><button class="btn" data-act="log-cols">Log columns…</button><button class="btn" data-act="field">${document.body.classList.contains('field') ? 'Turn off' : 'Turn on'} large controls</button></div>${gisPrefsHTML()}`,
     `<button class="btn primary" data-act="close">Done</button>`);
   document.querySelectorAll('[data-mirror]').forEach(sel => { sel.value = $('#' + sel.dataset.mirror).value; });
 }
@@ -4847,6 +4847,7 @@ function nn2d(P, k, G) {
 function plume3dField(G, xs, medium, param, lv, how) {
   const P = plume3dPts(G, xs, medium, param, lv), g0 = lv[0]?.v;
   if (how === 'ik' && !(g0 > 0)) return null;
+  if (how?.startsWith('gis_')) return gisPlume3d(G, xs, medium, param, lv, how, P);
   const fitK = (h, k) => { try { return h === 'idw' ? idw3d(P, k) : h === 'uk' ? ukrige3d(P, k) : h === 'ik' ? ikrige3d(P, k, g0) : h === 'rst' ? rbf3d(P, k, 'rst') : h === 'rbf' ? rbf3d(P, k, 'mq') : h === 'near' ? near3d(P, k) : h === 'nn' ? nn2d(P, k, G) : krige3d(P, k); } catch { return null; } };
   const autoM = how === 'auto', cands = autoM ? XS_AUTO : [how];
   // layering: the ratio given, or (Automatic) the one whose fit best predicts each sample from the others
@@ -4876,6 +4877,28 @@ function plume3dField(G, xs, medium, param, lv, how) {
   const short = name + ', layered ×' + k + (autoK ? ' (auto)' : '') + ' · ' + (how === 'ik' ? (M.constant ? 'every sample on one side of the guideline' : 'checked: wrong side ' + Math.round(M.loo * 100) + ' % on average') : 'checked: within ×' + (fac < 10 ? fac.toFixed(1) : Math.round(fac))) + ' · interpreted between samples, not measured; see the note for its limits';
   const xf = v => '×' + (10 ** v < 10 ? (10 ** v).toFixed(1) : Math.round(10 ** v)), pickNote = autoM && byM.length > 1 ? ' Chosen automatically as the most accurate here (typical error predicting each sample from the others: ' + byM.slice().sort((a, b) => a[1] - b[1]).map(([h, v]) => XS_METHODS[h][0].replace(/, 3D.*$|: .*$/, '') + ' ' + xf(v)).join(', ') + ').' : '';
   return { at, note: pickNote && /\sMethod: /.test(note) ? note.replace(/(\s*Method: )/,' ' + pickNote.trim() + '$1') : note + pickNote, short: (autoM ? 'Automatic: ' : '') + short, method: how, prob: how === 'ik' };
+}
+/* a section plume from a GIS engine: the samples and every node of the section grid, layered (a metre down counts as k sideways),
+   sent to the tool; its values (and kriging variance) come back for each node */
+function gisPlume3d(G, xs, medium, param, lv, how, P) {
+  const em = how.slice(4), autoK = xs.aniso == null || xs.aniso === 'auto' || !(+xs.aniso > 0), k = autoK ? (XS_ANISO_PICK || 10) : +xs.aniso;
+  const nx = Math.max(8, Math.ceil(G.plotW / 10)), ny = Math.max(6, Math.ceil(G.plotH / 10)), T = [];
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { const d = G.maxD * i / nx, e = G.e1 - (G.e1 - G.e0) * j / ny, [E, N] = G.pos.at(d); T.push([+E.toFixed(3), +N.toFixed(3), +(e * k).toFixed(3)]); }
+  const Ps = P.map(p => [p[0], p[1], p[2] * k, p[3]]);
+  const job = { kind: 'points3d', method: em, pts: Ps, targets: T };
+  if (em === 'grass_vol_rst') { const all = [...Ps, ...T], mn = i => Math.min(...all.map(q => q[i])), mx = i => Math.max(...all.map(q => q[i])), pd = i => (mx(i) - mn(i)) * .05 + 1;
+    job.box3 = [mn(0) - pd(0), mn(1) - pd(1), mn(2) - pd(2), mx(0) + pd(0), mx(1) + pd(1), mx(2) + pd(2)]; job.nx = 40; job.ny = 40; job.nz = 30; }
+  const key = gisKey(em, Ps, G.maxD.toFixed(1) + '|' + nx + 'x' + ny + '|' + G.e0.toFixed(2) + ',' + G.e1.toFixed(2) + '|' + T.length), r = Ps.length >= 4 ? gisGet(key, job) : null;
+  if (!r) { const f = plume3dField(G, xs, medium, param, lv, 'krige'); if (f) { const w = Ps.length < 4 ? XS_METHODS[how][0] + ' needs four or more samples.' : gisNote(how, key); f.note = w + ' ' + f.note; f.short = (GIS.busy.has(key) ? 'Running ' + XS_METHODS[how][0] + '… ' : '') + f.short; } return f; }
+  const W = nx + 1, vals = Float32Array.from(r.values.map(v => v == null ? NaN : v)), sill = r.sill || 1;
+  const h3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]), nn = Ps.map((p, i) => Math.min(...Ps.filter((_, j) => j !== i).map(q => h3(p, q) || Infinity))).filter(isFinite).sort((a, b) => a - b), sp = Math.max(1, nn[Math.floor(nn.length / 2)] || 1) * 2.5;
+  const sup = Float32Array.from(T.map((t, n) => { const c = r.var?.[n] != null ? 1 - r.var[n] / sill : 1 - Math.min(1, (Math.min(...Ps.map(p => h3(t, p))) / sp) ** 2); return Math.max(0, Math.min(1, (c - .1) / .6)); }));
+  const at = (d, e) => { const fi = Math.max(0, Math.min(nx, d / (G.maxD || 1) * nx)), fj = Math.max(0, Math.min(ny, (G.e1 - e) / ((G.e1 - G.e0) || 1) * ny)), i = Math.min(nx - 1, Math.floor(fi)), j = Math.min(ny - 1, Math.floor(fj)), u = fi - i, w = fj - j;
+    const bl = A => { const c = [[A[j * W + i], (1 - u) * (1 - w)], [A[j * W + i + 1], u * (1 - w)], [A[(j + 1) * W + i], (1 - u) * w], [A[(j + 1) * W + i + 1], u * w]].filter(q => isFinite(q[0])); const t = c.reduce((a, q) => a + q[1], 0); return t > 1e-9 ? c.reduce((a, q) => a + q[0] * q[1], 0) / t : NaN; };
+    const v = bl(vals); return [isFinite(v) ? Math.pow(10, v) : 0, isFinite(v) ? bl(sup) : 0]; };
+  const fac = r.loo != null ? gisX(r.loo) : null;
+  const note = r.tool + ' on log values, layered ×' + k + ' (a metre down counts as ' + k + ' m sideways' + (autoK ? ', the layering automatic kriging chose here' : '') + ')' + (r.detail ? ': ' + r.detail : '') + '; ' + P.length + ' samples from ' + (P.boreholes || '?') + ' boreholes.' + (fac ? ' Each sample predicted from the others is typically within ' + fac + ' (' + (r.loo_by || 'leave-one-out') + ').' : '') + ' Run on this computer in ' + (r.seconds || 0).toFixed(1) + ' s. Interpreted between samples, not measured.';
+  return { at, note, short: XS_METHODS[how][0] + ', layered ×' + k + (fac ? ' · checked: within ' + fac : '') + ' · interpreted between samples, not measured', method: how, prob: false };
 }
 function plumeField(pos, xs, G, cell = 4) {
   const medium = xs.medium || 'soil', param = medium === 'vapour' ? '' : xs.param, date = xs.date || '';
@@ -10446,7 +10469,7 @@ function krigeFit(P0) {
 /* nearest borehole: each point takes the reading of the closest borehole (Thiessen areas); nothing is invented between them */
 const nearestFit = P => (x, y) => { let best = Infinity, z = 0; for (const [px, py, pz] of P) { const d = (x - px) ** 2 + (y - py) ** 2; if (d < best) { best = d; z = pz; } } return z; };
 const RES_INTERP = { auto: 'Automatic: the most accurate for these readings (recommended)', krige: 'Kriging (smooth, the standard estimate)', idw: 'Inverse distance (local, can look spotty)', smooth: 'Spline (smooth, held to the readings)', linear: 'Straight-line between boreholes (triangles)', nearest: 'Nearest borehole (areas, nothing invented between)' };
-const resFit = (s, P) => s.interp === 'auto' ? resAuto(P).f : s.interp === 'idw' ? idwFit(P) : s.interp === 'smooth' ? clampedTps(P) : s.interp === 'nearest' ? nearestFit(P) : krigeFit(P) || clampedTps(P);
+const resFit = (s, P, p) => s.interp?.startsWith('gis:') ? (gisFit2d(s.interp.slice(4), P, p) || krigeFit(P) || clampedTps(P)) : s.interp === 'auto' ? resAuto(P).f : s.interp === 'idw' ? idwFit(P) : s.interp === 'smooth' ? clampedTps(P) : s.interp === 'nearest' ? nearestFit(P) : krigeFit(P) || clampedTps(P);
 /* the method that best predicts each reading from the others (leave-one-out, in log10): calibrated kriging, spline, inverse
    distance, nearest borehole. { key, f, rmse, all: { key: rmse } } */
 const RES_AUTO_MEMO = new Map(), RES_AUTO_LAST = {};
@@ -10460,6 +10483,129 @@ function resAuto(P) {
   const r = { key, f: f || kf || idwFit(P), rmse: all[key], all, cal: kf?.cal }; if (RES_AUTO_MEMO.size > 40) RES_AUTO_MEMO.clear(); RES_AUTO_MEMO.set(mk, r); return r;
 }
 /* in words, for the style editor and notes */
+/* ---------- GIS engines: real GIS software (GRASS GIS, GDAL, PyKrige, GSTools from conda-forge), optional, installed per user on
+   the desktop and run as separate programs. A map or section asks for a surface; it is drawn with the built-in method while the
+   tool runs, then redrawn from the tool's own grid. Notes name the tool, its version, its settings and its own leave-one-out check. ---------- */
+const GIS = { st: null, cache: new Map(), busy: new Map(), err: new Map(), prog: '', log: [] };
+const GIS_2D = {
+  grass_rst: ['GRASS GIS v.surf.rst: spline with tension', 'Regularized spline with tension (Mitasova and Mitas 1993), the GRASS GIS module, run as published: tension 40, smoothing 0.1.'],
+  grass_idw: ['GRASS GIS v.surf.idw: inverse distance', 'The GRASS GIS module: inverse distance squared from the 12 nearest readings.'],
+  pykrige_ok: ['PyKrige: ordinary kriging', 'PyKrige OrdinaryKriging; the variogram model, range and nugget are the ones that best predict each reading from the others.'],
+  pykrige_uk: ['PyKrige: universal kriging (trend)', 'PyKrige UniversalKriging with a linear regional drift; variogram chosen by leave-one-out.'],
+  gstools_ok: ['GSTools: ordinary kriging', 'GSTools krige.Ordinary with an exponential, spherical or Gaussian variogram fitted to the experimental variogram.'],
+  gdal_invdist: ['GDAL gdal_grid: inverse distance', 'gdal_grid -a invdist, power 2, every reading.'],
+  gdal_invdistnn: ['GDAL gdal_grid: inverse distance, 12 nearest', 'gdal_grid -a invdistnn, power 2, the 12 nearest readings.'],
+  gdal_linear: ['GDAL gdal_grid: linear (triangles)', 'gdal_grid -a linear: straight-line between readings on a Delaunay triangulation; nothing past the outer boreholes.'],
+  gdal_nearest: ['GDAL gdal_grid: nearest reading', 'gdal_grid -a nearest: each place takes the nearest reading.'],
+};
+const GIS_3D = {
+  gis_pykrige_ok3d: ['PyKrige: ordinary kriging, 3D', 'PyKrige OrdinaryKriging3D on the layered distance; the variogram model, range and nugget are the ones that best predict each sample from the others.'],
+  gis_gstools_ok3d: ['GSTools: ordinary kriging, 3D', 'GSTools krige.Ordinary in 3D with a variogram fitted to the experimental variogram, on the layered distance.'],
+  gis_grass_vol_rst: ['GRASS GIS v.vol.rst: 3D spline with tension', 'The GRASS GIS 3D regularized spline with tension (Mitasova et al. 1997), run as published.'],
+};
+// the GRASS tools that need its attribute database, which the Windows build cannot open
+const GIS_NO_WIN = new Set(['grass_bspline', 'gis_grass_vol_rst']);
+const gisOn = () => !!GIS.st?.installed && !GIS.st?.broken;
+const gisVer = () => GIS.st?.versions || {};
+function gisInit() {
+  if (!window.desktop?.gis) return;
+  window.desktop.gis.onProgress(p => { if (p.step) GIS.prog = p.step; if (p.line) GIS.log = [...GIS.log, p.line].slice(-4); const el = $('#gis-prog'); if (el) el.innerHTML = gisProgHTML(); });
+  window.desktop.gis.status().then(st => { GIS.st = st; gisMethods(); if (gisOn() && MAP_TABS.includes(S.tab)) renderView(true); });
+}
+// the 3D engine methods join the cross-section's list once the engines are installed
+function gisMethods() { if (!gisOn()) return; for (const [k, v] of Object.entries(GIS_3D)) { if (desktopWin() && GIS_NO_WIN.has(k)) continue; XS_METHODS[k] = v; XS_3D.add(k); } }
+const desktopWin = () => window.desktop?.platform === 'win32';
+const gisKey = (m, P, extra = '') => m + '|' + extra + '|' + P.map(p => p.map(v => (+v).toFixed(3)).join(',')).join(';');
+let gisT; const gisRedraw = () => { clearTimeout(gisT); gisT = setTimeout(() => { if (MAP_TABS.includes(S.tab)) renderView(true); }, 60); };
+function gisGet(key, job) {
+  if (GIS.cache.has(key)) return GIS.cache.get(key);
+  if (!GIS.busy.has(key) && !GIS.err.has(key) && gisOn()) {
+    GIS.busy.set(key, Date.now());
+    window.desktop.gis.run(job).then(r => { GIS.busy.delete(key); if (r?.ok) { if (GIS.cache.size > 60) GIS.cache.clear(); GIS.cache.set(key, r); } else GIS.err.set(key, r?.error || 'The tool stopped.'); gisRedraw(); },
+      e => { GIS.busy.delete(key); GIS.err.set(key, String(e?.message || e)); gisRedraw(); });
+  }
+  return null;
+}
+const gisX = v => '×' + (10 ** v < 10 ? (10 ** v).toFixed(1) : Math.round(10 ** v));
+/* where a 2D surface is asked for: the readings' extent and a third more on each side, about 120 cells across */
+function gisBox(P) {
+  const xs = P.map(p => p[0]), ys = P.map(p => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), span = Math.max(x1 - x0, y1 - y0, 20), pad = span * .35;
+  const box = [x0 - pad, y0 - pad, x1 + pad, y1 + pad], nx = 120, ny = Math.max(20, Math.min(400, Math.round(nx * (box[3] - box[1]) / (box[2] - box[0]))));
+  return { box, nx, ny };
+}
+const GIS_LAST = {};   // per map result: the key of the surface last drawn
+function gisFit2d(m, P, p) {
+  const g = gisBox(P), key = gisKey(m, P), r = gisGet(key, { kind: 'surface', method: m, pts: P, box: g.box, nx: g.nx, ny: g.ny }); if (p) GIS_LAST[p] = { key, m };
+  if (!r) return null;
+  const { box, nx, ny } = g, dx = (box[2] - box[0]) / nx, dy = (box[3] - box[1]) / ny, V = r.values;
+  const near = (x, y) => { let b = P[0], d = Infinity; for (const q of P) { const e = (q[0] - x) ** 2 + (q[1] - y) ** 2; if (e < d) { d = e; b = q; } } return b[2]; };
+  return (x, y) => {
+    const fi = Math.max(0, Math.min(nx - 1, (x - box[0]) / dx - .5)), fj = Math.max(0, Math.min(ny - 1, (box[3] - y) / dy - .5)), i = Math.min(nx - 2, Math.floor(fi)), j = Math.min(ny - 2, Math.floor(fj)), u = fi - i, w = fj - j;
+    const c = [[V[j * nx + i], (1 - u) * (1 - w)], [V[j * nx + i + 1], u * (1 - w)], [V[(j + 1) * nx + i], (1 - u) * w], [V[(j + 1) * nx + i + 1], u * w]].filter(q => q[0] != null);
+    if (!c.length) return near(x, y); const t = c.reduce((a, q) => a + q[1], 0); return t > 1e-9 ? c.reduce((a, q) => a + q[0] * q[1], 0) / t : c[0][0];
+  };
+}
+/* what the panel says about an engine method: running, failed (and what is shown instead), or the tool's own check */
+function gisNote(m, key) {
+  const name = (GIS_2D[m] || GIS_3D['gis_' + m] || GIS_3D[m] || [m])[0];
+  if (!window.desktop?.gis) return name + ' needs the desktop app; shown with built-in kriging.';
+  if (!gisOn()) return name + ' needs the GIS engines (Settings › GIS engines); shown with built-in kriging until they are installed.';
+  if (key && GIS.err.has(key)) return name + ' did not run: ' + GIS.err.get(key) + ' Shown with built-in kriging.';
+  const r = key && GIS.cache.get(key);
+  if (!r) return 'Running ' + name + '… shown with built-in kriging until it finishes.';
+  return r.tool + (r.detail ? ': ' + r.detail : '') + '.' + (r.loo != null ? ' Each reading predicted from the others is typically within ' + gisX(r.loo) + ' (' + (r.loo_by || 'leave-one-out') + ').' : '') + ' ' + (r.seconds ? r.seconds.toFixed(1) + ' s.' : '');
+}
+/* the EPSG code of the project's coordinate system (UTM north), for GeoTIFF and GeoPackage files */
+function projEpsg() {
+  const z = crsZone(), c = (projList().find(b => b.crs)?.crs || '').toUpperCase();
+  const CSRS = { 7: 3154, 8: 3155, 9: 3156, 10: 3157, 11: 2955, 12: 2956, 13: 2957, 14: 3158, 15: 3159, 16: 3160, 17: 2958, 18: 2959, 19: 2960, 20: 2961, 21: 2962, 22: 3761 };
+  if (/WGS/.test(c)) return 32600 + z; if (/NAD83/.test(c) && !/CSRS/.test(c)) return 26900 + z;
+  return CSRS[z] || 26900 + z;
+}
+/* the results map's surface as GIS files: a GeoTIFF of the values (in the result's own units) and a GeoPackage with the contours,
+   boreholes and section lines, in the project's coordinate system; written by GDAL */
+async function gisExport(p) {
+  if (!gisOn()) { toast('Exporting GIS files needs the GIS engines (Settings › GIS engines).'); return; }
+  const list = mapList(), s = resStyle(p), vals = list.map(b => ({ b, r: resultAt(b, p, S.mres.d0, S.mres.d1) })).filter(x => x.r && x.b.easting != null && !x.b.resOff);
+  if (vals.length < 3) { toast('Three or more boreholes with results are needed for a surface.'); return; }
+  const pos = vals.map(x => x.r.v).filter(v => v > 0), floor = p === 'cvc' ? 1 : pos.length ? Math.min(...pos) / 10 : 1e-6, lg = v => Math.log10(Math.max(floor, v));
+  const P = vals.map(x => [x.b.easting, x.b.northing, lg(x.r.lt ? x.r.v / 2 : x.r.v)]), g = gisBox(P), fit = resFit(s, P);
+  const dx = (g.box[2] - g.box[0]) / g.nx, dy = (g.box[3] - g.box[1]) / g.ny, values = [];
+  for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) { const v = fit(g.box[0] + dx * (i + .5), g.box[3] - dy * (j + .5)); values.push(isFinite(v) ? +v.toFixed(5) : null); }
+  const method = s.interp?.startsWith('gis:') ? (GIS.cache.get(GIS_LAST[p]?.key)?.tool || GIS_2D[s.interp.slice(4)]?.[0]) : s.interp === 'auto' ? 'Built-in automatic: ' + (RES_AUTO_NAMES[RES_AUTO_LAST[p]?.key] || 'kriging') : 'Built-in ' + (RES_INTERP[s.interp] || 'kriging').replace(/\s*\(.*$/, '');
+  const name = ((projList()[0]?.projNo || 'site') + ' ' + resLabel(p).replace(/\s*\(.*$/, '')).replace(/[^\w .-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const lines = { section_lines: secLinesOf().map(l => ({ name: secLetters(l.name), pts: l.pts })) };
+  toast('Writing the GeoTIFF and GeoPackage with GDAL…');
+  const r = await window.desktop.gis.run({ kind: 'export', box: g.box, nx: g.nx, ny: g.ny, values, levels: s.breaks.map(lg), unlog: true, epsg: projEpsg(), name, band: resLabel(p), source: 'Borehole Field Log; ' + method,
+    points: list.filter(b => b.easting != null).map(b => { const r0 = resultAt(b, p, S.mres.d0, S.mres.d1); return { x: b.easting, y: b.northing, name: gwName(b) || b.name || '', value: r0 ? r0.v : null, used: !!r0 && !b.resOff }; }), lines });
+  if (!r?.ok) { toast('GDAL could not write the files: ' + (r?.error || 'unknown error')); return; }
+  // contour levels in the file are log10; the GeoTIFF holds the values themselves
+  for (const [fn, b64] of Object.entries(r.files)) { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); await saveBytes(fn, bin, fn.endsWith('.tif') ? 'image/tiff' : 'application/geopackage+sqlite3'); }
+  toast('Saved ' + Object.keys(r.files).join(' and ') + ' (EPSG:' + projEpsg() + '). Contour values in the GeoPackage are log₁₀ of ' + resUnit(p) + '.');
+}
+const saveBytes = async (name, data, type) => { if (window.desktop?.save) return window.desktop.save({ name, data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) }); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type })); a.download = name; a.click(); };
+/* Settings › GIS engines */
+const gisProgHTML = () => GIS.installing ? `<b>${esc(GIS.prog || 'Starting…')}</b>${GIS.log.length ? '<br><span class="mono">' + GIS.log.map(esc).join('<br>') + '</span>' : ''}` : '';
+function gisPrefsHTML() {
+  if (!window.desktop?.gis) return '<p class="note">The GIS engines run on the desktop app (Windows or Mac).</p>';
+  const st = GIS.st, v = gisVer(), ro = GIS.installing ? 'disabled' : '';
+  const have = st?.installed && !st.broken ? `<p class="note">Installed in ${esc(st.home)}: GRASS GIS ${esc(v.grass || '?')}, GDAL ${esc(v.gdal || '?')}, PyKrige ${esc(v.pykrige || '?')}, GSTools ${esc(v.gstools || '?')} (Python ${esc(v.python || '?')}). Their methods are listed under "GIS software" wherever a map or section asks how to interpolate.</p>`
+    : st?.broken ? `<p class="note">Installed in ${esc(st.home)}, but they did not start: ${esc(st.broken)} Remove and install again.</p>`
+    : st && st.supported === false ? '<p class="note">Not available for this computer.</p>' : '<p class="note">Not installed. The app works fully without them, with its own methods.</p>';
+  return `<section class="gis-prefs"><h4>GIS engines</h4><p class="note">Real GIS software, run on this computer as separate programs: GRASS GIS (v.surf.rst, v.surf.idw), GDAL (gdal_grid, gdal_contour, GeoTIFF and GeoPackage), PyKrige and GSTools (kriging in 2D and 3D). Installed for you only, from conda-forge, about 1.6 GB.</p>${have}
+    <p class="note" id="gis-prog">${gisProgHTML()}</p>
+    <div class="actions">${st?.installed ? `<button class="btn" data-act="gis-check" ${ro}>Check</button><button class="btn" data-act="gis-remove" ${ro}>Remove</button>` : `<button class="btn primary" data-act="gis-install" ${ro}>Install GIS engines…</button>`}</div></section>`;
+}
+const GIS_LICENCE = `<p>This downloads and installs, for your user account only, from conda-forge (https://conda-forge.org), using micromamba (BSD-3-Clause):</p>
+  <ul><li><b>GRASS GIS 8.5</b>, GNU General Public License v2 or later. Source: https://github.com/OSGeo/grass</li><li><b>GDAL 3.12</b>, MIT license. Source: https://github.com/OSGeo/gdal</li><li><b>PyKrige 1.7</b>, BSD-3-Clause. <b>GSTools 1.7</b>, LGPL-3.0. Python and NumPy, SciPy (BSD-style), and the libraries they need.</li></ul>
+  <p>They are separate programs: Borehole Field Log runs them and exchanges files with them, and does not include or change their code. Each keeps its own licence, which is installed with it. Nothing updates without you: Remove deletes them all.</p><p>About 350 MB is downloaded and about 1.6 GB used.</p>`;
+async function gisInstall() {
+  if (GIS.installing) return;
+  GIS.installing = true; GIS.prog = 'Starting…'; GIS.log = []; const re = () => { const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); }; re();
+  const r = await window.desktop.gis.install(); GIS.installing = false;
+  if (!r.ok) { GIS.prog = ''; toast('The GIS engines did not install: ' + r.error); re(); return; }
+  GIS.prog = ''; GIS.st = await window.desktop.gis.status(); gisMethods(); re(); toast(gisOn() ? 'GIS engines installed: GRASS GIS ' + (gisVer().grass || '') + ', GDAL ' + (gisVer().gdal || '') + '.' : 'Installed, but they did not start: ' + (GIS.st?.broken || ''));
+}
 function resAutoText(r) { if (!r) return ''; const x = v => '×' + (10 ** v < 10 ? (10 ** v).toFixed(1) : Math.round(10 ** v));
   return 'Picked ' + RES_AUTO_NAMES[r.key] + (r.key === 'krige' && r.cal ? ' (' + r.cal.model + ', range ' + Math.round(r.cal.range) + ' m' + (r.cal.nug ? ', nugget ' + Math.round(r.cal.nug * 100) + ' %' : '') + ')' : '') + ': each reading predicted from the others within ' + x(r.rmse) + ' on average' + Object.entries(r.all).filter(([k, v]) => k !== r.key && v != null).map(([k, v], i) => (i ? ', ' : '; ') + RES_AUTO_NAMES[k] + ' ' + x(v)).join('') + '.'; }
 /* the spline held to the range of the readings, so it cannot invent a value higher or lower than any measured */
@@ -10507,7 +10653,7 @@ function resultsLayerSVG(pts, X, Y, M = S.mres, W = 0, H = 0) {
     const cols = heat ? Array.from({ length: 12 }, (_, i) => { const v = 10 ** (zmin + (zmax - zmin) * (i + .5) / 12); return resColour(p, { v }); }) : s.colors;
     // past the outer boreholes by half the typical spacing (not for straight-line triangles, which stop at the outline)
     const lin = s.interp === 'linear', nnd = P.map((q, i) => Math.min(...P.filter((_, j) => j !== i).map(r => Math.hypot(q[0] - r[0], q[1] - r[1])))).filter(isFinite).sort((a, c) => a - c), pad = lin ? 0 : Math.max(3, (nnd[Math.floor(nnd.length / 2)] || 0) * .5);
-    const fit = resFit(s, P); if (s.interp === 'auto') { RES_AUTO_LAST[p] = resAuto(P); queueMicrotask(() => document.querySelectorAll('[data-resauto="' + p + '"]').forEach(el => { el.textContent = resAutoText(RES_AUTO_LAST[p]); })); }
+    const fit = resFit(s, P, p); if (s.interp === 'auto') { RES_AUTO_LAST[p] = resAuto(P); queueMicrotask(() => document.querySelectorAll('[data-resauto="' + p + '"]').forEach(el => { el.textContent = resAutoText(RES_AUTO_LAST[p]); })); }
     const H = lin ? null : headSurface(P, lv, fit, pad), tris = lin ? delaunay(P) : null;
     const tr = tris || delaunay(P), bands = H ? H.bands : tinBands(P, tr, lv), lineAt = z => H ? (H.lines[lv.indexOf(z)]?.polys || []) : joinSegs(tinLine(P, tr, z), 1e-3);
     const hull = H ? H.hull : convexHull(P.map(q => [q[0], q[1]])), id = 'rs' + Math.random().toString(36).slice(2, 8);
@@ -10561,7 +10707,8 @@ function resStyleHTML(p) {
     ${RES_FIELD[p] ? '' : `<div class="rs-row"><input type="color" data-rs="nd" value="${s.nd}" aria-label="Not detected colour" ${ro}><span class="note">not detected</span></div>`}
     <div class="cmp-row"><button class="btn" data-rsadd ${ro}>Add a contour</button><button class="btn" data-rsreset ${ro}>Reset</button></div>
     <h4>Between boreholes</h4>
-    ${crow('Method', `<select id="rs-interp" data-rs="interp" ${ro}>${opt(RES_INTERP, s.interp)}</select>`, 'rs-interp')}${s.interp === 'auto' ? `<p class="note" data-resauto="${esc(p)}">${esc(resAutoText(RES_AUTO_LAST[p]))}</p>` : ''}
+    ${crow('Method', `<select id="rs-interp" data-rs="interp" ${ro}><optgroup label="Built in">${opt(RES_INTERP, s.interp)}</optgroup><optgroup label="GIS software${gisOn() ? '' : ' (install under Settings)'}">${Object.entries(GIS_2D).filter(([k]) => !(desktopWin() && GIS_NO_WIN.has(k))).map(([k, [l, d]]) => `<option value="gis:${k}" title="${esc(d)}" ${s.interp === 'gis:' + k ? 'selected' : ''} ${gisOn() || s.interp === 'gis:' + k ? '' : 'disabled'}>${esc(l)}</option>`).join('')}</optgroup></select>`, 'rs-interp')}${s.interp === 'auto' ? `<p class="note" data-resauto="${esc(p)}">${esc(resAutoText(RES_AUTO_LAST[p]))}</p>` : ''}${s.interp?.startsWith('gis:') ? `<p class="note gis-note">${esc(gisNote(s.interp.slice(4), GIS_LAST[p]?.key))}</p>` : ''}
+    ${window.desktop?.gis ? `<button class="btn" data-act="gis-export" data-p="${esc(p)}" ${gisOn() ? '' : 'disabled title="Needs the GIS engines (Settings › GIS engines)"'}>Export to GIS (GeoTIFF, GeoPackage)…</button>` : ''}
     ${crow('Reach', `<input id="rs-reach" type="number" step="any" min="0" data-rs="reach" value="${s.reach ?? ''}" placeholder="no limit" ${ro} data-tip="How far from a borehole the shading may reach. Blank: as far as the outer boreholes."><span class="note">m from a borehole</span>`, 'rs-reach')}
     ${crow('Outline', `<input type="checkbox" data-rs="limit" ${s.limit ? 'checked' : ''} ${ro} aria-label="Draw a limit outline"><input type="number" step="any" min="0" data-rs="lim" value="${s.lim ?? ''}" placeholder="${p === 'cvc' ? (S.co.vThr ?? 100) : projGuide()[p] ?? 'value'}" ${ro} aria-label="Outline at"><span class="note">${esc(u)}</span>`)}
     <h4>Points and values</h4>
@@ -12973,6 +13120,11 @@ document.addEventListener('click', e => {
     case 'drawer-layer-below': if (editable(b) && S.drawer?.kind === 'layer') { const l0 = b.layers[S.drawer.i], top = l0.bottom ?? l0.top ?? 0, nl = newLayer(top); nl.bottom = top + fromD(S.units === 'ft' ? 2 : .5); const nx = b.layers[S.drawer.i + 1]; if (nx && nx.top != null && nx.top < nl.bottom) nl.bottom = nx.top; b.layers.splice(S.drawer.i + 1, 0, nl); logChange(b, 'Soil layers'); store.save(b); redrawLog(); openDrawer('layer', S.drawer.i + 1); } break;
     case 'drawer-edit-full': S.drawer = null; renderDrawer(); S.tab = 'edit'; S.formStale = true; renderMain(); setTimeout(() => $('#sec-well')?.scrollIntoView({ block: 'start' }), 50); break;
     case 'prefs': openPrefs(); break;
+    case 'gis-install': dialog('Install the GIS engines', GIS_LICENCE, '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="gis-install-go">Agree and install</button>'); break;
+    case 'gis-install-go': openPrefs(); gisInstall(); break;
+    case 'gis-check': GIS.st = null; window.desktop?.gis?.status().then(st => { GIS.st = st; gisMethods(); const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); toast(gisOn() ? 'The GIS engines start and answer.' : 'They did not start: ' + (st?.broken || 'not installed')); }); break;
+    case 'gis-remove': if (confirm('Remove the GIS engines (about 1.6 GB)? Maps set to a GIS method go back to the built-in ones until they are installed again.')) window.desktop.gis.remove().then(r => { GIS.st = { installed: false }; GIS.cache.clear(); const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); toast(r.ok ? 'The GIS engines were removed.' : r.error); }); break;
+    case 'gis-export': gisExport(t.dataset.p || 'cvc'); break;
     case 'new-project': openNewProject(); break;
     case 'np-save': {
       const name = $('#np-name').value.trim(); if (!name) { $('#np-name').classList.add('bad'); $('#np-name').focus(); return; }
@@ -13371,6 +13523,7 @@ if (window.desktop) {   // desktop app: menu commands and project files opened f
   window.desktop.onOpenFile(f => { const go = () => S.loaded ? restore(new File([f.text], f.name), { name: f.name, path: f.path }) : setTimeout(go, 120); go(); });
   window.desktop.ready();
   setTimeout(() => updateCheck(false), 5000);   // after start-up has settled; silent when offline or up to date
+  gisInit();   // the optional GIS engines: whether they are installed, and their versions
 }
 store.init().then(() => {
   if (!(location.hash === '#quick' || window.QUICK_LOG_ONLY || lsGet('bhlog.startQL') === '1')) return;

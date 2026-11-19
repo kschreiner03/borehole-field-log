@@ -15,6 +15,14 @@ const desktop = {
   svgPdf: (o: { pages: { svg: string; w: number; h: number }[] }): Promise<{ ok: boolean; data?: Uint8Array; error?: string }> => ipcRenderer.invoke('pdf:svg', o),
   // MODFLOW 6, run on this computer: model files in, listed outputs (bytes) back
   mf6Run: (o: { files: Record<string, string>; outputs?: string[] }): Promise<{ ok: boolean; error?: string; stdout?: string; seconds?: number; files?: Record<string, Uint8Array> }> => ipcRenderer.invoke('mf6:run', o),
+  // GIS engines (GRASS GIS, GDAL, PyKrige, GSTools), optional and installed per user: one job from a fixed list of methods at a time
+  gis: {
+    status: (): Promise<{ installed: boolean; supported?: boolean; home?: string; versions?: Record<string, string>; broken?: string } | null> => ipcRenderer.invoke('gis:status'),
+    install: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('gis:install'),
+    remove: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('gis:remove'),
+    run: (job: unknown): Promise<Record<string, unknown> & { ok: boolean; error?: string }> => ipcRenderer.invoke('gis:run', job),
+    onProgress: (cb: (p: { step?: string; line?: string }) => void) => { ipcRenderer.on('gis:progress', (_e, p) => cb(p)); },
+  },
   // updates: whether GitHub has a newer release (nothing about the user is sent), and the download page in the browser
   updates: {
     check: (): Promise<{ ok: boolean; newer?: boolean; none?: boolean; version?: string; current?: string; notes?: string; date?: string; error?: string }> => ipcRenderer.invoke('update:check'),

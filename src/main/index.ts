@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { mf6Binary, runMf6 } from './mf6run.mjs';
+import { gisStatus, gisInstall, gisRemove, gisRun } from './gis.mjs';
 import { clearCreds, fetchSnapshot, loadCreds, saveCreds } from './applemaps.mjs';
 import { checkForUpdate, HUB } from './updates.mjs';
 import { fileGuard } from './guard.mjs';
@@ -97,6 +98,13 @@ ipcMain.handle('mf6:run', async (e, o: { files: Record<string, string>; outputs?
   if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' };
   return runMf6({ bin: mf6Binary(app.getAppPath()), files: o?.files, outputs: Array.isArray(o?.outputs) ? o.outputs : [] });
 });
+
+/* GIS engines (optional, per user): status, install with progress, remove, and one job at a time from a fixed list of methods */
+const gisCtx = () => ({ userData: app.getPath('userData'), root: app.getAppPath() });
+ipcMain.handle('gis:status', async e => e.sender !== win?.webContents ? null : gisStatus(gisCtx()));
+ipcMain.handle('gis:install', async e => { if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' }; const wc = e.sender; return gisInstall({ ...gisCtx(), onProgress: p => { if (!wc.isDestroyed()) wc.send('gis:progress', p); } }); });
+ipcMain.handle('gis:remove', async e => e.sender !== win?.webContents ? { ok: false, error: 'Not allowed.' } : gisRemove(gisCtx()));
+ipcMain.handle('gis:run', async (e, job: unknown) => e.sender !== win?.webContents ? { ok: false, error: 'Not allowed.' } : gisRun({ ...gisCtx(), job }));
 
 /* Apple Maps: the key is set up and kept here (the app's own folder); the page asks for pictures of areas and gets images back */
 const appleFile = () => join(app.getPath('userData'), 'apple-maps.json');

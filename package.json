@@ -48,7 +48,8 @@
       }
     ],
     "asarUnpack": [
-      "resources/mf6/**"
+      "resources/mf6/**",
+      "resources/gis/**"
     ],
     "fileAssociations": [
       {
