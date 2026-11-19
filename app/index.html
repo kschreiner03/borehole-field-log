@@ -1311,7 +1311,58 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .ctl-gb #gwm-units td.note { flex-basis: 100%; font-size: 11.5px; }
 .ctl-gb #gwm-units td:nth-child(2)::before { content: "K "; color: var(--muted); } .ctl-gb #gwm-units td:nth-child(5)::before { content: "Kv/Kh "; color: var(--muted); } .ctl-gb #gwm-units td:nth-child(7)::before { content: "nₑ "; color: var(--muted); }
 .ctl-gb #gwm-feat td { flex-basis: calc(50% - 4px); } .ctl-gb #gwm-feat td:nth-child(3) { flex-basis: 100%; } .ctl-gb #gwm-feat input, .ctl-gb #gwm-feat select { width: 100% !important; }
-.ctl-gb h4 { margin: 4px 0 !important; font-size: 12.5px; }
+.ctl-gb h4 { margin: 8px 0 0 !important; font: 600 10.5px var(--f-body) !important; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.ctl-gb h4:first-child { margin-top: 2px !important; }
+/* settings panel: the same look on every page. A label and its control on one row; hints short and muted; nothing wider than the panel */
+.ctl-gb { gap: 8px; padding: 4px 14px 14px; }
+.ctl-gb * { min-width: 0; }
+.ctl-gb .note { font-size: 11.5px; line-height: 1.4; margin: 0; }
+.ctl-gb select, .ctl-gb input[type="number"], .ctl-gb input[type="text"], .ctl-gb input:not([type]), .ctl-gb input[type="date"] { min-height: 30px; font-size: 12.5px; max-width: 100%; }
+.ctl-gb .check { font-size: 12.5px; gap: 7px; align-items: flex-start; line-height: 1.35; } .ctl-gb .check input { margin-top: 1px; flex: none; }
+.ctl-gb details > summary { font: 600 12px var(--f-body); cursor: pointer; padding: 3px 0; color: var(--ink); }
+.ctl-gb details > summary.note { font-weight: 500; color: var(--muted); }
+.ctl-gb .btn { min-height: 30px; font-size: 12.5px; }
+.cr { display: grid; grid-template-columns: 88px minmax(0, 1fr); align-items: center; gap: 8px; font-size: 12.5px; }
+.cr-l { color: var(--muted); line-height: 1.25; }
+.cr-c { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+.cr-c > select, .cr-c > input:not([type]), .cr-c > input[type="text"], .cr-c > input[type="range"], .cr-c > form { flex: 1 1 0; width: 100%; min-width: 0; }
+.cr-c > input[type="number"] { width: 64px; flex: 1 1 52px; max-width: 96px; }
+.cr-c > input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); flex: none; }
+.cr-c > .note { flex: none; }
+.cr-c > .seg { flex: 1 1 auto; display: flex; flex-wrap: wrap; } .cr-c > .seg button { flex: 1 1 auto; padding: 0 6px; font-size: 12px; }
+.ctl-sum { margin-left: auto; padding-left: 8px; font: 400 11.5px var(--f-body); color: var(--muted); max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctl-sum + .chev { margin-left: 6px !important; }
+.ctl-gb .map-layers { gap: 8px; } .ctl-gb .map-layers .note { font-size: 11.5px; }
+.ctl-gb .map-layers .lyr small { margin-left: auto; padding-left: 6px; font-size: 11px; white-space: nowrap; }
+.ctl-gb .map-go input { min-height: 30px; font-size: 12.5px; }
+.ctl-gb .cmp-geos { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.ctl-gb .cmp-geo { grid-template-columns: 88px minmax(0, 1fr) auto; gap: 8px; font-size: 12.5px; }
+.ctl-gb .cmp-geo > span:first-child { color: var(--muted); }
+.ctl-gb .cmp-geo select, .ctl-gb .cmp-geo input { width: 100%; min-height: 30px; }
+.ctl-gb .cmp-geo input[type="color"] { width: 44px; padding: 2px; }
+.ctl-gb .lay-ctl { display: grid; grid-template-columns: 88px minmax(0, 1fr); align-items: center; gap: 4px 8px; }
+.ctl-gb .lay-ctl > .note:first-child { font-size: 12.5px; }
+.ctl-gb .lay-ctl > .seg { display: flex; flex-wrap: wrap; } .ctl-gb .lay-ctl > .seg button { flex: 1 1 auto; padding: 0 6px; font-size: 12px; }
+.ctl-gb .lay-ctl > .check, .ctl-gb .lay-ctl > select { grid-column: 2; }
+.ctl-gb .res-style { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.ctl-gb .rs-classes { margin: 0; } .ctl-gb .rs-row { gap: 6px; } .ctl-gb .rs-row input[type=number] { width: 76px; } .ctl-gb .rs-row .tb { margin-left: auto; min-height: 24px; }
+.ctl-gb .rs-v { min-width: 76px; }
+.ctl-gb .rs-use { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; padding: 4px 0; }
+.ctl-gb .lbl-site, .ctl-gb .furn-site { display: flex; flex-direction: column; gap: 8px; }
+.ctl-gb .lbl-tab thead { display: none; }
+.ctl-gb .lbl-tab tr { display: grid; grid-template-columns: 62px minmax(0, 1fr) 74px 18px; gap: 4px; align-items: center; padding: 2px 0; }
+.ctl-gb .lbl-tab td { padding: 0; border: 0; font-size: 11.5px; } .ctl-gb .lbl-tab select, .ctl-gb .lbl-tab input:not([type="checkbox"]) { width: 100%; max-width: none; min-height: 26px; font-size: 11.5px; padding: 0 4px; }
+.ctl-gb .sec-tools { gap: 8px; margin: 0; padding: 0; border: 0; }
+.ctl-gb .sec-pick { display: flex; flex-direction: column; gap: 6px; }
+.ctl-gb .sec-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.ctl-gb .sec-chip { min-height: 26px; padding: 0 8px 0 4px; font-size: 12px; }
+.ctl-gb .sec-lines { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ctl-gb .actions { flex-wrap: wrap; gap: 6px; }
+.ctl-gb #xs-corr-sec { display: flex; flex-direction: column; gap: 6px; }
+.ctl-gb .xs-corr-each table { width: 100%; } .ctl-gb .xs-corr-each td { padding: 2px 4px 2px 0; border: 0; font-size: 11.5px; } .ctl-gb .xs-corr-each select { width: 100%; min-height: 26px; font-size: 11.5px; }
+/* the Map page: the map is the page */
+.ctl-gb #gwm-setup .fld { display: grid; grid-template-columns: minmax(0, 1fr) 128px; align-items: center; gap: 8px; } .ctl-gb #gwm-setup .fld label { font: 400 12.5px var(--f-body); color: var(--muted); } .ctl-gb #gwm-setup .fld select, .ctl-gb #gwm-setup .fld input { width: 100%; }
+.site-only { display: block; } .site-map > .body { padding: 8px; } .site-map .map-tip { margin: 6px 2px 0; font-size: 11.5px; }
 /* report editor: the page gets the room; item and page settings live in the panel */
 body.side-off .shell { --sidebar-width: 0px; } body.side-off .side { display: none; }
 .cmp { grid-template-columns: 210px minmax(0, 1fr) !important; gap: 14px; }
@@ -2147,6 +2198,8 @@ function treeGroup(key, label, count, kids, extra = '') {
 const BH_TABS = ['log', 'edit', 'report'];
 const NAV_LABEL = { v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Outputs', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
 const NAV_ICON = { soil: '<path d="M3 9l9-5 9 5-9 5z"/><path d="M3 14l9 5 9-5"/>', v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
+/* a row in the settings panel: its label, then the control (and its unit) on the same line; the same on every page */
+const crow = (l, c, id) => `<div class="cr">${id ? `<label class="cr-l" for="${id}">${l}</label>` : `<span class="cr-l">${l}</span>`}<span class="cr-c">${c}</span></div>`;
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 /* ---------- the Settings panel: each page with view settings lists its groups in CTL; the shell draws them on the right.
    Open or collapsed, width and folded groups are one app-wide choice, kept between sessions. ---------- */
@@ -2171,14 +2224,14 @@ function ctlRender() {
   sh.style.setProperty('--ctl-w', open ? ctlClamp(S.ui.ctlW) + 'px' : '40px');
   if (!open) { el.innerHTML = `<button type="button" class="tb" data-act="ctl-toggle" title="Show the settings panel" aria-label="Show the settings panel">${svgI('<path d="M15 6l-6 6 6 6"/>')}</button>` + G.map(g => `<button type="button" class="tb" data-ctlgo="${g.id}" title="${esc(g.title)}" aria-label="${esc(g.title)}">${svgI(g.icon || CTL_ICON)}</button>`).join(''); return; }
   el.innerHTML = `<div class="ctl-rz" data-ctlrz title="Drag to resize the panel"></div><div class="ctl-head"><b>Settings</b><span class="note">${esc(NAV_LABEL[S.tab] || '')}</span><span class="sp"></span><button type="button" class="tb" data-act="ctl-toggle" title="Collapse the settings panel" aria-label="Collapse the settings panel">${svgI('<path d="M9 6l6 6-6 6"/>')}</button></div>`
-    + G.map(g => { const f = !!S.ui.fold?.[g.id]; return `<section class="ctl-g" data-ctlg="${g.id}"><button type="button" class="ctl-gh" data-ctlfold="${g.id}" aria-expanded="${!f}">${svgI(g.icon || CTL_ICON)}<span>${esc(g.title)}</span>${svgI('<path d="M6 9l6 6 6-6"/>').replace('<svg', '<svg class="chev"')}</button><div class="ctl-gb" ${f ? 'hidden' : ''}>${g.html}</div></section>`; }).join('');
+    + G.map(g => { const f = S.ui.fold?.[g.id] ?? !!g.fold; return `<section class="ctl-g" data-ctlg="${g.id}"><button type="button" class="ctl-gh" data-ctlfold="${g.id}" aria-expanded="${!f}">${svgI(g.icon || CTL_ICON)}<span>${esc(g.title)}</span>${g.sum ? `<small class="ctl-sum">${esc(g.sum)}</small>` : ''}${svgI('<path d="M6 9l6 6 6-6"/>').replace('<svg', '<svg class="chev"')}</button><div class="ctl-gb" ${f ? 'hidden' : ''}>${g.html}</div></section>`; }).join('');
   el.scrollTop = top;
 }
 /* the work area changed width: redraw what was sized to it (not the borehole workspace, which keeps its inputs) */
 const workResized = () => { if (S.tab !== 'edit') renderView(true); else ctlRender(); };
 document.addEventListener('click', e => {
   const go = e.target.closest?.('[data-ctlgo]'); if (go) { S.ui.ctlOpen = true; S.ui.fold = { ...S.ui.fold, [go.dataset.ctlgo]: false }; uiSave(); workResized(); $(`[data-ctlg="${go.dataset.ctlgo}"]`)?.scrollIntoView({ block: 'start' }); return; }
-  const fo = e.target.closest?.('[data-ctlfold]'); if (fo) { const k = fo.dataset.ctlfold, f = !S.ui.fold?.[k]; S.ui.fold = { ...S.ui.fold, [k]: f }; uiSave(); fo.setAttribute('aria-expanded', String(!f)); fo.nextElementSibling.hidden = f; }
+  const fo = e.target.closest?.('[data-ctlfold]'); if (fo) { const k = fo.dataset.ctlfold, f = fo.getAttribute('aria-expanded') === 'true'; S.ui.fold = { ...S.ui.fold, [k]: f }; uiSave(); fo.setAttribute('aria-expanded', String(!f)); fo.nextElementSibling.hidden = f; }
 });
 document.addEventListener('pointerdown', e => {
   if (!e.target.closest?.('[data-ctlrz]')) return; e.preventDefault();
@@ -2302,7 +2355,7 @@ function coordsWarn(p, c) {
   return isFinite(d) && d > 20000 ? ` Check this: it is ${Math.round(d / 1000)} km from the nearest borehole.` : '';
 }
 /* Go to: latitude and longitude (decimal degrees, west negative or with W) or a UTM easting and northing */
-const goToHTML = () => `<form class="map-go" data-mapgo><input placeholder="NE 10-52-25 W4M, 53.52, -113.52 or E N" aria-label="Go to a legal land description, latitude and longitude, or easting and northing" autocomplete="off"><button class="btn">Go</button></form>`;
+const goToHTML = () => `<form class="map-go" data-mapgo><input placeholder="NE 10-52-25 W4M or 53.52, -113.52" aria-label="Go to a legal land description, latitude and longitude, or easting and northing" autocomplete="off"><button class="btn">Go</button></form>`;
 function mapGoTo(q) {
   const dls = dlsToLL(q);
   if (dls) {
@@ -2326,37 +2379,51 @@ function mapGoTo(q) {
 }
 document.addEventListener('submit', e => { const f = e.target.closest?.('[data-mapgo]'); if (!f) return; e.preventDefault(); mapGoTo(f.querySelector('input').value); });
 /* map layers and which boreholes the maps draw: a panel beside the map */
-CTL.site = () => [
-  ...(S.mapEdit ? [] : [{ id: 'map-layers', title: 'Map layers', icon: NAV_ICON.site, html: `<div class="map-layers">${layersPanelHTML()}</div>` }]),
-  { id: 'map-sec', title: 'Section line', icon: NAV_ICON.xsec, html: secToolsHTML() }];
+const CTL_I = { base: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 15l5-5 4 4 3-3 6 6"/>', lbl: '<path d="M5 7V5h14v2M12 5v14M9 19h6"/>', furn: '<path d="M12 3l3.5 8h-7z"/><path d="M4 20h16M4 17v3M12 17v3M20 17v3"/>', style: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/>', draw: '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M8 5v14M16 5v14"/>' };
+/* the map's own settings beside it: what is drawn first, then the look, then the less used */
+CTL.site = () => {
+  if (S.mapEdit) return [{ id: 'map-sec', title: 'Section line', icon: NAV_ICON.xsec, html: secToolsHTML() }];
+  const ps = projList(), on = LAYER_DEFS.filter(([k]) => lyrOn(k)).length, rp = resultParams(), M = S.mres;
+  return [
+    { id: 'map-base', title: 'Basemap', icon: CTL_I.base, sum: (BASEMAPS[basemapKey()]?.[0] || '').replace(/\s*\(.*\)\s*$/, '').replace(/,.*$/, ''), html: `<div class="map-layers">${mapBaseHTML()}</div>` },
+    { id: 'map-layers', title: 'Layers', icon: NAV_ICON.site, sum: `${on} on`, html: `<div class="map-layers">${mapLayersHTML()}</div>` },
+    { id: 'map-res', title: 'Results', icon: NAV_ICON.contam, sum: !rp.length ? '' : lyrOn('res') && M.p ? resLabel(M.p).replace(/\s*\(.*$/, '') : 'Off', html: `<div class="map-layers res-pick">${resPickHTML()}</div>` },
+    { id: 'map-lbl', title: 'Borehole labels', fold: true, icon: CTL_I.lbl, sum: S.lyr.labels !== false ? '' : 'Off', html: `<div class="lbl-site">${labelsHTML('s')}</div>` },
+    { id: 'map-furn', title: 'North arrow and scale bar', fold: true, icon: CTL_I.furn, html: `<div class="furn-site">${furnHTML('s')}</div>` },
+    { id: 'map-wl', title: 'Water levels', fold: true, icon: NAV_ICON.gw, html: `<div class="map-layers"><div class="gw-src-pick">${gwSrcHTML()}</div>${gwSkipHTML(gwHeads(mapList()).skip)}<p class="note">Used for the water-table contours and the flow arrow.</p></div>` },
+    { id: 'map-bhs', title: 'Boreholes shown', fold: true, icon: BH_ICON, sum: `${ps.filter(onMap).length} of ${ps.length}`, html: `<div class="map-layers">${mapBhsHTML()}</div>` },
+    { id: 'map-sec', title: 'Section line', fold: true, icon: NAV_ICON.xsec, sum: secLetters(), html: secToolsHTML() }];
+};
 function resPickHTML() {
   const ps = resultParams(), M = S.mres, L = LEN();
   if (!ps.length) return '<p class="note">No VOC readings or lab results in this project yet.</p>';
-  return `<div class="res-pick"><label class="note" for="mres-p">Show</label><select id="mres-p">${ps.map(([k, l]) => `<option value="${k}" ${k === M.p ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
-    <label class="note" for="mres-d0">Depth (${L})</label><span class="res-depth"><input id="mres-d0" type="number" step="any" min="0" placeholder="from" value="${M.d0 != null ? +toD(M.d0).toFixed(2) : ''}" style="width:72px"> to <input id="mres-d1" type="number" step="any" min="0" placeholder="to" value="${M.d1 != null ? +toD(M.d1).toFixed(2) : ''}" style="width:72px"></span>
-    <p class="note">The highest result in each borehole ${M.d0 != null || M.d1 != null ? 'in this depth range' : 'at any depth'}; blank depths take every sample. ${lyrOn('res') ? '' : 'Tick “Results: VOC and lab” above to draw it.'}</p>${resStyleHTML(M.p)}</div>`;
+  return `<label class="lyr"><input type="checkbox" data-lyr="res" ${lyrOn('res') ? 'checked' : ''}><span>Show results on the map</span></label>
+    ${crow('Result', `<select id="mres-p">${ps.map(([k, l]) => `<option value="${k}" ${k === M.p ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`, 'mres-p')}
+    ${crow(`Depth (${L})`, `<input id="mres-d0" type="number" step="any" min="0" placeholder="top" value="${M.d0 != null ? +toD(M.d0).toFixed(2) : ''}"><span class="note">to</span><input id="mres-d1" type="number" step="any" min="0" placeholder="bottom" value="${M.d1 != null ? +toD(M.d1).toFixed(2) : ''}" aria-label="Depth to">`, 'mres-d0')}
+    <p class="note">The highest result in each borehole${M.d0 != null || M.d1 != null ? ' in this depth range' : ''}. Leave the depths blank for every sample.</p>${resStyleHTML(M.p)}`;
 }
-function layersPanelHTML() {
-  const site = siteOf(), F = gwFlow(), ps = projList();
-  const rows = LAYER_DEFS.map(([k, label, sw]) => {
+function mapBaseHTML() {
+  const k = basemapKey(), z = crsZone(), zFixed = projList().some(b => /zone\s*\d/i.test(b.crs || ''));
+  const note = k !== 'apple' ? 'Kept on this computer once viewed, so it also works offline.'
+    : !window.desktop?.appleMaps ? 'Apple Maps needs the desktop app; Esri imagery is shown.'
+    : !S.apple.who ? 'Apple Maps needs a MapKit key from your Apple Developer account; Esri imagery is shown until then.'
+    : S.apple.off ? 'Apple Maps refused the key, so Esri imagery is shown. Check it below.'
+    : `Apple Maps close in (key ${esc(S.apple.who.keyId)}), Esri further out and offline. PDFs use the same pictures.`;
+  return `${crow('Basemap', `<select id="basemap" ${S.readOnly ? 'disabled' : ''}>${Object.entries(BASEMAPS).map(([v, [t]]) => `<option value="${v}" ${k === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`, 'basemap')}
+    <p class="note">${note} UTM Zone ${z}${zFixed ? ', from the boreholes' : ''}.</p>${k === 'apple' && window.desktop?.appleMaps && !S.readOnly ? `<button class="btn" data-act="apple-setup">${S.apple.who ? 'Apple Maps key…' : 'Set up Apple Maps…'}</button>` : ''}
+    <h4>Go to a place</h4>${goToHTML()}<p class="note">A land description, latitude and longitude, or easting and northing.</p>`;
+}
+function mapLayersHTML() {
+  const site = siteOf(), F = gwFlow();
+  return '<ul class="lyr-list">' + LAYER_DEFS.map(([k, label, sw]) => {
     const na = k === 'img' ? !site?.img : k === 'ortho' ? !imageryOf().length : k === 'feat' ? !featsOf().length : k === 'contours' ? gwHeads(mapList()).wells.length < 3 : k === 'flow' ? !!F.error : k === 'gwm' ? !S.gwm?.run?.ok : k === 'sec' ? sectionList().filter(b => b.easting != null).length < 2 : false;
-    return `<li><label class="lyr${na ? ' na' : ''}" title="${na ? 'Nothing to draw yet' : 'Show on the site plan and location plan'}"><input type="checkbox" data-lyr="${k}" ${lyrOn(k) ? 'checked' : ''}><svg class="sw" viewBox="0 0 16 16" aria-hidden="true">${sw}</svg><span>${esc(label)}</span></label></li>`;
-  }).join('');
-  const bh = ps.map(b => `<label class="lyr"><input type="checkbox" class="vis" data-vis="${esc(b.id)}" ${onMap(b) ? 'checked' : ''}>${bhGlyph(b.well?.installed)}<span>${esc(b.name || 'Untitled')}</span></label>`).join('');
-  const z = crsZone(), zFixed = projList().some(b => /zone\s*\d/i.test(b.crs || ''));
-  return `<h4>Basemap</h4><select id="basemap" ${S.readOnly ? 'disabled' : ''}>${Object.entries(BASEMAPS).map(([k, [t]]) => `<option value="${k}" ${basemapKey() === k ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>
-    <p class="note">${basemapKey() !== 'apple' ? `Loaded from ${basemapKey() === 'osm' ? 'OpenStreetMap' : 'Esri'} over the internet and kept on this computer, so areas you have viewed still show offline.`
-      : !window.desktop?.appleMaps ? 'Apple Maps needs the desktop app; Esri imagery is shown.'
-      : !S.apple.who ? 'Apple Maps needs a MapKit key from your Apple Developer account. Esri imagery is shown until it is set up.'
-      : S.apple.off ? 'Apple Maps refused the key, so Esri imagery is shown. Check it below.'
-      : `A picture of the area in view from Apple Maps (key ${esc(S.apple.who.keyId)}), close in; not kept on this computer. Esri imagery fills in further out, around it and offline. Reports and PDFs use the same pictures.`}
-      UTM Zone ${z}${zFixed ? ', from the boreholes’ coordinate system' : ''}.</p>${basemapKey() === 'apple' && window.desktop?.appleMaps && !S.readOnly ? `<button class="btn" data-act="apple-setup">${S.apple.who ? 'Apple Maps key…' : 'Set up Apple Maps…'}</button>` : ''}
-    <h4>Go to</h4>${goToHTML()}
-    <h4>Layers</h4><ul class="lyr-list">${rows}</ul>
-    <details class="lbl-site" ${S.lblOpen ? 'open' : ''}><summary>Borehole labels</summary>${labelsHTML('s')}</details><details class="furn-site" ${S.furnOpen ? 'open' : ''}><summary>North arrow and scale bar</summary>${furnHTML('s')}</details>
-    <h4>Results on the map</h4>${resPickHTML()}
-    <h4>Water levels for contours and flow</h4><div class="gw-src-pick">${gwSrcHTML()}</div>${gwSkipHTML(gwHeads(mapList()).skip)}
-    <details ${S.offMap.size ? 'open' : ''}><summary>Boreholes on maps · ${ps.filter(onMap).length} of ${ps.length}</summary><div class="lyr-bhs">${bh}</div><p class="note">Unticked boreholes are left out of maps, sections and the flow calculation, never out of logs or tables.</p></details>`;
+    return `<li><label class="lyr${na ? ' na' : ''}" title="${na ? 'Nothing to draw yet' : 'Show on the site plan and location plan'}"><input type="checkbox" data-lyr="${k}" ${lyrOn(k) ? 'checked' : ''}><svg class="sw" viewBox="0 0 16 16" aria-hidden="true">${sw}</svg><span>${esc(label)}</span>${na ? '<small class="note">none yet</small>' : ''}</label></li>`;
+  }).join('') + '</ul>';
+}
+function mapBhsHTML() {
+  const ps = projList();
+  return `<div class="lyr-bhs">${ps.map(b => `<label class="lyr"><input type="checkbox" class="vis" data-vis="${esc(b.id)}" ${onMap(b) ? 'checked' : ''}>${bhGlyph(b.well?.installed)}<span>${esc(b.name || 'Untitled')}</span></label>`).join('')}</div>
+    <p class="note">An unticked borehole is left out of maps, sections and the flow, never out of logs or tables.</p>`;
 }
 /* page header: where you are, and the tools for this page */
 const PAGE_TOOLS = {
@@ -2984,7 +3051,7 @@ function renderView(full) {
   else if (S.tab === 'home') { v.innerHTML = homeHTML(); }
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
   else if (S.tab === 'soil') { v.innerHTML = soilHTML(); drawSoil(); }
-  else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); }
+  else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); drawPlasticity(); }
   else if (S.tab === 'reports') { v.innerHTML = reportsHubHTML(b); }
   else if (S.tab === 'compose') { v.innerHTML = composeHTML(); requestAnimationFrame(() => { if (S.cout) { fillOutputs(); return; } drawCompose(); fillThumbs(); gwComposeEnsure(); }); }
   else { v.innerHTML = nextSteps(b) + (editable(b) ? '<div class="lt-new"><label for="lt-new">Add a layer by typing</label><input id="lt-new" autocomplete="off" spellcheck="false" placeholder="e.g. 2.4-3.1 CL silty clay, stiff, moist, brown (depths optional: it starts at the bottom of the log)"><span class="note" id="lt-new-read"></span></div>' : '') + (editable(b) ? '<p class="log-hint">Click any layer, sample, water level or the standpipe on the log to edit it. Click empty space in a column to add one at that depth.</p>' : '') + sheetHTML(b) + logLegendHTML(b); const el = $('#log'); el.innerHTML = logSVG(b, Math.max(el.clientWidth, 900)); }
@@ -9008,7 +9075,7 @@ function bhLabelSVG(b, x, y, sub, dflt = 'box', named = true) {
 function labelsHTML(pre) {
   const c = lblCfg(), ro = S.readOnly ? 'disabled' : '', d = 'data-' + pre + 'lbl', db = 'data-' + pre + 'lblb';
   const rows = mapList().map(b => { const p = c.bh[b.id] || {}; return '<tr><td>' + esc(b.name || '') + '</td><td><input ' + db + '="' + esc(b.id) + '.t" value="' + esc(p.t || '') + '" placeholder="' + esc(gwName(b)) + '" ' + ro + ' style="width:100%"></td><td><select ' + db + '="' + esc(b.id) + '.pos" ' + ro + '><option value="">' + esc(LBL_POS[c.pos] || 'Right') + ' (all)</option>' + Object.entries(LBL_POS).map(([v, l]) => '<option value="' + v + '" ' + (p.pos === v ? 'selected' : '') + '>' + l + '</option>').join('') + '</select></td><td><input type="checkbox" ' + db + '="' + esc(b.id) + '.show" ' + (p.hide ? '' : 'checked') + ' ' + ro + ' title="Show this label"></td></tr>'; }).join('');
-  return '<h4>Labels</h4><div class="cmp-geos"><label class="cmp-geo"><span>Size</span><input type="number" min="5" max="40" step="0.5" ' + d + '="size" value="' + (+c.size || 11.5) + '" ' + ro + '><span class="note">px</span></label>'
+  return (pre === 'c' ? '<h4>Labels</h4>' : '') + '<div class="cmp-geos"><label class="cmp-geo"><span>Size</span><input type="number" min="5" max="40" step="0.5" ' + d + '="size" value="' + (+c.size || 11.5) + '" ' + ro + '><span class="note">px</span></label>'
     + '<label class="cmp-geo"><span>Weight</span><select ' + d + '="weight" ' + ro + '>' + [['400', 'Regular'], ['600', 'Semibold'], ['700', 'Bold']].map(([v, l]) => '<option value="' + v + '" ' + (String(c.weight) === v ? 'selected' : '') + '>' + l + '</option>').join('') + '</select></label>'
     + '<label class="cmp-geo"><span>Colour</span><input type="color" ' + d + '="color" value="' + (c.color || '#1f2937') + '" ' + ro + '></label>'
     + '<label class="cmp-geo"><span>Backing</span><select ' + d + '="bg" ' + ro + '>' + [['', 'As the map'], ['box', 'Box'], ['halo', 'White halo'], ['none', 'None']].map(([v, l]) => '<option value="' + v + '" ' + ((c.bg || '') === v ? 'selected' : '') + '>' + l + '</option>').join('') + '</select></label>'
@@ -9361,12 +9428,16 @@ function tilesSVG(key, W, H, cx, cy, sc, op) {
 }
 
 function siteHTML() {
-  const pts = projList().filter(b => b.easting != null && b.northing != null);
-  return `<div class="site-grid">
+  const pts = projList().filter(b => b.easting != null && b.northing != null), miss = projList().length - pts.length;
+  return `<div class="site-grid site-only">
     ${S.mapEdit ? `<section class="sec" style="grid-column:1/-1"><header><h3>Map editor</h3><span class="note">Shapes and locations are saved as you go</span></header><div class="body" id="map-ed-wrap">${mapEditorHTML()}</div></section>` : ''}
-    <section class="sec" style="grid-column:1/-1" ${S.mapEdit ? 'hidden' : ''}><header><h3>Site plan</h3><span class="note">Drag to move · scroll to zoom · click boreholes to build the section line</span></header><div class="body">${S.mapEdit ? '' : `<div id="plan" class="map-canvas"></div>`}
-      ${pts.length < projList().length ? `<p class="note" style="margin-top:6px">${projList().length - pts.length} borehole${projList().length - pts.length > 1 ? 's have' : ' has'} no coordinates and ${projList().length - pts.length > 1 ? 'are' : 'is'} not shown.</p>` : ''}</div></section>
-    <section class="sec" style="grid-column:1/-1"><header><h3>Cross-section ${esc(secLetters())}</h3><span class="note">${secLineOf() ? `Along the line drawn on the map, ${sectionList().length} boreholes` : S.secIds.size >= 2 ? `Runs through ${S.secIds.size} boreholes picked on the plan` : 'Best-fit line through all boreholes'}</span><span class="sp"></span><button class="btn link" data-tab="xsec">Open cross-section</button></header></section>
+    <section class="sec site-map" style="grid-column:1/-1" ${S.mapEdit ? 'hidden' : ''}><div class="body">${S.mapEdit ? '' : `<div id="plan" class="map-canvas"></div>`}
+      <p class="note map-tip">Drag to move · scroll to zoom · click boreholes to build the section line${miss ? ` · ${miss} borehole${miss > 1 ? 's have' : ' has'} no coordinates and ${miss > 1 ? 'are' : 'is'} not shown` : ''}</p></div></section>
+  </div>`;
+}
+/* the soil test charts: on the Lab page, after the results */
+function soilTestsHTML() {
+  return `<div class="site-grid">
     <section class="sec"><header><h3>Plasticity chart</h3><span class="note">CFEM / Modified USCS</span></header><div class="body"><div id="pchart" class="scroll-x"></div></div></section>
     <section class="sec"><header><h3>Grain size distribution</h3><span class="note">CFEM size limits</span></header><div class="body scroll-x">${gsdSVG()}</div></section>
     <section class="sec"><header><h3>Soil texture triangle</h3><span class="note">CSSC (Canadian System of Soil Classification)</span></header><div class="body scroll-x">${textureTriSVG()}</div></section>
@@ -9463,7 +9534,7 @@ document.addEventListener('pointerdown', e => {
 document.addEventListener('pointermove', e => { if (S.secDraw && e.target.closest?.('#plan')) { const w = planWorld(e); if (w) secDraftDraw(w); } });
 document.addEventListener('dblclick', e => { if (S.secDraw && e.target.closest?.('#plan')) { S.secDraw.pts.pop(); finishSecLine(); } });
 document.addEventListener('keydown', e => { if (!S.secDraw || e.target.closest?.('input, textarea, select')) return; if (e.key === 'Enter') { e.preventDefault(); finishSecLine(); } else if (e.key === 'Escape') { e.preventDefault(); S.secDraw = null; renderView(true); } }, true);
-function setSec(k, v) { S.sec = { ...S.sec, [k]: v }; lsSet('bhlog.sec', JSON.stringify(S.sec)); if (k === 'units') S.showUnits = v; redrawSec(); if ($('#sec-tools')) $('#sec-tools').outerHTML = secToolsHTML(); }
+function setSec(k, v) { S.sec = { ...S.sec, [k]: v }; lsSet('bhlog.sec', JSON.stringify(S.sec)); if (k === 'units') S.showUnits = v; redrawSec(); if ($('#sec-tools')) $('#sec-tools').outerHTML = secToolsHTML(); if ($('#sec-opts')) $('#sec-opts').outerHTML = secOptsHTML(); }
 function secLineHTML() {
   const L = secLineOf(), ro = S.readOnly ? 'disabled' : '';
   if (S.secDraw) return '<div class="sec-pick sec-drawing"><span class="note"><b>Drawing section line ' + esc(secLetters(S.secDraw.redo && secActiveLine() ? secActiveLine().name : nextSecName())) + ':</b> click on the map to add points (click a borehole to go through it). Double-click or press Enter to finish; Esc cancels. ' + (S.secDraw.pts.length ? S.secDraw.pts.length + ' point' + (S.secDraw.pts.length === 1 ? '' : 's') + ' so far.' : '') + '</span><div class="actions" style="margin:0"><button class="btn primary" data-act="sec-draw-done" ' + (S.secDraw.pts.length >= 2 ? '' : 'disabled') + '>Finish line</button><button class="btn" data-act="sec-draw-cancel">Cancel</button></div></div>';
@@ -9475,23 +9546,25 @@ function secLineHTML() {
     + '<div class="actions" style="margin:0"><button class="btn link" data-act="sec-draw-redo" ' + ro + '>Redraw ' + esc(secLetters(L.name)) + '</button><button class="btn link" data-act="sec-line-rev" ' + ro + '>Reverse (' + esc(L.name) + ' ↔ ' + esc(L.name) + '′)</button><button class="btn link danger-text" data-act="sec-line-delete" ' + ro + '>Delete ' + esc(secLetters(L.name)) + '</button>' + (S.tab !== 'xsec' ? '<button class="btn link" data-tab="xsec">Open the cross-section</button>' : '') + '</div></div>';
 }
 function secToolsHTML() {
-  if (S.secDraw || secLineOf()) return '<div id="sec-tools" class="sec-tools">' + (S.secDraw ? '' : secChooserHTML()) + secLineHTML() + secOptsHTML() + '</div>';
+  if (S.secDraw || secLineOf()) return '<div id="sec-tools" class="sec-tools">' + (S.secDraw ? '' : secChooserHTML()) + secLineHTML() + '</div>';
   const all = mapList().filter(b => (b.layers || []).some(l => l.bottom > l.top)).sort((a, c) => (a.name || '').localeCompare(c.name || '', undefined, { numeric: true })), picked = [...S.secIds].filter(id => all.some(b => b.id === id));
   const seg = k => `<span class="lay-ctl"><span class="note">${SEC_OPTS[k].label}</span><span class="seg" role="group" aria-label="${SEC_OPTS[k].label}">${Object.entries(SEC_OPTS[k].opts).map(([v, [t]]) => `<button data-secopt="${k}:${v}" aria-pressed="${String(S.sec[k]) === v}">${t}</button>`).join('')}</span></span>`;
   const chk = (k, t) => `<label class="check"><input type="checkbox" data-secshow="${k}" ${S.sec[k] !== false ? 'checked' : ''}> ${t}</label>`;
   return `<div id="sec-tools" class="sec-tools">${secChooserHTML()}
-    <div class="sec-pick"><span class="note">${picked.length >= 2 ? 'Section runs through, in this order:' : 'Click boreholes in the order the section should run (here or on the site plan). Until you pick two, the section follows a best-fit line through all.'}</span>
+    <div class="sec-pick"><span class="note">${picked.length >= 2 ? 'Section runs through, in this order:' : 'Pick boreholes in the order the section runs, here or on the map. Until two are picked, it follows a best-fit line through all of them.'}</span>
       <div class="sec-chips">${all.map(b => { const i = picked.indexOf(b.id); return `<button class="sec-chip" data-secpick="${esc(b.id)}" aria-pressed="${i >= 0}"><span class="n${i >= 0 ? '' : ' off'}">${i >= 0 ? i + 1 : ''}</span>${esc(b.name)}</button>`; }).join('')}</div>
-      <div class="actions" style="margin:0"><button class="btn" data-act="sec-draw" ${S.readOnly ? 'disabled' : ''} title="Draw the section line on the map; the boreholes are ordered by where they fall along it">Draw a section line on the map</button>${picked.length ? `<button class="btn link" data-act="sec-rev">Reverse</button><button class="btn link" data-act="sec-clear">Clear and use the best-fit line</button>` : ''}</div></div>
-    ${secOptsHTML()}
+      <div class="actions" style="margin:0"><button class="btn" data-act="sec-draw" ${S.readOnly ? 'disabled' : ''} title="Draw the section line on the map; the boreholes are ordered by where they fall along it">Draw a line on the map</button>${picked.length ? `<button class="btn link" data-act="sec-rev">Reverse</button><button class="btn link" data-act="sec-clear">Clear</button>` : ''}</div></div>
   </div>`;
 }
 function secOptsHTML() {
-  const seg = k => `<span class="lay-ctl"><span class="note">${SEC_OPTS[k].label}</span><span class="seg" role="group" aria-label="${SEC_OPTS[k].label}">${Object.entries(SEC_OPTS[k].opts).map(([v, [t]]) => `<button data-secopt="${k}:${v}" aria-pressed="${String(S.sec[k]) === v}">${t}</button>`).join('')}</span></span>`;
+  const short = { h: 'Height', ve: 'Exaggeration', bw: 'Column width' };
+  const seg = k => crow(short[k] || SEC_OPTS[k].label, `<span class="seg" role="group" aria-label="${SEC_OPTS[k].label}">${Object.entries(SEC_OPTS[k].opts).map(([v, [t]]) => `<button data-secopt="${k}:${v}" aria-pressed="${String(S.sec[k]) === v}">${t}</button>`).join('')}</span>`);
   const chk = (k, t) => `<label class="check"><input type="checkbox" data-secshow="${k}" ${S.sec[k] !== false ? 'checked' : ''}> ${t}</label>`;
-  return `<div class="sec-opts">${seg('h')}${seg('ve')}${seg('bw')}<span class="lay-ctl"><span class="note">Show</span>${chk('units', 'Interpreted units')}${chk('water', 'Water table')}${chk('wells', 'Wells')}</span></div>`;
+  return `<div class="sec-opts" id="sec-opts">${seg('h')}${seg('ve')}${seg('bw')}<h4>Show</h4>${chk('units', 'Interpreted units between boreholes')}${chk('water', 'Water table')}${chk('wells', 'Wells')}</div>`;
 }
-function drawSite() { drawPlan(); drawPlasticity(); }
+function drawSite() { drawPlan(); }
+/* the Map page's map takes the height left in the window under it (at least 420 px) */
+const planH = el => { const r = el.getBoundingClientRect(), top = r.top + (document.scrollingElement?.scrollTop || 0); return Math.max(420, Math.round(innerHeight - top - 52)); };
 /* the Cross-section page: the section line, the drawing and everything drawn on it */
 function xsecHTML() {
   return `<div class="xs-page">
@@ -9502,37 +9575,56 @@ function xsecHTML() {
   </div>`;
 }
 CTL.soil = () => soilCtl();
-CTL.xsec = () => [
-  { id: 'xs-plume', title: 'Plume and layers', icon: NAV_ICON.contam, html: xsPlumeCtl() },
-  { id: 'xs-line', title: 'Section line and drawing', icon: NAV_ICON.xsec, html: secToolsHTML() },
-  { id: 'xs-model', title: 'Forecast (model)', icon: NAV_ICON.gwm, html: xsModelHTML() },
-  { id: 'xs-corr', title: 'Layer correlation', icon: '<path d="M4 7h6l4 4h6M4 17h6l4-4"/>', html: xsCorrHTML() }];
+/* the Lab page: the results map's settings */
+CTL.contam = () => { const list = projList(), p = S.mapParam && LAB_PARAMS[S.mapParam] ? S.mapParam : 'cvc', thr = S.co.vThr ?? 100; return [
+  { id: 'lab-map', title: 'Map', icon: NAV_ICON.contam, sum: p === 'cvc' ? 'Vapour' : LAB_PARAMS[p].label, html: `<div class="map-layers">
+    ${crow('Show', `<select id="map-param"><option value="">Vapour (headspace)</option>${labParamsUsed(list).map(k => `<option value="${k}" ${S.mapParam === k ? 'selected' : ''}>${esc(LAB_PARAMS[k].label)}</option>`).join('')}</select>`, 'map-param')}
+    ${crow(`Depth (${LEN()})`, `<input id="v-from" type="number" step="any" placeholder="top" value="${S.vFrom != null ? f(S.vFrom, 2) : ''}"><span class="note">to</span><input id="v-to" type="number" step="any" placeholder="bottom" value="${S.vTo != null ? f(S.vTo, 2) : ''}" aria-label="Depth to">`, 'v-from')}
+    ${crow('Screening', `<input id="v-thr" type="number" min="1" step="any" value="${thr}"><span class="note">ppm</span>`, 'v-thr')}
+    <p class="note">Readings at or over the screening level are flagged in red and drawn as the outline, unless one is set under Style. Blank depths take every sample.</p></div>` },
+  { id: 'lab-style', title: 'Style and contours', icon: CTL_I.style, html: `<div class="map-layers">${resStyleHTML(p)}</div>` },
+  { id: 'map-lbl', title: 'Borehole labels', fold: true, icon: CTL_I.lbl, html: `<div class="lbl-site">${labelsHTML('s')}</div>` },
+  { id: 'map-furn', title: 'North arrow and scale bar', fold: true, icon: CTL_I.furn, html: `<div class="furn-site">${furnHTML('s')}</div>` }]; };
+CTL.xsec = () => { const xs = S.xs; return [
+  { id: 'xs-line', title: 'Section line', icon: NAV_ICON.xsec, sum: secLetters(), html: secToolsHTML() },
+  { id: 'xs-plume', title: 'Plume', icon: NAV_ICON.contam, sum: xs.plume === false && !xs.model ? 'Off' : { soil: 'Soil', groundwater: 'Groundwater', vapour: 'Vapour' }[xs.medium] || '', html: xsPlumeCtl() },
+  { id: 'xs-drawing', title: 'Drawing', icon: CTL_I.draw, html: secOptsHTML() },
+  { id: 'xs-model', title: 'Forecast (model)', fold: true, icon: NAV_ICON.gwm, html: xsModelHTML() },
+  { id: 'xs-corr', title: 'Layer correlation', fold: true, icon: '<path d="M4 7h6l4 4h6M4 17h6l4-4"/>', html: xsCorrHTML() }]; };
 /* layer correlation: the section joins units of the same name; a unit can be paired with a differently named one by hand */
 function xsCorrHTML() {
-  const al = siteOf()?.xsec?.alias || {}, rows = [];
+  const al = siteOf()?.xsec?.alias || {}, rows = [], ro = S.readOnly ? 'disabled' : '';
   for (const b of sectionList()) for (const u of [...new Set((b.layers || []).filter(l => l.bottom > l.top).map(defaultUnit))]) rows.push([b, u]);
   const names = [...new Set(rows.map(r => r[1]))];
   if (!rows.length) return '';
-  return `<section class="sec" id="xs-corr-sec"><header><h3>Layer correlation</h3><span class="note">Units of the same name are joined between boreholes; pair others here</span></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th>Borehole</th><th>Logged unit</th><th>Joined as</th></tr></thead><tbody>
-    ${rows.map(([b, u]) => { const k = b.id + '|' + u; return `<tr><td>${esc(b.name)}</td><td>${esc(u)}</td><td><select data-xsalias="${esc(k)}" aria-label="${esc(`${b.name} ${u} joined as`)}" ${S.readOnly ? 'disabled' : ''}><option value="">${esc(u)} (as logged)</option>${names.filter(n => n !== u).map(n => `<option value="${esc(n)}" ${al[k] === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></td></tr>`; }).join('')}
-    </tbody></table></div><p class="note">Pairings are an interpretation and are drawn dashed like every other link between boreholes.</p></div></section>`;
+  const opts = (u, v) => `<option value="">${esc(u)} (as logged)</option>${names.filter(n => n !== u).map(n => `<option value="${esc(n)}" ${v === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}`;
+  // one choice per unit for the whole section; the table below sets single boreholes
+  const each = names.map(u => { const vs = [...new Set(rows.filter(r => r[1] === u).map(([b]) => al[b.id + '|' + u] || ''))]; return crow(esc(u), `<select data-xsaliasu="${esc(u)}" aria-label="${esc(u)} joined as" ${ro}>${vs.length > 1 ? '<option value="*" selected>Differs by borehole</option>' : ''}${opts(u, vs.length > 1 ? null : vs[0])}</select>`); }).join('');
+  return `<div id="xs-corr-sec"><p class="note">Units with the same name join automatically. To join a unit to a differently named one, choose it here.</p>${each}
+    <details class="xs-corr-each" ${S.xsCorrEach ? 'open' : ''}><summary>By borehole</summary><table class="sum"><tbody>
+    ${rows.map(([b, u]) => { const k = b.id + '|' + u; return `<tr><td>${esc(b.name)}</td><td><select data-xsalias="${esc(k)}" aria-label="${esc(`${b.name} ${u} joined as`)}" ${ro}>${opts(u, al[k])}</select></td></tr>`; }).join('')}
+    </tbody></table></details><p class="note">Pairings are an interpretation and are drawn dashed.</p></div>`;
 }
 function xsPlumeCtl() {
-  const list = sectionList(), dates = xsDates(list), xs = S.xs, idx = xs.date ? Math.max(0, dates.filter(d => d <= xs.date).length - 1) : dates.length - 1;
+  const list = sectionList(), xs = S.xs;
   const has = m => LAB_ORDER.filter(p => m === 'groundwater' ? list.some(b => (b.gwSamples || []).some(s => gwVal(s, p))) : list.some(b => (b.samples || []).some(sm => labVal(sm, p))));
   const params = has(xs.medium); if (xs.medium !== 'vapour' && !params.includes(xs.param) && params.length) xs.param = params.includes('benzene') ? 'benzene' : params[0];
-  return `<div class="xs-ctl sec-opts"><span class="lay-ctl"><label class="check"><input type="checkbox" id="xs-plume" ${xs.plume !== false ? 'checked' : ''}> Plume</label>
-    <select id="xs-medium" aria-label="Medium" style="width:auto">${[['soil', 'Soil (lab)'], ['groundwater', 'Groundwater (lab)'], ['vapour', 'Headspace vapour']].map(([v, t]) => `<option value="${v}" ${xs.medium === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-    ${xs.medium === 'vapour' ? '' : `<select id="xs-param" aria-label="Parameter" style="width:auto">${params.length ? params.map(p => `<option value="${p}" ${xs.param === p ? 'selected' : ''}>${esc(LAB_PARAMS[p].label)}</option>`).join('') : '<option value="">No results</option>'}</select>`}
-    <label class="check" title="Show only results within 7 days of the date"><input type="checkbox" id="xs-round" ${xs.round ? 'checked' : ''}> This round only</label></span>
-    <span class="lay-ctl"><select id="xs-layer" aria-label="Layers" style="width:auto">${[['meas', 'Measured'], ['model', 'Forecast'], ['both', 'Compare measured and forecast']].map(([v, t]) => `<option value="${v}" ${(xs.plume !== false && xs.model ? 'both' : xs.model ? 'model' : 'meas') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-    ${xs.medium === 'groundwater' ? `<select id="xs-shape" aria-label="Plume shape" style="width:auto" title="Model-guided: the forecast's shape, matched to every measured result. Data only: blended between wells across the screens. Kriging and inverse distance, 3D: from every well near the line, in real metres."><option value="guided" ${!(xs.shape === 'data' || XS_METHODS[xs.shape]) ? 'selected' : ''}>Shape: model-guided</option><option value="data" ${xs.shape === 'data' ? 'selected' : ''}>Shape: data only</option>${Object.entries(XS_METHODS).filter(([v]) => v !== 'tin').map(([v, [l, s]]) => `<option value="${v}" title="${esc(s)}" ${xs.shape === v ? 'selected' : ''}>Shape: ${esc(l.charAt(0).toLowerCase() + l.slice(1))}</option>`).join('')}</select>` : `<select id="xs-interp" aria-label="Interpolation" style="width:auto" title="Kriging and inverse distance work in real metres, in plan and depth together, from every borehole near the line">${Object.entries(XS_METHODS).map(([v, [l, s]]) => `<option value="${v}" title="${esc(s)}" ${(xs.interp || 'auto') === v ? 'selected' : ''}>${esc(v === 'auto' && XS_METHOD_PICK && (xs.interp || 'auto') === 'auto' ? 'Automatic (' + XS_METHODS[XS_METHOD_PICK][0].replace(/, 3D.*$|: .*$/, '').toLowerCase() + ')' : l)}</option>`).join('')}</select>`}
-    ${(() => { const mk = xs.medium === 'groundwater' ? xs.shape : (xs.interp || 'auto'); return XS_METHODS[mk] ? `<details class="xs-method"><summary class="note">About this method</summary><p class="note">${esc(XS_METHODS[mk][1])}</p></details>` : ''; })()}
-    ${(xs.medium === 'groundwater' ? XS_3D.has(xs.shape) : (xs.interp || 'auto') !== 'tin') ? `<select id="xs-aniso" aria-label="Layering" style="width:auto" title="How much further a plume reaches sideways than down: soil layers make plumes long and thin. A metre down counts as this many metres sideways."><option value="auto" ${xs.aniso == null || xs.aniso === 'auto' || !(+xs.aniso > 0) ? 'selected' : ''}>Layering: automatic${XS_ANISO_PICK && (xs.aniso == null || xs.aniso === 'auto') ? ' (×' + XS_ANISO_PICK + ')' : ''}</option>${XS_ANISO.map(k => `<option value="${k}" ${+xs.aniso === k ? 'selected' : ''}>${k === 1 ? 'Same sideways and down' : 'Reaches ×' + k + ' further sideways'}</option>`).join('')}</select><label class="check" title="Use boreholes near the line too, by their real distance (untick: only the section's own)"><input type="checkbox" id="xs-near" ${xs.only !== true ? 'checked' : ''}> Boreholes near the line</label>` : ''}
-    <select id="xs-style" aria-label="Drawing style" style="width:auto">${[['graded', 'Graded shading'], ['lines', 'Contour lines'], ['bands', 'Filled bands']].map(([v, t]) => `<option value="${v}" ${(xs.style || 'graded') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-    <label class="check"><input type="checkbox" id="xs-soilcol" ${xs.soilColour ? 'checked' : ''}> Keep soil colours</label>
-    <label class="check" title="The reading beside each point; labels are moved apart so none overlap"><input type="checkbox" id="xs-ptlabels" ${xs.ptLabels ? 'checked' : ''}> Show values</label>
-    <label class="check" title="The groundwater model's water table, head lines and flow arrows (MODFLOW 6), drawn when the model has run"><input type="checkbox" id="xs-gwflow" ${xs.gwFlow !== false ? 'checked' : ''}> Model heads &amp; flow</label></span></div>`;
+  const mk = xs.medium === 'groundwater' ? xs.shape : (xs.interp || 'auto'), aniso = xs.medium === 'groundwater' ? XS_3D.has(xs.shape) : (xs.interp || 'auto') !== 'tin';
+  return `<div class="xs-ctl">
+    <label class="check"><input type="checkbox" id="xs-plume" ${xs.plume !== false ? 'checked' : ''}> Show the plume</label>
+    ${crow('Results', `<select id="xs-medium" aria-label="Medium" style="width:auto">${[['soil', 'Soil (lab)'], ['groundwater', 'Groundwater (lab)'], ['vapour', 'Headspace vapour']].map(([v, t]) => `<option value="${v}" ${xs.medium === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`, 'xs-medium')}
+    ${xs.medium === 'vapour' ? '' : crow('Parameter', `<select id="xs-param" aria-label="Parameter" style="width:auto">${params.length ? params.map(p => `<option value="${p}" ${xs.param === p ? 'selected' : ''}>${esc(LAB_PARAMS[p].label)}</option>`).join('') : '<option value="">No results</option>'}</select>`, 'xs-param')}
+    ${crow('Show', `<select id="xs-layer" aria-label="Layers" style="width:auto">${[['meas', 'Measured'], ['model', 'Forecast'], ['both', 'Compare measured and forecast']].map(([v, t]) => `<option value="${v}" ${(xs.plume !== false && xs.model ? 'both' : xs.model ? 'model' : 'meas') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`, 'xs-layer')}
+    <label class="check" title="Show only results within 7 days of the date"><input type="checkbox" id="xs-round" ${xs.round ? 'checked' : ''}> Only results from this round (±7 days)</label>
+    <h4>Between boreholes</h4>
+    ${xs.medium === 'groundwater' ? crow('Shape', `<select id="xs-shape" aria-label="Plume shape" style="width:auto" title="Model-guided: the forecast's shape, matched to every measured result. Data only: blended between wells across the screens. Kriging and inverse distance, 3D: from every well near the line, in real metres."><option value="guided" ${!(xs.shape === 'data' || XS_METHODS[xs.shape]) ? 'selected' : ''}>Model-guided</option><option value="data" ${xs.shape === 'data' ? 'selected' : ''}>Data only</option>${Object.entries(XS_METHODS).filter(([v]) => v !== 'tin').map(([v, [l, s]]) => `<option value="${v}" title="${esc(s)}" ${xs.shape === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`, 'xs-shape') : crow('Method', `<select id="xs-interp" aria-label="Interpolation" style="width:auto" title="Kriging and inverse distance work in real metres, in plan and depth together, from every borehole near the line">${Object.entries(XS_METHODS).map(([v, [l, s]]) => `<option value="${v}" title="${esc(s)}" ${(xs.interp || 'auto') === v ? 'selected' : ''}>${esc(v === 'auto' && XS_METHOD_PICK && (xs.interp || 'auto') === 'auto' ? 'Automatic (' + XS_METHODS[XS_METHOD_PICK][0].replace(/, 3D.*$|: .*$/, '').toLowerCase() + ')' : l)}</option>`).join('')}</select>`, 'xs-interp')}
+    ${XS_METHODS[mk] ? `<details class="xs-method"><summary class="note">How this method works</summary><p class="note">${esc(XS_METHODS[mk][1])}</p></details>` : ''}
+    ${aniso ? crow('Layering', `<select id="xs-aniso" aria-label="Layering" style="width:auto" title="How much further a plume reaches sideways than down: soil layers make plumes long and thin. A metre down counts as this many metres sideways."><option value="auto" ${xs.aniso == null || xs.aniso === 'auto' || !(+xs.aniso > 0) ? 'selected' : ''}>Automatic${XS_ANISO_PICK && (xs.aniso == null || xs.aniso === 'auto') ? ' (×' + XS_ANISO_PICK + ')' : ''}</option>${XS_ANISO.map(k => `<option value="${k}" ${+xs.aniso === k ? 'selected' : ''}>${k === 1 ? 'Same sideways as down' : '×' + k + ' further sideways'}</option>`).join('')}</select>`, 'xs-aniso') + `<label class="check" title="Use boreholes near the line too, by their real distance (untick: only the section's own)"><input type="checkbox" id="xs-near" ${xs.only !== true ? 'checked' : ''}> Use boreholes near the line</label>` : ''}
+    <h4>Look</h4>
+    ${crow('Style', `<select id="xs-style" aria-label="Drawing style" style="width:auto">${[['graded', 'Graded shading'], ['lines', 'Contour lines'], ['bands', 'Filled bands']].map(([v, t]) => `<option value="${v}" ${(xs.style || 'graded') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`, 'xs-style')}
+    <label class="check"><input type="checkbox" id="xs-soilcol" ${xs.soilColour ? 'checked' : ''}> Keep the soil colours under it</label>
+    <label class="check" title="The reading beside each point; labels are moved apart so none overlap"><input type="checkbox" id="xs-ptlabels" ${xs.ptLabels ? 'checked' : ''}> Values at the sample points</label>
+    <label class="check" title="The groundwater model's water table, head lines and flow arrows (MODFLOW 6), drawn when the model has run"><input type="checkbox" id="xs-gwflow" ${xs.gwFlow !== false ? 'checked' : ''}> Model heads and flow</label></div>`;
 }
 /* the date strip stays with the drawing: scrub through time without opening the panel */
 function xsDateCtl() {
@@ -9555,7 +9647,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.i
 document.addEventListener('input', e => { if (e.target.id === 'xs-date') { const d = xsDates(sectionList())[+e.target.value]; if (d) xsSetDate(d); } });
 function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); const ms = $('#xs-model-sec'); if (ms) ms.outerHTML = xsModelHTML(); }   // the forecast panel reads the drawn section's geometry
 const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
-function drawPlan(el = $('#plan')) { if (!el) return; if (S.tab === 'soil') { drawSoil(); return; } el.innerHTML = planSVG(Math.max(el.clientWidth, 420), S.mapEdit ? 620 : 460, true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); loadImagery(); }
+function drawPlan(el = $('#plan')) { if (!el) return; if (S.tab === 'soil') { drawSoil(); return; } el.innerHTML = planSVG(Math.max(el.clientWidth, 420), S.mapEdit ? 620 : planH(el), true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); loadImagery(); }
 /* Delaunay triangulation (Bowyer–Watson) for contouring between boreholes */
 function delaunay(P) {
   const n = P.length; if (n < 3) return [];
@@ -10458,23 +10550,29 @@ function resultsLayerSVG(pts, X, Y, M = S.mres, W = 0, H = 0) {
 function resStyleHTML(p) {
   if (!p || p === 'none') return '';
   const s = resStyle(p), u = resUnit(p), ro = S.readOnly ? 'disabled' : '', opt = (o, v) => Object.entries(o).map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${esc(l)}</option>`).join('');
-  return `<details class="res-style" ${S.resOpen ? 'open' : ''}><summary>Style and contours: ${esc(resLabel(p))}</summary>
-    <label class="note" for="rs-viz">Display</label><select id="rs-viz" data-rs="viz" ${ro}>${opt(RES_VIZ, s.viz)}</select>
-    <label class="note" for="rs-preset">Contours</label><select id="rs-preset" data-rspreset ${ro}><option value="">Choose a preset…</option>${Object.entries(RES_PRESETS).map(([k, [l]]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select>
-    <div class="rs-classes">${s.colors.map((c, i) => `<div class="rs-row"><input type="color" data-rsc="${i}" value="${c === 'none' ? '#ffffff' : c}" aria-label="Colour of class ${i + 1}" ${ro} ${c === 'none' ? 'disabled' : ''}><label class="check note" title="No shading for this class"><input type="checkbox" data-rsnone="${i}" ${c === 'none' ? 'checked' : ''} ${ro}>clear</label><span class="note">${i === 0 ? 'under' : 'from'}</span>${i === 0 ? `<span class="rs-v">${s.breaks.length ? nfmt(s.breaks[0]) : 'any'}</span>` : `<input type="number" step="any" min="0" data-rsb="${i - 1}" value="${s.breaks[i - 1]}" aria-label="Class ${i + 1} starts at" ${ro}>`}<span class="note">${esc(u)}</span>${i ? `<button class="btn" data-rsdel="${i - 1}" aria-label="Remove this class" ${ro}>✕</button>` : ''}</div>`).join('')}</div>
-    <div class="cmp-row"><button class="btn" data-rsadd ${ro}>Add a contour</button><button class="btn" data-rsreset ${ro}>Reset</button></div>
+  const use = mapList().filter(b => resultAt(b, p)), inUse = use.filter(b => !b.resOff).length;
+  return `<div class="res-style">
+    <h4>Look</h4>
+    ${crow('Display', `<select id="rs-viz" data-rs="viz" ${ro}>${opt(RES_VIZ, s.viz)}</select>`, 'rs-viz')}
+    ${crow('Opacity', `<input id="rs-op" type="range" min=".1" max="1" step=".05" data-rs="op" value="${s.op}" ${ro}>`, 'rs-op')}
+    <h4>Contours (${esc(u)})</h4>
+    ${crow('Preset', `<select id="rs-preset" data-rspreset ${ro}><option value="">Choose a preset…</option>${Object.entries(RES_PRESETS).map(([k, [l]]) => `<option value="${k}">${esc(l)}</option>`).join('')}</select>`, 'rs-preset')}
+    <div class="rs-classes">${s.colors.map((c, i) => `<div class="rs-row"><input type="color" data-rsc="${i}" value="${c === 'none' ? '#ffffff' : c}" aria-label="Colour of class ${i + 1}" ${ro} ${c === 'none' ? 'disabled' : ''}><span class="note">${i === 0 ? 'under' : 'from'}</span>${i === 0 ? `<span class="rs-v">${s.breaks.length ? nfmt(s.breaks[0]) : 'any'}</span>` : `<input type="number" step="any" min="0" data-rsb="${i - 1}" value="${s.breaks[i - 1]}" aria-label="Class ${i + 1} starts at" ${ro}>`}<label class="check note" title="No shading for this class"><input type="checkbox" data-rsnone="${i}" ${c === 'none' ? 'checked' : ''} ${ro}>clear</label>${i ? `<button class="tb" data-rsdel="${i - 1}" aria-label="Remove this class" title="Remove this class" ${ro}>✕</button>` : ''}</div>`).join('')}</div>
     ${RES_FIELD[p] ? '' : `<div class="rs-row"><input type="color" data-rs="nd" value="${s.nd}" aria-label="Not detected colour" ${ro}><span class="note">not detected</span></div>`}
-    <label class="note" for="rs-interp">Between boreholes</label><select id="rs-interp" data-rs="interp" ${ro}>${opt(RES_INTERP, s.interp)}</select>${s.interp === 'auto' ? `<p class="note" data-resauto="${esc(p)}">${esc(resAutoText(RES_AUTO_LAST[p]))}</p>` : ''}
-    <label class="note" for="rs-reach">Shade within</label><input id="rs-reach" type="number" step="any" min="0" data-rs="reach" value="${s.reach ?? ''}" placeholder="no limit" style="width:80px" ${ro} data-tip="How far from a borehole the shading may reach, m. Blank: as far as the outer boreholes."><span class="note">m of a borehole</span>
-    <label class="check note"><input type="checkbox" data-rs="limit" ${s.limit ? 'checked' : ''} ${ro}> Limit outline at</label><input type="number" step="any" min="0" data-rs="lim" value="${s.lim ?? ''}" placeholder="${p === 'cvc' ? (S.co.vThr ?? 100) : projGuide()[p] ?? 'value'}" style="width:90px" ${ro}><span class="note">${esc(u)}</span>
-    <label class="note" for="rs-op">Shading</label><input id="rs-op" type="range" min=".1" max="1" step=".05" data-rs="op" value="${s.op}" ${ro}>
-    <label class="note" for="rs-labels">Labels</label><select id="rs-labels" data-rs="labels" ${ro}>${opt({ value: 'Value', id: 'Borehole and value', none: 'None' }, s.labels)}</select>
-    <label class="check note"><input type="checkbox" data-lyr="labels" ${S.lyr.labels !== false ? 'checked' : ''}> Borehole names${s.labels === 'id' ? ' (not repeated where the value label has the name)' : ''}</label>
-    <label class="note" for="rs-lpos">Label place</label><select id="rs-lpos" data-rs="lpos" ${ro}>${opt({ br: 'Below right', r: 'Right', l: 'Left', t: 'Above', b: 'Below' }, s.lpos)}</select>
-    <label class="note" for="rs-lsize">Label size</label><input id="rs-lsize" type="number" min="6" max="30" step="0.5" data-rs="lsize" value="${s.lsize}" style="width:70px" ${ro}><span class="note">px</span>
-    <label class="note" for="rs-psize">Point size</label><input id="rs-psize" type="number" min="3" max="40" step="0.5" data-rs="psize" value="${s.psize}" style="width:70px" ${ro}><span class="note">px radius${s.viz === 'graduated' ? ' (the middle size; graduated points scale with it)' : ''}</span>
-    <h4>Boreholes in the contours</h4><div class="rs-use">${mapList().filter(b => resultAt(b, p)).map(b => `<label class="check note"><input type="checkbox" data-resuse="${esc(b.id)}" ${b.resOff ? '' : 'checked'} ${ro}> ${esc(gwName(b))}</label>`).join('') || '<span class="note">No results yet.</span>'}</div>
-    <p class="note">Saved with the project: the Map page, the VOC map, report maps and legends all use it. An unticked borehole stays on the map, hollow, but is left out of the shading and contours.</p></details>`;
+    <div class="cmp-row"><button class="btn" data-rsadd ${ro}>Add a contour</button><button class="btn" data-rsreset ${ro}>Reset</button></div>
+    <h4>Between boreholes</h4>
+    ${crow('Method', `<select id="rs-interp" data-rs="interp" ${ro}>${opt(RES_INTERP, s.interp)}</select>`, 'rs-interp')}${s.interp === 'auto' ? `<p class="note" data-resauto="${esc(p)}">${esc(resAutoText(RES_AUTO_LAST[p]))}</p>` : ''}
+    ${crow('Reach', `<input id="rs-reach" type="number" step="any" min="0" data-rs="reach" value="${s.reach ?? ''}" placeholder="no limit" ${ro} data-tip="How far from a borehole the shading may reach. Blank: as far as the outer boreholes."><span class="note">m from a borehole</span>`, 'rs-reach')}
+    ${crow('Outline', `<input type="checkbox" data-rs="limit" ${s.limit ? 'checked' : ''} ${ro} aria-label="Draw a limit outline"><input type="number" step="any" min="0" data-rs="lim" value="${s.lim ?? ''}" placeholder="${p === 'cvc' ? (S.co.vThr ?? 100) : projGuide()[p] ?? 'value'}" ${ro} aria-label="Outline at"><span class="note">${esc(u)}</span>`)}
+    <h4>Points and values</h4>
+    ${crow('Values', `<select id="rs-labels" data-rs="labels" ${ro}>${opt({ value: 'Value', id: 'Borehole and value', none: 'None' }, s.labels)}</select>`, 'rs-labels')}
+    ${crow('Place', `<select id="rs-lpos" data-rs="lpos" ${ro}>${opt({ br: 'Below right', r: 'Right', l: 'Left', t: 'Above', b: 'Below' }, s.lpos)}</select>`, 'rs-lpos')}
+    ${crow('Text size', `<input id="rs-lsize" type="number" min="6" max="30" step="0.5" data-rs="lsize" value="${s.lsize}" ${ro}><span class="note">px</span>`, 'rs-lsize')}
+    ${crow('Point size', `<input id="rs-psize" type="number" min="3" max="40" step="0.5" data-rs="psize" value="${s.psize}" ${ro}><span class="note">px${s.viz === 'graduated' ? ', the middle size' : ''}</span>`, 'rs-psize')}
+    <label class="check note"><input type="checkbox" data-lyr="labels" ${S.lyr.labels !== false ? 'checked' : ''}> Borehole names too${s.labels === 'id' ? ' (not repeated where the value has it)' : ''}</label>
+    <details class="rs-usewrap" ${S.rsUseOpen ? 'open' : ''}><summary>Boreholes used · ${inUse} of ${use.length}</summary><div class="rs-use">${use.map(b => `<label class="check note"><input type="checkbox" data-resuse="${esc(b.id)}" ${b.resOff ? '' : 'checked'} ${ro}> ${esc(gwName(b))}</label>`).join('') || '<span class="note">No results yet.</span>'}</div>
+    <p class="note">An unticked borehole stays on the map, hollow, but is left out of the shading and contours.</p></details>
+    <p class="note">Saved with the project: every map of this result uses it.</p></div>`;
 }
 /* where a value label sits around its point (k > 1: further out, for a crowded spot), and the box it takes */
 function resLabAt(p, fs, x, y, rad, k = 1) { const d = rad + 4 + (k - 1) * (rad + fs), e = d - 4;
@@ -10501,20 +10599,16 @@ function contamHTML() {
   const finding = !withData.length ? 'No vapour readings in this project yet.' : over.length ? `${over.length} of ${withData.length} boreholes read ${thr.toLocaleString('en-CA')} ppm or more; highest ${withData[0].s.cvc.toLocaleString('en-CA')} ppm in ${withData[0].b.name} at ${fu(withData[0].s.depth)}.` : `No borehole reaches ${thr.toLocaleString('en-CA')} ppm; highest ${withData[0].s.cvc.toLocaleString('en-CA')} ppm in ${withData[0].b.name}.`;
   return `<p class="finding">${esc(finding)}</p>
   <div class="two-col">
-    <section class="sec"><header><h3>${S.mapParam && LAB_PARAMS[S.mapParam] ? esc(LAB_PARAMS[S.mapParam].label) + ' map' : 'Vapour map'}</h3>
-      <label class="note" for="map-param">Show</label><select id="map-param" style="width:auto"><option value="">Vapour (headspace)</option>${labParamsUsed(list).map(p => `<option value="${p}" ${S.mapParam === p ? 'selected' : ''}>${esc(LAB_PARAMS[p].label)}</option>`).join('')}</select>
-      <label class="note" for="v-thr">Outline at</label><input id="v-thr" type="number" min="1" step="any" value="${thr}" style="width:90px" data-tip="Screening level for the dashed outline, ppm. Choose the level your project uses."><span class="note">ppm</span>
-      <label class="note" for="v-from">Depth</label><input id="v-from" type="number" step="any" placeholder="from" value="${S.vFrom != null ? f(S.vFrom, 2) : ''}" style="width:70px"><input id="v-to" type="number" step="any" placeholder="to" value="${S.vTo != null ? f(S.vTo, 2) : ''}" style="width:70px"><span class="note">${LEN()}</span></header>
+    <section class="sec"><header><h3>${S.mapParam && LAB_PARAMS[S.mapParam] ? esc(LAB_PARAMS[S.mapParam].label) + ' map' : 'Vapour map'}</h3><span class="note">${S.vFrom != null || S.vTo != null ? 'Chosen depths' : 'Highest in each borehole'}</span></header>
       <div class="body"><div class="scroll-x map-box">${vapourMapSVG(620, 460)}</div>
       <div class="legend">${legendRows('vap', mapList()).filter(r => !r.head).map(r => `<span><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true">${r.sym(11, 7)}</svg>${esc(r.t)}</span>`).join('')}</div>
-      ${resStyleHTML(S.mapParam && LAB_PARAMS[S.mapParam] ? S.mapParam : 'cvc')}
-      <details class="lbl-site" ${S.lblOpen ? 'open' : ''}><summary>Borehole labels</summary>${labelsHTML('s')}</details><details class="furn-site" ${S.furnOpen ? 'open' : ''}><summary>North arrow and scale bar</summary>${furnHTML('s')}</details>
-      <p class="note">Highest headspace reading in each borehole${S.vFrom != null || S.vTo != null ? ' in the chosen depth range' : ''}. Shading, contours and the outline are interpolated in log₁₀ between boreholes (kriging by default, held between the highest and lowest reading; or as chosen under Style and contours), only inside the outer boreholes, and within a set distance of a reading if one is given. They are an interpretation to guide sampling, not a measured boundary; confirm with laboratory analysis.</p></div></section>
+      <p class="note">Shading, contours and the outline are interpolated between boreholes in log₁₀, only inside the outer boreholes: an interpretation to guide sampling, not a measured boundary. Confirm with laboratory analysis. Settings are in the panel on the right.</p></div></section>
     <section class="sec"><header><h3>Highest reading by borehole</h3></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th title="Untick to leave a borehole out of the shading and contours; it stays on the map">Use</th><th>Borehole</th><th class="r">Max (ppm)</th><th class="r">Depth (${LEN()})</th><th>Sample</th><th class="r">Readings</th></tr></thead><tbody>
       ${rows.map(r => `<tr${r.b.resOff ? ' class="muted"' : ''}><td><input type="checkbox" data-resuse="${esc(r.b.id)}" ${r.b.resOff ? '' : 'checked'} ${S.readOnly ? 'disabled' : ''} aria-label="Use ${esc(r.b.name)} in the contours"></td><td><button class="pick" data-pick="${esc(r.b.id)}" data-goto="log">${r.s ? `<span class="dot sq" style="background:${symFill(resColour('cvc', { v: r.s.cvc }))};border:1px solid var(--ink)"></span>` : '<span class="dot sq" style="background:var(--panel);border:1px dashed var(--muted)"></span>'}${esc(r.b.name)}</button></td><td class="r">${r.s ? `<b${r.s.cvc >= thr ? ' style="color:var(--negative)"' : ''}>${r.s.cvc.toLocaleString('en-CA')}</b>` : '—'}</td><td class="r">${r.s ? fx(r.s.depth) : '—'}</td><td>${r.s ? esc(sampleId(r.s)) : '—'}</td><td class="r">${r.n}</td></tr>`).join('')}</tbody></table></div></div></section>
   </div>
   <section class="sec"><header><h3>Laboratory results</h3><span class="note">Soil, by sample</span></header><div class="body">${labTableHTML(list)}</div></section>
-  <section class="sec"><header><h3>Cross-section with vapour</h3><span class="note">Bars to the right of each borehole: headspace on a log scale, 1 to 10,000 ppm</span></header><div class="body"><div class="scroll-x" id="csection"></div><p class="note" id="csection-note"></p></div></section>`;
+  <section class="sec"><header><h3>Cross-section with vapour</h3><span class="note">Bars to the right of each borehole: headspace on a log scale, 1 to 10,000 ppm</span></header><div class="body"><div class="scroll-x" id="csection"></div><p class="note" id="csection-note"></p></div></section>
+  ${soilTestsHTML()}`;
 }
 
 /* ---------- project overview: where is this investigation at? ---------- */
@@ -11490,6 +11584,7 @@ document.addEventListener('click', e => {
   else { const st = siteOf() || {}, rs = { ...(st.resStyle || {}) }; delete rs[p]; setSite({ ...st, resStyle: rs }); }
   renderView(true);
 });
+document.addEventListener('toggle', e => { if (e.target.classList?.contains('xs-corr-each')) S.xsCorrEach = e.target.open; if (e.target.classList?.contains('rs-usewrap')) S.rsUseOpen = e.target.open; }, true);
 document.addEventListener('toggle', e => { if (e.target.classList?.contains('res-style')) S.resOpen = e.target.open; if (e.target.classList?.contains('lbl-site')) S.lblOpen = e.target.open; if (e.target.classList?.contains('furn-site')) S.furnOpen = e.target.open; if (e.target.classList?.contains('lbl-each')) S.lblEachOpen = e.target.open; }, true);
 document.addEventListener('change', e => { const id = e.target.dataset?.resuse; if (!id || S.readOnly) return; const b = S.bh.get(id); if (!b) return; if (e.target.checked) delete b.resOff; else b.resOff = true; b.updated = new Date().toISOString(); store.save(b); renderView(true); });
 document.addEventListener('click', e => {
@@ -13064,7 +13159,10 @@ document.addEventListener('change', e => {
   if (t.id === 'gwm-tcal') { setGwm({ transport: { ...(gwSaved().transport || {}), calibrate: t.checked } }); return; }
   if (t.dataset?.mdl) { setModel(t.dataset.mdl, t.value); return; }
   if (t.dataset?.gw || t.dataset?.gwlt || t.dataset?.gwf || t.dataset?.gwguide) { gwChange(t); return; }
-  if (t.dataset?.xsalias != null && !S.readOnly) { const x = siteOf()?.xsec || {}, al = { ...(x.alias || {}) }; if (t.value) al[t.dataset.xsalias] = t.value; else delete al[t.dataset.xsalias]; setSite({ ...(siteOf() || {}), xsec: { ...x, alias: al } }); redrawSec(); }
+  if (t.dataset?.xsalias != null && !S.readOnly) { const x = siteOf()?.xsec || {}, al = { ...(x.alias || {}) }; if (t.value) al[t.dataset.xsalias] = t.value; else delete al[t.dataset.xsalias]; setSite({ ...(siteOf() || {}), xsec: { ...x, alias: al } }); redrawSec(); ctlRender(); }
+  if (t.dataset?.xsaliasu != null && !S.readOnly && t.value !== '*') { const u = t.dataset.xsaliasu, x = siteOf()?.xsec || {}, al = { ...(x.alias || {}) };
+    for (const b of sectionList()) if ((b.layers || []).some(l => l.bottom > l.top && defaultUnit(l) === u)) { const k = b.id + '|' + u; if (t.value) al[k] = t.value; else delete al[k]; }
+    setSite({ ...(siteOf() || {}), xsec: { ...x, alias: al } }); redrawSec(); ctlRender(); }
   else if (t.dataset?.lab || t.dataset?.lablt || t.dataset?.labmeta) {
     const b0 = cur(); if (!editable(b0)) return; const sm = b0.samples[+t.dataset.i]; sm.lab ||= {}; sm.labMeta ||= {};
     if (t.dataset.labmeta) sm.labMeta[t.dataset.labmeta] = t.value;
