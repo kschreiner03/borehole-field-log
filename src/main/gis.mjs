@@ -21,6 +21,7 @@ export const GIS_SPECS = ['grass=8.5', 'gdal=3.12', 'pykrige=1.7', 'gstools=1.7'
 export const GIS_METHODS = {
   surface: ['gdal_invdist', 'gdal_invdistnn', 'gdal_average', 'gdal_nearest', 'gdal_linear', 'pykrige_ok', 'pykrige_uk', 'gstools_ok', 'grass_rst', 'grass_bspline', 'grass_idw'],
   points3d: ['pykrige_ok3d', 'gstools_ok3d', 'grass_vol_rst'],
+  hydro: ['gw_gradient', 'gw_drain', 'gw_depth'],
 };
 
 // a short folder of the user's own (Windows paths in the packages are long; 260 characters is the limit)
@@ -120,8 +121,15 @@ export function checkJob(job) {
     if (!nums(job.pts, 4) || job.pts.length < 4 || job.pts.length > 2000) return 'Samples must be 4 to 2000 [x, y, z, value].';
     if (!nums(job.targets, 3) || job.targets.length > 200000) return 'Targets outside the limits.';
     if (method === 'grass_vol_rst' && (!nums([job.box3], 6) || !(job.nx * job.ny * job.nz <= 4e6))) return '3D grid outside the limits.';
-  } else if (kind === 'contours' || kind === 'export') {
+  } else if (kind === 'hydro') {
+    if (!GIS_METHODS.hydro.includes(method)) return 'Unknown method.';
+    if (!nums(job.pts, 3) || job.pts.length < 3 || job.pts.length > 5000) return 'Water levels must be 3 to 5000 [x, y, head].';
+    if (!nums([job.box], 4) || !(job.nx >= 2 && job.nx <= 1000 && job.ny >= 2 && job.ny <= 1000)) return 'Grid outside the limits.';
+    if (method === 'gw_drain' && !nums([job.start], 2)) return 'A start point [x, y] is needed.';
+    if (method === 'gw_depth' && (!nums(job.ground, 3) || job.ground.length < 3 || job.ground.length > 5000)) return 'Ground elevations must be 3 to 5000 [x, y, z].';
+  } else if (kind === 'contours' || kind === 'export' || kind === 'area') {
     if (!nums([job.box], 4) || !Array.isArray(job.values) || job.values.length !== job.nx * job.ny || job.values.some(v => v !== null && !isNum(v))) return 'Grid does not match its size.';
+    if (kind === 'area' && !isNum(job.level)) return 'A level is needed.';
     if (kind === 'export' && !(Number.isInteger(job.epsg) && job.epsg > 1000 && job.epsg < 100000)) return 'No coordinate system.';
     if (kind === 'export' && job.name && !/^[\w .-]{1,60}$/.test(job.name)) return 'A plain file name is needed.';
   } else return 'Unknown job.';

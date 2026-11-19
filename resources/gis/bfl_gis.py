@@ -238,8 +238,65 @@ def grass_run(job):
         return res
     finally: shutil.rmtree(tmp, ignore_errors=True)
 
+def in_grass_hydro(job, gs, tmp):
+    """groundwater tools on a water-table surface made with v.surf.rst; no attribute database is used"""
+    m, P, prm = job['method'], job['pts'], job.get('params', {})
+    xs, ys, dx, dy, nx, ny = grid_axes(job); x0, y0, x1, y1 = job['box']
+    ver = gs.version().get('version', '')
+    gs.run_command('g.region', w=x0, e=x1, s=y0, n=y1, cols=nx, rows=ny, quiet=True)
+    ten, smo = float(prm.get('tension', 40)), float(prm.get('smooth', 0.1))
+    def surf(points, name, what):
+        f = os.path.join(tmp, name + '.csv')
+        with open(f, 'w') as fh:
+            for p in points: fh.write('%.6f,%.6f,%.6f\n' % (p[0], p[1], p[2]))
+        prog(0.15 if name == 'h' else 0.4, 'v.surf.rst: the %s from %d points' % (what, len(points)))
+        gs.run_command('v.in.ascii', input=f, output=name, separator='comma', x=1, y=2, z=3, flags='zt', overwrite=True, quiet=True)
+        gs.run_command('v.surf.rst', input=name, elevation=name + '_r', tension=ten, smooth=smo, overwrite=True, quiet=True)
+    def read(r):
+        return [None if t in ('nan', '*') else float(t) for t in gs.read_command('r.out.ascii', input=r, null_value='nan', flags='h', precision=8).split()]
+    surf(P, 'h', 'water table')
+    base = 'v.surf.rst (tension %g, smoothing %g)' % (ten, smo)
+    if m == 'gw_gradient':
+        prog(0.6, 'r.slope.aspect: gradient and the direction it falls')
+        # -n: aspect as a compass bearing (0 = north, clockwise); the aspect of a surface is the way it faces, i.e. downhill
+        gs.run_command('r.slope.aspect', elevation='h_r', slope='sl', aspect='asp', format='percent', flags='n', overwrite=True, quiet=True)
+        prog(0.9, 'Reading the grids')
+        return {'head': read('h_r'), 'slope': read('sl'), 'aspect': read('asp'), 'tool': 'GRASS GIS %s r.slope.aspect' % ver, 'detail': 'on the water table from ' + base}
+    if m == 'gw_drain':
+        sx, sy = job['start']
+        prog(0.6, 'r.drain: steepest descent on the water table from %.1f E, %.1f N' % (sx, sy))
+        src, filled = 'h_r', ''
+        if str(prm.get('fill', 'yes')) != 'no':   # small hollows in the surface would stop the path: r.fill.dir fills them first
+            prog(0.5, 'r.fill.dir: filling local lows in the water table so the path is not trapped')
+            gs.run_command('r.fill.dir', input='h_r', output='h_f', direction='h_dir', overwrite=True, quiet=True); src, filled = 'h_f', ', local lows filled (r.fill.dir)'
+        gs.run_command('r.drain', input=src, output='path', start_coordinates='%.6f,%.6f' % (sx, sy), flags='n', overwrite=True, quiet=True)
+        cells = []
+        for line in gs.read_command('r.out.xyz', input='path', separator=',').strip().splitlines():
+            x, y, n = (float(v) for v in line.split(',')[:3]); cells.append((n, x, y))
+        cells.sort()
+        prog(0.85, 'Heads along the path (r.what)')
+        pts = [[c[1], c[2]] for c in cells]
+        heads = []
+        for i in range(0, len(pts), 200):
+            chunk = pts[i:i + 200]
+            out = gs.read_command('r.what', map='h_r', coordinates=','.join('%.6f,%.6f' % (a, b) for a, b in chunk), null_value='nan')
+            heads += [float(l.split('|')[-1]) if l.split('|')[-1] not in ('nan', '*') else None for l in out.strip().splitlines()]
+        return {'path': pts, 'heads': heads, 'tool': 'GRASS GIS %s r.drain' % ver, 'detail': 'steepest descent on the water table from ' + base + filled}
+    if m == 'gw_depth':
+        surf(job['ground'], 'g', 'ground surface')
+        prog(0.7, 'r.mapcalc: depth = ground surface − water table')
+        gs.run_command('r.mapcalc', expression='d = g_r - h_r', overwrite=True, quiet=True)
+        prog(0.9, 'Reading the grid')
+        return {'values': read('d'), 'head': read('h_r'), 'tool': 'GRASS GIS %s r.mapcalc' % ver, 'detail': 'ground surface and water table each from ' + base}
+    raise RuntimeError('Unknown groundwater tool ' + m)
+
 def in_grass(job):
     job = floats(job)
+    if job.get('kind') == 'hydro':
+        import grass.script as gs
+        tmp = tempfile.mkdtemp(prefix='bfl-gin-')
+        try: return in_grass_hydro(job, gs, tmp)
+        finally: shutil.rmtree(tmp, ignore_errors=True)
     import grass.script as gs
     m, P, prm = job['method'], job['pts'], job.get('params', {})
     tmp = tempfile.mkdtemp(prefix='bfl-gin-')
@@ -373,12 +430,37 @@ def contours(job):
     return {'lines': out, 'tool': 'GDAL %s gdal_contour' % gdal.__version__}
 
 def floats(job):
-    for k in ('pts', 'targets'):
+    for k in ('pts', 'targets', 'ground'):
         if k in job: job[k] = [[float(v) for v in p] for p in job[k]]
     return job
 
+def area_over(job):
+    """the part of a surface at or over a level: a mask polygonized by GDAL (gdal.Polygonize), its area from OGR"""
+    from osgeo import gdal, ogr
+    import numpy as np
+    gdal.UseExceptions(); ogr.UseExceptions()
+    xs, ys, dx, dy, nx, ny = grid_axes(job); x0, y0, x1, y1 = job['box']
+    prog(0.2, 'Marking the cells at or over the level')
+    a = np.array([(np.nan if v is None else v) for v in job['values']], float).reshape(ny, nx)
+    mk = np.where(np.isfinite(a) & (a >= float(job['level'])), 1, 0).astype(np.uint8)
+    ds = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Byte); ds.SetGeoTransform([x0, dx, 0, y1, 0, -dy])
+    b = ds.GetRasterBand(1); b.WriteArray(mk); b.SetNoDataValue(0)
+    prog(0.5, 'gdal.Polygonize')
+    vd = ogr.GetDriverByName('Memory').CreateDataSource('a'); ly = vd.CreateLayer('a', None, ogr.wkbPolygon); ly.CreateField(ogr.FieldDefn('v', ogr.OFTInteger))
+    gdal.Polygonize(b, b, ly, 0, [], callback=None)
+    polys, tot = [], 0.0
+    for f in ly:
+        g = f.GetGeometryRef(); tot += g.GetArea()
+        rings = []
+        for i in range(g.GetGeometryCount()):
+            r = g.GetGeometryRef(i); rings.append([[round(r.GetX(k), 3), round(r.GetY(k), 3)] for k in range(r.GetPointCount())])
+        polys.append(rings)
+    return {'polys': polys, 'area': tot, 'cells': int(mk.sum()), 'tool': 'GDAL %s Polygonize' % gdal.__version__, 'detail': '%d cells of %.3g × %.3g m' % (int(mk.sum()), dx, dy)}
+
 def run(job):
     job = floats(job)
+    if job.get('kind') == 'hydro': return grass_run(job)
+    if job.get('kind') == 'area': return area_over(job)
     k, m = job.get('kind'), job.get('method', '')
     if k == 'versions': return versions()
     if k == 'export': return export(job)
