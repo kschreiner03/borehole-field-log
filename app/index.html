@@ -1402,6 +1402,11 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .gp-head b { font-size: 13px; } .gp-pane { padding-top: 10px; } .gp-ph b { display: block; font-size: 14px; } .gp-ph small { color: var(--muted); font-size: 11.5px; }
 .gp-pane .gp-run .btn { flex: 1; } .gp-pane .gp-job { padding: 8px; } .gp-pane .gp-cmp th:nth-child(3), .gp-pane .gp-cmp td:nth-child(3) { width: 64px; } .gp-pane .gp-cmp th:nth-child(4), .gp-pane .gp-cmp td:nth-child(4) { width: 40px; } .gp-pane .gp-cmp td .note { display: block; }
 .gp-hd > summary { font: 600 12px var(--f-body); }
+.crs-q input { width: 100%; min-height: 34px; } .crs-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; margin-top: 6px; min-width: min(560px, 80vw); }
+.crs-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 6px 8px; border: 0; border-radius: var(--r-sm); background: none; text-align: left; font: 13px var(--f-body); color: var(--ink); cursor: pointer; }
+.crs-row:hover { background: var(--hover); } .crs-row[aria-pressed="true"] { background: var(--sel); } .crs-row b { font: 600 12px var(--f-mono, ui-monospace, monospace); } .crs-row small { display: block; color: var(--muted); font-size: 11.5px; }
+.crs-f { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; } .crs-f b { font: 600 12px var(--f-mono, ui-monospace, monospace); } .crs-b { display: flex; gap: 6px; width: 100%; }
+.crs-tbl td { font: 11.5px var(--f-mono, ui-monospace, monospace); } .gp-tool textarea, .gp-pane textarea { width: 100%; font: 12px var(--f-mono, ui-monospace, monospace); }
 .gp-chart { width: 100%; max-width: 420px; height: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-sm); margin-top: 4px; }
 .gis-fixkey { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin-top: 3px; font-size: 10.5px; color: var(--muted); } .gis-fixkey i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: -3px; }
 .gis-li { display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
@@ -2456,6 +2461,7 @@ function mapGoTo(q) {
   S.mv = { cx: e, cy: n, sc: Math.min(W, H) / 800 }; S.mvProj = projKey(projList()[0]); renderView(true);
 }
 /* the Toolbox's form and lists */
+document.addEventListener('change', e => { if (e.target.dataset?.vdatum == null || S.readOnly) return; setSite({ ...(siteOf() || {}), vdatum: e.target.value }); });
 document.addEventListener('change', e => { const t = e.target, id = t.dataset?.gisshow || t.dataset?.gisramp; if (!id) return; const L = GIS.layers.find(x => x.id === id); if (!L) return; if (t.dataset.gisshow) L.show = t.value; else L.ramp = t.value; if (L.url) URL.revokeObjectURL(L.url); L.url = null; renderView(true); });
 document.addEventListener('change', e => {
   const k = e.target.dataset?.gisl; if (!k) return; const [id, f, i] = k.split('.'), L = GIS.layers.find(x => x.id === id); if (!L) return; const t = e.target, lab = { ...(L.lab || {}) };
@@ -2477,10 +2483,10 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const t = e.target, f = t.dataset?.gpf, n = t.dataset?.gpprm; if (!f && !n) return;
   if (n) { const k = S.gp.tool; S.gp.prm = { ...S.gp.prm, [k]: { ...(S.gp.prm[k] || {}), [n]: t.value } }; }
-  else if (f === 'use' || f === 'save') S.gp[f] = t.checked;
+  else if (f === 'use' || f === 'save' || f === 'cShow') S.gp[f] = t.checked;
   else if (f === 'd0' || f === 'd1') S.gp[f] = t.value === '' ? null : fromD(+t.value);
   else S.gp[f] = t.value;
-  gpSave(); if (['p', 'd0', 'd1', 'r1', 'r2', 'unit', 'gL', 'gL2', 'gA', 'sbFrom', 'exL', 'fixL'].includes(f)) renderView(true);
+  gpSave(); if (['p', 'd0', 'd1', 'r1', 'r2', 'unit', 'gL', 'gL2', 'gA', 'sbFrom', 'exL', 'fixL', 'bGrp'].includes(f)) renderView(true);
 });
 document.addEventListener('input', e => { if (e.target.id === 'gp-q') { S.gp.q = e.target.value; const pos = e.target.selectionStart; renderView(true); const q = $('#gp-q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } } });
 document.addEventListener('submit', e => { const f = e.target.closest?.('[data-mapgo]'); if (!f) return; e.preventDefault(); mapGoTo(f.querySelector('input').value); });
@@ -2518,6 +2524,9 @@ function mapBaseHTML() {
     : `Apple Maps close in (key ${esc(S.apple.who.keyId)}), Esri further out and offline. PDFs use the same pictures.`;
   return `${crow('Basemap', `<select id="basemap" ${S.readOnly ? 'disabled' : ''}>${Object.entries(BASEMAPS).map(([v, [t]]) => `<option value="${v}" ${k === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`, 'basemap')}
     <p class="note">${note} UTM Zone ${z}${zFixed ? ', from the boreholes' : ''}.</p>${k === 'apple' && window.desktop?.appleMaps && !S.readOnly ? `<button class="btn" data-act="apple-setup">${S.apple.who ? 'Apple Maps key…' : 'Set up Apple Maps…'}</button>` : ''}
+    <h4>Coordinate system</h4>${crow('Project', `<span class="crs-f"><b>EPSG:${projEpsg()}</b> <span class="note">${esc(crsName('EPSG:' + projEpsg()) || (siteOf()?.epsg ? '' : 'from the boreholes'))}</span><span class="crs-b"><button class="btn" data-act="crs-project" ${S.readOnly ? 'disabled' : ''}>Change…</button>${siteOf()?.epsg ? '<button class="btn link" data-act="crs-project-auto">From the boreholes</button>' : ''}</span></span>`)}
+    ${crow('Heights', `<select data-vdatum ${S.readOnly ? 'disabled' : ''}>${[['', 'Not stated'], ['CGVD2013', 'CGVD2013 (geodetic, current)'], ['CGVD28', 'CGVD28 (older surveys)'], ['local', 'Local or assumed datum']].map(([v, l]) => `<option value="${v}" ${(siteOf()?.vdatum || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`)}
+    <p class="note">Maps, Toolbox layers and exports use the project system; files in other systems are reprojected to it (Toolbox › Coordinates).</p>
     <h4>Go to a place</h4>${goToHTML()}<p class="note">A land description, latitude and longitude, or easting and northing.</p>`;
 }
 function mapLayersHTML() {
@@ -2572,6 +2581,7 @@ const GP_CATS = [
   ['soil', 'Soil', NAV_ICON.soil, ['Soil']],
   ['terrain', 'Terrain', '<path d="M3 19l6-9 4 5 3-4 5 8z"/>', ['Terrain']],
   ['analysis', 'Analysis', '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', ['Analysis']],
+  ['coords', 'Coordinates', '<circle cx="12" cy="12" r="8"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="1.5"/>', ['Coordinates']],
   ['export', 'Export', '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/>', ['Export']]];
 const gpCatOf = id => GP_CATS.find(c => c[3].includes(GP_TOOLS[id]?.group))?.[0] || 'analysis';
 function gpMenuList() {
@@ -10676,7 +10686,7 @@ function gisStart(key, job, label, input = '') {
   if (GIS.prom.has(key)) return GIS.prom.get(key);
   const id = 'j' + Date.now().toString(36) + (++gisSeq), j = { id, key, label: label || gisLabel(job), input, p: 0, msg: 'Starting…', msgs: [], t0: Date.now(), status: 'running', job: { kind: job.kind, method: job.method, params: job.params } };
   GIS.jobs.set(id, j); GIS.err.delete(key); gisJobsUI();
-  const pr = window.desktop.gis.run({ ...job, id }).then(r => r, e => ({ ok: false, error: String(e?.message || e) })).then(r => {
+  const pr = window.desktop.gis.run({ ...job, id, ...(lsGet('bhlog.projnet') === '1' ? { network: true } : {}) }).then(r => r, e => ({ ok: false, error: String(e?.message || e) })).then(r => {
     GIS.prom.delete(key); j.t1 = Date.now(); j.res = r;
     if (r?.ok) { j.status = 'done'; j.p = 1; j.msg = 'Completed'; if (GIS.cache.size > 60) GIS.cache.delete(GIS.cache.keys().next().value); if (!job.nocache) GIS.cache.set(key, r); }
     else { j.status = r?.cancelled ? 'cancelled' : 'failed'; j.msg = r?.cancelled ? 'Cancelled' : r?.error || 'The tool stopped.'; if (!r?.cancelled) GIS.err.set(key, j.msg); }
@@ -10745,8 +10755,52 @@ function gisNote(m, key) {
   if (!r) { const j = [...GIS.jobs.values()].find(x => x.key === key && x.status === 'running'); return 'Running ' + name + (j?.p > 0 ? ' (' + Math.round(j.p * 100) + ' %)' : '') + '… shown with built-in kriging until it finishes. Progress is in the Toolbox.'; }
   return r.tool + (r.detail ? ': ' + r.detail : '') + '.' + (r.loo != null ? ' Each reading predicted from the others is typically within ' + gisX(r.loo) + ' (' + (r.loo_by || 'leave-one-out') + ').' : '') + ' ' + (r.seconds ? r.seconds.toFixed(1) + ' s.' : '');
 }
+/* a borehole's recorded system, read from its text ("UTM NAD83(CSRS) Zone 12"): the EPSG code, or null when it cannot be told */
+function crsFromText(t) {
+  const m = /zone\s*(\d{1,2})/i.exec(t || ''); if (!m) return null; const z = +m[1], c = String(t).toUpperCase();
+  const CSRS = { 7: 3154, 8: 3155, 9: 3156, 10: 3157, 11: 2955, 12: 2956, 13: 2957, 14: 3158, 15: 3159, 16: 3160, 17: 2958, 18: 2959, 19: 2960, 20: 2961, 21: 2962, 22: 3761 };
+  return /NAD\s*27/.test(c) ? 26700 + z : /WGS/.test(c) ? 32600 + z : /NAD\s*83/.test(c) && !/CSRS/.test(c) ? 26900 + z : CSRS[z] || 26900 + z;
+}
+S.crsNames = { ...jsonLS('bhlog.crsnames', {}) };
+const crsName = c => S.crsNames[c] || '';
+const crsRemember = rows => { for (const r of rows || []) if (r.code && r.name) S.crsNames[r.code] = r.name; lsSet('bhlog.crsnames', JSON.stringify(Object.fromEntries(Object.entries(S.crsNames).slice(-300)))); };
+/* the systems a site in western Canada most often meets, first: around the project's zone */
+function crsCommon() {
+  const z = crsZone(), CS = { 7: 3154, 8: 3155, 9: 3156, 10: 3157, 11: 2955, 12: 2956, 13: 2957, 14: 3158, 15: 3159, 16: 3160, 17: 2958, 18: 2959, 19: 2960, 20: 2961, 21: 2962, 22: 3761 };
+  const L = [['EPSG:' + projEpsg(), 'The project\'s system'], ['EPSG:' + (CS[z] || 2956), 'NAD83(CSRS) / UTM zone ' + z + 'N'], ['EPSG:' + (26900 + z), 'NAD83 / UTM zone ' + z + 'N'], ['EPSG:' + (26700 + z), 'NAD27 / UTM zone ' + z + 'N'], ['EPSG:' + (32600 + z), 'WGS 84 / UTM zone ' + z + 'N'],
+    ['EPSG:' + (CS[z - 1] || 2955), 'NAD83(CSRS) / UTM zone ' + (z - 1) + 'N'], ['EPSG:' + (CS[z + 1] || 2957), 'NAD83(CSRS) / UTM zone ' + (z + 1) + 'N'],
+    ['EPSG:3402', 'NAD83(CSRS) / Alberta 10-TM (Forest)'], ['EPSG:3403', 'NAD83(CSRS) / Alberta 10-TM (Resource)'], ['EPSG:3400', 'NAD83 / Alberta 10-TM (Forest)'], ['EPSG:3401', 'NAD83 / Alberta 10-TM (Resource)'],
+    ['EPSG:3005', 'NAD83 / BC Albers'], ['EPSG:3347', 'NAD83 / Statistics Canada Lambert'], ['EPSG:3978', 'NAD83 / Canada Atlas Lambert'],
+    ['EPSG:4326', 'WGS 84: latitude and longitude (GPS, Google Earth)'], ['EPSG:4617', 'NAD83(CSRS): latitude and longitude'], ['EPSG:4269', 'NAD83: latitude and longitude'], ['EPSG:4267', 'NAD27: latitude and longitude']];
+  const seen = new Set(); return L.filter(([c]) => !seen.has(c) && seen.add(c));
+}
+/* choosing a coordinate system: the common ones, or a search of every system PROJ knows (11,000+) by name or code */
+function crsPick(title, cur, done) {
+  const row = ([c, n, a]) => `<button type="button" class="crs-row" data-crspick="${esc(c)}" aria-pressed="${c === cur}"><b>${esc(c)}</b><span>${esc(n)}${a ? `<small>${esc(a)}</small>` : ''}</span></button>`;
+  S.crsDone = done;
+  dialog(esc(title), `<label class="crs-q"><span class="sr">Search</span><input id="crs-q" type="search" placeholder="Search by name or EPSG code: Alberta 10-TM, NAD27 zone 12, 3402, WGS 84…" autocomplete="off" ${gisOn() ? '' : 'disabled'}></label>
+    <p class="note" id="crs-st">${gisOn() ? 'Common systems:' : 'Searching every system needs the GIS engines; the common systems are below.'}</p><div class="crs-list" id="crs-res">${crsCommon().map(row).join('')}</div>`, '<button class="btn" data-act="close">Cancel</button>');
+  setTimeout(() => $('#crs-q')?.focus(), 0);
+}
+let crsT;
+document.addEventListener('input', e => {
+  if (e.target.id !== 'crs-q') return; clearTimeout(crsT); const q = e.target.value.trim();
+  crsT = setTimeout(async () => {
+    const res = $('#crs-res'), st = $('#crs-st'); if (!res) return;
+    if (!q) { st.textContent = 'Common systems:'; res.innerHTML = crsCommon().map(([c, n]) => `<button type="button" class="crs-row" data-crspick="${esc(c)}"><b>${esc(c)}</b><span>${esc(n)}</span></button>`).join(''); return; }
+    st.textContent = 'Searching…'; const r = await window.desktop.gis.run({ kind: 'crs', method: 'search', q: q.replace(/[;'"\\]/g, ' ').slice(0, 80) });
+    if ($('#crs-q')?.value.trim() !== q) return;
+    if (!r?.ok) { st.textContent = 'Search failed: ' + (r?.error || ''); return; }
+    crsRemember(r.rows); st.textContent = r.rows.length ? r.rows.length + (r.rows.length === 60 ? '+' : '') + ' found:' : 'Nothing found. Try fewer words, or the EPSG number.';
+    res.innerHTML = r.rows.map(x => `<button type="button" class="crs-row" data-crspick="${esc(x.code)}"><b>${esc(x.code)}</b><span>${esc(x.name)}<small>${esc([x.area, x.type !== 'projected' ? x.type : ''].filter(Boolean).join(' · '))}</small></span></button>`).join('');
+  }, 250);
+});
+document.addEventListener('click', e => { const b = e.target.closest?.('[data-crspick]'); if (!b) return; const c = b.dataset.crspick, n = b.querySelector('span')?.firstChild?.textContent || ''; if (n) { S.crsNames[c] = n; crsRemember([{ code: c, name: n }]); } closeOverlay(); const d = S.crsDone; S.crsDone = null; d?.(c, n); });
+/* a coordinate system field in a tool's form */
+const crsField = (f, label, def, auto) => { const c = S.gp[f] || def; return crow(label, `<span class="crs-f">${c ? `<b>${esc(c)}</b> <span class="note">${esc(crsName(c))}</span>` : `<span class="note">${esc(auto || 'none')}</span>`}<span class="crs-b"><button class="btn" data-act="gp-crs" data-f="${f}" data-t="${esc(label)}">Choose…</button>${auto && S.gp[f] ? `<button class="btn link" data-act="gp-crs-clear" data-f="${f}">${esc(auto)}</button>` : ''}</span></span>`); };
 /* the EPSG code of the project's coordinate system (UTM north), for GeoTIFF and GeoPackage files */
 function projEpsg() {
+  const set = siteOf()?.epsg; if (set && /^EPSG:\d+$/.test(set)) return +set.slice(5);
   const z = crsZone(), c = (projList().find(b => b.crs)?.crs || '').toUpperCase();
   const CSRS = { 7: 3154, 8: 3155, 9: 3156, 10: 3157, 11: 2955, 12: 2956, 13: 2957, 14: 3158, 15: 3159, 16: 3160, 17: 2958, 18: 2959, 19: 2960, 20: 2961, 21: 2962, 22: 3761 };
   if (/WGS/.test(c)) return 32600 + z; if (/NAD83/.test(c) && !/CSRS/.test(c)) return 26900 + z;
@@ -10783,6 +10837,7 @@ function gisPrefsHTML() {
     : st?.broken ? `<p class="note">Installed in ${esc(st.home)}, but they did not start: ${esc(st.broken)} Remove and install again.</p>`
     : st && st.supported === false ? '<p class="note">Not available for this computer.</p>' : '<p class="note">Not installed. The app works fully without them, with its own methods.</p>';
   return `<section class="gis-prefs"><h4>GIS engines</h4><p class="note">Real GIS software, run on this computer as separate programs: GRASS GIS (v.surf.rst, v.surf.idw), GDAL (gdal_grid, gdal_contour, GeoTIFF and GeoPackage), PyKrige and GSTools (kriging in 2D and 3D). Installed for you only, from conda-forge, about 1.6 GB.</p>${have}
+    <label class="check" style="margin:6px 0"><input type="checkbox" data-act="gis-net" ${lsGet('bhlog.projnet') === '1' ? 'checked' : ''}> Let PROJ download datum grids (cdn.proj.org) when a transformation needs one: NAD27 and older NAD83 to NAD83(CSRS), CGVD28 heights. They are kept on this computer.</label>
     <p class="note" id="gis-prog">${gisProgHTML()}</p>
     <div class="actions">${st?.installed ? `<button class="btn" data-act="gis-check" ${ro}>Check</button><button class="btn" data-act="gis-remove" ${ro}>Remove</button>` : `<button class="btn primary" data-act="gis-install" ${ro}>Install GIS engines…</button>`}</div></section>`;
 }
@@ -10824,6 +10879,9 @@ const GP_TOOLS = {
   drill_next: { group: 'Sampling', name: 'Where to drill next', by: 'PyKrige kriging variance', kind: 'drillnext', desc: 'Where the kriged estimate is least certain, and the next places to drill to cut that most: each is picked after the one before is added. Kept inside the outer boreholes.', prm: [['n', 'Locations', 3, 'How many to suggest (1 to 10).']] },
   unit_map: { group: 'Soil', name: 'Soil unit thickness and top', by: 'GRASS GIS v.surf.rst, GDAL gdal_contour', kind: 'unit', desc: 'For one soil unit from the logs: its thickness (isopach), the elevation of its top (structure contours) or the depth to it, between the boreholes.', prm: [['mode', 'Show', 'thickness', '', ['thickness', 'top', 'depth']], ['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, '']] },
   area_over: { group: 'Analysis', name: 'Area over a level', by: 'GDAL Polygonize', kind: 'area', desc: 'The area where the map\'s surface of a result is at or over a level (a guideline or screening level), as polygons with their area. The surface is the one the maps draw for that result.', prm: [['level', 'Level', 'guideline', 'In the result\'s units. Blank: the guideline, or the screening level for headspace vapour.']] },
+  crs_convert: { group: 'Coordinates', name: 'Convert coordinates', by: 'PROJ', kind: 'crs', desc: 'Paste coordinates in one system (GPS latitude and longitude, NAD27 surveys, Alberta 10-TM, another UTM zone, …) and get them in another, with the transformation PROJ used and how accurate it is.', prm: [] },
+  crs_import: { group: 'Coordinates', name: 'Add a GIS layer from a file', by: 'GDAL/OGR, PROJ', kind: 'crs', desc: 'A Shapefile, GeoPackage, KML, GeoJSON, DXF, GPX or CSV in any coordinate system, reprojected onto the map: property lines, pipelines, creeks, buildings, earlier investigations.', prm: [] },
+  crs_boreholes: { group: 'Coordinates', name: 'Check and convert borehole coordinates', by: 'PROJ', kind: 'crs', desc: 'Finds boreholes recorded in a different system from the project (another UTM zone, NAD27, latitude and longitude), shows where they move to, and converts them when you agree.', prm: [] },
   terr_profile: { group: 'Terrain', name: 'Profile along the section line', by: 'GRASS GIS r.profile', kind: 'rast', desc: 'The ground (or any layer) along the section line, as a chart with the boreholes on it, and the line on the map.', prm: [['step', 'Sample every (m)', 'auto', 'Blank: the layer\'s cell size.']] },
   terr_cutfill: { group: 'Terrain', name: 'Cut and fill volume', by: 'GRASS GIS r.mapcalc, r.univar', kind: 'rast', desc: 'How much ground lies above (cut) and below (fill) a level or a second surface, in an area or over the whole layer: for an excavation to a base level, or between ground before and after.', prm: [['level', 'Level (m)', 'mean', 'The base to cut to and fill up to, when not against a second layer.']] },
   terr_drain: { group: 'Terrain', name: 'Surface drainage (where runoff and spills go)', by: 'GRASS GIS r.watershed', kind: 'rast', desc: 'Flow directions and how much ground drains through each place, from an elevation layer; the drainage lines where enough area drains. For where a surface spill or runoff would run.', prm: [['threshold', 'Lines where at least (cells) drain', 'auto', 'Smaller: more, finer drainage lines.']] },
@@ -10875,10 +10933,19 @@ function gpFormHTML(k, T) {
   if (k === 'terr_drain') return `<h4>Input</h4>${crow('Elevation', lsel('gL', L => isGrid(L) && L.terrain))}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">The drainage lines on the map. Run Fix bad spots with Fill false depressions first if the lines break up.</p>`;
   if (k === 'an_diff') return `<h4>Input</h4>${crow('First', lsel('gL', isGrid))}${crow('Minus', lsel('gL2', L => isGrid(L) && L.id !== g.gL))}<h4>Output</h4><p class="note">A layer, red where the first is higher, blue where lower.</p>`;
   if (k === 'smp_dist' || k === 'smp_thiessen') { const n = projList().filter(b => b.easting != null).length; return `<h4>Input</h4>${crow('Boreholes', n + ' located' + (n < 2 ? ' <b>(two or more needed)</b>' : ''))}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">${k === 'smp_dist' ? 'A layer shaded by distance, with contours.' : 'The polygons on the map, each labelled with its borehole and area.'}</p>`; }
-  if (k === 'an_setback') { const fs = featsOf(); if (!['bh', ...GIS.layers.filter(L => isArea(L) || L.kind === 'path').map(L => L.id)].includes(g.sbFrom)) g.sbFrom = 'bh';
-    return `<h4>Input</h4>${crow('Around', `<select data-gpf="sbFrom"><option value="bh">The boreholes</option>${GIS.layers.filter(L => isArea(L) || L.kind === 'path').map(L => `<option value="${L.id}" ${g.sbFrom === L.id ? 'selected' : ''}>${esc(L.name)}</option>`).join('')}</select>`)}${crow('Distances to', fs.length ? fs.length + ' site shape' + (fs.length === 1 ? '' : 's') : '<span class="note">no site shapes yet (Edit map draws them)</span>')}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">The buffer on the map; the distances in the result.</p>`; }
+  if (k === 'an_setback') { const fs = featsOf(); if (!['bh', ...GIS.layers.filter(L => isArea(L) || L.kind === 'path' || L.kind === 'feats').map(L => L.id)].includes(g.sbFrom)) g.sbFrom = 'bh';
+    return `<h4>Input</h4>${crow('Around', `<select data-gpf="sbFrom"><option value="bh">The boreholes</option>${GIS.layers.filter(L => isArea(L) || L.kind === 'path' || L.kind === 'feats').map(L => `<option value="${L.id}" ${g.sbFrom === L.id ? 'selected' : ''}>${esc(L.name)}</option>`).join('')}</select>`)}${(() => { const nf = GIS.layers.filter(L => L.kind === 'feats' && L.id !== g.sbFrom).reduce((a, L) => a + L.features.length, 0); return crow('Distances to', fs.length + nf ? [fs.length ? fs.length + ' site shape' + (fs.length === 1 ? '' : 's') : '', nf ? nf + ' shape' + (nf === 1 ? '' : 's') + ' from added GIS layers' : ''].filter(Boolean).join(' and ') : '<span class="note">no site shapes yet (Edit map draws them, or Add a GIS layer from a file)</span>'); })()}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">The buffer on the map; the distances in the result.</p>`; }
+  if (k === 'crs_convert') return `<h4>Input</h4>${crsField('cFrom', 'From', 'EPSG:4326')}${crsField('cTo', 'To', 'EPSG:' + projEpsg())}
+    ${crow('Points', `<textarea data-gpf="cPts" rows="6" placeholder="One per line: x y, or name x y.\nLatitude and longitude in either order: 53.1931, -110.0997\nE N: 560152.0 5894126.0">${esc(g.cPts || '')}</textarea>`)}
+    <p class="note">Spaces, commas or tabs between the numbers; a height as a third number is converted too. Paste straight from Excel.</p><h4>Output</h4><label class="check"><input type="checkbox" data-gpf="cShow" ${g.cShow !== false ? 'checked' : ''}> Show them on the map (when To is the project system)</label>`;
+  if (k === 'crs_import') return `<h4>Input</h4>${crow('File', `<span class="gp-file">${g.vecName ? `<b>${esc(g.vecName)}</b><br>` : ''}<button class="btn" data-act="gp-pickvec">${g.vecFile ? 'Choose another…' : 'Choose file…'}</button></span>`)}${crsField('iSrc', 'File\'s system', '', 'As the file says')}
+    <p class="note">Most files say their system (a Shapefile's .prj, a GeoPackage, KML always latitude and longitude). Choose one only when it is missing or wrong. CSV: columns named x/y, easting/northing or lon/lat.</p><h4>Output</h4><p class="note">A layer in the project system (EPSG:${projEpsg()}), its names as labels.</p>`;
+  if (k === 'crs_boreholes') { const grp = crsGroups();
+    return `<h4>The boreholes</h4>${grp.map(q => crow(esc(q.label), `<span>${q.list.length} borehole${q.list.length === 1 ? '' : 's'}${q.same ? ' <span class="note">(the project system)</span>' : ' <b>differ from the project</b>'}</span>`)).join('') || '<p class="note">No located boreholes.</p>'}
+      <h4>Convert</h4>${crow('Boreholes', `<select data-gpf="bGrp">${grp.filter(q => !q.same).map(q => `<option value="${esc(q.key)}" ${g.bGrp === q.key ? 'selected' : ''}>${esc(q.label)} (${q.list.length})</option>`).join('') || '<option value="">All match the project</option>'}</select>`)}${crsField('bSrc', 'Recorded in', (grp.find(q => q.key === g.bGrp) || grp.find(q => !q.same))?.code || '', 'As their text says')}
+      <p class="note">Run shows where they would move to; nothing changes until you choose Apply.</p>`; }
   if (k === 'exp_layer') { if (!['bh', ...GIS.layers.map(L => L.id)].includes(g.exL)) g.exL = GIS.layers[0]?.id || 'bh';
-    return `<h4>Input</h4>${crow('Layer', `<select data-gpf="exL"><option value="bh" ${g.exL === 'bh' ? 'selected' : ''}>The boreholes</option>${GIS.layers.map(L => `<option value="${L.id}" ${g.exL === L.id ? 'selected' : ''}>${esc(L.name)}</option>`).join('')}</select>`)}${crow('Coordinates', 'EPSG:' + projEpsg())}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">Saved where you choose. A grid layer also gives a GeoTIFF; KML is written in latitude and longitude, as Google Earth needs.</p>`; }
+    return `<h4>Input</h4>${crow('Layer', `<select data-gpf="exL"><option value="bh" ${g.exL === 'bh' ? 'selected' : ''}>The boreholes</option>${GIS.layers.map(L => `<option value="${L.id}" ${g.exL === L.id ? 'selected' : ''}>${esc(L.name)}</option>`).join('')}</select>`)}${crsField('eOut', 'Coordinates', 'EPSG:' + projEpsg())}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">Saved where you choose, reprojected to the system above. A grid layer also gives a GeoTIFF; KML is written in latitude and longitude, as Google Earth needs.</p>`; }
   if (T.kind === 'demfix') {
     const ts = GIS.layers.filter(L => L.terrain); if (!ts.some(L => L.id === g.fixL)) g.fixL = ts[0]?.id || '';
     const L = ts.find(x => x.id === g.fixL), sp = S.gp.spots || [];
@@ -10889,7 +10956,7 @@ function gpFormHTML(k, T) {
   }
   if (T.kind === 'terrain') {
     const nb = projList().filter(b => b.easting != null && b.elevation != null).length;
-    const inp = k === 'elev_dem' ? crow('File', `<span class="gp-file">${g.demName ? `<b>${esc(g.demName)}</b>${g.demSize ? ' <span class="note">' + (g.demSize / 1048576).toFixed(1) + ' MB</span>' : ''}<br>` : ''}<button class="btn" data-act="gp-pick">${g.demFile ? 'Choose another…' : 'Choose file…'}</button></span>`) + crow('Area', 'the boreholes and the margin below') + crow('Coordinates', 'to EPSG:' + projEpsg())
+    const inp = k === 'elev_dem' ? crow('File', `<span class="gp-file">${g.demName ? `<b>${esc(g.demName)}</b>${g.demSize ? ' <span class="note">' + (g.demSize / 1048576).toFixed(1) + ' MB</span>' : ''}<br>` : ''}<button class="btn" data-act="gp-pick">${g.demFile ? 'Choose another…' : 'Choose file…'}</button></span>`) + crsField('dSrc', 'File\'s system', '', 'As the file says') + crow('Area', 'the boreholes and the margin below') + crow('Coordinates', 'to EPSG:' + projEpsg())
       : crow('Boreholes', nb + ' with a ground elevation' + (nb < 3 ? ' <b>(three or more needed)</b>' : ''));
     return `<h4>Input</h4>${inp}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">Added to the map: elevation colours with hillshade, and contours.${k === 'elev_dem' ? ' Kept for Depth to groundwater (Ground from: model).' : ''}</p>`;
   }
@@ -10947,6 +11014,7 @@ async function gpRun() {
   if (['hydro', 'area', 'prob', 'drillnext', 'volume', 'unit', 'terrain'].includes(T.kind)) { await gpHydro(k, T); return; }
   if (T.kind === 'demfix') { await gpFix(gpParams(k)); return; }
   if (['rast', 'thiessen', 'setback', 'export2'].includes(T.kind)) { await gpMore(k, T, gpParams(k)); return; }
+  if (T.kind === 'crs') { await gpCrs(k, T); return; }
   if (T.kind === 'points3d') {
     const prm = gpParams(k), kk = prm.k === 'auto' ? (XS_ANISO_PICK || 10) : +prm.k;
     S.xs = { ...S.xs, interp: 'gis_' + k, aniso: kk }; lsSet('bhlog.xs', JSON.stringify(S.xs)); gisMethods();
@@ -11106,7 +11174,8 @@ async function gpTerrain(k, prm, go, done) {
   if (k === 'elev_dem') {
     if (!S.gp.demFile) { toast('Choose the elevation model file first.'); return; }
     const A = terrainBox(prm); if (!A) { toast('The boreholes need coordinates to place the area.'); return; }
-    const params = { ...tp, ...(prm.cellsize > 0 ? { cellsize: prm.cellsize } : { cells: prm.res === 'source' ? 'source' : +(prm.res || 400) }) };
+    const params = { ...tp, ...(S.gp.dSrc ? { srcepsg: S.gp.dSrc } : {}), ...(prm.cellsize > 0 ? { cellsize: prm.cellsize } : { cells: prm.res === 'source' ? 'source' : +(prm.res || 400) }) };
+    if (S.gp.dSrc) tp.srcepsg = S.gp.dSrc;
     const job = p2 => ({ kind: 'dem', file: S.gp.demFile, box: A.box.map(v => +v.toFixed(2)), epsg: projEpsg(), params: p2 });
     let shift = 0;
     if (prm.datum === 'match') {   // a quick coarse pass to measure the offset at the boreholes, then the model shifted onto them
@@ -11156,6 +11225,7 @@ async function gpFix(prm) {
 const gridOf = L => ({ b64: f32b64(L.values), nx: L.nx, ny: L.ny, box: L.box.map(v => +v) });
 /* a Toolbox layer's shapes as features (lines, areas, points) for export or buffers */
 function layerFeatures(L) {
+  if (L.kind === 'feats') return L.features.map(f => ({ type: f.type, name: f.name || '', pts: f.pts }));
   if (L.kind === 'path') return [{ type: 'line', name: L.lab?.text ?? L.note ?? L.name, pts: L.path }];
   if (L.kind === 'polys') return L.polys.map((rings, i) => ({ type: 'polygon', name: L.plabels?.[i]?.[2] ?? L.lab?.text ?? L.name, pts: rings }));
   if (L.kind === 'arrows') { const l = L.len || 5; return L.arrows.map(([x, y, az]) => { const a = az * Math.PI / 180; return { type: 'line', name: Math.round(az) + '°', pts: [[x - Math.sin(a) * l / 2, y - Math.cos(a) * l / 2], [x + Math.sin(a) * l / 2, y + Math.cos(a) * l / 2]] }; }); }
@@ -11240,7 +11310,8 @@ async function gpMore(k, T, prm) {
   if (k === 'an_setback') {
     const src = g.sbFrom && g.sbFrom !== 'bh' ? GIS.layers.find(L => L.id === g.sbFrom) : null, from = src ? layerFeatures(src) : B.map(b => ({ type: 'point', name: gwName(b) || b.name, pts: [[b.easting, b.northing]] }));
     if (!from.length) { toast('Nothing to buffer.'); return; }
-    const to = featsOf().filter(f => f.pts?.length).map(f => ({ type: f.type === 'polygon' ? 'polygon' : f.type === 'point' ? 'point' : 'line', name: f.name || (FEAT_KINDS[f.kind]?.[0] || f.kind || 'shape'), kind: f.kind || '', pts: f.pts }));
+    const to = [...featsOf().filter(f => f.pts?.length).map(f => ({ type: f.type === 'polygon' ? 'polygon' : f.type === 'point' ? 'point' : 'line', name: f.name || (FEAT_KINDS[f.kind]?.[0] || f.kind || 'shape'), kind: f.kind || '', pts: f.pts })),
+      ...GIS.layers.filter(L => L.kind === 'feats' && L.id !== g.sbFrom).flatMap(L => L.features.slice(0, 2000).map(f => ({ type: f.type, name: f.name || L.name, kind: L.name, pts: f.pts })))];
     const dist = prm.distance > 0 ? +prm.distance : 30;
     const { r, j } = await go({ kind: 'setback', from: from.map(f => ({ ...f, pts: f.pts })), to, distance: dist }, (src ? src.name : 'the boreholes') + ', ' + dist + ' m');
     if (!r?.ok) return;
@@ -11252,12 +11323,67 @@ async function gpMore(k, T, prm) {
     const L = g.exL === 'bh' ? null : GIS.layers.find(x => x.id === g.exL), fmt = prm.format || 'GPKG';
     const feats = L ? layerFeatures(L) : B.map(b => ({ type: 'point', name: gwName(b) || b.name, value: b.elevation ?? undefined, pts: [[b.easting, b.northing]] })).map(f => (f.value == null ? (delete f.value, f) : f));
     const name = (L ? L.name : 'boreholes').replace(/[^\w .-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) || 'layer';
-    const { r, j } = await go({ kind: 'exportlayer', epsg: projEpsg(), format: fmt, name, ...(L && L.kind === 'raster' && L.values ? { raster: gridOf(L) } : {}), features: feats }, (L ? L.name : 'the boreholes') + ' as ' + fmt);
+    const { r, j } = await go({ kind: 'exportlayer', epsg: projEpsg(), ...(g.eOut && g.eOut !== 'EPSG:' + projEpsg() ? { out: g.eOut } : {}), format: fmt, name, ...(L && L.kind === 'raster' && L.values ? { raster: gridOf(L) } : {}), features: feats }, (L ? L.name : 'the boreholes') + ' as ' + fmt);
     if (!r?.ok) return;
     for (const [fn, b] of Object.entries(r.files)) await saveBytes(fn, b64bytes(b), 'application/octet-stream');
-    fin(j, 'Saved ' + Object.keys(r.files).join(', ') + ' (EPSG:' + projEpsg() + (fmt === 'KML' ? ', written in latitude and longitude' : '') + ').');
+    fin(j, 'Saved ' + Object.keys(r.files).join(', ') + ' (' + (fmt === 'KML' ? 'latitude and longitude, as KML needs' : [(g.eOut || 'EPSG:' + projEpsg()), crsName(g.eOut || 'EPSG:' + projEpsg())].filter(Boolean).join(' ')) + ').');
     return;
   }
+}
+/* boreholes grouped by the system their text records */
+function crsGroups() {
+  const P = 'EPSG:' + projEpsg(), m = new Map();
+  for (const b of projList().filter(x => x.easting != null && x.northing != null)) { const c = crsFromText(b.crs), code = c ? 'EPSG:' + c : '', key = code || 'unknown:' + (b.crs || ''), q = m.get(key) || { key, code, label: b.crs || 'not stated', list: [], same: !code || code === P }; q.list.push(b); m.set(key, q); }
+  return [...m.values()].sort((a, b) => (a.same ? 1 : 0) - (b.same ? 1 : 0));
+}
+/* parse pasted points: [name, a, b, z] per line */
+function parsePts(t) { return String(t || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => { const p = l.split(/[\s,;\t]+/).filter(Boolean), nm = isNaN(+p[0]) ? p.shift() : ''; const v = p.map(Number).filter(x => isFinite(x)); return v.length >= 2 ? [nm, v[0], v[1], v.length > 2 ? v[2] : null] : null; }).filter(Boolean); }
+const accTxt = o => !o ? '' : o.accuracy === 'unknown accuracy' || /ballpark/i.test(o.name) ? 'accuracy unknown (a ballpark shift: treat as metres off)' : 'accurate to about ' + o.accuracy;
+async function gpCrs(k, T) {
+  const g = S.gp, lab = T.name + ' (' + T.by + ')', P = 'EPSG:' + projEpsg();
+  const go = async (job, input) => { const key = k + '|' + Date.now(), pr = gisStart(key, { ...job, nocache: true }, lab, input), j = [...GIS.jobs.values()].find(x => x.key === key); if (j) { j.tool = k; j.kind = 'hydro'; } renderView(true); return { r: await pr, j }; };
+  const fin = (j, sum, L, chart) => { if (j) { j.sum = sum; if (chart) j.chart = chart; } if (L) { L.tool = k; gisAddLayer(L); } renderView(true); };
+  if (k === 'crs_convert') {
+    const from = g.cFrom || 'EPSG:4326', to = g.cTo || P, rows = parsePts(g.cPts); if (!rows.length) { toast('Paste some coordinates first.'); return; }
+    const info = await window.desktop.gis.run({ kind: 'crs', method: 'info', code: from }), geo = info?.ok && info.geographic;
+    // latitude and longitude come in either order: a value over 90 can only be a longitude
+    const pts = rows.map(([, a, b, z]) => geo ? (Math.abs(a) <= 90 && Math.abs(b) > 90 ? [b, a, z] : [a, b, z]) : [a, b, z]);
+    const { r, j } = await go({ kind: 'crs', method: 'transform', from, to, points: pts.map(p => p[2] == null ? p.slice(0, 2) : p) }, rows.length + ' point' + (rows.length === 1 ? '' : 's') + ', ' + from + ' to ' + to);
+    if (!r?.ok) return; crsRemember([{ code: from, name: r.from.name }, { code: to, name: r.to.name }]);
+    const dec = r.to.geographic ? 7 : 3, tbl = rows.map((q, i) => { const o = r.points[i]; return [q[0] || String(i + 1), o ? o[0].toFixed(dec) : '—', o ? o[1].toFixed(dec) : '—', o && o[2] != null ? o[2].toFixed(3) : '']; });
+    GIS.copy = [['Point', r.to.geographic ? 'Longitude' : 'Easting', r.to.geographic ? 'Latitude' : 'Northing', 'Height'].join('\t'), ...tbl.map(t => t.join('\t'))].join('\n');
+    const u = r.ops.used, b = r.ops.best, better = b && u && b.name !== u.name;
+    fin(j, `${rows.length} point${rows.length === 1 ? '' : 's'} from ${r.from.name} to ${r.to.name}${geo ? ' (latitude and longitude taken in whichever order they were given)' : ''}. PROJ used ${u ? u.name + ', ' + accTxt(u) : 'its default'}.${better ? ' A more accurate transformation exists (' + b.name + ', ' + accTxt(b) + ') but needs a datum grid: allow downloads under Settings › GIS engines.' : ''}`,
+      to === P && g.cShow !== false ? { name: 'Converted points', kind: 'feats', features: tbl.map((t, i) => r.points[i] ? { type: 'point', name: t[0], pts: [[r.points[i][0], r.points[i][1]]] } : null).filter(Boolean), color: '#b45309', note: rows.length + ' from ' + from } : null,
+      `<table class="sum gp-cmp crs-tbl"><thead><tr><th>Point</th><th class="r">${r.to.geographic ? 'Longitude' : 'Easting'}</th><th class="r">${r.to.geographic ? 'Latitude' : 'Northing'}</th>${tbl.some(t => t[3]) ? '<th class="r">Height</th>' : ''}</tr></thead><tbody>${tbl.slice(0, 200).map(t => `<tr><td>${esc(t[0])}</td><td class="r">${t[1]}</td><td class="r">${t[2]}</td>${tbl.some(q => q[3]) ? `<td class="r">${t[3]}</td>` : ''}</tr>`).join('')}</tbody></table><button class="btn" data-act="gp-copy">Copy as a table</button>`);
+    return;
+  }
+  if (k === 'crs_import') {
+    if (!g.vecFile) { toast('Choose a file first.'); return; }
+    const { r, j } = await go({ kind: 'importvec', file: g.vecFile, epsg: P, ...(g.iSrc ? { src: g.iSrc } : {}) }, g.vecName + (g.iSrc ? ' as ' + g.iSrc : ''));
+    if (!r?.ok) { if (r?.error && /again/.test(r.error)) { g.vecFile = null; gpSave(); } return; }
+    const B = projList().filter(b => b.easting != null), cx = B.length ? B.reduce((a, b) => a + b.easting, 0) / B.length : null, cy = B.length ? B.reduce((a, b) => a + b.northing, 0) / B.length : null;
+    const far = cx != null ? Math.hypot((r.bounds[0] + r.bounds[2]) / 2 - cx, (r.bounds[1] + r.bounds[3]) / 2 - cy) : 0, n = r.features.length;
+    fin(j, `${n} shape${n === 1 ? '' : 's'} from ${g.vecName} (${r.driver}: ${r.layers.map(l => l.name + ' ' + l.n).join(', ')}), from ${r.srcs.join(', ')} to EPSG:${projEpsg()}.${r.skipped ? ' ' + r.skipped + ' without coordinates were left out.' : ''}${r.truncated ? ' Only the first 20,000 were read.' : ''}${far > 50000 ? ` They lie about ${Math.round(far / 1000)} km from the boreholes: the file's coordinate system is probably wrong or missing; choose it under File's system and run again.` : ''}`,
+      { name: g.vecName.replace(/\.[^.]+$/, ''), kind: 'feats', features: r.features, color: '#5b2c83', note: n + ' shapes, from ' + r.srcs[0] });
+    return;
+  }
+  if (k === 'crs_boreholes') {
+    const grp = crsGroups(), q = grp.find(x => x.key === g.bGrp) || grp.find(x => !x.same); if (!q) { toast('Every borehole is in the project system.'); return; }
+    const src = g.bSrc || q.code; if (!src) { toast('Choose the system they were recorded in.'); return; }
+    const { r, j } = await go({ kind: 'crs', method: 'transform', from: src, to: P, points: q.list.map(b => [b.easting, b.northing]) }, q.list.length + ' boreholes, ' + src + ' to ' + P);
+    if (!r?.ok) return;
+    S.crsPending = { ids: q.list.map(b => b.id), pts: r.points, src, label: r.to.name };
+    const tbl = q.list.map((b, i) => { const o = r.points[i]; return [gwName(b) || b.name, b.easting.toFixed(2) + ', ' + b.northing.toFixed(2), o ? o[0].toFixed(2) + ', ' + o[1].toFixed(2) : '—', o ? Math.hypot(o[0] - b.easting, o[1] - b.northing) : 0]; });
+    fin(j, `${q.list.length} borehole${q.list.length === 1 ? '' : 's'} recorded in ${r.from.name}, in the project's ${r.to.name}: they move ${Math.round(Math.min(...tbl.map(t => t[3]))).toLocaleString('en-CA')} to ${Math.round(Math.max(...tbl.map(t => t[3]))).toLocaleString('en-CA')} m (PROJ: ${r.ops.used ? r.ops.used.name + ', ' + accTxt(r.ops.used) : 'default'}). Nothing has changed yet.`, null,
+      `<table class="sum gp-cmp crs-tbl"><thead><tr><th>Borehole</th><th>Now</th><th>Converted</th><th class="r">Moves</th></tr></thead><tbody>${tbl.map(t => `<tr><td>${esc(t[0])}</td><td>${t[1]}</td><td>${t[2]}</td><td class="r">${t[3] < 1000 ? t[3].toFixed(1) + ' m' : (t[3] / 1000).toFixed(2) + ' km'}</td></tr>`).join('')}</tbody></table><button class="btn primary" data-act="crs-apply" ${S.readOnly ? 'disabled' : ''}>Apply to ${q.list.length} borehole${q.list.length === 1 ? '' : 's'}</button>`);
+  }
+}
+function crsApply() {
+  const p = S.crsPending; if (!p || S.readOnly) return;
+  if (!confirm(`Move ${p.ids.length} borehole${p.ids.length === 1 ? '' : 's'} to the converted coordinates in ${p.label}? Undo puts them back.`)) return;
+  let n = 0; p.ids.forEach((id, i) => { const b = S.bh.get(id), o = p.pts[i]; if (!b || !o || !editable(b)) return; b.easting = +o[0].toFixed(3); b.northing = +o[1].toFixed(3); b.crs = 'EPSG:' + projEpsg() + ' ' + (crsName('EPSG:' + projEpsg()) || p.label); logChange(b, 'Location'); store.save(b); n++; });
+  S.crsPending = null; toast(n + ' borehole' + (n === 1 ? '' : 's') + ' converted to the project system.'); renderList(sortedList()); renderView(true);
 }
 /* the soil results by sample: [E, N, depth, log10 value] (a zero is the bottom of the range; a non-detect half its limit) */
 function samplePts(p, d0, d1) {
@@ -11387,6 +11513,14 @@ function gisLayersSVG(X, Y) {
       for (let i = 6; i < q.length - 1; i += 10) { const a = q[i], b = q[i + 1], ax = X(a[0]), ay = Y(a[1]), d = Math.hypot(X(b[0]) - ax, Y(b[1]) - ay) || 1, ux = (X(b[0]) - ax) / d, uy = (Y(b[1]) - ay) / d; o.push(`<path d="M${(ax - ux * 7 - uy * 4).toFixed(1)} ${(ay - uy * 7 + ux * 4).toFixed(1)}L${ax.toFixed(1)} ${ay.toFixed(1)}L${(ax - ux * 7 + uy * 4).toFixed(1)} ${(ay - uy * 7 - ux * 4).toFixed(1)}" fill="none" stroke="${col}" stroke-width="2"/>`); }
       o.push(`<circle cx="${X(q[0][0]).toFixed(1)}" cy="${Y(q[0][1]).toFixed(1)}" r="5" fill="${col}" stroke="#fff" stroke-width="1.5"/>`);
       if (lb.show) o.push(gisLabText(X(e[0]) + 6, Y(e[1]) - 6, lb.text ?? L.note ?? '', lb.size, lb.color || '#0b3d91'));
+    } else if (L.kind === 'feats') {
+      const col = lb.color || L.color || '#5b2c83', lab2 = [];
+      for (const f of L.features) {
+        if (f.type === 'point') { const x = X(f.pts[0][0]), y = Y(f.pts[0][1]); o.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${col}" stroke="#fff" stroke-width="1.5"/>`); if (f.name) lab2.push([x + 6, y + 4, f.name, 'start']); }
+        else if (f.type === 'line') { o.push(`<path d="M${P(f.pts)}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round"/>`); if (f.name && f.pts.length > 1) { const m = f.pts[Math.floor(f.pts.length / 2)]; lab2.push([X(m[0]), Y(m[1]) - 5, f.name, 'middle']); } }
+        else { o.push(`<path d="${f.pts.map(r => 'M' + P(r) + 'Z').join('')}" fill="${col}" fill-opacity=".12" fill-rule="evenodd" stroke="${col}" stroke-width="1.4"/>`); if (f.name) { const c = ringCentre(f.pts[0]); lab2.push([X(c[0]), Y(c[1]), f.name, 'middle']); } }
+      }
+      if (lb.show && lab2.length <= 400) for (const [x, y, t, a] of lab2) o.push(gisLabText(x, y, t, lb.size, col, `text-anchor="${a}"`));
     } else if (L.kind === 'polys') {
       const ps = L.style === 'cells' ? ['rgba(90,110,140,.06)', '#4a5a78', '1.3', ''] : L.style === 'buffer' ? ['rgba(255,170,0,.12)', '#c77700', '1.6', '5 3'] : ['rgba(196,36,42,.16)', '#c4242a', '1.6', '6 3'];
       for (const rings of L.polys) o.push(`<path d="${rings.map(r => 'M' + P(r) + 'Z').join('')}" fill="${ps[0]}" fill-rule="evenodd" stroke="${ps[1]}" stroke-width="${ps[2]}" ${ps[3] ? `stroke-dasharray="${ps[3]}"` : ''}/>`);
@@ -11407,11 +11541,12 @@ function gisLabelsHTML(L) {
   if (L.kind === 'raster' && L.marks?.length) body += show + L.marks.map((q, i) => f('m' + i, 'Place ' + (i + 1), `<input data-gisl="${id}.mark.${i}" value="${v(lb.marks?.[i] ?? String(i + 1))}">`)).join('') + size;
   if (L.kind === 'path') body += show + f('text', 'Text', `<input data-gisl="${id}.text" value="${v(lb.text ?? L.note)}">`) + size + col(L.color === '#c2410c' ? '#9a3412' : '#0b3d91');
   if (L.kind === 'polys') body += show + f('text', 'Text', `<input data-gisl="${id}.text" value="${v(lb.text ?? L.note)}">`) + size + col('#8e1b20');
+  if (L.kind === 'feats') body += show + size + col(L.color || '#5b2c83');
   if (L.kind === 'arrows') body += f('text', 'Label', `<input data-gisl="${id}.text" value="${v(lb.text)}" placeholder="none, e.g. Groundwater flow">`) + size;
   return `<details class="gis-lbl" ${S.gisLblOpen === id ? 'open' : ''} data-gislbl="${id}"><summary>Labels</summary><div class="gis-lbl-b">${body}<button class="btn link" data-gisldef="${id}">Back to the tool's labels</button></div></details>`;
 }
 function gisLayersHTML() {
-  return '<ul class="lyr-list">' + GIS.layers.map(L => `<li class="gis-li"><label class="lyr" title="${esc(L.name)}"><input type="checkbox" data-gislay="${L.id}" ${L.on ? 'checked' : ''}><svg class="sw" viewBox="0 0 16 16" aria-hidden="true">${{ raster: '<rect x="2" y="3" width="12" height="10" fill="#9ecae1" stroke="#08519c"/>', arrows: '<path d="M3 13L13 3M8 3h5v5" fill="none" stroke="#1565c0" stroke-width="1.6"/>', path: '<path d="M2 13C6 12 8 6 14 3" fill="none" stroke="#0b62c4" stroke-width="2" stroke-dasharray="4 2"/>', polys: '<path d="M3 4h9l2 8H5z" fill="rgba(196,36,42,.2)" stroke="#c4242a"/>' }[L.kind] || ''}</svg><span>${esc(L.name)}<small class="note" style="display:block;margin:0">${esc(L.note || '')}</small>${L.kind === 'raster' && L.show !== 'fix' ? `<i class="gis-ramp" style="background:${gisRampCSS(L.terrain && L.show === 'slope' ? 'slope' : L.terrain && L.show === 'hill' ? 'grey' : L.ramp)}"></i>` : ''}${L.show === 'fix' ? '<span class="gis-fixkey"><i style="background:#dc2828"></i>spike<i style="background:#1e5adc"></i>pit<i style="background:#eba000"></i>hole<i style="background:#009696"></i>hollow<i style="background:#8c3caa"></i>marked</span>' : ''}</span><button class="tb" data-gisdel="${L.id}" title="Remove this layer" aria-label="Remove ${esc(L.name)}">✕</button></label>${L.terrain ? `<span class="gis-disp"><select data-gisshow="${L.id}" aria-label="Show"><option value="elev" ${L.show === 'elev' ? 'selected' : ''}>Elevation</option><option value="slope" ${L.show === 'slope' ? 'selected' : ''}>Slope</option>${L.hill ? `<option value="hill" ${L.show === 'hill' ? 'selected' : ''}>Hillshade only</option>` : ''}${L.fixcode ? `<option value="fix" ${L.show === 'fix' ? 'selected' : ''}>What was fixed</option>` : ''}</select>${L.show === 'elev' ? `<select data-gisramp="${L.id}" aria-label="Colours">${['terrain', 'spectral', 'viridis', 'grey'].map(r => `<option value="${r}" ${L.ramp === r ? 'selected' : ''}>${{ terrain: 'Terrain', spectral: 'Spectral', viridis: 'Viridis', grey: 'Grey' }[r]}</option>`).join('')}</select>` : ''}</span>` : ''}${gisLabelsHTML(L)}</li>`).join('') + '<\/ul><p class="note">Made with the Toolbox; drawn inside the outer wells. They are kept until the app is closed.</p>';
+  return '<ul class="lyr-list">' + GIS.layers.map(L => `<li class="gis-li"><label class="lyr" title="${esc(L.name)}"><input type="checkbox" data-gislay="${L.id}" ${L.on ? 'checked' : ''}><svg class="sw" viewBox="0 0 16 16" aria-hidden="true">${{ raster: '<rect x="2" y="3" width="12" height="10" fill="#9ecae1" stroke="#08519c"/>', arrows: '<path d="M3 13L13 3M8 3h5v5" fill="none" stroke="#1565c0" stroke-width="1.6"/>', path: '<path d="M2 13C6 12 8 6 14 3" fill="none" stroke="#0b62c4" stroke-width="2" stroke-dasharray="4 2"/>', polys: '<path d="M3 4h9l2 8H5z" fill="rgba(196,36,42,.2)" stroke="#c4242a"/>', feats: '<path d="M2 12l5-6 4 4 5-7" fill="none" stroke="#5b2c83" stroke-width="1.6"/><circle cx="12" cy="13" r="2" fill="#5b2c83"/>' }[L.kind] || ''}</svg><span>${esc(L.name)}<small class="note" style="display:block;margin:0">${esc(L.note || '')}</small>${L.kind === 'raster' && L.show !== 'fix' ? `<i class="gis-ramp" style="background:${gisRampCSS(L.terrain && L.show === 'slope' ? 'slope' : L.terrain && L.show === 'hill' ? 'grey' : L.ramp)}"></i>` : ''}${L.show === 'fix' ? '<span class="gis-fixkey"><i style="background:#dc2828"></i>spike<i style="background:#1e5adc"></i>pit<i style="background:#eba000"></i>hole<i style="background:#009696"></i>hollow<i style="background:#8c3caa"></i>marked</span>' : ''}</span><button class="tb" data-gisdel="${L.id}" title="Remove this layer" aria-label="Remove ${esc(L.name)}">✕</button></label>${L.terrain ? `<span class="gis-disp"><select data-gisshow="${L.id}" aria-label="Show"><option value="elev" ${L.show === 'elev' ? 'selected' : ''}>Elevation</option><option value="slope" ${L.show === 'slope' ? 'selected' : ''}>Slope</option>${L.hill ? `<option value="hill" ${L.show === 'hill' ? 'selected' : ''}>Hillshade only</option>` : ''}${L.fixcode ? `<option value="fix" ${L.show === 'fix' ? 'selected' : ''}>What was fixed</option>` : ''}</select>${L.show === 'elev' ? `<select data-gisramp="${L.id}" aria-label="Colours">${['terrain', 'spectral', 'viridis', 'grey'].map(r => `<option value="${r}" ${L.ramp === r ? 'selected' : ''}>${{ terrain: 'Terrain', spectral: 'Spectral', viridis: 'Viridis', grey: 'Grey' }[r]}</option>`).join('')}</select>` : ''}</span>` : ''}${gisLabelsHTML(L)}</li>`).join('') + '<\/ul><p class="note">Made with the Toolbox; drawn inside the outer wells. They are kept until the app is closed.</p>';
 }
 function gpUse(j) {
   if (!j) return;
@@ -13944,6 +14079,14 @@ document.addEventListener('click', e => {
     case 'gis-remove': if (confirm('Remove the GIS engines (about 1.6 GB)? Maps set to a GIS method go back to the built-in ones until they are installed again.')) window.desktop.gis.remove().then(r => { GIS.st = { installed: false }; GIS.cache.clear(); const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); toast(r.ok ? 'The GIS engines were removed.' : r.error); }); break;
     case 'gis-export': gisExport(t.dataset.p || 'cvc'); break;
     case 'gp-run': gpRun(); break;
+    case 'crs-project': crsPick('Project coordinate system', 'EPSG:' + projEpsg(), c => { if (!/^EPSG:\d+$/.test(c)) { toast('The project system must be an EPSG code.'); return; } setSite({ ...(siteOf() || {}), epsg: c }); toast('The project now uses ' + c + ' ' + crsName(c) + '. Boreholes keep their coordinates; convert any recorded in another system with Toolbox › Coordinates.'); renderView(true); }); break;
+    case 'crs-project-auto': { const st = { ...(siteOf() || {}) }; delete st.epsg; setSite(st); renderView(true); break; }
+    case 'gp-crs': { const f = t.dataset.f; crsPick(t.dataset.t || 'Coordinate system', S.gp[f], c => { S.gp[f] = c; gpSave(); renderView(true); }); break; }
+    case 'gp-crs-clear': S.gp[t.dataset.f] = ''; gpSave(); renderView(true); break;
+    case 'gp-pickvec': window.desktop?.gis?.pick?.('vector').then(f => { if (!f) return; S.gp.vecFile = f.token; S.gp.vecName = f.name; gpSave(); renderView(true); }); break;
+    case 'gp-copy': navigator.clipboard?.writeText(GIS.copy || '').then(() => toast('Copied: paste into Excel or a text file.'), () => toast('Could not copy.')); break;
+    case 'crs-apply': crsApply(); break;
+    case 'gis-net': lsSet('bhlog.projnet', lsGet('bhlog.projnet') === '1' ? '0' : '1'); { const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); } break;
     case 'gp-spot': S.gpSpot = !S.gpSpot; if (S.gpSpot && S.tab !== 'site') goTab('site'); else renderView(true); if (S.gpSpot) toast('Click each bad spot on the map. Click Done marking when finished.'); break;
     case 'gp-spot-clear': S.gp.spots = []; gpSave(); renderView(true); break;
     case 'gp-pick': window.desktop?.gis?.pick?.().then(f => { if (!f) return; S.gp.demFile = f.token; S.gp.demName = f.name; S.gp.demSize = f.size; gpSave(); renderView(true); }); break;

@@ -106,6 +106,7 @@ export async function gisRemove({ userData }) {
 }
 
 // a job from the window: one known kind and method, numbers only, sizes held to what a site needs
+const CRS_CODE = /^(EPSG|ESRI|IGNF|OGC|CRS):\w{1,12}$|^\d{4,6}$/;
 const isNum = v => typeof v === 'number' && Number.isFinite(v), nums = (a, k) => Array.isArray(a) && a.every(p => Array.isArray(p) && p.length === k && p.every(isNum));
 export function checkJob(job) {
   if (!job || typeof job !== 'object') return 'No job.';
@@ -129,6 +130,15 @@ export function checkJob(job) {
     if (method === 'gw_drain' && !nums([job.start], 2)) return 'A start point [x, y] is needed.';
     if (method === 'gw_depth' && (!nums(job.ground, 3) || job.ground.length < 3 || job.ground.length > 5000)) return 'Ground elevations must be 3 to 5000 [x, y, z].';
     if (method === 'gw_change' && (!nums(job.pts2, 3) || job.pts2.length < 3 || job.pts2.length > 5000)) return 'The later round needs 3 to 5000 [x, y, head].';
+  } else if (kind === 'crs') {
+    if (!['search', 'info', 'transform', 'ops'].includes(method)) return 'Unknown method.';
+    if (method === 'search' && !(typeof job.q === 'string' && job.q.length >= 1 && job.q.length <= 80 && !/[;'"\\]/.test(job.q))) return 'Search for a name or code.';
+    if (method === 'info' && !CRS_CODE.test(String(job.code))) return 'A coordinate-system code is needed.';
+    if ((method === 'transform' || method === 'ops') && !(CRS_CODE.test(String(job.from)) && CRS_CODE.test(String(job.to)))) return 'Two coordinate-system codes are needed.';
+    if (method === 'transform' && !(Array.isArray(job.points) && job.points.length >= 1 && job.points.length <= 20000 && job.points.every(p => Array.isArray(p) && p.length >= 2 && p.length <= 3 && p.every(v => v === null || isNum(v))))) return 'Points [x, y] or [x, y, z] are needed.';
+  } else if (kind === 'importvec') {
+    if (!/^f[0-9a-f]{20}$/.test(String(job.file))) return 'Choose a file.';
+    if (!CRS_CODE.test(String(job.epsg)) || (job.src != null && !CRS_CODE.test(String(job.src)))) return 'Coordinate systems are needed.';
   } else if (kind === 'dem') {
     if (!/^f[0-9a-f]{20}$/.test(String(job.file))) return 'Choose an elevation model file.';
     if (!nums([job.box], 4) || !(Number.isInteger(job.epsg) && job.epsg > 1000 && job.epsg < 100000) || !(job.box[2] > job.box[0] && job.box[3] > job.box[1] && job.box[2] - job.box[0] < 50000 && job.box[3] - job.box[1] < 50000)) return 'Area outside the limits.';
@@ -175,7 +185,9 @@ export function checkJob(job) {
     if (kind === 'export' && !(Number.isInteger(job.epsg) && job.epsg > 1000 && job.epsg < 100000)) return 'No coordinate system.';
     if (kind === 'export' && job.name && !/^[\w .-]{1,60}$/.test(job.name)) return 'A plain file name is needed.';
   } else return 'Unknown job.';
-  if (job.params && (typeof job.params !== 'object' || Object.values(job.params).some(v => !isNum(v) && !/^[a-z]{1,20}$/.test(String(v))))) return 'Options must be numbers or plain words.';
+  if (job.params && (typeof job.params !== 'object' || Object.values(job.params).some(v => !isNum(v) && !/^[a-z]{1,20}$/.test(String(v)) && !CRS_CODE.test(String(v))))) return 'Options must be numbers, plain words or coordinate-system codes.';
+  if (job.network != null && typeof job.network !== 'boolean') return 'Bad option.';
+  if (job.out != null && !CRS_CODE.test(String(job.out))) return 'A coordinate-system code such as EPSG:2956 is needed.';
   return '';
 }
 
@@ -186,7 +198,7 @@ const picked = new Map();
 export function gisRegisterFile(path, name, size) { const token = 'f' + createHash('sha256').update(path + Date.now() + Math.random()).digest('hex').slice(0, 20); picked.set(token, path); return { token, name, size }; }
 export async function gisRun({ userData, root, job, timeoutMs = 600000, onProgress }) {
   const bad = checkJob(job); if (bad) return { ok: false, error: bad };
-  if (job.kind === 'dem') { const p = picked.get(job.file); if (!p || !existsSync(p)) return { ok: false, error: 'Choose the elevation model file again.' }; job = { ...job, path: p }; }
+  if (job.kind === 'dem' || job.kind === 'importvec') { const p = picked.get(job.file); if (!p || !existsSync(p)) return { ok: false, error: 'Choose the file again.' }; job = { ...job, path: p }; }
   const id = job.id;
   const home = gisHome(userData), py = pythonOf(home);
   if (!existsSync(py)) return { ok: false, error: 'The GIS engines are not installed. Install them under Settings › GIS engines.' };

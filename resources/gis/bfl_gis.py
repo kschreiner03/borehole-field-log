@@ -554,20 +554,23 @@ def export_layer(job):
     from osgeo import gdal, ogr, osr
     import numpy as np
     gdal.UseExceptions(); ogr.UseExceptions()
-    srs = osr.SpatialReference(); srs.ImportFromEPSG(int(job['epsg'])); fmt = job.get('format', 'GPKG'); name = job.get('name', 'layer')
+    srs = srs_of(job['epsg']); fmt = job.get('format', 'GPKG'); name = job.get('name', 'layer')
+    outc = job.get('out') or job['epsg']; osrs = srs_of(outc)
+    tr = None if osrs.IsSame(srs) else osr.CoordinateTransformation(srs, osrs)
     tmp = tempfile.mkdtemp(prefix='bfl-ex-'); files = {}
     try:
         if job.get('raster'):
             a, gt = grid_of(job['raster']); f = os.path.join(tmp, name + '.tif')
-            d = gdal.GetDriverByName('GTiff').CreateCopy(f, mem_ds(a, gt), options=['COMPRESS=DEFLATE', 'TILED=YES']); d.SetProjection(srs.ExportToWkt()); d.GetRasterBand(1).SetDescription(job.get('band', name)); d = None
+            m0 = mem_ds(a, gt); m0.SetProjection(srs.ExportToWkt())
+            if tr is not None: m0 = gdal.Warp('', m0, format='MEM', dstSRS=osrs.ExportToWkt(), resampleAlg='bilinear', srcNodata=-99999, dstNodata=-99999)
+            d = gdal.GetDriverByName('GTiff').CreateCopy(f, m0, options=['COMPRESS=DEFLATE', 'TILED=YES']); d.GetRasterBand(1).SetDescription(job.get('band', name)); d = None
             prog(0.4, 'GeoTIFF written')
         drv = {'GPKG': ('GPKG', '.gpkg'), 'SHP': ('ESRI Shapefile', '.shp'), 'KML': ('KML', '.kml'), 'DXF': ('DXF', '.dxf')}[fmt]
         feats = job.get('features') or []
         if feats:
             prog(0.6, 'Writing %d feature%s as %s' % (len(feats), '' if len(feats) == 1 else 's', drv[0]))
-            out_srs = srs
-            if fmt == 'KML': out_srs = osr.SpatialReference(); out_srs.ImportFromEPSG(4326); out_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
-            ct = osr.CoordinateTransformation(srs, out_srs) if fmt == 'KML' else None
+            out_srs = srs_of(4326) if fmt == 'KML' else osrs
+            ct = None if out_srs.IsSame(srs) else osr.CoordinateTransformation(srs, out_srs)
             by = {}
             for f in feats: by.setdefault(f['type'], []).append(f)
             for t, fs in by.items():
@@ -591,6 +594,120 @@ def export_layer(job):
             with open(os.path.join(tmp, fn), 'rb') as fh: files[fn] = base64.b64encode(fh.read()).decode()
         return {'files': files, 'tool': 'GDAL %s' % gdal.__version__, 'detail': ', '.join(files)}
     finally: shutil.rmtree(tmp, ignore_errors=True)
+
+# ---------- coordinate systems (PROJ through GDAL/OGR) ----------
+def srs_of(code):
+    """'EPSG:2956', 2956 or 'ESRI:102001' -> an osr.SpatialReference in x/y (easting/northing, longitude/latitude) order"""
+    from osgeo import osr
+    osr.UseExceptions()
+    c = str(code).strip(); c = c if ':' in c else 'EPSG:' + c
+    r = osr.SpatialReference(); r.SetFromUserInput(c); r.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER); return r
+
+def proj_db():
+    import sqlite3
+    from osgeo import osr
+    for d in [os.environ.get('PROJ_DATA', ''), os.path.join(sys.prefix, 'Library', 'share', 'proj'), os.path.join(sys.prefix, 'share', 'proj')]:
+        f = os.path.join(d, 'proj.db')
+        if d and os.path.exists(f): return sqlite3.connect('file:' + f + '?mode=ro', uri=True)
+    raise RuntimeError('The PROJ database was not found.')
+
+def crs_search(q, limit=60):
+    """systems in PROJ's database whose name or code matches, with where they are meant for"""
+    db = proj_db(); q = q.strip(); words = [w for w in q.replace(',', ' ').split() if w]
+    sql = """select c.auth_name, c.code, c.name, c.type, (select e.name from usage u join extent e on e.auth_name = u.extent_auth_name and e.code = u.extent_code
+             where u.object_table_name = c.table_name and u.object_auth_name = c.auth_name and u.object_code = c.code limit 1)
+             from crs_view c where c.deprecated = 0 and c.type in ('projected', 'geographic 2D', 'compound', 'vertical', 'geographic 3D')"""
+    args = []
+    if q.isdigit(): sql += ' and c.code = ?'; args.append(q)
+    else:
+        for w in words: sql += ' and c.name like ?'; args.append('%' + w + '%')
+    sql += " order by (c.auth_name = 'EPSG') desc, (c.type = 'projected') desc, length(c.name) limit %d" % limit
+    return [{'code': '%s:%s' % (a, c), 'name': n, 'type': t, 'area': ar or ''} for a, c, n, t, ar in db.execute(sql, args)]
+
+def crs_info(code):
+    r = srs_of(code)
+    au = r.GetAreaOfUse()
+    return {'code': str(code), 'name': r.GetName(), 'projected': bool(r.IsProjected()), 'geographic': bool(r.IsGeographic()), 'units': r.GetLinearUnitsName() if r.IsProjected() else 'degree',
+            'datum': r.GetAttrValue('DATUM') or '', 'area': au.name if au else '', 'bounds': [au.west_lon_degree, au.south_lat_degree, au.east_lon_degree, au.north_lat_degree] if au else None}
+
+def crs_ops(src, dst):
+    """the transformations PROJ knows between two systems (projinfo), and the one it will use with the grids at hand"""
+    exe = shutil.which('projinfo')
+    if not exe: return {'used': None, 'best': None}
+    def run(check):
+        r = subprocess.run([exe, '-s', str(src), '-t', str(dst), '--summary', '--spatial-test', 'intersects', '--grid-check', check], capture_output=True, text=True, timeout=60)
+        out = []
+        for l in r.stdout.splitlines():
+            q = [x.strip() for x in l.split(',')]
+            if len(q) >= 3 and (':' in q[0] or q[0].startswith('unknown')): out.append({'id': q[0], 'name': q[1], 'accuracy': q[2], 'area': ', '.join(q[3:])})
+        return out
+    avail, every = run('known_available'), run('none')
+    return {'used': avail[0] if avail else None, 'best': every[0] if every else None, 'n': len(every)}
+
+def crs_transform(job):
+    from osgeo import osr
+    osr.UseExceptions()
+    a, b = srs_of(job['from']), srs_of(job['to'])
+    ct = osr.CoordinateTransformation(a, b)
+    out = []
+    for p in job['points']:
+        try:
+            q = ct.TransformPoint(float(p[0]), float(p[1]), float(p[2]) if len(p) > 2 and p[2] is not None else 0.0)
+            out.append([q[0], q[1], q[2] if len(p) > 2 and p[2] is not None else None])
+        except Exception: out.append(None)
+    ops = crs_ops(job['from'], job['to'])
+    return {'points': out, 'from': crs_info(job['from']), 'to': crs_info(job['to']), 'ops': ops, 'tool': 'PROJ %d.%d through GDAL %s' % (osr.GetPROJVersionMajor(), osr.GetPROJVersionMinor(), __import__('osgeo').__version__)}
+
+def crs_job(job):
+    m = job['method']
+    if m == 'search': return {'rows': crs_search(job['q'])}
+    if m == 'info': return crs_info(job['code'])
+    if m == 'transform': return crs_transform(job)
+    if m == 'ops': return crs_ops(job['from'], job['to'])
+    raise RuntimeError('Unknown coordinate job')
+
+def import_vector(job):
+    """a GIS file (Shapefile, GeoPackage, KML, GeoJSON, DXF, CSV, …) in any coordinate system, reprojected to the project (OGR)"""
+    from osgeo import gdal, ogr, osr
+    gdal.UseExceptions(); ogr.UseExceptions(); osr.UseExceptions()
+    path = job['path']; dst = srs_of(job['epsg']); over = job.get('src')
+    oo = ['X_POSSIBLE_NAMES=x,easting,east,e,lon*,long*', 'Y_POSSIBLE_NAMES=y,northing,north,n,lat*', 'KEEP_GEOM_COLUMNS=NO'] if path.lower().endswith('.csv') else []
+    prog(0.1, 'Opening the file with OGR')
+    ds = gdal.OpenEx(path, gdal.OF_VECTOR, open_options=oo)
+    if ds is None: raise RuntimeError('OGR could not read shapes from this file.')
+    feats, layers, srcs, n_all, skipped = [], [], set(), 0, 0
+    for li in range(ds.GetLayerCount()):
+        ly = ds.GetLayer(li); s0 = ly.GetSpatialRef()
+        if over: src = srs_of(over); sname = src.GetName() + ' (chosen)'
+        elif s0 is not None: src = s0.Clone(); src.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER); sname = src.GetName()
+        else: src = srs_of(job['epsg']); sname = 'none in the file: taken as the project\'s'
+        ct = osr.CoordinateTransformation(src, dst); srcs.add(sname)
+        defn = ly.GetLayerDefn(); namef = next((defn.GetFieldDefn(i).GetName() for i in range(defn.GetFieldCount()) if defn.GetFieldDefn(i).GetName().lower() in ('name', 'label', 'id', 'text', 'title', 'bh', 'borehole', 'well')), None)
+        if namef is None and defn.GetFieldCount(): namef = next((defn.GetFieldDefn(i).GetName() for i in range(defn.GetFieldCount()) if defn.GetFieldDefn(i).GetType() == ogr.OFTString), None)
+        cnt = 0
+        for f in ly:
+            n_all += 1
+            g = f.GetGeometryRef()
+            if g is None: skipped += 1; continue
+            g = g.Clone(); g.FlattenTo2D()
+            try: g.Transform(ct)
+            except Exception: skipped += 1; continue
+            nm = str(f.GetField(namef)) if namef and f.GetField(namef) is not None else ''
+            def add(gg):
+                t = gg.GetGeometryName()
+                if t == 'POINT': feats.append({'type': 'point', 'pts': [[gg.GetX(), gg.GetY()]], 'name': nm, 'layer': ly.GetName()})
+                elif t in ('LINESTRING', 'LINEARRING'): feats.append({'type': 'line', 'pts': [[gg.GetX(i), gg.GetY(i)] for i in range(gg.GetPointCount())], 'name': nm, 'layer': ly.GetName()})
+                elif t == 'POLYGON': feats.append({'type': 'polygon', 'pts': [[[r.GetX(i), r.GetY(i)] for i in range(r.GetPointCount())] for r in (gg.GetGeometryRef(k) for k in range(gg.GetGeometryCount()))], 'name': nm, 'layer': ly.GetName()})
+                elif gg.GetGeometryCount():
+                    for k in range(gg.GetGeometryCount()): add(gg.GetGeometryRef(k))
+            add(g); cnt += 1
+            if len(feats) > 20000: break
+        layers.append({'name': ly.GetName(), 'n': cnt, 'crs': sname})
+        prog(0.2 + 0.7 * (li + 1) / ds.GetLayerCount(), 'Layer %s: %d shapes' % (ly.GetName(), cnt))
+    if not feats: raise RuntimeError('No shapes with coordinates were found in the file.')
+    xs = [q[0] for f in feats for q in (f['pts'] if f['type'] != 'polygon' else f['pts'][0])]; ys = [q[1] for f in feats for q in (f['pts'] if f['type'] != 'polygon' else f['pts'][0])]
+    return {'features': feats[:20000], 'layers': layers, 'srcs': sorted(srcs), 'skipped': skipped, 'truncated': len(feats) > 20000, 'bounds': [min(xs), min(ys), max(xs), max(ys)],
+            'driver': ds.GetDriver().ShortName, 'tool': 'GDAL %s OGR, PROJ %d.%d' % (gdal.__version__, osr.GetPROJVersionMajor(), osr.GetPROJVersionMinor())}
 
 def in_grass(job):
     job = floats(job)
@@ -879,6 +996,7 @@ def dem(job):
     src = gdal.Open(job['path'])
     if src is None or src.RasterCount < 1: raise RuntimeError('GDAL could not read an elevation grid from this file.')
     drv = src.GetDriver().ShortName; gt = src.GetGeoTransform(); wkt = src.GetProjection(); assumed = not wkt
+    if prm.get('srcepsg'): wkt = srs_of(prm['srcepsg']).ExportToWkt(); assumed = False; src = gdal.Translate('/vsimem/bfl_src.vrt', src, format='VRT', outputSRS=wkt)
     sr = osr.SpatialReference(wkt=wkt) if wkt else None; sname = sr.GetName() if sr else 'none in the file: taken as the project coordinate system'
     # the file's own cell size in metres (for a geographic file, at this latitude)
     x0, y0, x1, y1 = job['box']
@@ -933,6 +1051,11 @@ def area_over(job):
 
 def run(job):
     job = floats(job)
+    if job.get('network'):
+        os.environ['PROJ_NETWORK'] = 'ON'
+        cache = os.path.join(os.path.dirname(sys.prefix), 'proj-grids'); os.makedirs(cache, exist_ok=True); os.environ['PROJ_USER_WRITABLE_DIRECTORY'] = cache
+    if job.get('kind') == 'crs': return crs_job(job)
+    if job.get('kind') == 'importvec': return import_vector(job)
     if job.get('kind') in ('hydro', 'demfix', 'rast'): return grass_run(job)
     if job.get('kind') == 'thiessen': return thiessen(job)
     if job.get('kind') == 'setback': return setback(job)

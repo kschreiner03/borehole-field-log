@@ -108,9 +108,11 @@ ipcMain.handle('gis:remove', async e => e.sender !== win?.webContents ? { ok: fa
 ipcMain.handle('gis:run', async (e, job: unknown) => { if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' }; const wc = e.sender; return gisRun({ ...gisCtx(), job, onProgress: p => { if (!wc.isDestroyed()) wc.send('gis:jobprogress', p); } }); });
 ipcMain.handle('gis:cancel', async (e, id: unknown) => e.sender === win?.webContents && typeof id === 'string' ? gisCancel(id) : false);
 // an elevation model chosen here, in the shell's own Open dialog: the window gets a token for it, not its path
-ipcMain.handle('gis:pick', async e => {
+ipcMain.handle('gis:pick', async (e, what: unknown) => {
   if (e.sender !== win?.webContents || !win) return null;
-  const r = await dialog.showOpenDialog(win, { title: 'Open an elevation model', properties: ['openFile'], filters: [{ name: 'Elevation models', extensions: ['tif', 'tiff', 'asc', 'img', 'dem', 'vrt', 'bil', 'flt', 'nc', 'xyz'] }, { name: 'All files', extensions: ['*'] }] });
+  const r = await dialog.showOpenDialog(win, what === 'vector'
+    ? { title: 'Open a GIS layer', properties: ['openFile'], filters: [{ name: 'GIS layers', extensions: ['shp', 'gpkg', 'kml', 'kmz', 'geojson', 'json', 'dxf', 'csv', 'gml', 'tab', 'mif', 'gpx', 'fgb'] }, { name: 'All files', extensions: ['*'] }] }
+    : { title: 'Open an elevation model', properties: ['openFile'], filters: [{ name: 'Elevation models', extensions: ['tif', 'tiff', 'asc', 'img', 'dem', 'vrt', 'bil', 'flt', 'nc', 'xyz'] }, { name: 'All files', extensions: ['*'] }] });
   if (r.canceled || !r.filePaths[0]) return null;
   const p = r.filePaths[0], st = await stat(p).catch(() => null);
   return gisRegisterFile(p, basename(p), st?.size ?? 0);
