@@ -1393,6 +1393,7 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .gp-head b { font-size: 13px; } .gp-pane { padding-top: 10px; } .gp-ph b { display: block; font-size: 14px; } .gp-ph small { color: var(--muted); font-size: 11.5px; }
 .gp-pane .gp-run .btn { flex: 1; } .gp-pane .gp-job { padding: 8px; } .gp-pane .gp-cmp th:nth-child(3), .gp-pane .gp-cmp td:nth-child(3) { width: 64px; } .gp-pane .gp-cmp th:nth-child(4), .gp-pane .gp-cmp td:nth-child(4) { width: 40px; } .gp-pane .gp-cmp td .note { display: block; }
 .gp-hd > summary { font: 600 12px var(--f-body); }
+.gp-file { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .gis-ramp { display: block; width: 120px; height: 6px; margin-top: 3px; border-radius: 3px; border: 1px solid var(--rule); }
 .gp-sum { margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--ink); }
 .map-layers .lyr .tb[data-gisdel] { margin-left: auto; min-height: 22px; padding: 0 4px; color: var(--muted); } .map-layers .lyr span small { font-size: 11px; }
@@ -10751,7 +10752,9 @@ const GP_TOOLS = {
   gw_surface: { group: 'Groundwater', name: 'Water-table surface and contours', by: 'GRASS GIS v.surf.rst, GDAL gdal_contour', kind: 'hydro', desc: 'The water table between the wells from one round of water levels, shaded by elevation, with contour lines.', prm: [['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, ''], ['interval', 'Contour interval (m)', 'auto', '']] },
   gw_gradient: { group: 'Groundwater', name: 'Hydraulic gradient and flow direction', by: 'GRASS GIS r.slope.aspect', kind: 'hydro', desc: 'The slope of the water table at every place (the hydraulic gradient) and the way it falls (the flow direction), drawn as arrows; with the seepage velocity v = K·i / nₑ.', prm: [['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, ''], ['K', 'K (m/s)', 'from slug tests', 'Hydraulic conductivity. Blank: the geometric mean of the slug tests.'], ['ne', 'Effective porosity', 'project', 'Blank: the project setting.']] },
   gw_drain: { group: 'Groundwater', name: 'Flow path from a borehole', by: 'GRASS GIS r.drain', kind: 'hydro', desc: 'The path water takes from a borehole down the water table (steepest descent), its length and the travel time at the seepage velocity. For where a release would go.', prm: [['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, ''], ['fill', 'Fill local lows', 'yes', 'r.fill.dir fills small hollows in the surface so the path is not trapped in one.', ['yes', 'no']], ['K', 'K (m/s)', 'from slug tests', 'Hydraulic conductivity. Blank: the geometric mean of the slug tests.'], ['ne', 'Effective porosity', 'project', '']] },
-  gw_depth: { group: 'Groundwater', name: 'Depth to groundwater', by: 'GRASS GIS r.mapcalc', kind: 'hydro', desc: 'Ground surface (from the boreholes\' ground elevations) minus the water table, at every place between the wells.', prm: [['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, '']] },
+  gw_depth: { group: 'Groundwater', name: 'Depth to groundwater', by: 'GRASS GIS r.mapcalc', kind: 'hydro', desc: 'Ground surface minus the water table, at every place between the wells. The ground is the boreholes\' ground elevations, or an elevation model opened with Elevation map from a file.', prm: [['ground', 'Ground from', 'boreholes', '', ['boreholes', 'model']], ['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, '']] },
+  elev_dem: { group: 'Terrain', name: 'Elevation map from a file', by: 'GDAL gdalwarp, gdaldem, gdal_contour', kind: 'terrain', desc: 'An elevation model you have (lidar or NRCan HRDEM GeoTIFF, an ASCII grid, …), reprojected to the project, clipped to the site, shaded by elevation with hillshade, and contoured. Depth to groundwater can then use it as the ground surface.', prm: [['interval', 'Contour interval (m)', 'auto', ''], ['margin', 'Margin around the boreholes (m)', 60, ''], ['cells', 'Detail', '400', 'Cells across the site: more is finer and slower.', ['200', '400', '800']]] },
+  elev_points: { group: 'Terrain', name: 'Elevation map from the boreholes', by: 'GRASS GIS v.surf.rst, r.relief', kind: 'terrain', desc: 'The ground surface between the boreholes from their surveyed ground elevations, shaded with hillshade, and contoured. Only as good as the number of boreholes: for real terrain, use an elevation model file.', prm: [['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, ''], ['interval', 'Contour interval (m)', 'auto', '']] },
   gw_upgrad: { group: 'Groundwater', name: 'Where did it come from? (upgradient path)', by: 'GRASS GIS r.drain', kind: 'hydro', desc: 'Traces back up the water table from a borehole (steepest ascent): the direction a dissolved plume most likely came from, if it moved with the groundwater.', prm: [['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, ''], ['fill', 'Fill local highs', 'yes', '', ['yes', 'no']]] },
   gw_change: { group: 'Groundwater', name: 'Water-level change between rounds', by: 'GRASS GIS r.mapcalc', kind: 'hydro', desc: 'The water table of a later round minus an earlier one: where it rose and where it fell, from the wells read in both rounds.', prm: [['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, '']] },
   soil_volume: { group: 'Contamination', name: 'Impacted soil volume', by: 'PyKrige 3D kriging', kind: 'volume', desc: 'A block model of the soil results between two depths, by 3D kriging; the volume and tonnage at or over a level, the ground it lies under, and how thick it is: an excavation estimate.', prm: [['level', 'Level', 'guideline', 'In the result\'s units. Blank: the guideline, or the screening level for headspace.'], ['k', 'Layering', '10', 'How much further it reaches sideways than down.', ['3', '10', '30']], ['density', 'Density (t/m³)', 1.9, 'Bulk density to turn volume into tonnes.'], ['cell', 'Block size (m)', 'auto', 'Across; blocks are 0.25 m deep (or more for deep ranges).']] },
@@ -10793,6 +10796,12 @@ function gpFormHTML(k, T) {
     const from = k === 'gw_drain' || k === 'gw_upgrad' ? crow('Start at', `<select data-gpf="from">${H.wells.map(w => `<option value="${esc(w.b.id)}" ${g.from === w.b.id ? 'selected' : ''}>${esc(gwName(w.b) || w.b.name)}</option>`).join('')}</select>`) : '';
     const gr = k === 'gw_depth' ? crow('Ground', `${projList().filter(b => b.easting != null && b.elevation != null).length} boreholes with a ground elevation`) : '';
     return `<h4>Input</h4>${wl}${from}${gr}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">Added to the map as a layer; show, hide or remove it under Settings › Tool outputs.</p>`;
+  }
+  if (T.kind === 'terrain') {
+    const nb = projList().filter(b => b.easting != null && b.elevation != null).length;
+    const inp = k === 'elev_dem' ? crow('File', `<span class="gp-file">${g.demName ? `<b>${esc(g.demName)}</b>${g.demSize ? ' <span class="note">' + (g.demSize / 1048576).toFixed(1) + ' MB</span>' : ''}<br>` : ''}<button class="btn" data-act="gp-pick">${g.demFile ? 'Choose another…' : 'Choose file…'}</button></span>`) + crow('Area', 'the boreholes and the margin below') + crow('Coordinates', 'to EPSG:' + projEpsg())
+      : crow('Boreholes', nb + ' with a ground elevation' + (nb < 3 ? ' <b>(three or more needed)</b>' : ''));
+    return `<h4>Input</h4>${inp}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">Added to the map: elevation colours with hillshade, and contours.${k === 'elev_dem' ? ' Kept for Depth to groundwater (Ground from: model).' : ''}</p>`;
   }
   if (T.kind === 'unit') {
     const units = [...new Set(projList().flatMap(b => (b.layers || []).filter(l => l.bottom > l.top).map(defaultUnit)).filter(Boolean))].sort();
@@ -10845,7 +10854,7 @@ async function gpRun() {
   const k = GP_TOOLS[S.gp.tool] ? S.gp.tool : 'grass_rst', T = GP_TOOLS[k], g = S.gp;
   if (!gisOn()) { toast('Install the GIS engines first (Settings › GIS engines).'); return; }
   if (T.kind === 'export') { await gisExport(g.p, g.d0, g.d1); renderView(true); return; }
-  if (['hydro', 'area', 'prob', 'drillnext', 'volume', 'unit'].includes(T.kind)) { await gpHydro(k, T); return; }
+  if (['hydro', 'area', 'prob', 'drillnext', 'volume', 'unit', 'terrain'].includes(T.kind)) { await gpHydro(k, T); return; }
   if (T.kind === 'points3d') {
     const prm = gpParams(k), kk = prm.k === 'auto' ? (XS_ANISO_PICK || 10) : +prm.k;
     S.xs = { ...S.xs, interp: 'gis_' + k, aniso: kk }; lsSet('bhlog.xs', JSON.stringify(S.xs)); gisMethods();
@@ -10903,6 +10912,7 @@ async function gpHydro(k, T) {
     return;
   }
   if (k === 'soil_volume' || k === 'prob_over' || k === 'drill_next' || k === 'unit_map') { await gpSoil(k, prm, go, done); return; }
+  if (k === 'elev_dem' || k === 'elev_points') { await gpTerrain(k, prm, go, done); return; }
   if (k === 'gw_change') {
     const a = S.gp.r1, b = S.gp.r2, A = gwHeads(mapList(), a, true).wells, B = gwHeads(mapList(), b, true).wells.filter(w => A.some(x => x.b.id === w.b.id)), A2 = A.filter(w => B.some(x => x.b.id === w.b.id));
     if (!a || !b || A2.length < 3) { toast('Three or more wells read in both rounds are needed.'); return; }
@@ -10962,14 +10972,52 @@ async function gpHydro(k, T) {
     done(j, `From ${gwName(w.b) || w.b.name}: ${Math.round(L)} m ${out ? 'to the edge of the area the wells cover (it stops there: beyond, the water table is not known)' : 'to the lowest point it reaches'}, water table falling ${dh.toFixed(2)} m (i ≈ ${i.toFixed(4)}).${v ? ' At ' + fmtV(v) + ' that is about ' + fmtT(L / v) + ' of travel (' + kTxt + '; advection only, no dispersion or retardation).' : K ? '' : ' No slug tests, so no travel time: enter K to get one.'}`,
       { name: 'Flow path from ' + (gwName(w.b) || w.b.name), kind: 'path', path: pts, note: Math.round(L) + ' m' + (v ? ', ~' + fmtT(L / v) : '') });
   } else if (k === 'gw_depth') {
-    const G = projList().filter(b => b.easting != null && b.northing != null && b.elevation != null).map(b => [b.easting, b.northing, +b.elevation.toFixed(3)]);
+    let G = projList().filter(b => b.easting != null && b.northing != null && b.elevation != null).map(b => [b.easting, b.northing, +b.elevation.toFixed(3)]), gsrc = 'the boreholes';
+    if (prm.ground === 'model') {
+      const D = GIS.dem; if (!D) { toast('Open an elevation model first (Toolbox › Elevation map from a file), or set Ground from: boreholes.'); return; }
+      // the model sampled on a grid over the wells' area (at most about 3,000 points), as the ground surface
+      const step = Math.max(1, Math.ceil(Math.sqrt(D.nx * D.ny / 3000))), dxD = (D.box[2] - D.box[0]) / D.nx, dyD = (D.box[3] - D.box[1]) / D.ny; G = [];
+      for (let jj = 0; jj < D.ny; jj += step) for (let i = 0; i < D.nx; i += step) { const v = D.values[jj * D.nx + i], x = D.box[0] + dxD * (i + .5), y = D.box[3] - dyD * (jj + .5); if (v != null && x >= g.box[0] && x <= g.box[2] && y >= g.box[1] && y <= g.box[3]) G.push([+x.toFixed(2), +y.toFixed(2), +v.toFixed(3)]); }
+      gsrc = 'the elevation model ' + (D.name || ''); if (G.length < 3) { toast('The elevation model does not cover the wells.'); return; }
+    }
     if (G.length < 3) { toast('Three or more boreholes with a ground elevation are needed.'); return; }
-    const { r, j } = await go(gisKey('depth' + JSON.stringify(sp) + JSON.stringify(G), P), { kind: 'hydro', method: 'gw_depth', pts: P, ground: G, box: g.box, nx: g.nx, ny: g.ny, params: sp }, input + '; ground from ' + G.length + ' boreholes');
+    const { r, j } = await go(gisKey('depth' + JSON.stringify(sp) + G.length + gsrc, P), { kind: 'hydro', method: 'gw_depth', pts: P, ground: G, box: g.box, nx: g.nx, ny: g.ny, params: sp }, input + '; ground from ' + gsrc);
     if (!r?.ok) return;
     const inside = cells(r.values, n => r.values[n]), lo = Math.min(...inside), hi = Math.max(...inside);
-    done(j, `Depth to groundwater ${lo.toFixed(2)} to ${hi.toFixed(2)} m inside the wells (median ${pct(inside, .5).toFixed(2)} m).${lo < 0 ? ' Negative depths mean the water table is drawn above the ground: check the elevations and levels there.' : ''}`,
+    done(j, `Depth to groundwater ${lo.toFixed(2)} to ${hi.toFixed(2)} m inside the wells (median ${pct(inside, .5).toFixed(2)} m), the ground from ${gsrc}.${lo < 0 ? ' Negative depths mean the water table is drawn above the ground: check the elevations and levels there.' : ''}`,
       { name: 'Depth to groundwater' + (H.round ? ' ' + H.round : ''), kind: 'raster', ramp: 'depth', box: g.box, nx: g.nx, ny: g.ny, values: r.values, hull, range: [lo, hi], unit: 'm', note: lo.toFixed(2) + ' – ' + hi.toFixed(2) + ' m deep' });
   }
+}
+/* contour levels every step between lo and hi (step: as given, else a round number for about eight lines) */
+const gisLevels = (lo, hi, step) => { const st = step > 0 ? step : niceStep(Math.max(.05, hi - lo), 8), out = []; for (let v = Math.ceil(lo / st) * st; v <= hi + 1e-9 && out.length < 400; v += st) out.push(+v.toFixed(4)); return { st, levels: out }; };
+/* elevation maps: from a file (GDAL) or from the boreholes (GRASS) */
+async function gpTerrain(k, prm, go, done) {
+  const B = projList().filter(b => b.easting != null && b.northing != null);
+  if (k === 'elev_dem') {
+    if (!S.gp.demFile) { toast('Choose the elevation model file first.'); return; }
+    if (!B.length) { toast('The boreholes need coordinates to place the area.'); return; }
+    const m = prm.margin > 0 ? prm.margin : 60, xs = B.map(b => b.easting), ys = B.map(b => b.northing), box = [Math.min(...xs) - m, Math.min(...ys) - m, Math.max(...xs) + m, Math.max(...ys) + m];
+    const { r, j } = await go('dem|' + Date.now(), { kind: 'dem', file: S.gp.demFile, box: box.map(v => +v.toFixed(2)), epsg: projEpsg(), maxcells: +(prm.cells || 400) }, S.gp.demName || 'elevation model');
+    if (!r?.ok) { if (r?.error && /again/.test(r.error)) { S.gp.demFile = null; gpSave(); } return; }
+    const { st, levels } = gisLevels(r.min, r.max, prm.interval);
+    const c = await window.desktop.gis.run({ kind: 'contours', box: r.box, nx: r.nx, ny: r.ny, values: r.values, levels });
+    GIS.dem = { values: r.values, box: r.box, nx: r.nx, ny: r.ny, name: S.gp.demName };
+    const atB = B.filter(b => b.elevation != null).map(b => { const i = Math.floor((b.easting - r.box[0]) / (r.box[2] - r.box[0]) * r.nx), jj = Math.floor((r.box[3] - b.northing) / (r.box[3] - r.box[1]) * r.ny), v = r.values[jj * r.nx + i]; return v == null ? null : v - b.elevation; }).filter(v => v != null);
+    const off = atB.length ? atB.reduce((a, v) => a + v, 0) / atB.length : null;
+    done(j, `${S.gp.demName}: ${r.min.toFixed(2)} to ${r.max.toFixed(2)} m over the site, ${r.res.toFixed(2)} m cells; contours every ${st} m.${r.assumed ? ' The file has no coordinate system, so it was taken as EPSG:' + projEpsg() + ': check that is right.' : ''}${off != null ? ` At the boreholes the model is ${off >= 0 ? 'higher' : 'lower'} than their surveyed ground by ${Math.abs(off).toFixed(2)} m on average (${atB.length} boreholes)${Math.abs(off) > .5 ? ': a different vertical datum (e.g. CGVD28 against CGVD2013) or a survey error is likely; check before using it as the ground' : ''}.` : ''}`,
+      { name: 'Elevation: ' + S.gp.demName, kind: 'raster', ramp: 'terrain', box: r.box, nx: r.nx, ny: r.ny, values: r.values, hill: r.hill, op: .82, hull: null, contours: c?.ok ? c.lines : [], dec: st < .1 ? 2 : st < 1 ? 1 : 0, range: [r.min, r.max], note: r.min.toFixed(1) + ' – ' + r.max.toFixed(1) + ' m', under: true });
+    return;
+  }
+  const P = B.filter(b => b.elevation != null).map(b => [b.easting, b.northing, +b.elevation.toFixed(3)]);
+  if (P.length < 3) { toast('Three or more boreholes with a ground elevation are needed.'); return; }
+  const g = gisBox(P), hull = padHull(P), sp = { tension: prm.tension ?? 40, smooth: prm.smooth ?? 0.1 };
+  const { r, j } = await go(gisKey('terrain' + JSON.stringify(sp), P), { kind: 'hydro', method: 'terrain', pts: P, box: g.box, nx: g.nx, ny: g.ny, params: sp }, P.length + ' boreholes');
+  if (!r?.ok) return;
+  const dx = (g.box[2] - g.box[0]) / g.nx, dy = (g.box[3] - g.box[1]) / g.ny, inside = r.values.filter((v, n) => v != null && (!hull || inPolyG(g.box[0] + dx * (n % g.nx + .5), g.box[3] - dy * (Math.floor(n / g.nx) + .5), hull)));
+  const lo = Math.min(...inside), hi = Math.max(...inside), { st, levels } = gisLevels(lo, hi, prm.interval);
+  const c = await window.desktop.gis.run({ kind: 'contours', box: g.box, nx: g.nx, ny: g.ny, values: r.values, levels });
+  done(j, `Ground surface from ${P.length} boreholes: ${lo.toFixed(2)} to ${hi.toFixed(2)} m inside them; contours every ${st} m. Between boreholes it is a smooth guess: hollows, berms and ditches between them are not seen. For the real terrain, open an elevation model file.`,
+    { name: 'Ground surface (boreholes)', kind: 'raster', ramp: 'terrain', box: g.box, nx: g.nx, ny: g.ny, values: r.values, hill: r.hill, op: .75, hull, contours: c?.ok ? c.lines : [], dec: st < .1 ? 2 : 1, range: [lo, hi], note: lo.toFixed(2) + ' – ' + hi.toFixed(2) + ' m', under: true });
 }
 /* the soil results by sample: [E, N, depth, log10 value] (a zero is the bottom of the range; a non-detect half its limit) */
 function samplePts(p, d0, d1) {
@@ -11047,21 +11095,22 @@ async function gpSoil(k, prm, go, done) {
 /* the layers on the map: shaded grids (inside the wells), contours, arrows, paths and areas */
 const GIS_RAMPS = { water: [[230, 242, 255], [158, 202, 225], [66, 146, 198], [8, 69, 148]], depth: [[255, 245, 177], [161, 217, 155], [65, 171, 93], [8, 81, 156]],
   impact: [[255, 247, 188], [254, 196, 79], [236, 112, 20], [153, 52, 4]], prob: [[255, 255, 255], [253, 208, 162], [241, 105, 19], [127, 39, 4]], uncert: [[247, 244, 249], [212, 185, 218], [201, 148, 199], [129, 15, 124]],
+  terrain: [[56, 130, 72], [160, 190, 90], [232, 222, 140], [196, 146, 84], [150, 110, 80], [240, 236, 230]],
   soil: [[246, 232, 195], [223, 194, 125], [191, 129, 45], [140, 81, 10]], change: [[178, 24, 43], [244, 165, 130], [247, 247, 247], [146, 197, 222], [33, 102, 172]] };
 const gisRampCSS = r => 'linear-gradient(90deg,' + (GIS_RAMPS[r] || GIS_RAMPS.water).map(c => `rgb(${c.join(',')})`).join(',') + ')';
 function gisRasterURL(L) {
   if (L.url) return L.url;
   const c = document.createElement('canvas'); c.width = L.nx; c.height = L.ny; const x = c.getContext('2d'), im = x.createImageData(L.nx, L.ny), R = GIS_RAMPS[L.ramp] || GIS_RAMPS.water, [lo, hi] = L.range;
-  L.values.forEach((v, n) => { if (v == null) return; const t = Math.max(0, Math.min(1, (v - lo) / ((hi - lo) || 1))) * (R.length - 1), i = Math.min(R.length - 2, Math.floor(t)), u = t - i; for (let k = 0; k < 3; k++) im.data[n * 4 + k] = R[i][k] + (R[i + 1][k] - R[i][k]) * u; im.data[n * 4 + 3] = 255; });
+  L.values.forEach((v, n) => { if (v == null) return; const t = Math.max(0, Math.min(1, (v - lo) / ((hi - lo) || 1))) * (R.length - 1), i = Math.min(R.length - 2, Math.floor(t)), u = t - i, sh = L.hill && L.hill[n] != null ? .35 + .65 * Math.max(0, Math.min(255, L.hill[n])) / 255 * 1.15 : 1; for (let k = 0; k < 3; k++) im.data[n * 4 + k] = Math.min(255, (R[i][k] + (R[i + 1][k] - R[i][k]) * u) * sh); im.data[n * 4 + 3] = 255; });
   x.putImageData(im, 0, 0); return (L.url = c.toDataURL('image/png'));
 }
 function gisLayersSVG(X, Y) {
-  return (GIS.layers || []).filter(L => L.on).slice().reverse().map(L => {
+  return (GIS.layers || []).filter(L => L.on).slice().reverse().sort((a, b) => (b.under ? 1 : 0) - (a.under ? 1 : 0)).map(L => {
     const o = [], P = q => q.map(p => X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join('L');
     if (L.kind === 'raster') {
       const [x0, y0, x1, y1] = L.box, cid = 'gcl' + L.id + Math.random().toString(36).slice(2, 7);   // one id per drawing: a page can hold several maps
       if (L.hull) o.push(`<clipPath id="${cid}"><path d="M${P(L.hull)}Z"/></clipPath>`);
-      o.push(`<image href="${gisRasterURL(L)}" x="${X(x0).toFixed(1)}" y="${Y(y1).toFixed(1)}" width="${(X(x1) - X(x0)).toFixed(1)}" height="${(Y(y0) - Y(y1)).toFixed(1)}" preserveAspectRatio="none" opacity=".62" ${L.hull ? `clip-path="url(#${cid})"` : ''}/>`);
+      o.push(`<image href="${gisRasterURL(L)}" x="${X(x0).toFixed(1)}" y="${Y(y1).toFixed(1)}" width="${(X(x1) - X(x0)).toFixed(1)}" height="${(Y(y0) - Y(y1)).toFixed(1)}" preserveAspectRatio="none" opacity="${L.op ?? .62}" ${L.hull ? `clip-path="url(#${cid})"` : ''}/>`);
       for (const [v, line] of L.contours || []) { if (line.length < 2) continue; const m = line[Math.floor(line.length / 2)]; o.push(`<g ${L.hull ? `clip-path="url(#${cid})"` : ''}><path d="M${P(line)}" fill="none" stroke="#08519c" stroke-width="1.1" opacity=".85"/><text x="${X(m[0]).toFixed(1)}" y="${Y(m[1]).toFixed(1)}" font-size="10" text-anchor="middle" fill="#08306b" stroke="#fff" stroke-width="3" paint-order="stroke" style="font-family:var(--f-label)">${(+v).toFixed(L.dec ?? 2)}${L.cfmt || ''}</text></g>`); }
       for (const [x, y] of L.marks || []) { const i = L.marks.findIndex(q => q[0] === x && q[1] === y) + 1; o.push(`<g><circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="10" fill="#fff" stroke="#6a1b9a" stroke-width="2.4"/><text x="${X(x).toFixed(1)}" y="${(Y(y) + 4).toFixed(1)}" font-size="11.5" font-weight="700" text-anchor="middle" fill="#6a1b9a" style="font-family:var(--f-label)">${i}</text></g>`); }
     } else if (L.kind === 'arrows') {
@@ -13612,6 +13661,7 @@ document.addEventListener('click', e => {
     case 'gis-remove': if (confirm('Remove the GIS engines (about 1.6 GB)? Maps set to a GIS method go back to the built-in ones until they are installed again.')) window.desktop.gis.remove().then(r => { GIS.st = { installed: false }; GIS.cache.clear(); const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); toast(r.ok ? 'The GIS engines were removed.' : r.error); }); break;
     case 'gis-export': gisExport(t.dataset.p || 'cvc'); break;
     case 'gp-run': gpRun(); break;
+    case 'gp-pick': window.desktop?.gis?.pick?.().then(f => { if (!f) return; S.gp.demFile = f.token; S.gp.demName = f.name; S.gp.demSize = f.size; gpSave(); renderView(true); }); break;
     case 'gp-menu': openGpMenu(t.closest('.gp-tb') || t); break;
     case 'gp-open': { closeMenu(); S.gp.tool = t.dataset.tool; S.gpPanel = t.dataset.tool; gpSave(); if (!GP_TABS.includes(S.tab)) { goTab(GP_TOOLS[S.gpPanel].kind === 'points3d' ? 'xsec' : 'site'); } else workResized(); renderBar(cur()); break; }
     case 'gp-close': S.gpPanel = null; workResized(); renderBar(cur()); break;

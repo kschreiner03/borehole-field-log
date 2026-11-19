@@ -255,6 +255,12 @@ def in_grass_hydro(job, gs, tmp):
         gs.run_command('v.surf.rst', input=name, elevation=name + '_r', tension=ten, smooth=smo, overwrite=True, quiet=True)
     def read(r):
         return [None if t in ('nan', '*') else float(t) for t in gs.read_command('r.out.ascii', input=r, null_value='nan', flags='h', precision=8).split()]
+    if m == 'terrain':
+        surf(P, 'h', 'ground surface')
+        prog(0.6, 'r.relief: hillshade; r.slope.aspect: slope')
+        gs.run_command('r.relief', input='h_r', output='rel', altitude=45, azimuth=315, overwrite=True, quiet=True)
+        gs.run_command('r.slope.aspect', elevation='h_r', slope='sl', format='degrees', overwrite=True, quiet=True)
+        return {'values': read('h_r'), 'hill': read('rel'), 'slope': read('sl'), 'tool': 'GRASS GIS %s v.surf.rst, r.relief, r.slope.aspect' % ver, 'detail': 'ground surface from %d points, ' % len(P) + 'v.surf.rst (tension %g, smoothing %g)' % (ten, smo)}
     surf(P, 'h', 'water table')
     base = 'v.surf.rst (tension %g, smoothing %g)' % (ten, smo)
     if m == 'gw_gradient':
@@ -520,6 +526,49 @@ def prob_over(job):
     return {'values': as_list(z), 'loo': e, 'n_over': n1, 'tool': 'PyKrige %s OrdinaryKriging of indicators' % pykrige.__version__,
             'detail': 'indicator kriging: %d of %d readings at or over the level; %s variogram, range %.3g m (the best of %d by leave-one-out)' % (n1, len(I), model, vp['range'], n)}
 
+
+# ---------- terrain ----------
+def dem(job):
+    """an elevation model from a file (GeoTIFF, ASCII grid, …): reprojected to the project (gdalwarp), clipped to the site,
+    with hillshade and slope (gdaldem) and contours (gdal_contour)"""
+    from osgeo import gdal, osr, ogr
+    import numpy as np
+    gdal.UseExceptions(); osr.UseExceptions(); ogr.UseExceptions()
+    prog(0.05, 'Opening the file with GDAL')
+    src = gdal.Open(job['path'])
+    if src is None or src.RasterCount < 1: raise RuntimeError('GDAL could not read an elevation grid from this file.')
+    drv = src.GetDriver().ShortName; gt = src.GetGeoTransform(); sres = abs(gt[1]) if gt else None
+    wkt = src.GetProjection(); s_srs = None; assumed = False
+    if wkt:
+        sr = osr.SpatialReference(wkt=wkt); sname = sr.GetName()
+    else:
+        sname = 'none in the file: taken as the project coordinate system'; assumed = True; s_srs = 'EPSG:%d' % job['epsg']
+    x0, y0, x1, y1 = job['box']; n = int(job['maxcells'])
+    res = max((x1 - x0) / n, (y1 - y0) / n)
+    if sres and not assumed and sr.IsProjected(): res = max(res, sres * sr.GetLinearUnits())
+    prog(0.25, 'gdalwarp: to EPSG:%d, clipped to the site, %.2f m cells' % (job['epsg'], res))
+    w = gdal.Warp('/vsimem/bfl_dem.tif', src, format='GTiff', dstSRS='EPSG:%d' % job['epsg'], srcSRS=s_srs, outputBounds=[x0, y0, x1, y1], xRes=res, yRes=res, resampleAlg='bilinear', dstNodata=-99999, outputType=gdal.GDT_Float32)
+    b = w.GetRasterBand(1); a = b.ReadAsArray().astype(float); a[a <= -99998] = np.nan
+    if not np.isfinite(a).any(): w = None; gdal.Unlink('/vsimem/bfl_dem.tif'); raise RuntimeError('The file does not cover the site (after reprojecting it to EPSG:%d).' % job['epsg'])
+    ny, nx = a.shape; gt2 = w.GetGeoTransform()
+    prog(0.55, 'gdaldem: hillshade and slope')
+    hds = gdal.DEMProcessing('/vsimem/bfl_hs.tif', w, 'hillshade', azimuth=315, altitude=45, computeEdges=True); h = hds.GetRasterBand(1).ReadAsArray().astype(float); hds = None
+    sds = gdal.DEMProcessing('/vsimem/bfl_sl.tif', w, 'slope', computeEdges=True); sl = sds.GetRasterBand(1).ReadAsArray().astype(float); sds = None
+    lines = []
+    if job.get('levels'):
+        prog(0.8, 'gdal_contour: %d levels' % len(job['levels']))
+        vd = ogr.GetDriverByName('Memory').CreateDataSource('c'); cl = vd.CreateLayer('c', None, ogr.wkbLineString)
+        cl.CreateField(ogr.FieldDefn('ID', ogr.OFTInteger)); cl.CreateField(ogr.FieldDefn('v', ogr.OFTReal))
+        gdal.ContourGenerateEx(b, cl, options=['FIXED_LEVELS=' + ','.join(str(v) for v in job['levels']), 'ID_FIELD=0', 'ELEV_FIELD=1'])
+        for f in cl:
+            g = f.GetGeometryRef(); lines.append([f.GetField('v'), [[round(g.GetX(i), 2), round(g.GetY(i), 2)] for i in range(g.GetPointCount())]])
+    for v in ('/vsimem/bfl_dem.tif', '/vsimem/bfl_hs.tif', '/vsimem/bfl_sl.tif'): gdal.Unlink(v)
+    fin = a[np.isfinite(a)]
+    return {'values': as_list(a), 'hill': as_list(np.where(np.isfinite(a), h, np.nan)), 'slope': as_list(np.where(np.isfinite(a), sl, np.nan)), 'lines': lines,
+            'box': [gt2[0], gt2[3] + gt2[5] * ny, gt2[0] + gt2[1] * nx, gt2[3]], 'nx': nx, 'ny': ny, 'res': res, 'min': float(fin.min()), 'max': float(fin.max()),
+            'tool': 'GDAL %s gdalwarp, gdaldem, gdal_contour' % gdal.__version__,
+            'detail': '%s file, %s, %s cells; reprojected to EPSG:%d at %.2f m' % (drv, sname, ('%.2f m' % (sres * sr.GetLinearUnits())) if sres and not assumed and sr.IsProjected() else ('%.6g°' % sres if sres else '?'), job['epsg'], res), 'assumed': assumed}
+
 def area_over(job):
     """the part of a surface at or over a level: a mask polygonized by GDAL (gdal.Polygonize), its area from OGR"""
     from osgeo import gdal, ogr
@@ -547,6 +596,7 @@ def run(job):
     job = floats(job)
     if job.get('kind') == 'hydro': return grass_run(job)
     if job.get('kind') == 'area': return area_over(job)
+    if job.get('kind') == 'dem': return dem(job)
     if job.get('kind') == 'volume': return soil_volume(job)
     if job.get('kind') == 'drillnext': return drill_next(job)
     if job.get('kind') == 'prob': return prob_over(job)

@@ -7,5 +7,6 @@ export function gisStatus(o: { userData: string; root: string }): Promise<{ inst
 export function gisInstall(o: { userData: string; onProgress?: (p: { step?: string; line?: string }) => void }): Promise<{ ok: boolean; error?: string; home?: string }>;
 export function gisRemove(o: { userData: string }): Promise<{ ok: boolean; error?: string }>;
 export function gisCancel(id: string): boolean;
+export function gisRegisterFile(path: string, name: string, size: number): { token: string; name: string; size: number };
 export function killTree(p: unknown): void;
 export function gisRun(o: { userData: string; root: string; job: unknown; timeoutMs?: number; onProgress?: (p: { id?: string; p?: number; msg?: string }) => void }): Promise<Record<string, unknown> & { ok: boolean; error?: string }>;

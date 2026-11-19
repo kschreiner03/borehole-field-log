@@ -25,6 +25,8 @@ const desktop = {
     // a running job's progress (the share done and what it is doing), and stopping it
     onJobProgress: (cb: (p: { id: string; p?: number; msg?: string }) => void) => { ipcRenderer.on('gis:jobprogress', (_e, p) => cb(p)); },
     cancel: (id: string): Promise<boolean> => ipcRenderer.invoke('gis:cancel', id),
+    // an elevation model chosen in an Open dialog: a token for the file (its name and size to show), never its path
+    pick: (): Promise<{ token: string; name: string; size: number } | null> => ipcRenderer.invoke('gis:pick'),
   },
   // updates: whether GitHub has a newer release (nothing about the user is sent), and the download page in the browser
   updates: {

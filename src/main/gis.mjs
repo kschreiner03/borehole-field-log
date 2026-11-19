@@ -21,7 +21,7 @@ export const GIS_SPECS = ['grass=8.5', 'gdal=3.12', 'pykrige=1.7', 'gstools=1.7'
 export const GIS_METHODS = {
   surface: ['gdal_invdist', 'gdal_invdistnn', 'gdal_average', 'gdal_nearest', 'gdal_linear', 'pykrige_ok', 'pykrige_uk', 'gstools_ok', 'grass_rst', 'grass_bspline', 'grass_idw'],
   points3d: ['pykrige_ok3d', 'gstools_ok3d', 'grass_vol_rst'],
-  hydro: ['gw_gradient', 'gw_drain', 'gw_depth', 'gw_change'],
+  hydro: ['gw_gradient', 'gw_drain', 'gw_depth', 'gw_change', 'terrain'],
 };
 
 // a short folder of the user's own (Windows paths in the packages are long; 260 characters is the limit)
@@ -128,6 +128,10 @@ export function checkJob(job) {
     if (method === 'gw_drain' && !nums([job.start], 2)) return 'A start point [x, y] is needed.';
     if (method === 'gw_depth' && (!nums(job.ground, 3) || job.ground.length < 3 || job.ground.length > 5000)) return 'Ground elevations must be 3 to 5000 [x, y, z].';
     if (method === 'gw_change' && (!nums(job.pts2, 3) || job.pts2.length < 3 || job.pts2.length > 5000)) return 'The later round needs 3 to 5000 [x, y, head].';
+  } else if (kind === 'dem') {
+    if (!/^f[0-9a-f]{20}$/.test(String(job.file))) return 'Choose an elevation model file.';
+    if (!nums([job.box], 4) || !(Number.isInteger(job.epsg) && job.epsg > 1000 && job.epsg < 100000) || !(job.maxcells >= 50 && job.maxcells <= 1500)) return 'Area or size outside the limits.';
+    if (job.levels != null && (!Array.isArray(job.levels) || job.levels.length > 400 || !job.levels.every(isNum))) return 'Contour levels must be numbers.';
   } else if (kind === 'volume') {
     if (!nums(job.pts, 4) || job.pts.length < 4 || job.pts.length > 2000) return 'Samples must be 4 to 2000 [x, y, depth, value].';
     if (!nums([job.box3], 6) || !(job.nx >= 2 && job.ny >= 2 && job.nz >= 1 && job.nx * job.ny * job.nz <= 200000)) return 'Block grid outside the limits.';
@@ -149,8 +153,12 @@ export function checkJob(job) {
 
 const running = new Map(), cancelled = new Set();
 export function gisCancel(id) { const p = running.get(id); if (!p) return false; cancelled.add(id); killTree(p); return true; }
+/* files the user chose in an Open dialog (an elevation model): the window gets a token, never a path; a job names the token */
+const picked = new Map();
+export function gisRegisterFile(path, name, size) { const token = 'f' + createHash('sha256').update(path + Date.now() + Math.random()).digest('hex').slice(0, 20); picked.set(token, path); return { token, name, size }; }
 export async function gisRun({ userData, root, job, timeoutMs = 600000, onProgress }) {
   const bad = checkJob(job); if (bad) return { ok: false, error: bad };
+  if (job.kind === 'dem') { const p = picked.get(job.file); if (!p || !existsSync(p)) return { ok: false, error: 'Choose the elevation model file again.' }; job = { ...job, path: p }; }
   const id = job.id;
   const home = gisHome(userData), py = pythonOf(home);
   if (!existsSync(py)) return { ok: false, error: 'The GIS engines are not installed. Install them under Settings › GIS engines.' };
