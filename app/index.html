@@ -1386,6 +1386,13 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .gp-hist button { display: flex; gap: 8px; width: 100%; padding: 5px 4px; border: 0; border-radius: var(--r-sm); background: none; text-align: left; cursor: pointer; font: 12px var(--f-body); color: var(--ink); }
 .gp-hist button:hover { background: var(--hover); } .gp-hist small { display: block; color: var(--muted); font-size: 11px; }
 .gp-st { flex: none; width: 16px; text-align: center; font-weight: 700; } .gp-hist .done .gp-st { color: var(--positive, #2e7d32); } .gp-hist .failed .gp-st { color: var(--negative, #c4242a); }
+.gp-tb { display: inline-flex; align-items: center; gap: 6px; } .gp-tb svg { width: 16px; height: 16px; } .gp-tb .chev { width: 13px; height: 13px; opacity: .7; } .gp-tb.on { background: var(--sel); border-color: var(--accent); }
+.menu.fmenu.gp-menu { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 4px 16px; padding: 10px 12px; width: min(560px, calc(100vw - 24px)); max-height: 70vh; overflow: auto; }
+.gp-mg { display: flex; flex-direction: column; } .gp-mg > b { margin: 6px 6px 2px; font: 600 10.5px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.gp-mg .mi small { display: block; font-size: 11px; color: var(--muted); font-weight: 400; } .gp-menu-warn { grid-column: 1 / -1; margin: 0 6px 6px; font-size: 12.5px; }
+.gp-head b { font-size: 13px; } .gp-pane { padding-top: 10px; } .gp-ph b { display: block; font-size: 14px; } .gp-ph small { color: var(--muted); font-size: 11.5px; }
+.gp-pane .gp-run .btn { flex: 1; } .gp-pane .gp-job { padding: 8px; } .gp-pane .gp-cmp th:nth-child(3), .gp-pane .gp-cmp td:nth-child(3) { width: 64px; } .gp-pane .gp-cmp th:nth-child(4), .gp-pane .gp-cmp td:nth-child(4) { width: 40px; } .gp-pane .gp-cmp td .note { display: block; }
+.gp-hd > summary { font: 600 12px var(--f-body); }
 .sb-gp { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 0; background: none; font: inherit; color: var(--ink); cursor: pointer; } .sb-gp[hidden] { display: none; }
 .gp-mini { position: relative; width: 70px; height: 6px; border-radius: 3px; background: var(--rule); overflow: hidden; } .gp-mini > span { position: absolute; inset: 0 auto 0 0; background: var(--accent); }
 .gp-mini > span.ind { background: repeating-linear-gradient(-45deg, var(--accent) 0 6px, transparent 6px 12px); animation: gp-ind 1s linear infinite; }
@@ -1506,7 +1513,7 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
   <span id="sb-bh"></span>
   <button type="button" id="sb-iss" class="sb-iss" data-act="show-issues" hidden></button>
   <span class="sb-grow"></span>
-  <button type="button" id="sb-gp" class="sb-gp" data-tab="gp" hidden title="GIS tools running"></button>
+  <button type="button" id="sb-gp" class="sb-gp" data-act="gp-chip" hidden title="GIS tools running"></button>
   <span id="sb-units" class="sb-opt"></span>
   <span id="sb-count" class="sb-opt"></span>
 </footer>
@@ -2242,13 +2249,32 @@ function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen ==
 /* the panel's column is set before a page draws, so drawings measure the work area they will really have */
 function ctlLayout() {
   const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
+  if (S.gpPanel && GP_TOOLS[S.gpPanel] && GP_TABS.includes(S.tab) && cur()) { el.hidden = false; el.classList.remove('min'); sh.style.setProperty('--ctl-w', Math.max(340, ctlClamp(S.ui.ctlW)) + 'px'); return; }
   const has = !!CTL[S.tab] && (!!cur() || S.tab === 'soil') && (S.tab !== 'gwm' || !gwModel().error), open = S.ui.ctlOpen !== false;
   if (el.dataset.tab !== S.tab) { el.scrollTop = 0; el.dataset.tab = S.tab; }
   el.hidden = !has; el.classList.toggle('min', has && !open);
   sh.style.setProperty('--ctl-w', !has ? '0px' : open ? ctlClamp(S.ui.ctlW) + 'px' : '40px');
 }
+const GP_TABS = ['site', 'contam', 'xsec'];
+function gpPaneHTML(k) {
+  const T = GP_TOOLS[k], j = [...GIS.jobs.values()].filter(x => x.tool === k).pop(), off = !gisOn(), hist = [...GIS.jobs.values()].reverse();
+  return `<div class="ctl-rz" data-ctlrz title="Drag to resize the panel"></div><div class="ctl-head gp-head"><button type="button" class="tb" data-act="gp-close" title="Back to the settings" aria-label="Back to the settings">${svgI('<path d="M15 6l-6 6 6 6"/>')}</button><b>Toolbox</b><span class="note">${esc(T.group)}</span><span class="sp"></span><button type="button" class="tb" data-act="gp-menu" title="Choose another tool" aria-label="Choose another tool">${svgI(NAV_ICON.gp)}</button></div>
+    <section class="ctl-g"><div class="ctl-gb gp-pane">
+      <div class="gp-ph"><b>${esc(T.name)}</b><small>${esc(T.by)}</small></div><p class="note">${esc(T.desc)}</p>
+      ${off ? `<div class="gp-warn">${window.desktop?.gis ? 'Needs the GIS engines. <button class="btn link" data-act="gis-install">Install…</button>' : 'Runs on the desktop app.'}</div>` : ''}
+      ${gpFormHTML(k, T)}
+      <div class="gp-run"><button class="btn primary" data-act="gp-run" ${off || (j && j.status === 'running') ? 'disabled' : ''}>Run</button>${j && j.status === 'running' ? `<button class="btn" data-act="gp-cancel" data-id="${j.id}">Cancel</button>` : ''}</div>
+      ${j ? gpJobHTML(j, true) : ''}
+      ${hist.length ? `<details class="gp-hd" ${S.gpHistOpen ? 'open' : ''}><summary>History · ${hist.length}</summary><ul class="gp-hist">${hist.map(x => `<li class="${x.status}"><button type="button" data-gphist="${x.id}" title="${esc(x.msg || '')}"><span class="gp-st">${{ done: '✓', failed: '✕', cancelled: '–', running: '…' }[x.status]}</span><span><b>${esc(x.label)}</b><small>${esc(x.input || '')} · ${new Date(x.t0).toLocaleTimeString()} · ${gisElapsed(x)}${x.res?.loo != null ? ' · within ' + gisX(x.res.loo) : ''}</small></span></button></li>`).join('')}</ul></details>` : ''}
+    </div></section>`;
+}
 function ctlRender() {
   const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
+  if (S.gpPanel && GP_TOOLS[S.gpPanel] && GP_TABS.includes(S.tab) && (cur() || S.tab === 'soil')) {   // a tool open from the Toolbox
+    const top = el.dataset.gp === S.gpPanel ? el.scrollTop : 0; el.hidden = false; el.classList.remove('min'); el.dataset.gp = S.gpPanel;
+    sh.style.setProperty('--ctl-w', Math.max(340, ctlClamp(S.ui.ctlW)) + 'px'); el.innerHTML = gpPaneHTML(S.gpPanel); el.scrollTop = top; return;
+  }
+  delete el.dataset.gp;
   const G = (CTL[S.tab]?.() || []).filter(g => g && g.html);
   if (!G.length) { el.hidden = true; el.innerHTML = ''; sh.style.setProperty('--ctl-w', '0px'); return; }
   const open = S.ui.ctlOpen !== false, top = el.scrollTop; el.hidden = false; el.classList.toggle('min', !open);
@@ -2274,7 +2300,7 @@ document.addEventListener('pointerdown', e => {
 const bhGlyph = well => `<svg class="bhg" viewBox="0 0 16 16" aria-hidden="true">${well ? '<circle cx="8" cy="8" r="4.6" fill="#fff" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/>' : '<circle cx="8" cy="8" r="4.6" fill="currentColor"/>'}</svg>`;
 /* the sidebar is the project as a tree: project pages, and each borehole with its own pages nested under it when chosen */
 /* the left side: a rail of project pages, then the project's boreholes as a list with a filter, status chips and a sort */
-const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['soil', 'Soil'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['gp', 'Toolbox'], ['compose', 'Outputs']];
+const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['soil', 'Soil'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['compose', 'Outputs']];
 const BH_ICON = '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M8 9h8M8 14h8"/>';
 S.bl = { q: '', st: lsGet('bhlog.blSt') || 'all', sort: lsGet('bhlog.blSort') || 'name' };
 const blMeta = b => { const w = latestWater(b), v = vapourMax(b, null, null); return { d: depthOf(b), w: w ? w.depth : null, v: v ? v.cvc : null }; };
@@ -2411,7 +2437,7 @@ function mapGoTo(q) {
 /* the Toolbox's form and lists */
 document.addEventListener('click', e => {
   const tl = e.target.closest?.('[data-gptool]'); if (tl) { S.gp.tool = tl.dataset.gptool; gpSave(); renderView(true); return; }
-  const h = e.target.closest?.('[data-gphist]'); if (h) { const j = GIS.jobs.get(h.dataset.gphist); if (j) { S.gp.tool = j.tool && GP_TOOLS[j.tool] ? j.tool : j.job?.method && GP_TOOLS[j.job.method] ? j.job.method : S.gp.tool; if (j.p0) S.gp.p = j.p0; if (j.prm) S.gp.prm = { ...S.gp.prm, [S.gp.tool]: { ...j.prm } }; gpSave(); if (S.tab !== 'gp') goTab('gp'); else renderView(true); } }
+  const h = e.target.closest?.('[data-gphist]'); if (h) { const j = GIS.jobs.get(h.dataset.gphist); if (j) { S.gp.tool = j.tool && GP_TOOLS[j.tool] ? j.tool : j.job?.method && GP_TOOLS[j.job.method] ? j.job.method : S.gp.tool; if (j.p0) S.gp.p = j.p0; if (j.prm) S.gp.prm = { ...S.gp.prm, [S.gp.tool]: { ...j.prm } }; gpSave(); if (GP_TABS.includes(S.tab)) { S.gpPanel = S.gp.tool; workResized(); } else if (S.tab === 'gp') renderView(true); else { S.gpPanel = S.gp.tool; goTab('site'); } } }
 });
 document.addEventListener('change', e => {
   const t = e.target, f = t.dataset?.gpf, n = t.dataset?.gpprm; if (!f && !n) return;
@@ -2473,11 +2499,11 @@ function mapBhsHTML() {
 /* page header: where you are, and the tools for this page */
 const PAGE_TOOLS = {
   home: [['new', 'New borehole'], ['import', 'Import Excel'], ['round', 'Monitoring round'], ['apply-project', 'Copy details to all boreholes']],
-  site: [['map-edit', 'Edit map', 1], ['imp-loc', 'Import locations'], ['imp-shp', 'Import shapes'], ['imp-img', 'Add imagery'], ['site-img', 'Site drawing…'], ['plan-pdf', 'Location plan PDF']],
+  site: [['gp-menu', 'Toolbox'], ['map-edit', 'Edit map', 1], ['imp-loc', 'Import locations'], ['imp-shp', 'Import shapes'], ['imp-img', 'Add imagery'], ['site-img', 'Site drawing…'], ['plan-pdf', 'Location plan PDF']],
   table: [['import', 'Import Excel'], ['imp-lab', 'Import lab results']],
   gw: [['round', 'Monitoring round', 1], ['go-slug', 'Slug tests']],
-  contam: [['imp-lab', 'Import lab results', 1], ['go-lab', 'Add lab results']],
-  xsec: [['imp-lab', 'Import lab results']],
+  contam: [['gp-menu', 'Toolbox'], ['imp-lab', 'Import lab results', 1], ['go-lab', 'Add lab results']],
+  xsec: [['gp-menu', 'Toolbox'], ['imp-lab', 'Import lab results']],
   compose: [['pdf-all', 'All logs (PDF)'], ['export', 'Excel report']],
   log: [['qlog', 'Edit step by step', 1], ['to-review', 'For review'], ['issue', 'Issue'], ['revise', 'Revise'], ['graphs', 'Graphs…'], ['comments', 'Comments'], ['history', 'History'], ['bh-more', 'More']],
   edit: [['to-review', 'For review'], ['issue', 'Issue'], ['revise', 'Revise'], ['comments', 'Comments'], ['history', 'History'], ['bh-more', 'More']],
@@ -2496,8 +2522,18 @@ function renderBar(b) {
   const views = onBh ? `<span class="seg bh-views" role="group" aria-label="Borehole view">${[['edit', 'Log & data', 'Ctrl+1'], ['log', 'Full log', 'Ctrl+2'], ['report', 'PDF preview', 'Ctrl+3']].map(([k, t, key]) => `<button type="button" data-tab="${k}" aria-pressed="${tab === k}" title="${t} (${key})">${t}</button>`).join('')}</span>` : '';
   tl.innerHTML = views + (PAGE_TOOLS[tab] || []).filter(([a]) => a === 'revise' ? st === 'issued' : a === 'to-review' ? st === 'draft' : a === 'issue' ? st !== 'issued' : true).map(([a, label, primary]) => {
     const rb = document.querySelector(`.ribbon [data-act="${a}"]`), lb = a === 'map-edit' && S.mapEdit ? 'Done editing' : label;
+    if (a === 'gp-menu') return `<button class="btn gp-tb${S.gpPanel ? ' on' : ''}" data-act="gp-menu" aria-haspopup="menu" title="GIS tools: GRASS GIS, GDAL, PyKrige, GSTools">${svgI(NAV_ICON.gp)}<span>Toolbox</span>${svgI('<path d="M6 9l6 6 6-6"/>').replace('<svg', '<svg class="chev"')}</button>`;
     return `<button class="btn${primary ? ' primary' : ''}${S.hlAct === a ? ' hl' : ''}" data-act="${a}" ${rb?.disabled ? 'disabled' : ''} ${rb?.title ? `title="${esc(rb.title)}"` : ''}>${esc(lb)}</button>`;
   }).join('');
+}
+function openGpMenu(anchor) {
+  if ($('#menu')) { closeMenu(); return; }
+  const m = document.createElement('div'); m.id = 'menu'; m.className = 'menu fmenu gp-menu'; m.setAttribute('role', 'menu');
+  const groups = [...new Set(gpTools().map(([, t]) => t.group))];
+  m.innerHTML = (gisOn() ? '' : `<p class="gp-menu-warn">${window.desktop?.gis ? 'The tools need the GIS engines. <button class="btn link" data-act="gis-install">Install…</button>' : 'The GIS tools run on the desktop app.'}</p>`)
+    + groups.map(g => `<div class="gp-mg"><b>${esc(g)}</b>${gpTools().filter(([, t]) => t.group === g).map(([id, t]) => `<button class="mi" role="menuitem" data-act="gp-open" data-tool="${id}"><span><b>${esc(t.name)}</b><small>${esc(t.by)}</small></span></button>`).join('')}</div>`).join('');
+  const r = anchor.getBoundingClientRect(); m.style.top = r.bottom + 6 + 'px'; m.style.left = Math.max(12, Math.min(r.left, innerWidth - 560)) + 'px'; m.style.right = 'auto';
+  document.body.append(m);
 }
 function openActMenu(anchor, items) {
   if ($('#menu')) { closeMenu(); return; }
@@ -2612,7 +2648,7 @@ function closeMenu() { $('#menu')?.remove(); $('#tb-menu')?.setAttribute('aria-e
 document.addEventListener('click', e => {
   if (!$('#menu')) return;
   if (e.target.closest('.menu .mi')) setTimeout(closeMenu, 0);
-  else if (!e.target.closest('#menu') && !e.target.closest('#tb-menu') && !e.target.closest('#tb-file') && !e.target.closest('[data-act="bh-more"]')) closeMenu();
+  else if (!e.target.closest('#menu') && !e.target.closest('#tb-menu') && !e.target.closest('#tb-file') && !e.target.closest('[data-act="bh-more"]') && !e.target.closest('[data-act="gp-menu"]')) closeMenu();
 }, true);
 /* settings in one place; each control drives the original setting so its behaviour stays the same */
 function openPrefs() {
@@ -3094,7 +3130,7 @@ function renderView(full) {
   else if (S.tab === 'gwm') { v.innerHTML = gwmHTML(); gwEnsure(); }
   else if (S.tab === 'v3d') { v.innerHTML = v3dHTML(); v3dBuild(); gwAutoEnsure(); }
   else if (S.tab === 'home') { v.innerHTML = homeHTML(); }
-  else if (S.tab === 'gp') { v.innerHTML = gpHTML(); }
+  else if (S.tab === 'gp') { S.tab = 'site'; S.gpPanel = S.gp.tool; v.innerHTML = siteHTML(); drawSite(); }
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
   else if (S.tab === 'soil') { v.innerHTML = soilHTML(); drawSoil(); }
   else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); drawPlasticity(); }
@@ -10563,7 +10599,7 @@ function gisInit() {
 function gisMethods() { if (!gisOn()) return; for (const [k, v] of Object.entries(GIS_3D)) { if (desktopWin() && GIS_NO_WIN.has(k)) continue; XS_METHODS[k] = v; XS_3D.add(k); } }
 const desktopWin = () => window.desktop?.platform === 'win32';
 const gisKey = (m, P, extra = '') => m + '|' + extra + '|' + P.map(p => p.map(v => (+v).toFixed(3)).join(',')).join(';');
-let gisT; const gisRedraw = () => { clearTimeout(gisT); gisT = setTimeout(() => { if (MAP_TABS.includes(S.tab) || S.tab === 'gp') renderView(true); }, 60); };
+let gisT; const gisRedraw = () => { clearTimeout(gisT); gisT = setTimeout(() => { if (MAP_TABS.includes(S.tab)) renderView(true); }, 60); };
 let gisSeq = 0;
 /* start a job (once per key): it is listed with its progress in the Toolbox and the status bar, and can be cancelled */
 function gisStart(key, job, label, input = '') {
@@ -11931,7 +11967,7 @@ document.addEventListener('click', e => {
   else { const st = siteOf() || {}, rs = { ...(st.resStyle || {}) }; delete rs[p]; setSite({ ...st, resStyle: rs }); }
   renderView(true);
 });
-document.addEventListener('toggle', e => { if (e.target.classList?.contains('xs-corr-each')) S.xsCorrEach = e.target.open; if (e.target.classList?.contains('rs-usewrap')) S.rsUseOpen = e.target.open; }, true);
+document.addEventListener('toggle', e => { if (e.target.classList?.contains('gp-hd')) S.gpHistOpen = e.target.open; if (e.target.classList?.contains('xs-corr-each')) S.xsCorrEach = e.target.open; if (e.target.classList?.contains('rs-usewrap')) S.rsUseOpen = e.target.open; }, true);
 document.addEventListener('toggle', e => { if (e.target.classList?.contains('res-style')) S.resOpen = e.target.open; if (e.target.classList?.contains('lbl-site')) S.lblOpen = e.target.open; if (e.target.classList?.contains('furn-site')) S.furnOpen = e.target.open; if (e.target.classList?.contains('lbl-each')) S.lblEachOpen = e.target.open; }, true);
 document.addEventListener('change', e => { const id = e.target.dataset?.resuse; if (!id || S.readOnly) return; const b = S.bh.get(id); if (!b) return; if (e.target.checked) delete b.resOff; else b.resOff = true; b.updated = new Date().toISOString(); store.save(b); renderView(true); });
 document.addEventListener('click', e => {
@@ -13326,6 +13362,10 @@ document.addEventListener('click', e => {
     case 'gis-remove': if (confirm('Remove the GIS engines (about 1.6 GB)? Maps set to a GIS method go back to the built-in ones until they are installed again.')) window.desktop.gis.remove().then(r => { GIS.st = { installed: false }; GIS.cache.clear(); const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); toast(r.ok ? 'The GIS engines were removed.' : r.error); }); break;
     case 'gis-export': gisExport(t.dataset.p || 'cvc'); break;
     case 'gp-run': gpRun(); break;
+    case 'gp-menu': openGpMenu(t.closest('.gp-tb') || t); break;
+    case 'gp-open': { closeMenu(); S.gp.tool = t.dataset.tool; S.gpPanel = t.dataset.tool; gpSave(); if (!GP_TABS.includes(S.tab)) { goTab(GP_TOOLS[S.gpPanel].kind === 'points3d' ? 'xsec' : 'site'); } else workResized(); renderBar(cur()); break; }
+    case 'gp-close': S.gpPanel = null; workResized(); renderBar(cur()); break;
+    case 'gp-chip': { const j = gisRunning()[0], k = j?.tool && GP_TOOLS[j.tool] ? j.tool : j?.job?.method && GP_TOOLS[j.job.method] ? j.job.method : S.gp.tool; S.gp.tool = k; S.gpPanel = k; if (!GP_TABS.includes(S.tab)) goTab(GP_TOOLS[k].kind === 'points3d' ? 'xsec' : 'site'); else workResized(); break; }
     case 'gp-cancel': window.desktop?.gis?.cancel(t.dataset.id); break;
     case 'gp-use': gpUse(GIS.jobs.get(t.dataset.id)); break;
     case 'gp-show': { gpUse(GIS.jobs.get(t.dataset.id)); goTab('site'); break; }
