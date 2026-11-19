@@ -896,6 +896,16 @@ def png_b64(rgba):
     gdal.GetDriverByName('PNG').CreateCopy('/vsimem/bfl.png', m); f = gdal.VSIFOpenL('/vsimem/bfl.png', 'rb'); gdal.VSIFSeekL(f, 0, 2); n = gdal.VSIFTellL(f); gdal.VSIFSeekL(f, 0, 0)
     data = gdal.VSIFReadL(1, n, f); gdal.VSIFCloseL(f); gdal.Unlink('/vsimem/bfl.png'); return base64.b64encode(data).decode()
 
+def pic_b64(rgba):
+    """a picture for the app: PNG when small, else WebP (quality 88, alpha kept); (base64, mime type)"""
+    from osgeo import gdal
+    h, w = rgba.shape[:2]
+    if w * h <= 1500000 or gdal.GetDriverByName('WEBP') is None or max(w, h) > 16383: return png_b64(rgba), 'image/png'
+    m = gdal.GetDriverByName('MEM').Create('', w, h, 4, gdal.GDT_Byte)
+    for i in range(4): m.GetRasterBand(i + 1).WriteArray(rgba[:, :, i])
+    gdal.GetDriverByName('WEBP').CreateCopy('/vsimem/bfl.webp', m, options=['QUALITY=88']); f = gdal.VSIFOpenL('/vsimem/bfl.webp', 'rb'); gdal.VSIFSeekL(f, 0, 2); n = gdal.VSIFTellL(f); gdal.VSIFSeekL(f, 0, 0)
+    data = gdal.VSIFReadL(1, n, f); gdal.VSIFCloseL(f); gdal.Unlink('/vsimem/bfl.webp'); return base64.b64encode(data).decode(), 'image/webp'
+
 def rgba_of(ds, maxpx=None):
     """a raster's picture as RGBA (8-bit): RGB(A) bands as they are, one band stretched to grey, a palette expanded"""
     from osgeo import gdal
@@ -933,12 +943,16 @@ def import_raster(job):
     if prm.get('srcepsg'): src = gdal.Translate('/vsimem/bfl_s.vrt', src, format='VRT', outputSRS=srs_of(prm['srcepsg']).ExportToWkt()); wkt = src.GetProjection()
     if not wkt or gt is None: raise RuntimeError('The file has no position on the ground: it is not georeferenced. Use Georeference an image to place it, or set its coordinate system if only that is missing.')
     image = src.RasterCount >= 3 or src.GetRasterBand(1).GetColorTable() is not None or str(prm.get('as', 'auto')) == 'image'
-    maxpx = int(prm.get('maxpx') or 2000)
-    prog(0.3, 'gdalwarp: to EPSG:%s' % job['epsg'])
-    w = gdal.Warp('', src, format='MEM', dstSRS=srs_of(job['epsg']).ExportToWkt(), resampleAlg='bilinear' if not image else 'cubic', dstAlpha=image and src.RasterCount in (1, 3), width=0, height=0)
+    maxpx = max(200, min(8192, int(prm.get('maxpx') or 2000)))
+    prog(0.2, 'gdalwarp: to EPSG:%s' % job['epsg'])
+    v = gdal.Warp('', src, format='VRT', dstSRS=srs_of(job['epsg']).ExportToWkt(), dstAlpha=image and src.RasterCount in (1, 3))
+    VW, VH = v.RasterXSize, v.RasterYSize; s2 = min(1.0, maxpx / max(VW, VH))
+    prog(0.4, 'gdalwarp: %d × %d px%s' % (max(1, int(VW * s2)), max(1, int(VH * s2)), ' (from %d × %d)' % (VW, VH) if s2 < 1 else ''))
+    w = gdal.Warp('', v, format='MEM', width=max(1, int(VW * s2)), height=max(1, int(VH * s2)), resampleAlg=('average' if s2 < .7 else 'cubic') if image else 'bilinear', multithread=True)
+    v = None
     g = w.GetGeoTransform(); W, H = w.RasterXSize, w.RasterYSize; box = [g[0], g[3] + g[5] * H, g[0] + g[1] * W, g[3]]
     if image:
-        rgba, sc = rgba_of(w, maxpx); return {'image': png_b64(rgba), 'box': box, 'w': rgba.shape[1], 'h': rgba.shape[0], 'tool': 'GDAL %s gdalwarp' % gdal.__version__, 'detail': '%s, %d × %d px from %s' % (src.GetDriver().ShortName, W, H, osr.SpatialReference(wkt=wkt).GetName())}
+        rgba, sc = rgba_of(w, maxpx); pic, mime = pic_b64(rgba); prog(0.9, 'Sending the picture (%s)' % mime); return {'image': pic, 'mime': mime, 'box': box, 'w': rgba.shape[1], 'h': rgba.shape[0], 'tool': 'GDAL %s gdalwarp' % gdal.__version__, 'detail': '%s, %d × %d px from %s' % (src.GetDriver().ShortName, W, H, osr.SpatialReference(wkt=wkt).GetName())}
     b = w.GetRasterBand(1); sc = min(1.0, maxpx / max(W, H)); W2, H2 = max(2, int(W * sc)), max(2, int(H * sc))
     a = b.ReadAsArray(buf_xsize=W2, buf_ysize=H2).astype(float); nd = b.GetNoDataValue()
     if nd is not None: a[a == nd] = np.nan
