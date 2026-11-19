@@ -136,6 +136,25 @@ export function checkJob(job) {
     if (pc != null && pc !== 'source' && !(+pc >= 25 && +pc <= 3000)) return 'Cells across must be 25 to 3000.';
     if (cs != null && !(+cs >= 0.05)) return 'The cell size must be 0.05 m or more.';
     if (job.levels != null && (!Array.isArray(job.levels) || job.levels.length > 400 || !job.levels.every(isNum))) return 'Contour levels must be numbers.';
+  } else if (kind === 'rast') {
+    if (!['profile', 'cutfill', 'watershed', 'diff', 'griddist'].includes(method)) return 'Unknown method.';
+    const grid = g => g && typeof g.b64 === 'string' && g.b64.length <= 24e6 && Number.isInteger(g.nx) && Number.isInteger(g.ny) && g.nx >= 3 && g.ny >= 3 && g.nx * g.ny <= 4.5e6 && Math.ceil(g.nx * g.ny * 4 / 3) * 4 === g.b64.length && nums([g.box], 4);
+    if (!grid(job.rasters?.a) || (job.rasters.b != null && !grid(job.rasters.b))) return 'A layer grid is missing or does not match its size.';
+    if (method === 'profile' && (!nums(job.line, 2) || job.line.length < 2 || job.line.length > 500)) return 'A line of 2 to 500 points is needed.';
+    if (method === 'griddist' && (!nums(job.points, 2) || job.points.length < 1 || job.points.length > 5000)) return 'Points are needed.';
+    if (job.polys != null && (!Array.isArray(job.polys) || job.polys.length > 500 || !job.polys.every(p => Array.isArray(p) && p.every(r => nums(r, 2))))) return 'Areas must be rings of [x, y].';
+  } else if (kind === 'thiessen') {
+    if (!Array.isArray(job.points) || job.points.length < 2 || job.points.length > 5000 || !job.points.every(p => Array.isArray(p) && isNum(p[0]) && isNum(p[1]) && (p[2] == null || typeof p[2] === 'string'))) return 'Points [x, y, name] are needed.';
+    if (!nums(job.outline, 2) || job.outline.length < 3) return 'An outline is needed.';
+  } else if (kind === 'setback' || kind === 'exportlayer') {
+    const feat = f => f && ['point', 'line', 'polygon'].includes(f.type) && Array.isArray(f.pts) && f.pts.length && f.pts.length <= 20000 && (nums(f.pts, 2) || f.pts.every(r => nums(r, 2))) && (f.name == null || typeof f.name === 'string');
+    const list = (a, mx) => Array.isArray(a) && a.length <= mx && a.every(feat);
+    if (kind === 'setback') { if (!list(job.from, 2000) || !job.from.length || (job.to != null && !list(job.to, 2000)) || !(job.distance >= 0 && job.distance <= 100000)) return 'Shapes and a distance are needed.'; }
+    else {
+      if (!(Number.isInteger(job.epsg) && job.epsg > 1000 && job.epsg < 100000) || !['GPKG', 'SHP', 'KML', 'DXF'].includes(job.format) || (job.name && !/^[\w .-]{1,60}$/.test(job.name))) return 'A format, a plain name and a coordinate system are needed.';
+      if (job.features != null && !list(job.features, 50000)) return 'Features must be points, lines or areas.';
+      if (job.raster != null && !(typeof job.raster.b64 === 'string' && Math.ceil(job.raster.nx * job.raster.ny * 4 / 3) * 4 === job.raster.b64.length && nums([job.raster.box], 4))) return 'The grid does not match its size.';
+    }
   } else if (kind === 'demfix') {
     if (typeof job.values_b64 !== 'string' || !/^[A-Za-z0-9+/=]+$/.test(job.values_b64.slice(0, 200)) || job.values_b64.length > 24e6) return 'The elevation grid is missing or too large.';
     if (!(Number.isInteger(job.nx) && Number.isInteger(job.ny) && job.nx >= 3 && job.ny >= 3 && job.nx * job.ny <= 4.5e6) || Math.ceil(job.nx * job.ny * 4 / 3) * 4 !== job.values_b64.length) return 'The grid does not match its size.';

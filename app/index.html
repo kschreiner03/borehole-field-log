@@ -1387,12 +1387,22 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 .gp-hist button:hover { background: var(--hover); } .gp-hist small { display: block; color: var(--muted); font-size: 11px; }
 .gp-st { flex: none; width: 16px; text-align: center; font-weight: 700; } .gp-hist .done .gp-st { color: var(--positive, #2e7d32); } .gp-hist .failed .gp-st { color: var(--negative, #c4242a); }
 .gp-tb { display: inline-flex; align-items: center; gap: 6px; } .gp-tb svg { width: 16px; height: 16px; } .gp-tb .chev { width: 13px; height: 13px; opacity: .7; } .gp-tb.on { background: var(--sel); border-color: var(--accent); }
-.menu.fmenu.gp-menu { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 4px 16px; padding: 10px 12px; width: min(560px, calc(100vw - 24px)); max-height: 70vh; overflow: auto; }
+.menu.fmenu.gp-menu { display: flex; flex-direction: column; gap: 0; padding: 0; width: min(600px, calc(100vw - 24px)); max-height: min(560px, 75vh); overflow: hidden; }
+.gp-mq { padding: 10px 10px 8px; border-bottom: 1px solid var(--rule); } .gp-mq input { width: 100%; min-height: 34px; padding: 0 10px; font-size: 13.5px; }
+.gp-mb { display: grid; grid-template-columns: 150px minmax(0, 1fr); min-height: 0; flex: 1; }
+.gp-cats { display: flex; flex-direction: column; gap: 1px; padding: 6px; border-right: 1px solid var(--rule); background: var(--panel-2, var(--panel)); overflow-y: auto; }
+.gp-cat { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 7px 8px; border: 0; border-radius: var(--r-sm); background: none; font: 13px var(--f-body); color: var(--ink); text-align: left; cursor: pointer; }
+.gp-cat svg { width: 17px; height: 17px; color: var(--muted); } .gp-cat small { font-size: 11px; color: var(--muted); }
+.gp-cat:hover { background: var(--hover); } .gp-cat[aria-selected="true"] { background: var(--sel); font-weight: 600; } .gp-cat[aria-selected="true"] svg { color: var(--accent); }
+.gp-tl { overflow-y: auto; padding: 6px; } .gp-mh { margin: 6px 8px 4px; font: 600 10.5px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.gp-mi { display: grid !important; grid-template-columns: 22px minmax(0, 1fr); gap: 10px !important; align-items: center !important; }
+.gp-mi-i svg { width: 18px; height: 18px; color: var(--accent-2, var(--accent)); margin: 0 !important; }
 .gp-mg { display: flex; flex-direction: column; } .gp-mg > b { margin: 6px 6px 2px; font: 600 10.5px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .gp-mg .mi small { display: block; font-size: 11px; color: var(--muted); font-weight: 400; } .gp-menu-warn { grid-column: 1 / -1; margin: 0 6px 6px; font-size: 12.5px; }
 .gp-head b { font-size: 13px; } .gp-pane { padding-top: 10px; } .gp-ph b { display: block; font-size: 14px; } .gp-ph small { color: var(--muted); font-size: 11.5px; }
 .gp-pane .gp-run .btn { flex: 1; } .gp-pane .gp-job { padding: 8px; } .gp-pane .gp-cmp th:nth-child(3), .gp-pane .gp-cmp td:nth-child(3) { width: 64px; } .gp-pane .gp-cmp th:nth-child(4), .gp-pane .gp-cmp td:nth-child(4) { width: 40px; } .gp-pane .gp-cmp td .note { display: block; }
 .gp-hd > summary { font: 600 12px var(--f-body); }
+.gp-chart { width: 100%; max-width: 420px; height: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-sm); margin-top: 4px; }
 .gis-fixkey { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin-top: 3px; font-size: 10.5px; color: var(--muted); } .gis-fixkey i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: -3px; }
 .gis-li { display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
 .gis-li .gis-disp { margin: 0 0 0 26px; }
@@ -2470,7 +2480,7 @@ document.addEventListener('change', e => {
   else if (f === 'use' || f === 'save') S.gp[f] = t.checked;
   else if (f === 'd0' || f === 'd1') S.gp[f] = t.value === '' ? null : fromD(+t.value);
   else S.gp[f] = t.value;
-  gpSave(); if (['p', 'd0', 'd1', 'r1', 'r2', 'unit'].includes(f)) renderView(true);
+  gpSave(); if (['p', 'd0', 'd1', 'r1', 'r2', 'unit', 'gL', 'gL2', 'gA', 'sbFrom', 'exL', 'fixL'].includes(f)) renderView(true);
 });
 document.addEventListener('input', e => { if (e.target.id === 'gp-q') { S.gp.q = e.target.value; const pos = e.target.selectionStart; renderView(true); const q = $('#gp-q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } } });
 document.addEventListener('submit', e => { const f = e.target.closest?.('[data-mapgo]'); if (!f) return; e.preventDefault(); mapGoTo(f.querySelector('input').value); });
@@ -2552,15 +2562,42 @@ function renderBar(b) {
     return `<button class="btn${primary ? ' primary' : ''}${S.hlAct === a ? ' hl' : ''}" data-act="${a}" ${rb?.disabled ? 'disabled' : ''} ${rb?.title ? `title="${esc(rb.title)}"` : ''}>${esc(lb)}</button>`;
   }).join('');
 }
+/* the Toolbox's categories: an icon each, and the tool groups they hold */
+const GP_CATS = [
+  ['recent', 'Recent', '<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>', []],
+  ['interp', 'Interpolation', '<path d="M3 18c3-8 6-8 9-4s6 4 9-4"/><circle cx="3" cy="18" r="1.5"/><circle cx="12" cy="14" r="1.5"/><circle cx="21" cy="10" r="1.5"/>', ['Interpolation', 'Interpolation 3D (cross-section)']],
+  ['gw', 'Groundwater', NAV_ICON.gw, ['Groundwater']],
+  ['contam', 'Contamination', NAV_ICON.contam, ['Contamination']],
+  ['sample', 'Sampling', '<circle cx="12" cy="10" r="3"/><path d="M12 13v8M8 21h8"/><path d="M5 4l2 2M19 4l-2 2"/>', ['Sampling']],
+  ['soil', 'Soil', NAV_ICON.soil, ['Soil']],
+  ['terrain', 'Terrain', '<path d="M3 19l6-9 4 5 3-4 5 8z"/>', ['Terrain']],
+  ['analysis', 'Analysis', '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', ['Analysis']],
+  ['export', 'Export', '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/>', ['Export']]];
+const gpCatOf = id => GP_CATS.find(c => c[3].includes(GP_TOOLS[id]?.group))?.[0] || 'analysis';
+function gpMenuList() {
+  const q = (S.gpMenuQ || '').trim().toLowerCase(), cat = S.gpMenuCat || 'recent', tools = gpTools();
+  const hit = ([id, t]) => (t.name + ' ' + t.by + ' ' + t.group + ' ' + t.desc).toLowerCase().includes(q);
+  const row = ([id, t]) => `<button class="mi gp-mi" role="menuitem" data-act="gp-open" data-tool="${id}"><span class="gp-mi-i">${svgI(GP_CATS.find(c => c[0] === gpCatOf(id))[2])}</span><span><b>${esc(t.name)}</b><small>${esc(t.by)}</small></span></button>`;
+  if (q) { const hits = tools.filter(hit); return hits.length ? `<p class="gp-mh">${hits.length} tool${hits.length === 1 ? '' : 's'} matching “${esc(S.gpMenuQ.trim())}”</p>` + hits.map(row).join('') : '<p class="gp-mh">No tool matches. Try “volume”, “water”, “export”.</p>'; }
+  if (cat === 'recent') { const rec = (S.gp.recent || []).filter(id => GP_TOOLS[id] && tools.some(([x]) => x === id)); return rec.length ? '<p class="gp-mh">Used lately</p>' + rec.map(id => row([id, GP_TOOLS[id]])).join('') : '<p class="gp-mh">Tools you run appear here. Pick a category on the left, or type to search.</p>'; }
+  const C = GP_CATS.find(c => c[0] === cat);
+  return C[3].map(gname => { const ts = tools.filter(([, t]) => t.group === gname); return ts.length ? (C[3].length > 1 ? `<p class="gp-mh">${esc(gname)}</p>` : '') + ts.map(row).join('') : ''; }).join('');
+}
 function openGpMenu(anchor) {
   if ($('#menu')) { closeMenu(); return; }
+  if (!S.gpMenuCat) S.gpMenuCat = (S.gp.recent || []).length ? 'recent' : 'interp'; S.gpMenuQ = '';
   const m = document.createElement('div'); m.id = 'menu'; m.className = 'menu fmenu gp-menu'; m.setAttribute('role', 'menu');
-  const groups = [...new Set(gpTools().map(([, t]) => t.group))];
+  const counts = Object.fromEntries(GP_CATS.map(c => [c[0], c[0] === 'recent' ? (S.gp.recent || []).length : gpTools().filter(([, t]) => c[3].includes(t.group)).length]));
   m.innerHTML = (gisOn() ? '' : `<p class="gp-menu-warn">${window.desktop?.gis ? 'The tools need the GIS engines. <button class="btn link" data-act="gis-install">Install…</button>' : 'The GIS tools run on the desktop app.'}</p>`)
-    + groups.map(g => `<div class="gp-mg"><b>${esc(g)}</b>${gpTools().filter(([, t]) => t.group === g).map(([id, t]) => `<button class="mi" role="menuitem" data-act="gp-open" data-tool="${id}"><span><b>${esc(t.name)}</b><small>${esc(t.by)}</small></span></button>`).join('')}</div>`).join('');
-  const r = anchor.getBoundingClientRect(); m.style.top = r.bottom + 6 + 'px'; m.style.left = Math.max(12, Math.min(r.left, innerWidth - 560)) + 'px'; m.style.right = 'auto';
-  document.body.append(m);
+    + `<div class="gp-mq"><input id="gp-menu-q" type="search" placeholder="Search ${gpTools().length} tools" aria-label="Search the tools" autocomplete="off"></div>
+    <div class="gp-mb"><nav class="gp-cats" role="tablist" aria-label="Tool categories">${GP_CATS.map(([id, label, icon]) => `<button type="button" role="tab" class="gp-cat" data-gpcat="${id}" aria-selected="${S.gpMenuCat === id}">${svgI(icon)}<span>${label}</span><small>${counts[id] || ''}</small></button>`).join('')}</nav>
+    <div class="gp-tl" id="gp-menu-list">${gpMenuList()}</div></div>`;
+  const r = anchor.getBoundingClientRect(); m.style.top = r.bottom + 6 + 'px'; m.style.left = Math.max(12, Math.min(r.left, innerWidth - 620)) + 'px'; m.style.right = 'auto';
+  document.body.append(m); setTimeout(() => $('#gp-menu-q')?.focus(), 0);
 }
+document.addEventListener('click', e => { const c = e.target.closest?.('[data-gpcat]'); if (!c) return; e.stopPropagation(); S.gpMenuCat = c.dataset.gpcat; S.gpMenuQ = ''; const q = $('#gp-menu-q'); if (q) q.value = ''; document.querySelectorAll('[data-gpcat]').forEach(b => b.setAttribute('aria-selected', String(b === c))); $('#gp-menu-list').innerHTML = gpMenuList(); }, true);
+document.addEventListener('input', e => { if (e.target.id !== 'gp-menu-q') return; S.gpMenuQ = e.target.value; $('#gp-menu-list').innerHTML = gpMenuList(); });
+document.addEventListener('keydown', e => { if (e.target.id === 'gp-menu-q' && e.key === 'Enter') { const b = $('#gp-menu-list [data-act="gp-open"]'); if (b) { e.preventDefault(); b.click(); } } });
 function openActMenu(anchor, items) {
   if ($('#menu')) { closeMenu(); return; }
   updateRibbon();
@@ -2673,7 +2710,7 @@ function openMenu() {
 function closeMenu() { $('#menu')?.remove(); $('#tb-menu')?.setAttribute('aria-expanded', 'false'); $('#tb-file')?.setAttribute('aria-expanded', 'false'); }
 document.addEventListener('click', e => {
   if (!$('#menu')) return;
-  if (e.target.closest('.menu .mi')) setTimeout(closeMenu, 0);
+  if (e.target.closest('.menu .mi') && !e.target.closest('.gp-menu')) setTimeout(closeMenu, 0);
   else if (!e.target.closest('#menu') && !e.target.closest('#tb-menu') && !e.target.closest('#tb-file') && !e.target.closest('[data-act="bh-more"]') && !e.target.closest('[data-act="gp-menu"]')) closeMenu();
 }, true);
 /* settings in one place; each control drives the original setting so its behaviour stays the same */
@@ -10787,8 +10824,16 @@ const GP_TOOLS = {
   drill_next: { group: 'Sampling', name: 'Where to drill next', by: 'PyKrige kriging variance', kind: 'drillnext', desc: 'Where the kriged estimate is least certain, and the next places to drill to cut that most: each is picked after the one before is added. Kept inside the outer boreholes.', prm: [['n', 'Locations', 3, 'How many to suggest (1 to 10).']] },
   unit_map: { group: 'Soil', name: 'Soil unit thickness and top', by: 'GRASS GIS v.surf.rst, GDAL gdal_contour', kind: 'unit', desc: 'For one soil unit from the logs: its thickness (isopach), the elevation of its top (structure contours) or the depth to it, between the boreholes.', prm: [['mode', 'Show', 'thickness', '', ['thickness', 'top', 'depth']], ['tension', 'Tension', 40, ''], ['smooth', 'Smoothing', 0.1, '']] },
   area_over: { group: 'Analysis', name: 'Area over a level', by: 'GDAL Polygonize', kind: 'area', desc: 'The area where the map\'s surface of a result is at or over a level (a guideline or screening level), as polygons with their area. The surface is the one the maps draw for that result.', prm: [['level', 'Level', 'guideline', 'In the result\'s units. Blank: the guideline, or the screening level for headspace vapour.']] },
+  terr_profile: { group: 'Terrain', name: 'Profile along the section line', by: 'GRASS GIS r.profile', kind: 'rast', desc: 'The ground (or any layer) along the section line, as a chart with the boreholes on it, and the line on the map.', prm: [['step', 'Sample every (m)', 'auto', 'Blank: the layer\'s cell size.']] },
+  terr_cutfill: { group: 'Terrain', name: 'Cut and fill volume', by: 'GRASS GIS r.mapcalc, r.univar', kind: 'rast', desc: 'How much ground lies above (cut) and below (fill) a level or a second surface, in an area or over the whole layer: for an excavation to a base level, or between ground before and after.', prm: [['level', 'Level (m)', 'mean', 'The base to cut to and fill up to, when not against a second layer.']] },
+  terr_drain: { group: 'Terrain', name: 'Surface drainage (where runoff and spills go)', by: 'GRASS GIS r.watershed', kind: 'rast', desc: 'Flow directions and how much ground drains through each place, from an elevation layer; the drainage lines where enough area drains. For where a surface spill or runoff would run.', prm: [['threshold', 'Lines where at least (cells) drain', 'auto', 'Smaller: more, finer drainage lines.']] },
+  an_diff: { group: 'Analysis', name: 'Difference between two layers', by: 'GRASS GIS r.mapcalc, GDAL gdalwarp', kind: 'rast', desc: 'The first layer minus the second, on the first one\'s cells: elevation before and after, two water tables, two results surfaces.', prm: [] },
+  smp_dist: { group: 'Sampling', name: 'Distance to the nearest borehole', by: 'GRASS GIS r.grow.distance', kind: 'rast', desc: 'How far every place is from the nearest borehole: where the site is thinly covered. With contours.', prm: [['cell', 'Cell size (m)', 'auto', ''], ['margin', 'Margin (m)', 30, 'Around the outer boreholes.'], ['interval', 'Contour every (m)', 'auto', '']] },
+  smp_thiessen: { group: 'Sampling', name: 'Area each borehole represents', by: 'SciPy Voronoi, OGR', kind: 'thiessen', desc: 'Thiessen (Voronoi) polygons: every place belongs to its nearest borehole. The areas, for area-weighted averages and for showing how much ground each borehole stands for.', prm: [['margin', 'Margin (m)', 10, 'How far past the outer boreholes the outline goes.']] },
+  an_setback: { group: 'Analysis', name: 'Buffer and setback distances', by: 'OGR Buffer, Distance', kind: 'setback', desc: 'A buffer of a set distance around the boreholes, a Toolbox area or path, and the shortest distance from them to each site shape (creeks, wells, property lines, buildings).', prm: [['distance', 'Buffer (m)', 30, '']] },
+  exp_layer: { group: 'Export', name: 'Export a layer', by: 'GDAL/OGR', kind: 'export2', desc: 'A Toolbox layer or the boreholes as GIS files in the project\'s coordinates: a grid as GeoTIFF, lines, areas and points as GeoPackage, Shapefile, KML (Google Earth) or DXF (AutoCAD, Civil 3D).', prm: [['format', 'Format', 'GPKG', '', ['GPKG', 'SHP', 'KML', 'DXF'], { GPKG: 'GeoPackage (QGIS, ArcGIS)', SHP: 'Shapefile', KML: 'KML (Google Earth)', DXF: 'DXF (AutoCAD, Civil 3D)' }]] },
   compare: { group: 'Analysis', name: 'Compare interpolation methods', by: 'every 2D tool, leave-one-out', kind: 'compare', desc: 'Runs each interpolation tool on the same readings and ranks them by how well each predicts every reading from the others.', prm: [] },
-  export: { group: 'Conversion', name: 'Surface to GeoTIFF and GeoPackage', by: 'GDAL', kind: 'export', desc: 'The map\'s surface (as its method draws it) as a GeoTIFF, and its contours, boreholes and section lines as a GeoPackage, in the project\'s coordinate system.', prm: [] },
+  export: { group: 'Export', name: 'Surface to GeoTIFF and GeoPackage', by: 'GDAL', kind: 'export', desc: 'The map\'s surface (as its method draws it) as a GeoTIFF, and its contours, boreholes and section lines as a GeoPackage, in the project\'s coordinate system.', prm: [] },
 };
 S.gp = { tool: 'grass_rst', p: '', d0: null, d1: null, prm: {}, cell: '', use: true, save: false, q: '', ...jsonLS('bhlog.gp', {}) };
 const gpSave = () => lsSet('bhlog.gp', JSON.stringify({ ...S.gp, run: undefined }));
@@ -10822,6 +10867,18 @@ function gpFormHTML(k, T) {
     const gr = k === 'gw_depth' ? crow('Ground', `${projList().filter(b => b.easting != null && b.elevation != null).length} boreholes with a ground elevation`) : '';
     return `<h4>Input</h4>${wl}${from}${gr}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">Added to the map as a layer; show, hide or remove it under Settings › Tool outputs.</p>`;
   }
+  const lsel = (f, test, none) => { const ls = GIS.layers.filter(test); if (!none && !ls.some(L => L.id === g[f])) g[f] = ls[0]?.id || ''; return ls.length || none ? `<select data-gpf="${f}">${none ? `<option value="">${esc(none)}</option>` : ''}${ls.map(L => `<option value="${L.id}" ${L.id === g[f] ? 'selected' : ''}>${esc(L.name)}</option>`).join('')}</select>` : '<span class="note">None yet: make one with a Toolbox tool first.</span>'; };
+  const isGrid = L => L.kind === 'raster' && L.values && L.box, isArea = L => L.kind === 'polys';
+  if (k === 'terr_profile') { const ln = secLineOf()?.pts || sectionList().filter(b => b.easting != null).map(b => [b.easting, b.northing]);
+    return `<h4>Input</h4>${crow('Layer', lsel('gL', isGrid))}${crow('Along', ln.length >= 2 ? (secLineOf() ? 'section line ' + esc(secLetters()) : 'the section through ' + ln.length + ' boreholes') : '<b>no section line yet</b>')}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">A chart in the result, and the line on the map.</p>`; }
+  if (k === 'terr_cutfill') return `<h4>Input</h4>${crow('Surface', lsel('gL', isGrid))}${crow('Against', lsel('gL2', L => isGrid(L) && L.id !== g.gL, 'A level (below)'))}${crow('Within', lsel('gA', isArea, 'The whole layer'))}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">A layer: red where the surface is above (cut), blue where it is below (fill); the volumes in the result.</p>`;
+  if (k === 'terr_drain') return `<h4>Input</h4>${crow('Elevation', lsel('gL', L => isGrid(L) && L.terrain))}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">The drainage lines on the map. Run Fix bad spots with Fill false depressions first if the lines break up.</p>`;
+  if (k === 'an_diff') return `<h4>Input</h4>${crow('First', lsel('gL', isGrid))}${crow('Minus', lsel('gL2', L => isGrid(L) && L.id !== g.gL))}<h4>Output</h4><p class="note">A layer, red where the first is higher, blue where lower.</p>`;
+  if (k === 'smp_dist' || k === 'smp_thiessen') { const n = projList().filter(b => b.easting != null).length; return `<h4>Input</h4>${crow('Boreholes', n + ' located' + (n < 2 ? ' <b>(two or more needed)</b>' : ''))}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">${k === 'smp_dist' ? 'A layer shaded by distance, with contours.' : 'The polygons on the map, each labelled with its borehole and area.'}</p>`; }
+  if (k === 'an_setback') { const fs = featsOf(); if (!['bh', ...GIS.layers.filter(L => isArea(L) || L.kind === 'path').map(L => L.id)].includes(g.sbFrom)) g.sbFrom = 'bh';
+    return `<h4>Input</h4>${crow('Around', `<select data-gpf="sbFrom"><option value="bh">The boreholes</option>${GIS.layers.filter(L => isArea(L) || L.kind === 'path').map(L => `<option value="${L.id}" ${g.sbFrom === L.id ? 'selected' : ''}>${esc(L.name)}</option>`).join('')}</select>`)}${crow('Distances to', fs.length ? fs.length + ' site shape' + (fs.length === 1 ? '' : 's') : '<span class="note">no site shapes yet (Edit map draws them)</span>')}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">The buffer on the map; the distances in the result.</p>`; }
+  if (k === 'exp_layer') { if (!['bh', ...GIS.layers.map(L => L.id)].includes(g.exL)) g.exL = GIS.layers[0]?.id || 'bh';
+    return `<h4>Input</h4>${crow('Layer', `<select data-gpf="exL"><option value="bh" ${g.exL === 'bh' ? 'selected' : ''}>The boreholes</option>${GIS.layers.map(L => `<option value="${L.id}" ${g.exL === L.id ? 'selected' : ''}>${esc(L.name)}</option>`).join('')}</select>`)}${crow('Coordinates', 'EPSG:' + projEpsg())}<h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">Saved where you choose. A grid layer also gives a GeoTIFF; KML is written in latitude and longitude, as Google Earth needs.</p>`; }
   if (T.kind === 'demfix') {
     const ts = GIS.layers.filter(L => L.terrain); if (!ts.some(L => L.id === g.fixL)) g.fixL = ts[0]?.id || '';
     const L = ts.find(x => x.id === g.fixL), sp = S.gp.spots || [];
@@ -10868,7 +10925,7 @@ function gpJobHTML(j, full) {
     <div class="gp-jh"><b>${esc(j.label)}</b><span class="gp-time note">${j.status === 'running' ? Math.round(j.p * 100) + ' % · ' : ''}${gisElapsed(j)}</span></div>
     ${gpBarHTML(j)}<div class="gp-msg note">${esc(j.msg || '')}</div>
     ${full ? `<details class="gp-det" ${j.status === 'running' ? 'open' : ''}><summary>Messages</summary><ul class="gp-log">${(j.msgs || []).slice(-60).map(([t, m]) => `<li><span>${new Date(t).toLocaleTimeString()}</span>${esc(m)}</li>`).join('')}</ul></details>` : ''}
-    ${ok && r?.tool ? `<p class="note gp-out">${esc(r.tool)}${r.detail ? ': ' + esc(r.detail) : ''}.${r.loo != null && j.kind !== 'hydro' ? ' Each reading predicted from the others typically within ' + gisX(r.loo) + ' (' + esc(r.loo_by || 'leave-one-out') + ').' : ''}</p>` : ''}${ok && j.sum ? `<p class="gp-sum">${esc(j.sum)}</p>` : ''}
+    ${ok && r?.tool ? `<p class="note gp-out">${esc(r.tool)}${r.detail ? ': ' + esc(r.detail) : ''}.${r.loo != null && j.kind !== 'hydro' ? ' Each reading predicted from the others typically within ' + gisX(r.loo) + ' (' + esc(r.loo_by || 'leave-one-out') + ').' : ''}</p>` : ''}${ok && j.sum ? `<p class="gp-sum">${esc(j.sum)}</p>` : ''}${ok && j.chart ? j.chart : ''}
     ${full && ok && j.kind === 'hydro' && !GP_TABS.includes(S.tab) ? '' : ''}${full && ok && j.kind === 'hydro' && S.tab !== 'site' ? '<div class="actions"><button class="btn" data-tab="site">Show on the map</button></div>' : ''}
     ${full && ok && j.kind === 'surface' ? `<div class="actions"><button class="btn" data-act="gp-use" data-id="${j.id}">Use on the maps</button><button class="btn" data-act="gp-show" data-id="${j.id}">Show on the map</button></div>` : ''}
     ${full && ok && j.kind === 'points3d' ? `<div class="actions"><button class="btn" data-act="gp-use" data-id="${j.id}">Use on the cross-section</button><button class="btn" data-tab="xsec">Open the cross-section</button></div>` : ''}
@@ -10889,6 +10946,7 @@ async function gpRun() {
   if (T.kind === 'export') { await gisExport(g.p, g.d0, g.d1); renderView(true); return; }
   if (['hydro', 'area', 'prob', 'drillnext', 'volume', 'unit', 'terrain'].includes(T.kind)) { await gpHydro(k, T); return; }
   if (T.kind === 'demfix') { await gpFix(gpParams(k)); return; }
+  if (['rast', 'thiessen', 'setback', 'export2'].includes(T.kind)) { await gpMore(k, T, gpParams(k)); return; }
   if (T.kind === 'points3d') {
     const prm = gpParams(k), kk = prm.k === 'auto' ? (XS_ANISO_PICK || 10) : +prm.k;
     S.xs = { ...S.xs, interp: 'gis_' + k, aniso: kk }; lsSet('bhlog.xs', JSON.stringify(S.xs)); gisMethods();
@@ -11094,6 +11152,113 @@ async function gpFix(prm) {
   if (j) j.sum = parts.length ? `Fixed: ${parts.join('; ')}. The largest change is ${r.maxchange.toFixed(2)} m. The corrected model runs ${r.min.toFixed(2)} to ${r.max.toFixed(2)} m (the original ${L.range[0].toFixed(2)} to ${L.range[1].toFixed(2)} m). It opens on What was fixed (red spikes, blue pits, amber holes, teal depressions, purple your spots); switch Show to Elevation for the result. Check the flagged places against the photos or the site: a real mound, ditch or culvert can look like a spike or pit.${params.spikes !== 'no' ? ' Objects wider than about ' + (params.window * (L.box[2] - L.box[0]) / L.nx / 2).toFixed(1) + ' m (half the ' + params.window + ' × ' + params.window + '-cell window) look like real ground to this test: mark them on the map, or compare with a larger window.' : ''}${r.notes.length > 1 ? ' ' + r.notes.slice(1).join('; ') + '.' : ''}` : 'Nothing needed fixing at this sensitivity: no spikes, pits or holes found.' + (spots.length ? '' : ' Mark spots on the map to remove particular places.');
   S.gp.spots = []; gpSave(); renderView(true);
 }
+/* a grid layer as the driver takes it */
+const gridOf = L => ({ b64: f32b64(L.values), nx: L.nx, ny: L.ny, box: L.box.map(v => +v) });
+/* a Toolbox layer's shapes as features (lines, areas, points) for export or buffers */
+function layerFeatures(L) {
+  if (L.kind === 'path') return [{ type: 'line', name: L.lab?.text ?? L.note ?? L.name, pts: L.path }];
+  if (L.kind === 'polys') return L.polys.map((rings, i) => ({ type: 'polygon', name: L.plabels?.[i]?.[2] ?? L.lab?.text ?? L.name, pts: rings }));
+  if (L.kind === 'arrows') { const l = L.len || 5; return L.arrows.map(([x, y, az]) => { const a = az * Math.PI / 180; return { type: 'line', name: Math.round(az) + '°', pts: [[x - Math.sin(a) * l / 2, y - Math.cos(a) * l / 2], [x + Math.sin(a) * l / 2, y + Math.cos(a) * l / 2]] }; }); }
+  const out = (L.contours || []).map(([v, pts]) => ({ type: 'line', name: String(v), value: +v, pts }));
+  (L.marks || []).forEach(([x, y], i) => out.push({ type: 'point', name: L.lab?.marks?.[i] ?? String(i + 1), pts: [[x, y]] }));
+  return out;
+}
+/* a small chart of a profile: distance against value, the boreholes marked */
+function profileSVG(rows, line) {
+  const v = rows.filter(r => r[1] != null); if (v.length < 2) return '';
+  const W = 300, H = 150, m = { l: 40, r: 8, t: 8, b: 24 }, d1 = v[v.length - 1][0], lo = Math.min(...v.map(r => r[1])), hi = Math.max(...v.map(r => r[1])), pad = (hi - lo) * .1 || .5;
+  const X = d => m.l + d / (d1 || 1) * (W - m.l - m.r), Y = z => H - m.b - (z - lo + pad) / (hi - lo + 2 * pad) * (H - m.t - m.b);
+  const bh = mapList().filter(b => b.easting != null).map(b => { let best = null; for (const r of rows) { const dd = Math.hypot(r[2] - b.easting, r[3] - b.northing); if (!best || dd < best.dd) best = { dd, r }; } return best && best.dd < 8 ? { b, r: best.r } : null; }).filter(Boolean);
+  return `<svg class="gp-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Profile"><path d="M${v.map(r => X(r[0]).toFixed(1) + ' ' + Y(r[1]).toFixed(1)).join('L')}" fill="none" stroke="#7a5230" stroke-width="1.6"/>
+    ${[lo, (lo + hi) / 2, hi].map(z => `<text x="${m.l - 4}" y="${(Y(z) + 3).toFixed(1)}" font-size="9" text-anchor="end" fill="#666">${z.toFixed(1)}</text>`).join('')}<text x="${m.l}" y="${H - 6}" font-size="9" fill="#666">0</text><text x="${W - m.r}" y="${H - 6}" font-size="9" text-anchor="end" fill="#666">${Math.round(d1)} m</text>
+    ${bh.map(({ b, r }) => r[1] == null ? '' : `<line x1="${X(r[0]).toFixed(1)}" x2="${X(r[0]).toFixed(1)}" y1="${Y(r[1]).toFixed(1)}" y2="${H - m.b}" stroke="#333" stroke-dasharray="2 2"/><text x="${X(r[0]).toFixed(1)}" y="${(Y(r[1]) - 4).toFixed(1)}" font-size="8.5" text-anchor="middle">${esc(gwName(b) || b.name)}</text>`).join('')}
+    <line x1="${m.l}" x2="${W - m.r}" y1="${H - m.b}" y2="${H - m.b}" stroke="#999"/></svg>`;
+}
+async function gpMore(k, T, prm) {
+  const lab = T.name + ' (' + T.by + ')', g = S.gp;
+  const go = async (job, input) => { const key = k + '|' + Date.now(), pr = gisStart(key, { ...job, nocache: true }, lab, input), j = [...GIS.jobs.values()].find(x => x.key === key); if (j) { j.tool = k; j.kind = 'hydro'; } renderView(true); return { r: await pr, j }; };
+  const fin = (j, sum, L, chart) => { if (j) { j.sum = sum; if (chart) j.chart = chart; } if (L) { L.tool = k; gisAddLayer(L); } renderView(true); };
+  const Lg = GIS.layers.find(L => L.id === g.gL), Lg2 = GIS.layers.find(L => L.id === g.gL2);
+  const need = L => { if (!L) toast('Choose a layer first (make one with a Toolbox tool).'); return !!L; };
+  const decode = r => b64f32(r.values_b64);
+  const sym = (vals, q = .98) => { const a = Array.from(vals).filter(isFinite).map(Math.abs).sort((x, y) => x - y); return a.length ? a[Math.floor(a.length * q)] || a[a.length - 1] : 1; };
+  if (k === 'terr_profile') {
+    if (!need(Lg)) return; const ln = secLineOf()?.pts || sectionList().filter(b => b.easting != null).map(b => [b.easting, b.northing]); if (ln.length < 2) { toast('Draw a section line first (Settings › Section line).'); return; }
+    const { r, j } = await go({ kind: 'rast', method: 'profile', rasters: { a: gridOf(Lg) }, line: ln.map(q => [+q[0].toFixed(2), +q[1].toFixed(2)]), params: prm.step > 0 ? { step: prm.step } : {} }, Lg.name + ' along ' + (secLineOf() ? 'section ' + secLetters() : 'the section'));
+    if (!r?.ok) return; const v = r.profile.filter(q => q[1] != null), lo = Math.min(...v.map(q => q[1])), hi = Math.max(...v.map(q => q[1]));
+    fin(j, `${Lg.name} along ${secLetters()}: ${Math.round(r.profile.at(-1)?.[0] || 0)} m long, ${lo.toFixed(2)} to ${hi.toFixed(2)} m; ${r.profile.length} points.`, { name: 'Profile line ' + secLetters(), kind: 'path', path: ln, color: '#7a5230', note: Math.round(r.profile.at(-1)?.[0] || 0) + ' m' }, profileSVG(r.profile));
+    return;
+  }
+  if (k === 'terr_cutfill') {
+    if (!need(Lg)) return; const area = GIS.layers.find(L => L.id === g.gA && L.kind === 'polys');
+    const fv = Array.from(Lg.values).filter(isFinite), level = prm.level != null && prm.level !== '' && !isNaN(+prm.level) ? +prm.level : +(fv.reduce((a, x) => a + x, 0) / fv.length).toFixed(2);
+    const { r, j } = await go({ kind: 'rast', method: 'cutfill', rasters: { a: gridOf(Lg), ...(Lg2 ? { b: gridOf(Lg2) } : {}) }, ...(area ? { polys: area.polys } : {}), params: Lg2 ? {} : { level } }, Lg.name + ' against ' + (Lg2 ? Lg2.name : level + ' m') + (area ? ' within ' + area.name : ''));
+    if (!r?.ok) return; const d = decode(r), m = sym(d), fmt = x => Math.round(x).toLocaleString('en-CA');
+    fin(j, `Against ${Lg2 ? Lg2.name : 'a level of ' + level + ' m'}${area ? ', within ' + area.name : ''}: cut ${fmt(r.cut)} m³ over ${fmt(r.cut_area)} m² (up to ${(r.cut_max || 0).toFixed(2)} m), fill ${fmt(r.fill)} m³ over ${fmt(r.fill_area)} m² (up to ${(r.fill_max || 0).toFixed(2)} m); net ${r.cut >= r.fill ? 'cut' : 'fill'} ${fmt(Math.abs(r.cut - r.fill))} m³. Bank volumes: allow for bulking when the soil is dug.`,
+      { name: 'Cut and fill: ' + Lg.name.replace(/^Elevation: /, ''), kind: 'raster', ramp: 'cutfill', box: Lg.box, nx: Lg.nx, ny: Lg.ny, values: d, range: [-m, m], op: .7, note: 'cut ' + fmt(r.cut) + ' m³, fill ' + fmt(r.fill) + ' m³' });
+    return;
+  }
+  if (k === 'terr_drain') {
+    if (!need(Lg)) return;
+    const { r, j } = await go({ kind: 'rast', method: 'watershed', rasters: { a: gridOf(Lg) }, params: prm.threshold > 0 ? { threshold: Math.round(prm.threshold) } : {} }, Lg.name);
+    if (!r?.ok) return; const acc = decode(r), st = b64u8(r.stream_b64), vals = Float32Array.from(acc, (v, i) => st[i] ? v : NaN), lo = Math.log10(r.threshold), hi = Math.max(...Array.from(vals).filter(isFinite), lo + 1);
+    fin(j, `Drainage lines where more than ${r.threshold} cells (${Math.round(r.threshold * (Lg.box[2] - Lg.box[0]) / Lg.nx * (Lg.box[3] - Lg.box[1]) / Lg.ny).toLocaleString('en-CA')} m²) drain through; the largest catchment in the layer is ${Math.round(r.max_area).toLocaleString('en-CA')} m². Darker lines carry more. A spill or runoff follows these lines downhill.`,
+      { name: 'Drainage: ' + Lg.name.replace(/^Elevation: /, ''), kind: 'raster', ramp: 'drain', box: Lg.box, nx: Lg.nx, ny: Lg.ny, values: vals, range: [lo, hi], op: .95, note: 'lines where ≥ ' + r.threshold + ' cells drain' });
+    return;
+  }
+  if (k === 'an_diff') {
+    if (!need(Lg) || !need(Lg2)) return;
+    const { r, j } = await go({ kind: 'rast', method: 'diff', rasters: { a: gridOf(Lg), b: gridOf(Lg2) } }, Lg.name + ' minus ' + Lg2.name);
+    if (!r?.ok) return; const d = decode(r), m = sym(d), st = r.stats || {};
+    fin(j, `${Lg.name} minus ${Lg2.name}: from ${(st.min ?? 0).toFixed(2)} to ${(st.max ?? 0).toFixed(2)} (mean ${(st.mean ?? 0).toFixed(3)}), over ${Math.round((st.n || 0) * (Lg.box[2] - Lg.box[0]) / Lg.nx * (Lg.box[3] - Lg.box[1]) / Lg.ny).toLocaleString('en-CA')} m² where both have values.`,
+      { name: 'Difference: ' + Lg.name + ' − ' + Lg2.name, kind: 'raster', ramp: 'cutfill', box: Lg.box, nx: Lg.nx, ny: Lg.ny, values: d, range: [-m, m], op: .7, hull: Lg.hull, note: (st.min ?? 0).toFixed(2) + ' to ' + (st.max ?? 0).toFixed(2) });
+    return;
+  }
+  const B = projList().filter(b => b.easting != null && b.northing != null);
+  if (k === 'smp_dist') {
+    if (B.length < 1) { toast('The boreholes need coordinates.'); return; }
+    const mg = prm.margin > 0 ? prm.margin : 30, xs = B.map(b => b.easting), ys = B.map(b => b.northing), box = [Math.min(...xs) - mg, Math.min(...ys) - mg, Math.max(...xs) + mg, Math.max(...ys) + mg], cell = prm.cell > 0 ? prm.cell : Math.max(.5, +((box[2] - box[0]) / 300).toPrecision(2));
+    const nx = Math.max(3, Math.round((box[2] - box[0]) / cell)), ny = Math.max(3, Math.round((box[3] - box[1]) / cell)), grid = { b64: f32b64(new Float32Array(nx * ny)), nx, ny, box };
+    const { r, j } = await go({ kind: 'rast', method: 'griddist', rasters: { a: grid }, points: B.map(b => [b.easting, b.northing]) }, B.length + ' boreholes');
+    if (!r?.ok) return; const d = decode(r), all = Array.from(d).filter(isFinite).sort((a, b) => a - b), mx = all[all.length - 1] || 1, { st, levels } = gisLevels(0, mx, prm.interval);
+    const c = await window.desktop.gis.run({ kind: 'contours', box, nx, ny, values: Array.from(d, v => isFinite(v) ? +v.toFixed(3) : null), levels: levels.filter(v => v > 0) });
+    const med = all[Math.floor(all.length / 2)], far = all.filter(v => v > 2 * med).length / all.length;
+    fin(j, `Over the boreholes and ${mg} m around them, half the ground is within ${med.toFixed(1)} m of a borehole and the farthest place is ${mx.toFixed(1)} m away; ${Math.round(far * 100)} % is more than twice the typical distance from one (the darker areas): the thinly covered parts.`,
+      { name: 'Distance to the nearest borehole', kind: 'raster', ramp: 'distance', box, nx, ny, values: d, range: [0, mx], op: .55, contours: c?.ok ? c.lines : [], step: st, dec: st < 1 ? 1 : 0, cfmt: ' m', ccol: '#7f2704', note: 'up to ' + mx.toFixed(0) + ' m' });
+    return;
+  }
+  if (k === 'smp_thiessen') {
+    if (B.length < 2) { toast('Two or more located boreholes are needed.'); return; }
+    const P = B.map(b => [b.easting, b.northing]), h = padHull(P, 1), cx = P.reduce((a, q) => a + q[0], 0) / P.length, cy = P.reduce((a, q) => a + q[1], 0) / P.length, mg = prm.margin != null && prm.margin !== '' && +prm.margin >= 0 ? +prm.margin : 10;
+    const outline = (h || [[Math.min(...P.map(q => q[0])), Math.min(...P.map(q => q[1]))], [Math.max(...P.map(q => q[0])), Math.min(...P.map(q => q[1]))], [Math.max(...P.map(q => q[0])), Math.max(...P.map(q => q[1]))], [Math.min(...P.map(q => q[0])), Math.max(...P.map(q => q[1]))]]).map(([x, y]) => { const dd = Math.hypot(x - cx, y - cy) || 1; return [+(x + (x - cx) / dd * mg).toFixed(2), +(y + (y - cy) / dd * mg).toFixed(2)]; });
+    const { r, j } = await go({ kind: 'thiessen', points: B.map(b => [b.easting, b.northing, gwName(b) || b.name || '']), outline }, B.length + ' boreholes, ' + mg + ' m margin');
+    if (!r?.ok) return; const tot = r.total || 1, f0 = a => Math.round(a).toLocaleString('en-CA');
+    fin(j, `Each borehole stands for: ${r.cells.slice().sort((a, b) => b.area - a.area).map(c => c.name + ' ' + f0(c.area) + ' m² (' + Math.round(c.area / tot * 100) + ' %)').join(', ')}. Total ${f0(tot)} m², the boreholes and ${mg} m past the outer ones.`,
+      { name: 'Area each borehole represents', kind: 'polys', polys: r.cells.map(c => c.rings), plabels: r.cells.map(c => [c.x, c.y, c.name + ': ' + f0(c.area) + ' m²']), style: 'cells', note: r.cells.length + ' areas' });
+    return;
+  }
+  if (k === 'an_setback') {
+    const src = g.sbFrom && g.sbFrom !== 'bh' ? GIS.layers.find(L => L.id === g.sbFrom) : null, from = src ? layerFeatures(src) : B.map(b => ({ type: 'point', name: gwName(b) || b.name, pts: [[b.easting, b.northing]] }));
+    if (!from.length) { toast('Nothing to buffer.'); return; }
+    const to = featsOf().filter(f => f.pts?.length).map(f => ({ type: f.type === 'polygon' ? 'polygon' : f.type === 'point' ? 'point' : 'line', name: f.name || (FEAT_KINDS[f.kind]?.[0] || f.kind || 'shape'), kind: f.kind || '', pts: f.pts }));
+    const dist = prm.distance > 0 ? +prm.distance : 30;
+    const { r, j } = await go({ kind: 'setback', from: from.map(f => ({ ...f, pts: f.pts })), to, distance: dist }, (src ? src.name : 'the boreholes') + ', ' + dist + ' m');
+    if (!r?.ok) return;
+    fin(j, `${dist} m around ${src ? src.name : 'the boreholes'}: ${Math.round(r.area).toLocaleString('en-CA')} m².${r.rows.length ? ' Nearest site shapes: ' + r.rows.slice(0, 12).map(x => x.name + ' ' + x.dist.toFixed(1) + ' m' + (x.inside ? ' (inside the buffer)' : '')).join(', ') + '.' : ' No site shapes to measure to: draw them with Edit map.'}`,
+      { name: dist + ' m buffer: ' + (src ? src.name : 'boreholes'), kind: 'polys', polys: r.polys, style: 'buffer', note: Math.round(r.area).toLocaleString('en-CA') + ' m²' });
+    return;
+  }
+  if (k === 'exp_layer') {
+    const L = g.exL === 'bh' ? null : GIS.layers.find(x => x.id === g.exL), fmt = prm.format || 'GPKG';
+    const feats = L ? layerFeatures(L) : B.map(b => ({ type: 'point', name: gwName(b) || b.name, value: b.elevation ?? undefined, pts: [[b.easting, b.northing]] })).map(f => (f.value == null ? (delete f.value, f) : f));
+    const name = (L ? L.name : 'boreholes').replace(/[^\w .-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) || 'layer';
+    const { r, j } = await go({ kind: 'exportlayer', epsg: projEpsg(), format: fmt, name, ...(L && L.kind === 'raster' && L.values ? { raster: gridOf(L) } : {}), features: feats }, (L ? L.name : 'the boreholes') + ' as ' + fmt);
+    if (!r?.ok) return;
+    for (const [fn, b] of Object.entries(r.files)) await saveBytes(fn, b64bytes(b), 'application/octet-stream');
+    fin(j, 'Saved ' + Object.keys(r.files).join(', ') + ' (EPSG:' + projEpsg() + (fmt === 'KML' ? ', written in latitude and longitude' : '') + ').');
+    return;
+  }
+}
 /* the soil results by sample: [E, N, depth, log10 value] (a zero is the bottom of the range; a non-detect half its limit) */
 function samplePts(p, d0, d1) {
   const raw = [];
@@ -11171,6 +11336,7 @@ async function gpSoil(k, prm, go, done) {
 const GIS_RAMPS = { water: [[230, 242, 255], [158, 202, 225], [66, 146, 198], [8, 69, 148]], depth: [[255, 245, 177], [161, 217, 155], [65, 171, 93], [8, 81, 156]],
   impact: [[255, 247, 188], [254, 196, 79], [236, 112, 20], [153, 52, 4]], prob: [[255, 255, 255], [253, 208, 162], [241, 105, 19], [127, 39, 4]], uncert: [[247, 244, 249], [212, 185, 218], [201, 148, 199], [129, 15, 124]],
   slope: [[255, 255, 229], [254, 227, 145], [254, 153, 41], [204, 76, 2], [102, 37, 6]], grey: [[30, 30, 30], [235, 235, 235]], spectral: [[43, 131, 186], [171, 221, 164], [255, 255, 191], [253, 174, 97], [215, 25, 28]], viridis: [[68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]],
+  cutfill: [[33, 102, 172], [146, 197, 222], [247, 247, 247], [244, 165, 130], [178, 24, 43]], drain: [[107, 174, 214], [33, 113, 181], [8, 48, 107]], distance: [[255, 255, 255], [253, 208, 162], [241, 105, 19], [127, 39, 4]],
   terrain: [[56, 130, 72], [160, 190, 90], [232, 222, 140], [196, 146, 84], [150, 110, 80], [240, 236, 230]],
   soil: [[246, 232, 195], [223, 194, 125], [191, 129, 45], [140, 81, 10]], change: [[178, 24, 43], [244, 165, 130], [247, 247, 247], [146, 197, 222], [33, 102, 172]] };
 const gisRampCSS = r => 'linear-gradient(90deg,' + (GIS_RAMPS[r] || GIS_RAMPS.water).map(c => `rgb(${c.join(',')})`).join(',') + ')';
@@ -11222,8 +11388,10 @@ function gisLayersSVG(X, Y) {
       o.push(`<circle cx="${X(q[0][0]).toFixed(1)}" cy="${Y(q[0][1]).toFixed(1)}" r="5" fill="${col}" stroke="#fff" stroke-width="1.5"/>`);
       if (lb.show) o.push(gisLabText(X(e[0]) + 6, Y(e[1]) - 6, lb.text ?? L.note ?? '', lb.size, lb.color || '#0b3d91'));
     } else if (L.kind === 'polys') {
-      for (const rings of L.polys) o.push(`<path d="${rings.map(r => 'M' + P(r) + 'Z').join('')}" fill="rgba(196,36,42,.16)" fill-rule="evenodd" stroke="#c4242a" stroke-width="1.6" stroke-dasharray="6 3"/>`);
-      if (lb.show && L.polys.length) { const big = L.polys.map(r => ringCentre(r[0])).sort((a, b) => b[2] - a[2])[0]; o.push(gisLabText(X(big[0]), Y(big[1]), lb.text ?? L.note ?? '', lb.size, lb.color || '#8e1b20', 'text-anchor="middle" font-weight="600"')); }
+      const ps = L.style === 'cells' ? ['rgba(90,110,140,.06)', '#4a5a78', '1.3', ''] : L.style === 'buffer' ? ['rgba(255,170,0,.12)', '#c77700', '1.6', '5 3'] : ['rgba(196,36,42,.16)', '#c4242a', '1.6', '6 3'];
+      for (const rings of L.polys) o.push(`<path d="${rings.map(r => 'M' + P(r) + 'Z').join('')}" fill="${ps[0]}" fill-rule="evenodd" stroke="${ps[1]}" stroke-width="${ps[2]}" ${ps[3] ? `stroke-dasharray="${ps[3]}"` : ''}/>`);
+      if (lb.show) (L.plabels || []).forEach(([x, y, t], i) => o.push(gisLabText(X(x), Y(y) + 16, lb.texts?.[i] ?? t, lb.size, lb.color || ps[1], 'text-anchor="middle"')));
+      if (lb.show && L.polys.length && !L.plabels) { const big = L.polys.map(r => ringCentre(r[0])).sort((a, b) => b[2] - a[2])[0]; o.push(gisLabText(X(big[0]), Y(big[1]), lb.text ?? L.note ?? '', lb.size, lb.color || '#8e1b20', 'text-anchor="middle" font-weight="600"')); }
     }
     return `<g data-gislayer="${L.id}"><title>${esc(L.name + (L.note ? ': ' + L.note : ''))}</title>${o.join('')}</g>`;
   }).join('');
@@ -13780,7 +13948,7 @@ document.addEventListener('click', e => {
     case 'gp-spot-clear': S.gp.spots = []; gpSave(); renderView(true); break;
     case 'gp-pick': window.desktop?.gis?.pick?.().then(f => { if (!f) return; S.gp.demFile = f.token; S.gp.demName = f.name; S.gp.demSize = f.size; gpSave(); renderView(true); }); break;
     case 'gp-menu': openGpMenu(t.closest('.gp-tb') || t); break;
-    case 'gp-open': { closeMenu(); S.gp.tool = t.dataset.tool; S.gpPanel = t.dataset.tool; gpSave(); if (!GP_TABS.includes(S.tab)) { goTab(GP_TOOLS[S.gpPanel].kind === 'points3d' ? 'xsec' : 'site'); } else workResized(); renderBar(cur()); break; }
+    case 'gp-open': { closeMenu(); S.gp.recent = [t.dataset.tool, ...(S.gp.recent || []).filter(x => x !== t.dataset.tool)].slice(0, 8); S.gp.tool = t.dataset.tool; S.gpPanel = t.dataset.tool; gpSave(); if (!GP_TABS.includes(S.tab)) { goTab(GP_TOOLS[S.gpPanel].kind === 'points3d' ? 'xsec' : 'site'); } else workResized(); renderBar(cur()); break; }
     case 'gp-close': S.gpPanel = null; workResized(); renderBar(cur()); break;
     case 'gp-chip': { const j = gisRunning()[0], k = j?.tool && GP_TOOLS[j.tool] ? j.tool : j?.job?.method && GP_TOOLS[j.job.method] ? j.job.method : S.gp.tool; S.gp.tool = k; S.gpPanel = k; if (!GP_TABS.includes(S.tab)) goTab(GP_TOOLS[k].kind === 'points3d' ? 'xsec' : 'site'); else workResized(); break; }
     case 'gp-cancel': window.desktop?.gis?.cancel(t.dataset.id); break;

@@ -380,8 +380,225 @@ def in_grass_demfix(job, gs, tmp):
     return {**out, 'code_b64': b64u8(code), 'counts': cnt, 'cell_area': dx * dy, 'maxchange': float(chg.max()) if chg.size else 0.0, 'notes': notes,
             'tool': 'GRASS GIS %s r.neighbors%s; GDAL %s FillNodata, gdaldem' % (ver, ', r.fill.dir' if str(prm.get('sinks', 'no')) == 'yes' else '', gdal.__version__), 'detail': '; '.join(notes)}
 
+# ---------- raster tools on the app's layers (in a temporary GRASS project) ----------
+def grid_of(r):
+    """a layer sent by the app: {b64, nx, ny, box} -> (array north-first, geotransform)"""
+    import numpy as np
+    nx, ny = int(r['nx']), int(r['ny']); x0, y0, x1, y1 = r['box']
+    a = np.frombuffer(base64.b64decode(r['b64']), dtype='<f4').astype(float).reshape(ny, nx)
+    return a, [x0, (x1 - x0) / nx, 0, y1, 0, -(y1 - y0) / ny]
+
+def mem_ds(a, gt):
+    from osgeo import gdal
+    import numpy as np
+    ny, nx = a.shape; ds = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds.SetGeoTransform(gt)
+    b = ds.GetRasterBand(1); b.SetNoDataValue(-99999); b.WriteArray(np.where(np.isfinite(a), a, -99999)); return ds
+
+def rasterize_polys(polys, gt, nx, ny):
+    """polygons [[ring, ...], ...] burnt onto a grid (GDAL Rasterize): 1 inside"""
+    from osgeo import gdal, ogr
+    import numpy as np
+    ds = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Byte); ds.SetGeoTransform(gt)
+    vd = ogr.GetDriverByName('Memory').CreateDataSource('m'); ly = vd.CreateLayer('m', None, ogr.wkbPolygon)
+    for rings in polys:
+        g = ogr.Geometry(ogr.wkbPolygon)
+        for r in rings:
+            lr = ogr.Geometry(ogr.wkbLinearRing)
+            for x, y in r: lr.AddPoint_2D(x, y)
+            lr.CloseRings(); g.AddGeometry(lr)
+        f = ogr.Feature(ly.GetLayerDefn()); f.SetGeometry(g); ly.CreateFeature(f)
+    gdal.RasterizeLayer(ds, [1], ly, burn_values=[1])
+    return ds.GetRasterBand(1).ReadAsArray().astype(bool)
+
+def in_grass_rast(job, gs, tmp):
+    import numpy as np
+    from osgeo import gdal
+    gdal.UseExceptions()
+    m, prm = job['method'], job.get('params', {}); ver = gs.version().get('version', '')
+    A, gt = grid_of(job['rasters']['a']); ny, nx = A.shape; cell = abs(gt[1] * gt[5])
+    def to_grass(arr, name, g=gt):
+        f = os.path.join(tmp, name + '.tif'); d = gdal.GetDriverByName('GTiff').CreateCopy(f, mem_ds(arr, g)); d = None
+        gs.run_command('r.in.gdal', input=f, output=name, flags='o', overwrite=True, quiet=True)
+    def read(name):
+        f = os.path.join(tmp, name + '_o.tif'); gs.run_command('r.out.gdal', input=name, output=f, format='GTiff', type='Float32', flags='cf', nodata=-99999, overwrite=True, quiet=True)
+        d = gdal.Open(f); r = d.GetRasterBand(1).ReadAsArray().astype(float); d = None; r[r <= -99998] = np.nan; return r
+    def univar(name):
+        out, r = gs.parse_command('r.univar', map=name, flags='g'), {}
+        for k, v in out.items():   # an empty map reports nan (on Windows '-nan(ind)'): left out
+            try:
+                f = float(v)
+                if math.isfinite(f): r[k] = f
+            except (TypeError, ValueError): pass
+        return r
+    prog(0.05, 'r.in.gdal: the layer into GRASS, %d × %d cells' % (nx, ny))
+    to_grass(A, 'a'); gs.run_command('g.region', raster='a', quiet=True)
+    if m == 'profile':
+        pts = job['line']; res = float(prm.get('step') or 0) or abs(gt[1])
+        prog(0.4, 'r.profile: %d points along the line every %.2f m' % (len(pts), res))
+        txt = gs.read_command('r.profile', input='a', coordinates=','.join('%.3f,%.3f' % (x, y) for x, y in pts), resolution=res, null_value='nan', flags='g')
+        rows = []
+        for l in txt.strip().splitlines():
+            q = l.split()
+            if len(q) >= 4:
+                try: rows.append([float(q[2]), None if q[3] in ('nan', '*') else float(q[3]), float(q[0]), float(q[1])])
+                except ValueError: pass
+        return {'profile': rows, 'tool': 'GRASS GIS %s r.profile' % ver, 'detail': 'every %.2f m along %d points' % (res, len(pts))}
+    if m == 'cutfill':
+        if job['rasters'].get('b'):   # a second surface, resampled onto the first's grid (gdalwarp)
+            B, gb = grid_of(job['rasters']['b']); w = gdal.Warp('', mem_ds(B, gb), format='MEM', outputBounds=[gt[0], gt[3] + gt[5] * ny, gt[0] + gt[1] * nx, gt[3]], width=nx, height=ny, resampleAlg='bilinear', srcNodata=-99999, dstNodata=-99999)
+            Bw = w.GetRasterBand(1).ReadAsArray().astype(float); Bw[Bw <= -99998] = np.nan; to_grass(Bw, 'b'); base = 'b'; what = 'the second surface'
+        else:
+            lv = float(prm['level']); gs.run_command('r.mapcalc', expression='b = %.6f' % lv, overwrite=True, quiet=True); base = 'b'; what = 'a level of %.3f m' % lv
+        mask = rasterize_polys(job['polys'], gt, nx, ny) if job.get('polys') else np.ones((ny, nx), bool)
+        to_grass(np.where(mask, 1.0, np.nan), 'mk')
+        prog(0.4, 'r.mapcalc: the surface minus %s, inside the area' % what)
+        gs.run_command('r.mapcalc', expression='d = if(isnull(mk), null(), a - %s)' % base, overwrite=True, quiet=True)
+        gs.run_command('r.mapcalc', expression='cut = if(d > 0, d, null())', overwrite=True, quiet=True)
+        gs.run_command('r.mapcalc', expression='fill = if(d < 0, -d, null())', overwrite=True, quiet=True)
+        prog(0.7, 'r.univar: volumes')
+        uc, uf = univar('cut'), univar('fill')
+        return {'values_b64': b64f(read('d')), 'cut': uc.get('sum', 0) * cell, 'fill': uf.get('sum', 0) * cell, 'cut_area': uc.get('n', 0) * cell, 'fill_area': uf.get('n', 0) * cell, 'cut_max': uc.get('max', 0), 'fill_max': uf.get('max', 0),
+                'tool': 'GRASS GIS %s r.mapcalc, r.univar' % ver, 'detail': 'the surface against %s, %.2f × %.2f m cells' % (what, abs(gt[1]), abs(gt[5]))}
+    if m == 'watershed':
+        thr = int(prm.get('threshold') or 0) or max(20, int(nx * ny / 400))
+        prog(0.3, 'r.watershed: flow directions and accumulation (multiple flow directions), streams from %d cells' % thr)
+        gs.run_command('r.watershed', elevation='a', accumulation='acc', stream='str', threshold=thr, overwrite=True, quiet=True)
+        acc = np.abs(read('acc')); st = read('str')
+        return {'values_b64': b64f(np.log10(np.maximum(acc, 1))), 'stream_b64': b64u8(np.where(np.isfinite(st), 255, 0)), 'threshold': thr, 'max_area': float(np.nanmax(acc)) * cell,
+                'tool': 'GRASS GIS %s r.watershed' % ver, 'detail': 'multiple flow directions; streams where more than %d cells (%.0f m²) drain' % (thr, thr * cell)}
+    if m == 'diff':
+        B, gb = grid_of(job['rasters']['b'])
+        prog(0.3, 'gdalwarp: the second layer onto the first one\'s cells')
+        w = gdal.Warp('', mem_ds(B, gb), format='MEM', outputBounds=[gt[0], gt[3] + gt[5] * ny, gt[0] + gt[1] * nx, gt[3]], width=nx, height=ny, resampleAlg='bilinear', srcNodata=-99999, dstNodata=-99999)
+        Bw = w.GetRasterBand(1).ReadAsArray().astype(float); Bw[Bw <= -99998] = np.nan; to_grass(Bw, 'b')
+        gs.run_command('r.mapcalc', expression='d = a - b', overwrite=True, quiet=True)
+        u = univar('d')
+        return {'values_b64': b64f(read('d')), 'stats': u, 'tool': 'GRASS GIS %s r.mapcalc; GDAL gdalwarp' % ver, 'detail': 'first minus second, on the first layer\'s %.2f m cells' % abs(gt[1])}
+    if m == 'griddist':
+        P = np.zeros((ny, nx)); P[:] = np.nan
+        for x, y in job['points']:
+            i, j = int((x - gt[0]) / gt[1]), int((y - gt[3]) / gt[5])
+            if 0 <= i < nx and 0 <= j < ny: P[j, i] = 1
+        to_grass(P, 'p')
+        prog(0.4, 'r.grow.distance: the distance from every cell to the nearest borehole')
+        gs.run_command('r.grow.distance', input='p', distance='dist', metric='euclidean', overwrite=True, quiet=True)
+        return {'values_b64': b64f(read('dist')), 'tool': 'GRASS GIS %s r.grow.distance' % ver, 'detail': 'straight-line distance on %.2f m cells' % abs(gt[1])}
+    raise RuntimeError('Unknown raster tool ' + m)
+
+# ---------- vector tools (SciPy, OGR) ----------
+def thiessen(job):
+    """the area each borehole represents: Voronoi cells (SciPy) clipped to an outline (OGR), with their areas"""
+    import numpy as np
+    from scipy.spatial import Voronoi
+    from osgeo import ogr
+    ogr.UseExceptions()
+    pts = np.array([p[:2] for p in job['points']], float); names = [p[2] if len(p) > 2 else str(i + 1) for i, p in enumerate(job['points'])]
+    clip = ogr.Geometry(ogr.wkbPolygon); lr = ogr.Geometry(ogr.wkbLinearRing)
+    for x, y in job['outline']: lr.AddPoint_2D(x, y)
+    lr.CloseRings(); clip.AddGeometry(lr)
+    prog(0.3, 'scipy.spatial.Voronoi: %d boreholes' % len(pts))
+    span = float(np.ptp(pts, axis=0).max()) * 20 + 1000; c = pts.mean(axis=0)
+    far = np.array([[c[0] - span, c[1] - span], [c[0] + span, c[1] - span], [c[0] + span, c[1] + span], [c[0] - span, c[1] + span]])
+    vor = Voronoi(np.vstack([pts, far]))
+    cells = []
+    for i in range(len(pts)):
+        reg = vor.regions[vor.point_region[i]]
+        if -1 in reg or not reg: continue
+        g = ogr.Geometry(ogr.wkbPolygon); r = ogr.Geometry(ogr.wkbLinearRing)
+        for v in reg: r.AddPoint_2D(*vor.vertices[v])
+        r.CloseRings(); g.AddGeometry(r); g = g.Intersection(clip)
+        if g is None or g.IsEmpty(): continue
+        rings = []
+        for k in range(g.GetGeometryCount()):
+            sub = g.GetGeometryRef(k)
+            if sub.GetGeometryName() == 'POLYGON': sub = sub.GetGeometryRef(0)
+            rings.append([[round(sub.GetX(n), 3), round(sub.GetY(n), 3)] for n in range(sub.GetPointCount())])
+        cells.append({'name': names[i], 'area': g.GetArea(), 'rings': rings, 'x': float(pts[i][0]), 'y': float(pts[i][1])})
+    return {'cells': cells, 'total': clip.GetArea(), 'tool': 'SciPy Voronoi; GDAL %s OGR Intersection' % __import__('osgeo').__version__, 'detail': '%d cells clipped to the outline' % len(cells)}
+
+def ogr_geom(f):
+    from osgeo import ogr
+    t, P = f['type'], f['pts']
+    if t == 'point': g = ogr.Geometry(ogr.wkbPoint); g.AddPoint_2D(*P[0]); return g
+    if t == 'line': g = ogr.Geometry(ogr.wkbLineString); [g.AddPoint_2D(x, y) for x, y in P]; return g
+    g = ogr.Geometry(ogr.wkbPolygon)
+    for ring in (P if P and isinstance(P[0][0], (list, tuple)) else [P]):
+        r = ogr.Geometry(ogr.wkbLinearRing); [r.AddPoint_2D(x, y) for x, y in ring]; r.CloseRings(); g.AddGeometry(r)
+    return g
+
+def rings_of(g):
+    out = []
+    if g is None or g.IsEmpty(): return out
+    gs_ = [g.GetGeometryRef(i) for i in range(g.GetGeometryCount())] if g.GetGeometryName() == 'MULTIPOLYGON' else [g]
+    for poly in gs_:
+        out.append([[[round(r.GetX(n), 3), round(r.GetY(n), 3)] for n in range(r.GetPointCount())] for r in (poly.GetGeometryRef(k) for k in range(poly.GetGeometryCount()))])
+    return out
+
+def setback(job):
+    """buffers around the chosen things (OGR Buffer), and the shortest distance from each to each site feature (OGR Distance)"""
+    from osgeo import ogr
+    ogr.UseExceptions()
+    src = [ogr_geom(f) for f in job['from']]; d = float(job['distance'])
+    prog(0.3, 'OGR Buffer: %.1f m around %d shape%s' % (d, len(src), '' if len(src) == 1 else 's'))
+    u = None
+    for g in src: b = g.Buffer(d, 16); u = b if u is None else u.Union(b)
+    rows = []
+    for f in job.get('to') or []:
+        tg = ogr_geom(f); best = min((g.Distance(tg) for g in src), default=None)
+        rows.append({'name': f.get('name') or f.get('kind') or 'feature', 'kind': f.get('kind', ''), 'dist': best, 'inside': bool(u.Intersects(tg)) if u else False})
+    rows.sort(key=lambda r: r['dist'] if r['dist'] is not None else 1e18)
+    return {'polys': rings_of(u), 'area': u.GetArea() if u else 0, 'rows': rows, 'tool': 'GDAL %s OGR Buffer, Distance' % __import__('osgeo').__version__, 'detail': '%.1f m buffer' % d}
+
+def export_layer(job):
+    """a layer as GIS files (GDAL/OGR): a grid as GeoTIFF; lines, areas and points as GeoPackage, Shapefile, KML or DXF"""
+    from osgeo import gdal, ogr, osr
+    import numpy as np
+    gdal.UseExceptions(); ogr.UseExceptions()
+    srs = osr.SpatialReference(); srs.ImportFromEPSG(int(job['epsg'])); fmt = job.get('format', 'GPKG'); name = job.get('name', 'layer')
+    tmp = tempfile.mkdtemp(prefix='bfl-ex-'); files = {}
+    try:
+        if job.get('raster'):
+            a, gt = grid_of(job['raster']); f = os.path.join(tmp, name + '.tif')
+            d = gdal.GetDriverByName('GTiff').CreateCopy(f, mem_ds(a, gt), options=['COMPRESS=DEFLATE', 'TILED=YES']); d.SetProjection(srs.ExportToWkt()); d.GetRasterBand(1).SetDescription(job.get('band', name)); d = None
+            prog(0.4, 'GeoTIFF written')
+        drv = {'GPKG': ('GPKG', '.gpkg'), 'SHP': ('ESRI Shapefile', '.shp'), 'KML': ('KML', '.kml'), 'DXF': ('DXF', '.dxf')}[fmt]
+        feats = job.get('features') or []
+        if feats:
+            prog(0.6, 'Writing %d feature%s as %s' % (len(feats), '' if len(feats) == 1 else 's', drv[0]))
+            out_srs = srs
+            if fmt == 'KML': out_srs = osr.SpatialReference(); out_srs.ImportFromEPSG(4326); out_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+            ct = osr.CoordinateTransformation(srs, out_srs) if fmt == 'KML' else None
+            by = {}
+            for f in feats: by.setdefault(f['type'], []).append(f)
+            for t, fs in by.items():
+                fn = os.path.join(tmp, (name + ('' if len(by) == 1 else '_' + t + 's')) + drv[1])
+                ds = ogr.GetDriverByName(drv[0]).CreateDataSource(fn)
+                ly = ds.CreateLayer(name if fmt != 'DXF' else 'entities', out_srs if fmt != 'DXF' else None, {'point': ogr.wkbPoint, 'line': ogr.wkbLineString, 'polygon': ogr.wkbPolygon}[t])
+                if fmt != 'DXF':
+                    ly.CreateField(ogr.FieldDefn('name', ogr.OFTString)); fv = ogr.FieldDefn('value', ogr.OFTReal); ly.CreateField(fv)
+                for f in fs:
+                    g = ogr_geom(f)
+                    if ct: g.Transform(ct)
+                    o = ogr.Feature(ly.GetLayerDefn()); o.SetGeometry(g)
+                    if fmt != 'DXF':
+                        o.SetField('name', str(f.get('name', ''))[:250])
+                        if f.get('value') is not None: o.SetField('value', float(f['value']))
+                    else:
+                        o.SetField('Layer', str(f.get('layer', name))[:60])
+                    ly.CreateFeature(o)
+                ds = None
+        for fn in sorted(os.listdir(tmp)):
+            with open(os.path.join(tmp, fn), 'rb') as fh: files[fn] = base64.b64encode(fh.read()).decode()
+        return {'files': files, 'tool': 'GDAL %s' % gdal.__version__, 'detail': ', '.join(files)}
+    finally: shutil.rmtree(tmp, ignore_errors=True)
+
 def in_grass(job):
     job = floats(job)
+    if job.get('kind') == 'rast':
+        import grass.script as gs
+        tmp = tempfile.mkdtemp(prefix='bfl-gin-')
+        try: return in_grass_rast(job, gs, tmp)
+        finally: shutil.rmtree(tmp, ignore_errors=True)
     if job.get('kind') == 'demfix':
         import grass.script as gs
         tmp = tempfile.mkdtemp(prefix='bfl-gin-')
@@ -716,7 +933,10 @@ def area_over(job):
 
 def run(job):
     job = floats(job)
-    if job.get('kind') in ('hydro', 'demfix'): return grass_run(job)
+    if job.get('kind') in ('hydro', 'demfix', 'rast'): return grass_run(job)
+    if job.get('kind') == 'thiessen': return thiessen(job)
+    if job.get('kind') == 'setback': return setback(job)
+    if job.get('kind') == 'exportlayer': return export_layer(job)
     if job.get('kind') == 'area': return area_over(job)
     if job.get('kind') == 'dem': return dem(job)
     if job.get('kind') == 'volume': return soil_volume(job)
