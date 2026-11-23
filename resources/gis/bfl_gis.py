@@ -396,6 +396,28 @@ def units_of(job, cx, cy):
     return 1.0, 1.0, 1.0, False
 
 def find_trees(job):
+    """the tree finder, retried on cells twice the size (up to three times) if the computer runs out of memory"""
+    import numpy as np, gc
+    nx, ny = int(job['nx']), int(job['ny']); half = 0; pre = []
+    def pool(job, k):   # cells k times bigger, each the highest of the ones it covers (the treetops are kept)
+        a = np.frombuffer(base64.b64decode(job['values_b64']), dtype='<f4').reshape(int(job['ny']), int(job['nx'])); h2, w2 = int(job['ny']) // k, int(job['nx']) // k; x0, y0, x1, y1 = job['box']
+        with np.errstate(all='ignore'): b = np.nanmax(a[:h2 * k, :w2 * k].reshape(h2, k, w2, k), axis=(1, 3)).astype('<f4')
+        return {**job, 'values_b64': base64.b64encode(b.tobytes()).decode(), 'nx': w2, 'ny': h2, 'box': [x0, y1 - (y1 - y0) / int(job['ny']) * h2 * k, x0 + (x1 - x0) / int(job['nx']) * w2 * k, y1]}
+    x0, y0, x1, y1 = job['box']; ux, uy, _, _ = units_of(job, (x0 + x1) / 2, (y0 + y1) / 2); cell = ((x1 - x0) / nx * ux * (y1 - y0) / ny * uy) ** .5
+    k = int(.25 // cell) if cell < .2 else 1   # finer than about 0.25 m adds time, not trees
+    if k >= 2: prog(0.03, 'The cells are %.2f m: working on %.2f m (the highest of each %d × %d)' % (cell, cell * k, k, k)); job = pool(job, k); pre.append('the layer\'s %.2f m cells were combined to %.2f m (the highest of each %d × %d): finer adds time, not trees; the bare-ground layer is at %.2f m' % (cell, cell * k, k, k, cell * k))
+    while True:
+        try:
+            r = find_trees_grid(job)
+            if half: r['notes'] = r.get('notes', []) + ['there was not enough memory at the layer\'s %d × %d cells, so this ran on %d × %d (cells %d times as big); make the elevation map over a smaller area for the full detail' % (nx, ny, int(job['nx']), int(job['ny']), 2 ** half)]
+            r['notes'] = pre + r.get('notes', []); r['nx'], r['ny'] = int(job['nx']), int(job['ny']); return r
+        except MemoryError:
+            gc.collect(); half += 1
+            if half > 3: raise RuntimeError('Not enough memory to find trees on a %d × %d grid, even at an eighth of it. Close other programs, or make the elevation map over a smaller area or at a coarser resolution.' % (nx, ny))
+            prog(0.05, 'Not enough memory: trying again on cells twice the size')
+            job = pool(job, 2)
+
+def find_trees_grid(job):
     """trees in a surface model (lidar first returns, a photogrammetry DSM): the bare ground under them, and each tree's top,
     height and crown. 1. ground: a morphological opening (SciPy grey_opening, a disc wider than the widest crown) keeps the ground's
     shape and removes what stands on it; cells more than a threshold above it are vegetation, taken out and refilled from the ground
@@ -410,7 +432,7 @@ def find_trees(job):
     gdal.UseExceptions()
     prm = job.get('params', {}); nx, ny = int(job['nx']), int(job['ny']); x0, y0, x1, y1 = job['box']; dx, dy = (x1 - x0) / nx, (y1 - y0) / ny
     ux, uy, zf, geo = units_of(job, (x0 + x1) / 2, (y0 + y1) / 2); dxm, dym = dx * ux, dy * uy; cell = (dxm * dym) ** .5; nd = 8 if geo else 3   # metres a cell, each way
-    a = np.frombuffer(base64.b64decode(job['values_b64']), dtype='<f4').astype(float).reshape(ny, nx) * zf; fin = np.isfinite(a)
+    a = np.frombuffer(base64.b64decode(job['values_b64']), dtype='<f4').astype(np.float32).reshape(ny, nx) * np.float32(zf); fin = np.isfinite(a)
     if not fin.any(): raise RuntimeError('The elevation layer has no values.')
     hmin = float(prm.get('hmin') or 2); gwin = float(prm.get('ground') or 12); notes = []
     if cell > 2.5: notes.append('the cells are %.1f m: single trees need cells of about 1 m or finer, so crowns run together and fewer trees are found' % cell)
@@ -419,9 +441,18 @@ def find_trees(job):
     sig = lambda m, lo: (max(lo, m / dym), max(lo, m / dxm))
     # 1. the bare ground
     prog(0.1, 'SciPy grey_opening: the ground under the trees (a %.0f m disc)' % gwin)
-    f = np.where(fin, a, np.nanmax(a))
-    op = ndimage.grey_opening(f, footprint=disc(gwin / 2))
-    op = ndimage.uniform_filter(op, size=(max(3, int(round(gwin / 2 / dym)) | 1), max(3, int(round(gwin / 2 / dxm)) | 1)))   # the opening's flat steps rounded off
+    f = np.where(fin, a, np.nanmax(a)).astype(np.float32)
+    k = max(1, int(np.ceil(gwin / 2 / min(dxm, dym) / 30)))   # the disc at most ~30 cells across in radius: work on cells k times bigger
+    if k > 1:
+        H2, W2 = -(-ny // k), -(-nx // k); fp = np.pad(f, ((0, H2 * k - ny), (0, W2 * k - nx)), mode='edge').reshape(H2, k, W2, k).min(axis=(1, 3))
+        ry, rx = max(1, int(round(gwin / 2 / (dym * k)))), max(1, int(round(gwin / 2 / (dxm * k)))); yy, xx = np.mgrid[-ry:ry + 1, -rx:rx + 1]
+        oc = ndimage.grey_opening(fp, footprint=(xx / rx) ** 2 + (yy / ry) ** 2 <= 1); oc = ndimage.uniform_filter(oc, size=3)
+        op = ndimage.zoom(oc, (H2 * k / H2, W2 * k / W2), order=1)[:ny, :nx].astype(np.float32); del fp, oc
+        notes.append('the ground filter ran on %.2f m cells (the layer\'s %.2f m are finer than it needs)' % (cell * k, cell))
+    else:
+        op = ndimage.grey_opening(f, footprint=disc(gwin / 2))
+        op = ndimage.uniform_filter(op, size=(max(3, int(round(gwin / 2 / dym)) | 1), max(3, int(round(gwin / 2 / dxm)) | 1)))   # the opening's flat steps rounded off
+    del f
     thr = max(0.3, min(1.0, hmin * 0.4))
     veg = fin & (a - op > thr)
     prog(0.35, 'GDAL FillNodata: refilling %d vegetation cells from the ground around them' % int(veg.sum()))

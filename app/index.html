@@ -11423,7 +11423,7 @@ async function gpTrees(prm) {
   renderView(true);
   const r = await pr; if (!r?.ok) return;
   const T = r.trees || [], n = T.length, nm = L.name.replace(/ \((fixed|bare ground)\)$/, ''), q = a => a.length ? a[Math.floor(a.length / 2)] : 0;
-  const N = gisAddLayer({ ...L, id: undefined, url: null, name: nm + ' (bare ground)', values: b64f32(r.values_b64), hill: L.hill ? b64u8(r.hill_b64) : null, slope: b64f32(r.slope_b64), contours: r.lines, step: r.step, range: [r.min, r.max], fixcode: null, show: 'elev', trees: T, showTrees: true,
+  const N = gisAddLayer({ ...L, id: undefined, url: null, name: nm + ' (bare ground)', nx: r.nx || L.nx, ny: r.ny || L.ny, box: r.nx && r.nx !== L.nx ? [L.box[0], L.box[3] - (L.box[3] - L.box[1]) / L.ny * r.ny, L.box[0] + (L.box[2] - L.box[0]) / L.nx * r.nx, L.box[3]] : L.box, values: b64f32(r.values_b64), hill: L.hill ? b64u8(r.hill_b64) : null, slope: b64f32(r.slope_b64), contours: r.lines, step: r.step, range: [r.min, r.max], fixcode: null, show: 'elev', trees: T, showTrees: true,
     note: n.toLocaleString('en-CA') + ' tree' + (n === 1 ? '' : 's') + '; ground ' + r.min.toFixed(1) + ' – ' + r.max.toFixed(1) + ' m', lab: L.lab ? { ...L.lab } : null, tool: 'elev_trees' });
   L.on = false; if (GIS.dem && GIS.dem.values === L.values) GIS.dem = { ...GIS.dem, values: N.values, name: N.name };
   if (S.v3dTerrain) S.v3dTerrain = { ...S.v3dTerrain, layer: N.id };
