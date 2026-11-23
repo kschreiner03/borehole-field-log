@@ -17,7 +17,7 @@ const MAMBA = {
   'darwin-x64': ['micromamba-osx-64', '8421462a1ef1df9f7acd114f9e2a24c1332ce4f4e29f44465b4acb44e2755172'],
 };
 // what is installed: versions held to the ones the driver was written and checked against
-export const GIS_SPECS = ['grass=8.5', 'gdal=3.12', 'pykrige=1.7', 'gstools=1.7'];
+export const GIS_SPECS = ['grass=8.5', 'gdal=3.12', 'pykrige=1.7', 'gstools=1.7', 'whitebox_tools=2.4'];
 export const GIS_METHODS = {
   surface: ['gdal_invdist', 'gdal_invdistnn', 'gdal_average', 'gdal_nearest', 'gdal_linear', 'pykrige_ok', 'pykrige_uk', 'gstools_ok', 'grass_rst', 'grass_bspline', 'grass_idw'],
   points3d: ['pykrige_ok3d', 'gstools_ok3d', 'grass_vol_rst'],
@@ -89,9 +89,9 @@ export function gisInstall({ userData, onProgress = () => {} }) {
     try {
       await mkdir(home, { recursive: true });
       if (!existsSync(exe)) { onProgress({ step: 'Downloading the installer (micromamba ' + MAMBA_TAG + ')' }); await download(`https://github.com/mamba-org/micromamba-releases/releases/download/${MAMBA_TAG}/${mm[0]}`, exe, mm[1]); }
-      onProgress({ step: 'Installing GRASS GIS, GDAL, PyKrige and GSTools from conda-forge (about 350 MB)' });
+      onProgress({ step: existsSync(pythonOf(home)) ? 'Adding what is missing (WhiteboxTools, about 6 MB) from conda-forge' : 'Installing GRASS GIS, GDAL, PyKrige, GSTools and WhiteboxTools from conda-forge (about 360 MB)' });
       const env = { MAMBA_ROOT_PREFIX: join(home, 'root') };
-      const r = await run(exe, ['create', '-y', '-p', envDir(home), '-c', 'conda-forge', '--override-channels', ...GIS_SPECS], { env, timeoutMs: 3600000, onLine: l => { if (/^(Linking|Transaction|Downloading|\s*\+)/.test(l) || /\d+(\.\d+)?\s?[kMG]B/.test(l)) onProgress({ line: l.slice(0, 160) }); } });
+      const r = await run(exe, [existsSync(pythonOf(home)) ? 'install' : 'create', '-y', '-p', envDir(home), '-c', 'conda-forge', '--override-channels', ...GIS_SPECS], { env, timeoutMs: 3600000, onLine: l => { if (/^(Linking|Transaction|Downloading|\s*\+)/.test(l) || /\d+(\.\d+)?\s?[kMG]B/.test(l)) onProgress({ line: l.slice(0, 160) }); } });
       if (r.code !== 0 || !existsSync(pythonOf(home))) return { ok: false, error: r.timedOut ? 'The install took over an hour and was stopped.' : (r.out.match(/critical[^\n]*/i)?.[0] || 'The install did not finish.').slice(0, 600) };
       onProgress({ step: 'Clearing the download cache' }); await run(exe, ['clean', '-a', '-y'], { env, timeoutMs: 600000 });
       statusCache = null; return { ok: true, home };
@@ -193,6 +193,26 @@ export function checkJob(job) {
     if (!nums([job.box], 4)) return 'No area.';
     if (job.spots != null && (!nums(job.spots, 3) || job.spots.length > 300)) return 'Spots must be [x, y, radius].';
     if (job.foot_b64 != null && (typeof job.foot_b64 !== 'string' || Math.ceil(job.nx * job.ny / 3) * 4 !== job.foot_b64.length || !/^[A-Za-z0-9+/=]+$/.test(job.foot_b64.slice(0, 200)))) return 'The outline does not match the grid.';
+  } else if (kind === 'wbt') {
+    if (job.method === 'catalog') return '';
+    if (job.method !== 'run' || !/^[A-Za-z0-9]{2,64}$/.test(String(job.tool))) return 'A WhiteboxTools tool is needed.';
+    if (job.epsg != null && !CRS_CODE.test(String(job.epsg))) return 'The coordinate system code is not valid.';
+    if (job.terrain != null && typeof job.terrain !== 'boolean') return 'Bad option.';
+    if (!Array.isArray(job.args) || job.args.length > 60) return 'Too many settings.';
+    const plain = s => typeof s === 'string' && !/[\\/:*?"<>|\u0000-\u001f]/.test(s);   // settings never name a file: files go by token
+    const feat = f => f && ['point', 'line', 'polygon'].includes(f.type) && Array.isArray(f.pts) && f.pts.length && f.pts.length <= 20000 && (f.name == null || (typeof f.name === 'string' && f.name.length <= 200))
+      && (f.attrs == null || (typeof f.attrs === 'object' && !Array.isArray(f.attrs) && Object.keys(f.attrs).length <= 30 && Object.entries(f.attrs).every(([a, x]) => /^[A-Za-z_][A-Za-z0-9_]{0,9}$/.test(a) && (x == null || isNum(x) || (typeof x === 'string' && x.length <= 80)))));
+    const val = (v, inList) => {
+      if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+      if ('num' in v) return isNum(v.num); if ('bool' in v) return typeof v.bool === 'boolean';
+      if ('str' in v) return plain(v.str) && v.str.length <= 200; if ('opt' in v) return plain(v.opt) && v.opt.length <= 80;
+      if ('out' in v) return !inList && ['raster', 'vector', 'lidar', 'html', 'text', 'csv'].includes(v.out);
+      if ('grid' in v) return gridOk(v.grid); if ('file' in v) return /^f[0-9a-f]{20}$/.test(String(v.file));
+      if ('feats' in v) return Array.isArray(v.feats) && v.feats.length <= 50000 && (v.geom == null || ['Point', 'Line', 'Polygon', 'Any', 'LineOrPolygon'].includes(v.geom)) && v.feats.every(feat);
+      if ('list' in v) return !inList && Array.isArray(v.list) && v.list.length >= 1 && v.list.length <= 50 && v.list.every(x => val(x, true));
+      return false;
+    };
+    if (!job.args.every(a => a && /^--?[A-Za-z0-9_]{1,40}$/.test(String(a.flag)) && val(a.v))) return 'A setting is not valid.';
   } else if (kind === 'otrees') {
     if (job.epsg != null && !CRS_CODE.test(String(job.epsg))) return 'The coordinate system code is not valid.';
     if (typeof job.image_b64 !== 'string' || job.image_b64.length > 90e6 || !/^[A-Za-z0-9+/=]+$/.test(job.image_b64.slice(0, 200)) || !['image/png', 'image/webp'].includes(job.mime)) return 'The orthophoto is missing, too large, or not PNG or WebP.';
@@ -224,10 +244,16 @@ const running = new Map(), cancelled = new Set();
 export function gisCancel(id) { const p = running.get(id); if (!p) return false; cancelled.add(id); killTree(p); return true; }
 /* files the user chose in an Open dialog (an elevation model): the window gets a token, never a path; a job names the token */
 const picked = new Map();
+export function gisFilePath(token) { const p = picked.get(String(token)); return p && existsSync(p) ? p : null; }
 export function gisRegisterFile(path, name, size) { const token = 'f' + createHash('sha256').update(path + Date.now() + Math.random()).digest('hex').slice(0, 20); picked.set(token, path); return { token, name, size }; }
 export async function gisRun({ userData, root, job, timeoutMs = 600000, onProgress }) {
   const bad = checkJob(job); if (bad) return { ok: false, error: bad };
   if (['dem', 'importvec', 'importrast', 'imgprev', 'georef'].includes(job.kind)) { const p = picked.get(job.file); if (!p || !existsSync(p)) return { ok: false, error: 'Choose the file again.' }; job = { ...job, path: p }; }
+  if (job.kind === 'wbt' && job.method === 'run') {
+    let miss = false; const res = v => v && v.file ? (picked.get(v.file) && existsSync(picked.get(v.file)) ? { file: picked.get(v.file) } : (miss = true, v)) : v && v.list ? { list: v.list.map(res) } : v;
+    job = { ...job, args: job.args.map(a => ({ ...a, v: res(a.v) })) };
+    if (miss) return { ok: false, error: 'Choose the file again: files are remembered only while the app is open.' };
+  }
   const id = job.id;
   const home = gisHome(userData), py = pythonOf(home);
   if (!existsSync(py)) return { ok: false, error: 'The GIS engines are not installed. Install them under Settings › GIS engines.' };
@@ -240,6 +266,8 @@ export async function gisRun({ userData, root, job, timeoutMs = 600000, onProgre
     if (id) running.delete(id);
     if (id && cancelled.delete(id)) return { ok: false, cancelled: true, error: 'Cancelled.' };
     if (!existsSync(rf) || (await stat(rf)).size > 256e6) return { ok: false, error: r.timedOut ? `The GIS tool did not finish within ${timeoutMs / 1000} s.` : 'The GIS tool stopped: ' + r.out.slice(-800) };
-    const res = JSON.parse(await readFile(rf, 'utf8')); res.seconds = (Date.now() - t0) / 1000; return res;
+    const res = JSON.parse(await readFile(rf, 'utf8')); res.seconds = (Date.now() - t0) / 1000;
+    if (job.kind === 'wbt' && Array.isArray(res.outputs)) for (const o of res.outputs) if (o && o.kind === 'file' && typeof o.path === 'string' && o.path.startsWith(join(home, 'wbt_out'))) { o.token = gisRegisterFile(o.path, o.fname || 'result', o.size || 0).token; delete o.path; }
+    return res;
   } catch (e) { return { ok: false, error: String(e.message || e) }; } finally { await rm(dir, { recursive: true, force: true }); }
 }

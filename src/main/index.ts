@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { mf6Binary, runMf6 } from './mf6run.mjs';
-import { gisStatus, gisInstall, gisRemove, gisRun, gisCancel, gisRegisterFile } from './gis.mjs';
-import { stat } from 'node:fs/promises';
+import { gisStatus, gisInstall, gisRemove, gisRun, gisCancel, gisRegisterFile, gisFilePath } from './gis.mjs';
+import { stat, copyFile } from 'node:fs/promises';
 import { clearCreds, fetchSnapshot, loadCreds, saveCreds } from './applemaps.mjs';
 import { checkForUpdate, HUB } from './updates.mjs';
 import { fileGuard } from './guard.mjs';
@@ -110,7 +110,10 @@ ipcMain.handle('gis:cancel', async (e, id: unknown) => e.sender === win?.webCont
 // an elevation model chosen here, in the shell's own Open dialog: the window gets a token for it, not its path
 ipcMain.handle('gis:pick', async (e, what: unknown) => {
   if (e.sender !== win?.webContents || !win) return null;
-  const r = await dialog.showOpenDialog(win, what === 'vector'
+  const r = await dialog.showOpenDialog(win, what === 'lidar'
+    ? { title: 'Open a lidar point cloud', properties: ['openFile'], filters: [{ name: 'Lidar point clouds', extensions: ['las', 'laz', 'zlidar'] }, { name: 'All files', extensions: ['*'] }] }
+    : what === 'csv' ? { title: 'Open a table', properties: ['openFile'], filters: [{ name: 'Tables', extensions: ['csv', 'txt'] }, { name: 'All files', extensions: ['*'] }] }
+    : what === 'vector'
     ? { title: 'Open a GIS layer', properties: ['openFile'], filters: [{ name: 'GIS layers', extensions: ['shp', 'gpkg', 'kml', 'kmz', 'geojson', 'json', 'dxf', 'csv', 'gml', 'tab', 'mif', 'gpx', 'fgb'] }, { name: 'All files', extensions: ['*'] }] }
     : what === 'image' ? { title: 'Open an image to georeference', properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'tif', 'tiff', 'bmp', 'gif', 'webp', 'jp2'] }, { name: 'All files', extensions: ['*'] }] }
     : what === 'raster' ? { title: 'Open a raster', properties: ['openFile'], filters: [{ name: 'Rasters', extensions: ['tif', 'tiff', 'img', 'asc', 'vrt', 'jp2', 'ecw', 'sid', 'nc', 'bil', 'flt', 'png', 'jpg'] }, { name: 'All files', extensions: ['*'] }] }
@@ -118,6 +121,15 @@ ipcMain.handle('gis:pick', async (e, what: unknown) => {
   if (r.canceled || !r.filePaths[0]) return null;
   const p = r.filePaths[0], st = await stat(p).catch(() => null);
   return gisRegisterFile(p, basename(p), st?.size ?? 0);
+});
+
+// a file a WhiteboxTools tool made (a lidar file): saved where the user chooses, by its token
+ipcMain.handle('gis:savefile', async (e, token: unknown, name: unknown) => {
+  if (e.sender !== win?.webContents || !win || typeof token !== 'string') return null;
+  const src = gisFilePath(token); if (!src) return null;
+  const r = await dialog.showSaveDialog(win, { title: 'Save the file', defaultPath: typeof name === 'string' ? name.replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 120) : basename(src) });
+  if (r.canceled || !r.filePath) return null;
+  await copyFile(src, r.filePath); return { name: basename(r.filePath) };
 });
 
 /* Apple Maps: the key is set up and kept here (the app's own folder); the page asks for pictures of areas and gets images back */

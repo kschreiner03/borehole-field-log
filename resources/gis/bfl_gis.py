@@ -21,6 +21,9 @@ def versions():
     for m in ('pykrige', 'gstools', 'numpy', 'scipy'):
         try: out[m] = __import__(m).__version__
         except Exception as e: out[m + '_error'] = str(e)
+    try:
+        r = subprocess.run([wbt_exe(), '--version'], capture_output=True, text=True, timeout=60); m = __import__('re').search(r'v(\d+\.\d+\.\d+)', r.stdout); out['whitebox'] = m.group(1) if m else ''
+    except Exception as e: out['whitebox_error'] = str(e)
     g = grass_exe()
     if g:
         try:
@@ -667,6 +670,176 @@ def ortho_trees(job):
         rgba = np.dstack([np.clip(b_, 0, 255) for b_ in outb] + [A]).astype(np.uint8)
         res['image'], res['mime'] = pic_b64(rgba)
     return res
+
+# ---------- WhiteboxTools (MIT, John Lindsay): any of its tools, run on the app's layers and the user's files ----------
+def wbt_exe():
+    import shutil
+    for p in (os.path.join(sys.prefix, 'Library', 'bin', 'whitebox_tools.exe'), os.path.join(sys.prefix, 'bin', 'whitebox_tools')):
+        if os.path.exists(p): return p
+    p = shutil.which('whitebox_tools')
+    if not p: raise RuntimeError('WhiteboxTools is not installed in the GIS engines: update them under Settings › GIS engines.')
+    return p
+
+def real_crs(wkt):
+    """a coordinate system that can be transformed: not empty, not a local or engineering placeholder"""
+    from osgeo import osr
+    if not wkt: return False
+    try:
+        r = osr.SpatialReference(wkt=wkt); return bool(r.IsProjected() or r.IsGeographic()) and not r.IsLocal()
+    except Exception: return False
+
+def wbt_catalog():
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wbt_catalog.json'), encoding='utf-8') as f: return json.load(f)
+
+def wbt_job(job):
+    """'catalog': every tool with its parameters (from wbt_catalog.json, made from the installed program). 'run': one tool. Inputs are the
+    app's layers (grids written as GeoTIFF, shapes as shapefiles, in the project's coordinate system) or files the user chose; outputs come
+    back as grids, shapes, files (lidar, kept for the next tool), reports or text. The program's own progress drives the bar."""
+    if job.get('method') == 'catalog':
+        cat = wbt_catalog(); ok = True
+        try: wbt_exe()
+        except Exception: ok = False
+        return {'catalog': cat, 'installed': ok}
+    import subprocess, re, tempfile, time, uuid
+    import numpy as np
+    from osgeo import gdal, ogr, osr
+    gdal.UseExceptions(); ogr.UseExceptions()
+    exe = wbt_exe(); cat = {t['name']: t for t in wbt_catalog()['tools']}
+    tool = cat.get(str(job.get('tool')))
+    if not tool: raise RuntimeError('WhiteboxTools has no tool called %s.' % job.get('tool'))
+    flags = {}
+    for p in tool['params']:
+        for fl in p['flags']: flags[fl] = p
+    epsg = job.get('epsg'); srs = srs_of(epsg) if epsg else None
+    wd = tempfile.mkdtemp(prefix='bfl-wbt-'); keep = os.path.join(os.path.dirname(sys.prefix), 'wbt_out'); os.makedirs(keep, exist_ok=True)
+    for f in os.listdir(keep):   # results kept for the next tool: a week
+        fp = os.path.join(keep, f)
+        try:
+            if time.time() - os.path.getmtime(fp) > 7 * 86400: os.remove(fp)
+        except OSError: pass
+    n_in = [0]
+    def write_grid(g):
+        a, gt = grid_of(g); n_in[0] += 1; fn = os.path.join(wd, 'in%d.tif' % n_in[0]); ny, nx = a.shape
+        ds = gdal.GetDriverByName('GTiff').Create(fn, nx, ny, 1, gdal.GDT_Float32); ds.SetGeoTransform(gt)
+        if srs is not None: ds.SetProjection(srs.ExportToWkt())
+        b = ds.GetRasterBand(1); b.SetNoDataValue(-32768.0); b.WriteArray(np.where(np.isfinite(a), a, -32768.0)); ds = None; return fn
+    def write_feats(v):
+        feats = v.get('feats') or []; n_in[0] += 1; fn = os.path.join(wd, 'in%d.shp' % n_in[0])
+        want = v.get('geom') or 'Any'; kinds = {f['type'] for f in feats}
+        gt = {'Point': ogr.wkbPoint, 'Line': ogr.wkbLineString, 'Polygon': ogr.wkbPolygon}.get(want) or ({'point': ogr.wkbPoint, 'line': ogr.wkbLineString, 'polygon': ogr.wkbPolygon}.get(next(iter(kinds))) if len(kinds) == 1 else ogr.wkbPolygon if 'polygon' in kinds else ogr.wkbLineString if 'line' in kinds else ogr.wkbPoint)
+        tname = {ogr.wkbPoint: 'point', ogr.wkbLineString: 'line', ogr.wkbPolygon: 'polygon'}[gt]
+        ds = ogr.GetDriverByName('ESRI Shapefile').CreateDataSource(fn); ly = ds.CreateLayer('in', srs, gt)
+        ly.CreateField(ogr.FieldDefn('FID_', ogr.OFTInteger)); nf = ogr.FieldDefn('NAME', ogr.OFTString); nf.SetWidth(80); ly.CreateField(nf)
+        keys = []
+        for f in feats:
+            for k, x in (f.get('attrs') or {}).items():
+                if k not in keys and len(keys) < 30: keys.append(k)
+        for k in keys:
+            num = all(isinstance((f.get('attrs') or {}).get(k), (int, float)) or (f.get('attrs') or {}).get(k) is None for f in feats)
+            fd = ogr.FieldDefn(k[:10], ogr.OFTReal if num else ogr.OFTString)
+            if not num: fd.SetWidth(80)
+            ly.CreateField(fd)
+        for i, f in enumerate(feats):
+            if f['type'] != tname: continue
+            if tname == 'point': g = ogr.Geometry(ogr.wkbPoint); q = f['pts'][0] if isinstance(f['pts'][0], (list, tuple)) else f['pts']; g.AddPoint_2D(float(q[0]), float(q[1]))
+            elif tname == 'line': g = ogr.Geometry(ogr.wkbLineString); [g.AddPoint_2D(float(x), float(y)) for x, y in f['pts']]
+            else:
+                g = ogr.Geometry(ogr.wkbPolygon); rings = f['pts'] if isinstance(f['pts'][0][0], (list, tuple)) else [f['pts']]
+                for rg in rings:
+                    r_ = ogr.Geometry(ogr.wkbLinearRing); [r_.AddPoint_2D(float(x), float(y)) for x, y in rg]; r_.CloseRings(); g.AddGeometry(r_)
+            ft = ogr.Feature(ly.GetLayerDefn()); ft.SetField('FID_', i); ft.SetField('NAME', str(f.get('name') or '')[:80])
+            for k in keys:
+                x = (f.get('attrs') or {}).get(k)
+                if x is not None: ft.SetField(k[:10], x)
+            ft.SetGeometry(g); ly.CreateFeature(ft)
+        ds = None; return fn
+    def value(v, p=None):
+        if 'grid' in v: return write_grid(v['grid'])
+        if 'feats' in v: return write_feats(v)
+        if 'file' in v:   # a table or text is copied in, so a tool that writes beside its input writes here, not in the user's folder
+            if os.path.splitext(v['file'])[1].lower() in ('.csv', '.txt', '.html', '.dat') and os.path.getsize(v['file']) < 200e6:
+                n_in[0] += 1; dst = os.path.join(wd, 'in%d_%s' % (n_in[0], os.path.basename(v['file']))); shutil.copyfile(v['file'], dst); return dst
+            return v['file']
+        raise RuntimeError('An input is missing.')
+    outs = []; args = [exe, '--run=' + tool['name'], '--wd=' + wd, '-v']
+    for a in job.get('args') or []:
+        p = flags.get(a.get('flag'))
+        if not p: raise RuntimeError('%s has no setting %s.' % (tool['name'], a.get('flag')))
+        fl = p['flags'][-1]; v = a.get('v') or {}
+        if 'out' in v:
+            ext = {'raster': '.tif', 'vector': '.shp', 'lidar': '.laz', 'html': '.html', 'text': '.txt', 'csv': '.csv'}.get(v['out'], '.dat')
+            fn = os.path.join(wd, 'out_%s%s' % (re.sub(r'\W', '', fl), ext)); outs.append((v['out'], fn, p['name'], fl)); args.append('%s=%s' % (fl, fn)); continue
+        if 'bool' in v: args.append('%s=%s' % (fl, 'true' if v['bool'] else 'false')); continue
+        if 'num' in v: args.append('%s=%s' % (fl, repr(float(v['num'])) if not float(v['num']).is_integer() or p['parameter_type'] == 'Float' else str(int(v['num'])))); continue
+        if 'str' in v or 'opt' in v: args.append('%s=%s' % (fl, v.get('str', v.get('opt')))); continue
+        if 'list' in v: args.append('%s=%s' % (fl, ';'.join(value(x, p) for x in v['list']))); continue
+        args.append('%s=%s' % (fl, value(v, p)))
+    before = set(os.listdir(wd))
+    prog(0.05, 'WhiteboxTools %s: %s' % (wbt_catalog()['version'], tool['name']))
+    pr = subprocess.Popen(args, cwd=wd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace', bufsize=1)
+    log, last = [], -1
+    for line in pr.stdout:
+        line = line.rstrip(); log.append(line); log[:] = log[-400:]
+        m = re.search(r'(\d{1,3})%\s*$', line)
+        if m:
+            q = int(m.group(1))
+            if q != last: last = q; prog(0.05 + 0.75 * q / 100.0, line[:120])
+        elif line and not line.startswith('*'): prog(max(0.05, 0.05 + 0.75 * max(last, 0) / 100.0), line[:120])
+    rc = pr.wait()
+    text = '\n'.join(log)
+    if rc != 0 or re.search(r'^(Error|thread .main. panicked)', text, re.M):
+        msg = [l for l in log if l and not l.startswith('*') and not re.search(r'%\s*$', l)][-6:]
+        shutil.rmtree(wd, ignore_errors=True); raise RuntimeError('WhiteboxTools %s stopped: %s' % (tool['name'], ' / '.join(msg) or 'exit code %d' % rc))
+    prog(0.85, 'Reading the results')
+    declared = {os.path.splitext(fn)[0] for _, fn, _, _ in outs}
+    for f in sorted(set(os.listdir(wd)) - before):   # files the tool wrote beside its inputs
+        stem, ext = os.path.splitext(f); ext = ext.lower()
+        if os.path.join(wd, stem) in declared or ext in ('.shx', '.dbf', '.prj', '.cpg', '.aux', '.xml', '.qmd', '.vrt') or f.endswith('.aux.xml'): continue
+        kind = {'.tif': 'raster', '.tiff': 'raster', '.shp': 'vector', '.las': 'lidar', '.laz': 'lidar', '.zlidar': 'lidar', '.html': 'html', '.txt': 'text', '.csv': 'csv'}.get(ext)
+        if kind: outs.append((kind, os.path.join(wd, f), stem.split('_', 1)[-1] if stem.startswith('in') else stem, ''))
+    res = []
+    for kind, fn, pname, fl in outs:
+        if not os.path.exists(fn) and kind == 'vector':
+            alt = [f for f in os.listdir(wd) if f.startswith(os.path.basename(fn)[:-4]) and f.endswith('.shp')]; fn = os.path.join(wd, alt[0]) if alt else fn
+        if not os.path.exists(fn): res.append({'kind': 'missing', 'name': pname}); continue
+        if kind == 'raster':
+            src = gdal.Open(fn, gdal.GA_Update); wkt = src.GetProjection()
+            if srs is not None and not real_crs(wkt): src.SetProjection(srs.ExportToWkt())   # none, or a placeholder local one: the coordinates are the project's
+            W, H = src.RasterXSize, src.RasterYSize; s = min(1.0, (4.2e6 / (W * H)) ** .5)
+            w = gdal.Warp('', src, format='MEM', dstSRS=srs.ExportToWkt() if srs is not None else None, width=max(2, int(W * s)), height=max(2, int(H * s)), resampleAlg='average' if s < 1 else 'near', dstNodata=-99999, outputType=gdal.GDT_Float32)
+            b = w.GetRasterBand(1); g2 = w.GetGeoTransform(); a = b.ReadAsArray().astype(float); a[a <= -99998] = np.nan; nx, ny = w.RasterXSize, w.RasterYSize
+            fin = a[np.isfinite(a)]; ints = fin.size and np.all(np.mod(fin[:20000], 1) == 0) and np.unique(fin[:200000]).size <= 64
+            item = {'kind': 'raster', 'name': pname, 'flag': fl, 'nx': nx, 'ny': ny, 'box': [g2[0], g2[3] + g2[5] * ny, g2[0] + g2[1] * nx, g2[3]], 'values_b64': b64f(a),
+                    'min': float(fin.min()) if fin.size else 0.0, 'max': float(fin.max()) if fin.size else 1.0, 'classes': bool(ints), 'scaled': s < 1}
+            if job.get('terrain') and fin.size: item.update(terrain_products(w, b, job.get('tparams') or {}))
+            res.append(item); w = None; src = None
+        elif kind == 'vector':
+            ds = ogr.Open(fn); ly = ds.GetLayer(0); ct = None; ls = ly.GetSpatialRef()
+            if ls is not None and srs is not None and real_crs(ls.ExportToWkt()) and not ls.IsSame(srs): ls.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER); ct = osr.CoordinateTransformation(ls, srs)
+            defn = ly.GetLayerDefn(); fields = [defn.GetFieldDefn(i).GetName() for i in range(min(12, defn.GetFieldCount()))]; feats = []
+            for ft in ly:
+                g = ft.GetGeometryRef()
+                if g is None: continue
+                g = g.Clone()
+                if ct: g.Transform(ct)
+                attrs = {k: ft.GetField(k) for k in fields}
+                nm = next((str(attrs[k]) for k in fields if isinstance(attrs[k], str) and attrs[k]), '')
+                for part in ([g.GetGeometryRef(i) for i in range(g.GetGeometryCount())] if g.GetGeometryName().startswith('MULTI') else [g]):
+                    t = part.GetGeometryName()
+                    if t == 'POINT': feats.append({'type': 'point', 'pts': [[round(part.GetX(), 3), round(part.GetY(), 3)]], 'name': nm, 'attrs': attrs})
+                    elif t == 'LINESTRING': feats.append({'type': 'line', 'pts': [[round(x, 3), round(y, 3)] for x, y, *_ in part.GetPoints() or []], 'name': nm, 'attrs': attrs})
+                    elif t == 'POLYGON': feats.append({'type': 'polygon', 'pts': [[[round(x, 3), round(y, 3)] for x, y, *_ in part.GetGeometryRef(r).GetPoints() or []] for r in range(part.GetGeometryCount())], 'name': nm, 'attrs': attrs})
+                if len(feats) >= 50000: break
+            res.append({'kind': 'vector', 'name': pname, 'flag': fl, 'features': feats, 'fields': fields, 'capped': len(feats) >= 50000}); ds = None
+        elif kind in ('html', 'text', 'csv'):
+            with open(fn, encoding='utf-8', errors='replace') as f: body = f.read(3_000_000)
+            res.append({'kind': kind, 'name': pname, 'flag': fl, 'body': body})
+        else:   # a lidar file (or other): kept for the next tool; the app gets a token for it
+            dst = os.path.join(keep, '%s_%s%s' % (tool['name'], uuid.uuid4().hex[:8], os.path.splitext(fn)[1])); shutil.move(fn, dst)
+            res.append({'kind': 'file', 'ftype': kind, 'name': pname, 'flag': fl, 'path': dst, 'fname': '%s %s%s' % (tool['name'], pname.lower(), os.path.splitext(fn)[1]), 'size': os.path.getsize(dst)})
+    shutil.rmtree(wd, ignore_errors=True)
+    say = [l for l in log if l and not l.startswith('*') and not re.search(r'(\d{1,3})%\s*$', l) and not l.startswith(('Reading', 'Saving', 'Elapsed', 'Output file', '***'))]
+    return {'outputs': res, 'log': '\n'.join(say[-60:])[:20000], 'tool': 'WhiteboxTools %s %s' % (wbt_catalog()['version'], tool['name']), 'detail': tool['desc']}
 
 # ---------- raster tools on the app's layers (in a temporary GRASS project) ----------
 def grid_of(r):
@@ -1600,6 +1773,7 @@ def run(job):
     if job.get('kind') == 'imgprev': return img_preview(job)
     if job.get('kind') == 'georef': return georef(job)
     if job.get('kind') in ('hydro', 'demfix', 'rast'): return grass_run(job)
+    if job.get('kind') == 'wbt': return wbt_job(job)
     if job.get('kind') == 'trees': return find_trees(job)
     if job.get('kind') == 'otrees': return ortho_trees(job)
     if job.get('kind') == 'thiessen': return thiessen(job)

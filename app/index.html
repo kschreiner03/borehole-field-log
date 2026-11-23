@@ -1476,6 +1476,7 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
   .titlebar h1, .titlebar .co { display: none; }
   #statusbar .sb-opt { display: none; }
 }
+.wb-rep{width:100%;height:380px;border:1px solid var(--line);border-radius:6px;background:#fff;margin-top:6px}.wb-pre{max-height:320px;overflow:auto;font-size:11.5px;background:var(--panel-2,#f6f7f8);padding:8px;border-radius:6px;white-space:pre-wrap}.gp-ul{margin:4px 0 6px 18px;padding:0}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="pat-defs"></defs></svg>
@@ -2605,7 +2606,7 @@ function gpMenuList() {
 }
 function openGpMenu(anchor) {
   if ($('#menu')) { closeMenu(); return; }
-  if (!S.gpMenuCat) S.gpMenuCat = (S.gp.recent || []).length ? 'recent' : 'interp'; S.gpMenuQ = '';
+  if (!S.gpMenuCat) S.gpMenuCat = (S.gp.recent || []).length ? 'recent' : 'interp'; S.gpMenuQ = ''; wbLoad();
   const m = document.createElement('div'); m.id = 'menu'; m.className = 'menu fmenu gp-menu'; m.setAttribute('role', 'menu');
   const counts = Object.fromEntries(GP_CATS.map(c => [c[0], c[0] === 'recent' ? (S.gp.recent || []).length : gpTools().filter(([, t]) => c[3].includes(t.group)).length]));
   m.innerHTML = (gisOn() ? '' : `<p class="gp-menu-warn">${window.desktop?.gis ? 'The tools need the GIS engines. <button class="btn link" data-act="gis-install">Install…</button>' : 'The GIS tools run on the desktop app.'}</p>`)
@@ -10818,7 +10819,7 @@ function gisInit() {
   window.desktop.gis.status().then(st => { GIS.st = st; gisMethods(); if (gisOn() && MAP_TABS.includes(S.tab)) renderView(true); });
 }
 // the 3D engine methods join the cross-section's list once the engines are installed
-function gisMethods() { if (!gisOn()) return; for (const [k, v] of Object.entries(GIS_3D)) { if (desktopWin() && GIS_NO_WIN.has(k)) continue; XS_METHODS[k] = v; XS_3D.add(k); } }
+function gisMethods() { if (!gisOn()) return; wbLoad(); for (const [k, v] of Object.entries(GIS_3D)) { if (desktopWin() && GIS_NO_WIN.has(k)) continue; XS_METHODS[k] = v; XS_3D.add(k); } }
 const desktopWin = () => window.desktop?.platform === 'win32';
 const gisKey = (m, P, extra = '') => m + '|' + extra + '|' + P.map(p => p.map(v => (+v).toFixed(3)).join(',')).join(';');
 let gisT; const gisRedraw = () => { clearTimeout(gisT); gisT = setTimeout(() => { if (MAP_TABS.includes(S.tab)) renderView(true); }, 60); };
@@ -10982,11 +10983,11 @@ function gisPrefsHTML() {
   return `<section class="gis-prefs"><h4>GIS engines</h4><p class="note">Real GIS software, run on this computer as separate programs: GRASS GIS (v.surf.rst, v.surf.idw), GDAL (gdal_grid, gdal_contour, GeoTIFF and GeoPackage), PyKrige and GSTools (kriging in 2D and 3D). Installed for you only, from conda-forge, about 1.6 GB.</p>${have}
     <label class="check" style="margin:6px 0"><input type="checkbox" data-act="gis-net" ${lsGet('bhlog.projnet') === '1' ? 'checked' : ''}> Let PROJ download datum grids (cdn.proj.org) when a transformation needs one: NAD27 and older NAD83 to NAD83(CSRS), CGVD28 heights. They are kept on this computer.</label>
     <p class="note" id="gis-prog">${gisProgHTML()}</p>
-    <div class="actions">${st?.installed ? `<button class="btn" data-act="gis-check" ${ro}>Check</button><button class="btn" data-act="gis-remove" ${ro}>Remove</button>` : `<button class="btn primary" data-act="gis-install" ${ro}>Install GIS engines…</button>`}</div></section>`;
+    <div class="actions">${st?.installed ? `${st.versions && !st.versions.whitebox ? `<button class="btn primary" data-act="gis-install-go" ${ro} title="WhiteboxTools 2.4 (MIT), about 6 MB from conda-forge">Add WhiteboxTools</button>` : ''}<button class="btn" data-act="gis-check" ${ro}>Check</button><button class="btn" data-act="gis-remove" ${ro}>Remove</button>` : `<button class="btn primary" data-act="gis-install" ${ro}>Install GIS engines…</button>`}</div></section>`;
 }
 const GIS_LICENCE = `<p>This downloads and installs, for your user account only, from conda-forge (https://conda-forge.org), using micromamba (BSD-3-Clause):</p>
-  <ul><li><b>GRASS GIS 8.5</b>, GNU General Public License v2 or later. Source: https://github.com/OSGeo/grass</li><li><b>GDAL 3.12</b>, MIT license. Source: https://github.com/OSGeo/gdal</li><li><b>PyKrige 1.7</b>, BSD-3-Clause. <b>GSTools 1.7</b>, LGPL-3.0. Python and NumPy, SciPy (BSD-style), and the libraries they need.</li></ul>
-  <p>They are separate programs: Borehole Field Log runs them and exchanges files with them, and does not include or change their code. Each keeps its own licence, which is installed with it. Nothing updates without you: Remove deletes them all.</p><p>About 350 MB is downloaded and about 1.6 GB used.</p>`;
+  <ul><li><b>GRASS GIS 8.5</b>, GNU General Public License v2 or later. Source: https://github.com/OSGeo/grass</li><li><b>GDAL 3.12</b>, MIT license. Source: https://github.com/OSGeo/gdal</li><li><b>WhiteboxTools 2.4</b> (Dr John Lindsay, University of Guelph), MIT license. Source: https://github.com/jblindsay/whitebox-tools</li><li><b>PyKrige 1.7</b>, BSD-3-Clause. <b>GSTools 1.7</b>, LGPL-3.0. Python and NumPy, SciPy (BSD-style), and the libraries they need.</li></ul>
+  <p>They are separate programs: Borehole Field Log runs them and exchanges files with them, and does not include or change their code. Each keeps its own licence, which is installed with it. Nothing updates without you: Remove deletes them all.</p><p>About 360 MB is downloaded and about 1.6 GB used.</p>`;
 async function gisInstall() {
   if (GIS.installing) return;
   GIS.installing = true; GIS.prog = 'Starting…'; GIS.log = []; const re = () => { const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); }; re();
@@ -11124,6 +11125,7 @@ function gpFormHTML(k, T) {
       <div class="actions"><button class="btn${S.gpSpot ? ' primary' : ''}" data-act="gp-spot">${S.gpSpot ? 'Done marking' : 'Mark spots on the map'}</button>${sp.length ? '<button class="btn link" data-act="gp-spot-clear">Clear them</button>' : ''}</div>
       <h4>Parameters</h4>${prm}<h4>Output</h4><p class="note">A corrected layer, with Show › What was fixed to see each change. The original layer is kept, turned off.</p>`;
   }
+  if (T.kind === 'wbt') return wbFormHTML(k, T);
   if (T.kind === 'otrees') { const tl = GIS.layers.filter(L => L.terrain && L.values), ims = GIS.layers.filter(L => L.kind === 'image');
     if (!tl.some(L => L.id === g.otL)) g.otL = (tl.find(L => L.trees) || tl[0])?.id || ''; if (!ims.some(L => L.id === g.otI)) g.otI = (ims.find(L => !/\(ground under trees\)$/.test(L.name)) || ims[0])?.id || '';
     const L = tl.find(x => x.id === g.otL), I = ims.find(x => x.id === g.otI);
@@ -11174,7 +11176,7 @@ function gpJobHTML(j, full) {
     <div class="gp-jh"><b>${esc(j.label)}</b><span class="gp-time note">${j.status === 'running' ? Math.round(j.p * 100) + ' % · ' : ''}${gisElapsed(j)}</span></div>
     ${gpBarHTML(j)}<div class="gp-msg note">${esc(j.msg || '')}</div>
     ${full ? `<details class="gp-det" ${j.status === 'running' ? 'open' : ''}><summary>Messages</summary><ul class="gp-log">${(j.msgs || []).slice(-60).map(([t, m]) => `<li><span>${new Date(t).toLocaleTimeString()}</span>${esc(m)}</li>`).join('')}</ul></details>` : ''}
-    ${ok && r?.tool ? `<p class="note gp-out">${esc(r.tool)}${r.detail ? ': ' + esc(r.detail) : ''}.${r.loo != null && j.kind !== 'hydro' ? ' Each reading predicted from the others typically within ' + gisX(r.loo) + ' (' + esc(r.loo_by || 'leave-one-out') + ').' : ''}</p>` : ''}${ok && j.sum ? `<p class="gp-sum">${esc(j.sum)}</p>` : ''}${ok && j.chart ? j.chart : ''}
+    ${ok && r?.tool ? `<p class="note gp-out">${esc(r.tool)}${r.detail ? ': ' + esc(r.detail) : ''}.${r.loo != null && j.kind !== 'hydro' ? ' Each reading predicted from the others typically within ' + gisX(r.loo) + ' (' + esc(r.loo_by || 'leave-one-out') + ').' : ''}</p>` : ''}${ok && j.sum ? `<p class="gp-sum">${esc(j.sum)}</p>` : ''}${ok && j.chart ? j.chart : ''}${ok && j.report && full ? wbReportHTML(j.report) : ''}
     ${full && ok && j.kind === 'hydro' && !GP_TABS.includes(S.tab) ? '' : ''}${full && ok && j.kind === 'hydro' && S.tab !== 'site' ? '<div class="actions"><button class="btn" data-tab="site">Show on the map</button></div>' : ''}
     ${full && ok && j.kind === 'surface' ? `<div class="actions"><button class="btn" data-act="gp-use" data-id="${j.id}">Use on the maps</button><button class="btn" data-act="gp-show" data-id="${j.id}">Show on the map</button></div>` : ''}
     ${full && ok && j.kind === 'points3d' ? `<div class="actions"><button class="btn" data-act="gp-use" data-id="${j.id}">Use on the cross-section</button><button class="btn" data-tab="xsec">Open the cross-section</button></div>` : ''}
@@ -11187,7 +11189,7 @@ function gpCompareHTML() {
   return `<table class="sum gp-cmp"><thead><tr><th>#</th><th>Tool</th><th class="r">Typical error</th><th></th></tr></thead><tbody>${[...done, ...rows.filter(x => !(x.r?.loo != null))].map((x, i) => `<tr${i === 0 && x.r ? ' class="best"' : ''}><td>${x.r ? i + 1 : ''}</td><td>${esc(GP_TOOLS[x.m].name)} <span class="note">${esc(GP_TOOLS[x.m].by)}</span></td><td class="r">${x.r?.loo != null ? gisX(x.r.loo) : x.j?.status === 'running' ? Math.round(x.j.p * 100) + ' %' : x.j?.status === 'failed' ? 'failed' : '…'}</td><td>${x.r ? `<button class="btn link" data-act="gp-cmp-use" data-m="${x.m}">Use</button>` : ''}</td></tr>`).join('')}</tbody></table>
     <p class="note">Typical error: how far off each reading is, as a factor, when the tool predicts it from the others (leave-one-out, in log₁₀). Smaller is better.</p>`;
 }
-const gpParams = k => { const o = {}; for (const [n, , d, , opts] of GP_TOOLS[k].prm || []) { const v = S.gp.prm[k]?.[n]; o[n] = v == null || v === '' ? (opts ? d : null) : opts ? v : +v; } return o; };
+const gpParams = k => { const o = {}; for (const [n, , d, , opts] of GP_TOOLS[k]?.prm || []) { const v = S.gp.prm[k]?.[n]; o[n] = v == null || v === '' ? (opts ? d : null) : opts ? v : +v; } return o; };
 /* Run: build the job from the form, start it (it shows in the bar and the history), then act on what was ticked */
 async function gpRun() {
   const k = GP_TOOLS[S.gp.tool] ? S.gp.tool : 'grass_rst', T = GP_TOOLS[k], g = S.gp;
@@ -11197,6 +11199,7 @@ async function gpRun() {
   if (T.kind === 'demfix') { await gpFix(gpParams(k)); return; }
   if (T.kind === 'trees') { await gpTrees(gpParams(k)); return; }
   if (T.kind === 'otrees') { await gpOrthoTrees(gpParams(k)); return; }
+  if (T.kind === 'wbt') { await gpWbt(k, T); return; }
   if (['rast', 'thiessen', 'setback', 'export2'].includes(T.kind)) { await gpMore(k, T, gpParams(k)); return; }
   if (T.kind === 'crs') { await gpCrs(k, T); return; }
   if (T.kind === 'rast2') { await gpRast(k, T, gpParams(k)); return; }
@@ -11544,6 +11547,166 @@ async function gpOrthoTrees(prm) {
     `Crowns cover ${Math.round(100 * r.crown_frac)}% of the photo.${r.image ? ' The ground under the crowns is painted in on a new picture layer, draped in 3D.' : ''}${(r.notes || []).length ? ' Note: ' + r.notes.join('; ') + '.' : ''}`;
   gpSave(); renderView(true);
 }
+/* ---------- WhiteboxTools (MIT, John Lindsay): all of its tools in the Toolbox, each form made from the tool's own list of settings.
+   Inputs are map layers (grids, shapes, the boreholes as points, found trees as points) or files chosen in the Open dialog (by token);
+   outputs come back as layers, as files (lidar: kept for the next tool, Save a copy keeps one) and as reports. ---------- */
+const WB_ICON = '<path d="M4 18l5-8 4 5 3-4 4 7"/><circle cx="17" cy="6" r="2"/><path d="M3 21h18"/>';
+const wbNice = n => n.replace(/([a-z\d])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').split(' ').map((w, i) => /^[A-Z\d]{2,}$/.test(w) ? w : i ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+const WB_TERR = /Gridding|TIN|Dem$|DEM|Dsm|DSM|FillDepressions|BreachDepressions|Smooth|Denoise|Interpolation|Elev|Height|RemoveOffTerrain|FillMissingData|Kriging|Idw|NaturalNeighbour|NearestNeighbour|RadialBasis/;
+function wbInstall(cat, installed) {
+  GIS.wbt = { version: cat.version, installed };
+  const groups = new Set();
+  for (const t of cat.tools) {
+    const g = 'Whitebox: ' + t.toolbox.replace('Image Processing Tools', 'Image processing').replace('GIS Analysis', 'GIS analysis').replace('Math and Stats Tools', 'Maths and statistics').replace('LiDAR Tools', 'Lidar').replace('Data Tools', 'Data').replace('Hydrological Analysis', 'Hydrology').replace('Geomorphometric Analysis', 'Terrain (geomorphometry)').replace('Stream Network Analysis', 'Stream networks').replace('Machine Learning', 'Machine learning').replace('/', ' › ');
+    groups.add(g);
+    GP_TOOLS['wb_' + t.name] = { group: g, name: wbNice(t.name), by: 'WhiteboxTools ' + cat.version + ' · ' + t.name, kind: 'wbt', desc: t.desc, wb: t, prm: [] };
+  }
+  const order = ['Lidar', 'Hydrology', 'Terrain', 'Stream', 'GIS', 'Image', 'Maths', 'Data', 'Machine'], rank = g => { const i = order.findIndex(o => g.slice(10).startsWith(o)); return i < 0 ? 99 : i; };
+  const list = [...groups].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  const C = GP_CATS.find(c => c[0] === 'whitebox'); if (C) C[3] = list; else GP_CATS.push(['whitebox', 'Whitebox', WB_ICON, list]);
+}
+async function wbLoad() {
+  if (GIS.wbt || GIS.wbtLoading || !gisOn() || !window.desktop?.gis) return; GIS.wbtLoading = true;
+  try { const r = await window.desktop.gis.run({ kind: 'wbt', method: 'catalog' }); if (r?.ok && r.catalog) { wbInstall(r.catalog, r.installed); if ($('#gp-menu-list')) $('#gp-menu-list').innerHTML = gpMenuList(); if (S.gpPanel?.startsWith('wb_')) ctlRender(); } }
+  finally { GIS.wbtLoading = false; }
+}
+function wbType(p) {
+  const pt = p.parameter_type, k = typeof pt === 'string' ? pt : Object.keys(pt)[0], sub = typeof pt === 'string' ? null : pt[k];
+  const what = x => x === 'Raster' ? 'raster' : x === 'Lidar' ? 'lidar' : ['Csv', 'Text', 'Html', 'Dat'].includes(x) ? 'csv' : x?.Vector ? 'vector' : x?.RasterAndVector ? 'both' : 'raster';
+  if (k === 'NewFile') return { out: sub === 'Raster' ? 'raster' : sub === 'Lidar' ? 'lidar' : sub === 'Html' ? 'html' : sub === 'Csv' ? 'csv' : sub?.Vector ? 'vector' : 'text' };
+  if (k === 'ExistingFile') return { src: true, what: what(sub), geom: sub?.Vector || sub?.RasterAndVector || null };
+  if (k === 'ExistingFileOrFloat') return { src: true, orNum: true, what: what(sub), geom: sub?.Vector || null };
+  if (k === 'FileList') return { list: true, what: what(sub), geom: sub?.Vector || null };
+  if (k === 'Boolean') return { bool: true };
+  if (k === 'Integer' || k === 'Float') return { num: true, int: k === 'Integer' };
+  if (k === 'OptionList') return { opt: sub };
+  if (k === 'VectorAttributeField') return { field: true, parent: sub?.[1] };
+  if (k === 'Directory') return { dir: true };
+  return { str: true };
+}
+/* what can feed an input: map layers of the right kind, the boreholes, found trees, files chosen or made */
+function wbSources(t) {
+  const o = [], vec = t.what === 'vector' || t.what === 'both', ras = t.what === 'raster' || t.what === 'both', g = t.geom || 'Any', geomOk = ty => g === 'Any' || g === 'Point' && ty === 'point' || g === 'Line' && ty === 'line' || g === 'Polygon' && ty === 'polygon' || g === 'LineOrPolygon' && ty !== 'point';
+  if (ras) for (const L of GIS.layers) if (L.kind === 'raster' && L.values) o.push({ v: 'L:' + L.id, n: L.name });
+  if (vec) {
+    if (geomOk('point') && projList().some(b => b.easting != null)) o.push({ v: 'B:bh', n: 'The boreholes (points: NAME, ELEV, DEPTH)' });
+    for (const L of GIS.layers) {
+      if (L.trees?.length && geomOk('point')) o.push({ v: 'T:' + L.id, n: 'Trees on ' + L.name + ' (points: HEIGHT, CROWN)' });
+      if (['feats', 'path', 'polys'].includes(L.kind)) { let f = []; try { f = layerFeatures(L); } catch { f = []; } if (f.some(x => geomOk(x.type))) o.push({ v: 'L:' + L.id, n: L.name }); }
+    }
+  }
+  for (const f of S.wbFiles || []) if (f.kind === t.what || (t.what === 'both' && (f.kind === 'raster' || f.kind === 'vector'))) o.push({ v: 'F:' + f.token, n: f.name + ' (file)' });
+  return o;
+}
+function wbFeats(v, t) {
+  const g = t.geom || 'Any', ok = ty => g === 'Any' || g === 'Point' && ty === 'point' || g === 'Line' && ty === 'line' || g === 'Polygon' && ty === 'polygon' || g === 'LineOrPolygon' && ty !== 'point';
+  if (v === 'B:bh') return projList().filter(b => b.easting != null && b.northing != null).map(b => ({ type: 'point', name: String(b.name || '').slice(0, 80), pts: [[b.easting, b.northing]], attrs: { ELEV: b.elevation ?? null, DEPTH: depthOf(b) ?? null } }));
+  if (v.startsWith('T:')) { const L = GIS.layers.find(x => x.id === v.slice(2)); return (L?.trees || []).map((q, i) => ({ type: 'point', name: 'T' + (i + 1), pts: [[q[0], q[1]]], attrs: { HEIGHT: q[3], CROWN: +(2 * q[4]).toFixed(2), GROUND: q[2] } })); }
+  const L = GIS.layers.find(x => x.id === v.slice(2)); if (!L) return null;
+  const F = layerFeatures(L).map((f, i) => ({ ...f, name: String(f.name || '').slice(0, 80), ...(L.features?.[i]?.attrs ? { attrs: Object.fromEntries(Object.entries(L.features[i].attrs).filter(([a, x]) => /^[A-Za-z_][A-Za-z0-9_]{0,9}$/.test(a) && (x == null || typeof x === 'number' || typeof x === 'string')).slice(0, 30).map(([a, x]) => [a, typeof x === 'string' ? x.slice(0, 80) : x])) } : {}) }));
+  return F.filter(f => ok(f.type));
+}
+function wbSource(v, t) {
+  if (!v) return null;
+  if (v.startsWith('N:')) return v.length > 2 && isFinite(+v.slice(2)) ? { num: +v.slice(2) } : null;
+  if (v.startsWith('F:')) return { file: v.slice(2) };
+  if (v.startsWith('L:')) { const L = GIS.layers.find(x => x.id === v.slice(2)); if (!L) return null; if (L.kind === 'raster' && L.values) return { grid: gridOf(L) }; }
+  const f = wbFeats(v, t); return f?.length ? { feats: f, geom: ['Point', 'Line', 'Polygon'].includes(t.geom) ? t.geom : undefined } : null;
+}
+function wbFields(v) {
+  if (!v) return null; if (v === 'B:bh') return ['NAME', 'ELEV', 'DEPTH']; if (v.startsWith('T:')) return ['NAME', 'HEIGHT', 'CROWN', 'GROUND'];
+  if (v.startsWith('L:')) { const L = GIS.layers.find(x => x.id === v.slice(2)); if (L && ['feats', 'path', 'polys'].includes(L.kind)) return ['NAME', ...Object.keys(L.features?.[0]?.attrs || {}).filter(a => /^[A-Za-z_][A-Za-z0-9_]{0,9}$/.test(a))]; }
+  return null;
+}
+function wbFormHTML(k, T) {
+  const vals = ((S.gp.wb ||= {})[k] ||= {}), ins = [], prm = [], outs = [], W = T.wb;
+  if (GIS.wbt && !GIS.wbt.installed) ins.push('<p class="gp-warn">WhiteboxTools is not in your GIS engines yet: Settings › GIS engines › Add WhiteboxTools (about 6 MB).</p>');
+  for (const p of W.params) {
+    const fl = p.flags.at(-1), t = wbType(p), tip = esc(p.description || ''), lab = `<span title="${tip}">${esc(p.name)}${p.optional ? '' : ' *'}</span>`;
+    let v = vals[fl];
+    if (t.out) { outs.push(`<li>${esc(p.name)}: ${{ raster: 'a grid on the map', vector: 'shapes on the map', lidar: 'a lidar file (in Files below, for the next tool; Save a copy keeps it)', html: 'a report, shown here', text: 'text, shown here', csv: 'a table, shown here' }[t.out]}</li>`); continue; }
+    if (t.dir) { prm.push(`<p class="note">${esc(p.name)}: a whole folder of files (batch mode) is not offered here; choose files one at a time.</p>`); continue; }
+    if (t.src || t.list) {
+      const opts = wbSources(t);
+      if (t.list) { ins.push(crow(lab, (opts.length ? opts.map(o => `<label class="check"><input type="checkbox" data-wbl="${fl}" value="${esc(o.v)}" ${(v || []).includes(o.v) ? 'checked' : ''}> ${esc(o.n)}</label>`).join('') : '<span class="note">Nothing yet.</span>') + (t.what !== 'both' ? ` <button type="button" class="btn link" data-wbpick="${t.what}" data-flag="${fl}" data-list="1">Add a file…</button>` : ''))); continue; }
+      if (v == null && !p.optional && opts[0] && !t.orNum) vals[fl] = v = opts[0].v;
+      const sel = `<select data-wbf="${fl}"><option value="">${p.optional ? '(none)' : 'Choose…'}</option>${opts.map(o => `<option value="${esc(o.v)}" ${o.v === v ? 'selected' : ''}>${esc(o.n)}</option>`).join('')}${t.orNum ? `<option value="N:" ${v?.startsWith('N:') ? 'selected' : ''}>A number</option>` : ''}</select>`;
+      ins.push(crow(lab, sel + (t.orNum && v?.startsWith('N:') ? ` <input type="number" step="any" data-wbn="${fl}" value="${esc(v.slice(2))}" style="width:7em">` : '') + (t.what !== 'both' ? ` <button type="button" class="btn link" data-wbpick="${t.what}" data-flag="${fl}">A file…</button>` : '')));
+      continue;
+    }
+    if (t.bool) { prm.push(`<label class="check" title="${tip}"><input type="checkbox" data-wbf="${fl}" ${(v ?? (p.default_value === 'true')) ? 'checked' : ''}> ${esc(p.name)}</label>`); continue; }
+    if (t.num) { prm.push(crow(lab, `<input type="number" step="${t.int ? 1 : 'any'}" data-wbf="${fl}" value="${esc(v ?? '')}" placeholder="${esc(p.default_value ?? (p.optional ? 'optional' : ''))}" title="${tip}">`)); continue; }
+    if (t.opt) { const d = v ?? p.default_value ?? ''; prm.push(crow(lab, `<select data-wbf="${fl}" title="${tip}">${p.optional && p.default_value == null ? '<option value="">(default)</option>' : ''}${t.opt.map(o => `<option value="${esc(o)}" ${o === d ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`)); continue; }
+    if (t.field) { const fs_ = wbFields(vals[t.parent] || vals['--' + String(t.parent).replace(/^-+/, '')]); if (fs_) { if (v == null && !p.optional) vals[fl] = v = fs_.find(x => x !== 'NAME') || fs_[0]; prm.push(crow(lab, `<select data-wbf="${fl}" title="${tip}">${p.optional ? '<option value="">(none)</option>' : ''}${fs_.map(f => `<option ${f === v ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select>`)); continue; } }
+    prm.push(crow(lab, `<input type="text" data-wbf="${fl}" value="${esc(v ?? '')}" placeholder="${esc(p.default_value ?? (/proj|epsg/i.test(fl) ? 'project: ' + projEpsg() : p.optional ? 'optional' : ''))}" title="${tip}">`));
+  }
+  const hasRas = W.params.some(p => wbType(p).out === 'raster'), terr = S.gp.wbTerr?.[k] ?? WB_TERR.test(W.name), files = S.wbFiles || [];
+  return `<h4>Input</h4>${ins.join('') || '<p class="note">None.</p>'}${prm.length ? '<h4>Parameters</h4>' + prm.join('') : ''}<h4>Output</h4><ul class="note gp-ul">${outs.join('') || '<li>Messages from the tool, shown here</li>'}</ul>
+    ${hasRas ? `<label class="check"><input type="checkbox" data-wbterr ${terr ? 'checked' : ''}> Shade grids as elevation (hillshade, contours; usable as ground by the other tools)</label>` : ''}
+    <p class="note">* needed. Hover a setting for WhiteboxTools' own description. Grids and shapes go in and come out in the project's coordinate system (EPSG:${projEpsg()}).</p>
+    ${files.length ? `<h4>Files</h4><ul class="gp-ul">${files.map(f => `<li>${esc(f.name)} <span class="note">${(f.size / 1048576).toFixed(1)} MB</span> <button type="button" class="btn link" data-wbsave="${esc(f.token)}">Save a copy…</button></li>`).join('')}</ul><p class="note">Files are remembered while the app is open.</p>` : ''}`;
+}
+async function gpWbt(k, T) {
+  const W = T.wb, vals = S.gp.wb?.[k] || {}, args = [];
+  for (const p of W.params) {
+    const fl = p.flags.at(-1), t = wbType(p); let v = vals[fl], a = null;
+    if (t.out) { args.push({ flag: fl, v: { out: t.out } }); continue; }
+    if (t.dir) { if (!p.optional) { toast(T.name + ' works on a folder of files, which is not offered here.'); return; } continue; }
+    if (t.src) { a = wbSource(v, t); if (v && !a) { toast(T.name + ': ' + p.name + ' has nothing usable in it.'); return; } }
+    else if (t.list) { const items = (v || []).map(x => wbSource(x, t)).filter(Boolean); if (items.length) a = { list: items }; }
+    else if (t.bool) a = { bool: !!(v ?? (p.default_value === 'true')) };
+    else if (t.num) { if (v === '' || v == null) v = p.default_value; if (v != null && v !== '' && isFinite(+v)) a = { num: +v }; }
+    else if (t.opt) { v = v || p.default_value; if (v) a = { opt: String(v) }; }
+    else { v = v || p.default_value || (/proj|epsg/i.test(fl) ? String(projEpsg()) : null); if (v != null && v !== '') { if (/[\\/:*?"<>|]/.test(String(v))) { toast(T.name + ': ' + p.name + ' cannot hold a file path or the characters \\ / : * ? " < > |.'); return; } a = { str: String(v) }; } }
+    if (a == null) { if (!p.optional) { toast(T.name + ': ' + p.name + ' is needed.'); return; } continue; }
+    args.push({ flag: fl, v: a });
+  }
+  const terr = W.params.some(p => wbType(p).out === 'raster') && (S.gp.wbTerr?.[k] ?? WB_TERR.test(W.name));
+  const key = 'wbt|' + Date.now(), pr = gisStart(key, { nocache: true, kind: 'wbt', method: 'run', tool: W.name, epsg: 'EPSG:' + projEpsg(), terrain: terr, ...(terr ? { tparams: { interval: 0, shade: 'single', azimuth: 315, altitude: 45, zfactor: 1 } } : {}), args }, T.name + ' (WhiteboxTools)', W.name);
+  const j = [...GIS.jobs.values()].find(x => x.key === key); if (j) { j.tool = k; j.kind = 'hydro'; }
+  renderView(true);
+  const r = await pr; if (!r?.ok) return;
+  const made = [], notes = [];
+  for (const o of r.outputs || []) {
+    const nm = T.name + ((r.outputs || []).length > 1 ? ' – ' + o.name.replace(/^Output\s*(File)?\s*/i, '') : '');
+    if (o.kind === 'raster') {
+      const v = b64f32(o.values_b64); if (!v.some(x => isFinite(x))) { notes.push(o.name + ' came out empty: check the settings (a search radius or number of points, the input\'s area, its no-data)'); continue; }
+      const tr = !!o.hill_b64;
+      gisAddLayer({ name: nm, kind: 'raster', ramp: tr ? 'terrain' : o.classes ? 'classes' : 'viridis', show: 'elev', shade: tr ? 'single' : 'none', box: o.box, nx: o.nx, ny: o.ny, values: v, hill: tr ? b64u8(o.hill_b64) : null, slope: tr ? b64f32(o.slope_b64) : null, contours: tr ? o.lines : null, step: tr ? o.step : null, range: [o.min, o.max], op: .82, terrain: tr, under: tr, note: o.min.toFixed(2) + ' – ' + o.max.toFixed(2) + (o.scaled ? '; made coarser to fit' : ''), tool: k });
+      made.push(`a grid, ${o.nx} × ${o.ny} cells, ${o.min.toFixed(2)} to ${o.max.toFixed(2)}${o.scaled ? ' (made coarser to stay under about 4 million cells)' : ''}`);
+    } else if (o.kind === 'vector') {
+      if (!o.features.length) { notes.push(o.name + ' has no shapes'); continue; }
+      gisAddLayer({ name: nm, kind: 'feats', features: o.features, color: '#0f766e', note: o.features.length + ' shapes' + (o.fields.length ? '; fields ' + o.fields.join(', ') : ''), tool: k });
+      made.push(`${o.features.length.toLocaleString('en-CA')} shapes${o.capped ? ' (the first 50,000)' : ''}`);
+    } else if (o.kind === 'file') { (S.wbFiles ||= []).push({ token: o.token, name: o.fname, kind: o.ftype === 'lidar' ? 'lidar' : o.ftype, size: o.size || 0 }); made.push(`the file ${o.fname} (${((o.size || 0) / 1048576).toFixed(1)} MB; under Files, to use in the next tool or save)`); }
+    else if (['html', 'text', 'csv'].includes(o.kind)) { if (j) j.report = { kind: o.kind, body: o.body, name: o.name }; made.push('a report, below'); }
+    else if (o.kind === 'missing') notes.push(o.name + ' was not made');
+  }
+  if (j) j.sum = (made.length ? 'Made ' + made.join('; ') + '.' : 'Done.') + (notes.length ? ' ' + notes.join('; ') + '.' : '') + (r.log && !made.length ? ' ' + r.log.split('\n').slice(-12).join(' · ') : '');
+  gpSave(); renderView(true);
+}
+function wbReportHTML(rp) {
+  if (rp.kind === 'html') return `<iframe class="wb-rep" sandbox="" title="${esc(rp.name)}" srcdoc="${esc(rp.body)}"></iframe>`;
+  return `<pre class="wb-pre">${esc(rp.body.slice(0, 200000))}</pre>`;
+}
+document.addEventListener('change', e => {
+  const t = e.target, k = S.gpPanel; if (!k || !GP_TOOLS[k]?.wb) return; const vals = ((S.gp.wb ||= {})[k] ||= {});
+  if (t.dataset.wbf) { vals[t.dataset.wbf] = t.type === 'checkbox' ? t.checked : t.value; gpSave(); if (t.tagName === 'SELECT') ctlRender(); }
+  else if (t.dataset.wbn) { vals[t.dataset.wbn] = 'N:' + t.value; gpSave(); }
+  else if (t.dataset.wbl) { const a = new Set(vals[t.dataset.wbl] || []); t.checked ? a.add(t.value) : a.delete(t.value); vals[t.dataset.wbl] = [...a]; gpSave(); }
+  else if ('wbterr' in t.dataset) { (S.gp.wbTerr ||= {})[k] = t.checked; gpSave(); }
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('[data-wbpick]'); if (!b) return; e.preventDefault();
+  const f = await window.desktop?.gis?.pick?.(b.dataset.wbpick); if (!f) return;
+  (S.wbFiles ||= []).push({ token: f.token, name: f.name, kind: b.dataset.wbpick, size: f.size || 0 });
+  const vals = ((S.gp.wb ||= {})[S.gpPanel] ||= {}); vals[b.dataset.flag] = b.dataset.list ? [...(vals[b.dataset.flag] || []), 'F:' + f.token] : 'F:' + f.token; gpSave(); ctlRender();
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('[data-wbsave]'); if (!b) return; e.preventDefault();
+  const f = (S.wbFiles || []).find(x => x.token === b.dataset.wbsave); const r = await window.desktop?.gis?.saveFile?.(b.dataset.wbsave, f?.name);
+  if (r) toast('Saved ' + r.name + '.'); else if (r === null && f) toast('Not saved: if the app was restarted, run the tool again to make the file.');
+});
 /* a grid layer as the driver takes it */
 const gridOf = L => ({ b64: f32b64(L.values), nx: L.nx, ny: L.ny, box: L.box.map(v => +v) });
 /* a Toolbox layer's shapes as features (lines, areas, points) for export or buffers */
