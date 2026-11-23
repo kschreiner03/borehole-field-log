@@ -470,6 +470,9 @@ body.proj-home .shell { --sidebar-width: 0px; grid-template-columns: 0 0 minmax(
 .pj-none { padding: 30px 0; text-align: center; } .pj-last { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
 .pj-empty .step .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .dialog.wide { width: min(980px, 94vw); max-width: none; }
+.dl-st { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; border: 1px solid var(--c); color: var(--c); white-space: nowrap; }
+.dl-sd { display: inline-block; width: 20px; margin-right: 3px; border-radius: 3px; text-align: center; font: 600 11px/18px var(--f-body); color: #fff; } .dl-sd.ok { background: #2e8b57; } .dl-sd.mo { background: #d9822b; } .dl-sd.no { background: #c0392b; }
+.gw-side { grid-template-columns: minmax(0, 1fr); } .dl-warn { margin: 0 0 12px; } .qc-set { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px 16px; } .lab-view > .sec + .sec, .lab-map + .sec { margin-top: var(--gap, 16px); }
 /* Overview page */
 .kpi-go { cursor: pointer; } .kpi-go:hover { border-color: var(--accent); border-left-color: inherit; background: var(--hover); }
 .ov-prog { display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: var(--rule); overflow: hidden; } .ov-prog i { display: block; height: 100%; background: var(--ok, #2e8b57); }
@@ -13165,9 +13168,123 @@ function vapourMapSVG(W, H) {
   LBL_AVOID = null; o.push(...F.tail);
   return o.join('');
 }
+/* ---------- delineation: each borehole against the project's soil guideline, parameter by parameter.
+   over: a detected result above the guideline. Bounded with depth: below the deepest one over, a deeper sample of the same
+   parameter is at or under it. A non-detect whose limit is above the guideline proves nothing, so it bounds nothing. Sideways, a
+   borehole is bounded in a direction (N, E, S, W, 90° each) when a borehole within reach that way was tested for the same
+   parameter, found under, and reaches at least as deep as the deepest result over (within 0.3 m) ---------- */
+const DELIN0 = { reach: 30, step: 10 };
+const delinOpt = () => ({ ...DELIN0, ...(siteOf()?.delin || {}) });
+function delineate(list, guide, opt) {
+  const ps = LAB_ORDER.filter(p => guide[p] != null), TOL = .3;
+  const R = list.map(b => {
+    const pr = {}; let tested = 0, unsure = 0;
+    for (const p of ps) {
+      const rs = (b.samples || []).filter(sm => sm.depth != null).map(sm => ({ d: sm.depth, r: labVal(sm, p) })).filter(x => x.r).sort((a, c) => a.d - c.d); if (!rs.length) continue;
+      tested++; const st = x => x.r.lt ? (x.r.v > guide[p] ? '?' : 'ok') : x.r.v > guide[p] ? 'over' : 'ok', S2 = rs.map(x => ({ ...x, s: st(x) })), ov = S2.filter(x => x.s === 'over'); if (S2.some(x => x.s === '?')) unsure++;
+      const deep = ov.at(-1), clean = deep && S2.find(x => x.d > deep.d + 1e-6 && x.s === 'ok');
+      pr[p] = { n: S2.length, over: ov.length, top: ov[0]?.d, deep: deep?.d, clean: clean?.d ?? null, last: rs.at(-1).d, lastOk: S2.filter(x => x.s === 'ok').at(-1)?.d ?? null, max: ov.length ? ov.reduce((a, c) => c.r.v > a.r.v ? c : a) : null, unsure: S2.some(x => x.s === '?') };
+    }
+    const ovP = ps.filter(p => pr[p]?.over), openP = ovP.filter(p => pr[p].clean == null);
+    return { b, pr, tested, ovP, openP, status: !tested ? 'none' : openP.length ? 'open' : ovP.length ? 'bounded' : unsure ? 'unsure' : 'clean', deep: ovP.length ? Math.max(...ovP.map(p => pr[p].deep)) : null, top: ovP.length ? Math.min(...ovP.map(p => pr[p].top)) : null, base: ovP.length && !openP.length ? Math.max(...ovP.map(p => pr[p].clean)) : null, last: Math.max(0, ...Object.values(pr).map(q => q.last)) };
+  });
+  const loc = R.filter(r => r.b.easting != null && r.b.northing != null), DIR = [['N', 0, 1], ['E', 1, 0], ['S', 0, -1], ['W', -1, 0]];
+  const way = (a, c) => { const x = c.b.easting - a.b.easting, y = c.b.northing - a.b.northing; return Math.abs(x) > Math.abs(y) ? (x > 0 ? 'E' : 'W') : y > 0 ? 'N' : 'S'; }, dist = (a, c) => Math.hypot(c.b.easting - a.b.easting, c.b.northing - a.b.northing);
+  const bounds = (a, c) => a.ovP.every(p => c.pr[p] && !c.pr[p].over && !c.pr[p].unsure && c.pr[p].lastOk != null && c.pr[p].lastOk >= a.pr[p].deep - TOL);
+  let steps = [];
+  for (const r of R) { r.sides = null; if (!r.ovP.length || !loc.includes(r)) continue;
+    r.sides = DIR.map(([k, ex, ny]) => { const near = loc.filter(c => c !== r && dist(r, c) > .01 && dist(r, c) <= opt.reach && way(r, c) === k).sort((a, c) => dist(r, a) - dist(r, c)), by = near.find(c => bounds(r, c)), more = near.find(c => c.ovP.length);
+      const sh = !by && near.find(c => !c.ovP.length && c.tested);
+      if (!by && !more) steps.push({ x: r.b.easting + ex * opt.step, y: r.b.northing + ny * opt.step, for: [r.b.name + ' ' + k], depth: r.deep });
+      return { k, by: by?.b.name || '', d: by ? dist(r, by) : null, more: !by && more ? more.b.name : '', shallow: !by && !more && sh ? sh.b.name : '' }; }); }
+  // step-outs close together are one borehole
+  const out = []; for (const q of steps) { const o = out.find(z => Math.hypot(z.x - q.x, z.y - q.y) < opt.step * .6); if (o) { const n = o.for.length; o.x = (o.x * n + q.x) / (n + 1); o.y = (o.y * n + q.y) / (n + 1); o.for.push(...q.for); o.depth = Math.max(o.depth, q.depth); } else out.push({ ...q, for: [...q.for] }); }
+  out.forEach((q, i) => { q.name = 'SO-' + (i + 1); });
+  return { R, ps, steps: out, nloc: loc.length };
+}
+const DELIN_ST = { open: ['Not bounded with depth', '#c0392b'], bounded: ['Bounded with depth', '#d9822b'], clean: ['Under the guideline', '#2e8b57'], unsure: ['Limit above guideline', '#7f5aa8'], none: ['Not tested', '#8a94a0'] };
+const csvOut = (name, rows) => saveFile(name, '﻿' + rows.map(r => r.map(v => { let t = String(v ?? ''); if (/^[=+@]/.test(t) || /^-(?!\d)/.test(t)) t = "'" + t; return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }).join(',')).join('\r\n'));
+function delinHTML(list, vw) {
+  const guide = projGuide(), used = labParamsUsed(list), opt = delinOpt(), D = delineate(list, guide, opt), L = LEN();
+  if (!used.length || !D.ps.some(p => used.includes(p))) return '<section class="sec"><div class="body lab-empty">' + svgI(NAV_ICON.contam) + '<h3>' + (used.length ? 'Enter the guideline first' : 'No laboratory results yet') + '</h3><p class="note">' + (used.length ? 'Delineation compares each result with the soil guideline for this site. Type the values in the Guideline row of Lab results (' + used.map(p => esc(LAB_PARAMS[p].label)).join(', ') + '), or apply a saved set. No value is assumed.' : 'Import the laboratory report first.') + '</p><div class="actions"><button class="btn primary" data-labview="lab">Open Lab results</button></div></div></section>';
+  const no = used.filter(p => guide[p] == null), cnt = k => D.R.filter(r => r.status === k).length, st = siteOf() || {}, ro = S.readOnly ? ' disabled' : '';
+  const stack = vw < 760, mw = Math.max(420, Math.round(stack ? vw - 34 : (vw - 16) * 1.75 / 2.75 - 34)), F = mapFrame(list.filter(onMap), mw, Math.round(mw * .72));
+  let map = '<p class="note">Add coordinates to the boreholes to see the map, the open sides and step-out locations.</p>';
+  if (F) { const o = [...F.head]; LBL_AVOID = null;
+    for (const q of D.steps) { const x = F.X(q.x), y = F.Y(q.y); o.push('<g><title>' + esc(q.name + ': ' + q.for.join(', ')) + '</title><path d="M' + (x - 7) + ' ' + y + 'h14M' + x + ' ' + (y - 7) + 'v14" stroke="#1f5fbf" stroke-width="2"/><circle cx="' + x + '" cy="' + y + '" r="9" fill="none" stroke="#1f5fbf" stroke-width="1.5" stroke-dasharray="3 2"/><text x="' + x + '" y="' + (y - 12) + '" text-anchor="middle" style="font:600 10px var(--f-body);fill:#1f5fbf;stroke:#fff;stroke-width:3px;paint-order:stroke">' + q.name + '</text></g>'); }
+    for (const r of D.R) { const b = r.b; if (!F.pts.includes(b)) continue; const x = F.X(b.easting), y = F.Y(b.northing); o.push('<g><title>' + esc(b.name + ': ' + DELIN_ST[r.status][0]) + '</title><circle cx="' + x + '" cy="' + y + '" r="11" fill="' + DELIN_ST[r.status][1] + '" fill-opacity=".35" stroke="' + DELIN_ST[r.status][1] + '" stroke-width="2.5"/>' + BH_SYMBOL(x, y, !!b.well?.installed) + '</g>', bhLabelSVG(b, x, y, null, 'halo', true)); }
+    o.push(...F.tail); map = o.join(''); }
+  const ord = { open: 0, bounded: 1, unsure: 2, clean: 3, none: 4 }, rows = [...D.R].sort((a, c) => ord[a.status] - ord[c.status] || a.b.name.localeCompare(c.b.name, undefined, { numeric: true }));
+  const chip = k => '<span class="dl-st" style="--c:' + DELIN_ST[k][1] + '">' + DELIN_ST[k][0] + '</span>';
+  const side = r => !r.ovP.length ? '—' : !r.sides ? '<span class="note">no coordinates</span>' : r.sides.map(q => '<span class="dl-sd ' + (q.by ? 'ok' : q.more ? 'mo' : 'no') + '" title="' + esc(q.by ? 'Bounded by ' + q.by + ', ' + q.d.toFixed(1) + ' m' : q.more ? 'Next borehole this way is also over: ' + q.more : q.shallow ? q.shallow + ' is under, but not tested for it or not deep enough' : 'No borehole within ' + opt.reach + ' m') + '">' + q.k + '</span>').join('');
+  const deeper = rows.filter(r => r.status === 'open');
+  return '<div class="lab-kpis">' + [['Not bounded with depth', cnt('open'), 'open'], ['Bounded with depth', cnt('bounded'), 'bounded'], ['Under the guideline', cnt('clean'), 'clean'], ['Limit above guideline', cnt('unsure'), 'unsure'], ['Not tested', cnt('none'), 'none']].map(([t, n, k]) => '<div class="kpi" style="border-left-color:' + DELIN_ST[k][1] + '"><span class="kpi-l">' + t + '</span><span class="kpi-v">' + n + '</span></div>').join('') + '</div>'
+    + (no.length ? '<p class="note dl-warn">Not judged, because no guideline is entered: ' + no.map(p => esc(LAB_PARAMS[p].label)).join(', ') + '.</p>' : '')
+    + '<div class="lab-map' + (stack ? ' stack' : '') + '"><section class="sec"><header><h3>Delineation</h3><span class="note">' + esc(st.guideSrc || 'Project guideline') + '</span></header><div class="body"><div class="map-box">' + map + '</div></div></section>'
+    + '<div class="gw-side"><section class="sec"><header><h3>Drill deeper</h3><span class="note">' + deeper.length + '</span></header><div class="body">' + (deeper.length ? '<ul class="ov-att">' + deeper.map(r => '<li><span class="ov-dot" style="background:#c0392b"></span><span><b>' + esc(r.b.name) + '</b> below ' + fx(r.last) + ' ' + L + ': ' + r.openP.map(p => esc(LAB_PARAMS[p].label) + ' ' + fmtLab(r.pr[p].max.r)).join(', ') + '</span></li>').join('') + '</ul>' : '<p class="note">Every borehole over the guideline has a result under it below.</p>') + '</div></section>'
+    + '<section class="sec"><header><h3>Step out</h3><button class="btn link" data-act="dl-csv">CSV</button></header><div class="body">' + crow('Reach (m)', '<input type="number" min="1" step="any" data-dl="reach" value="' + opt.reach + '"' + ro + '>') + crow('Step (m)', '<input type="number" min="1" step="any" data-dl="step" value="' + opt.step + '"' + ro + '>')
+    + (D.steps.length ? '<div class="scroll-x"><table class="sum"><thead><tr><th>Point</th><th class="r">Easting</th><th class="r">Northing</th><th>For</th></tr></thead><tbody>' + D.steps.map(q => '<tr><td>' + q.name + '</td><td class="r">' + q.x.toFixed(1) + '</td><td class="r">' + q.y.toFixed(1) + '</td><td>' + esc(q.for.join(', ')) + '</td></tr>').join('') + '</tbody></table></div>' : '<p class="note">' + (D.nloc ? 'No open side found.' : 'Needs coordinates.') + '</p>')
+    + '<p class="note">Starting points for a plan, placed by geometry alone. Check utilities, access, flow direction and property lines.</p></div></section></div></div>'
+    + '<section class="sec"><header><h3>By borehole</h3><button class="btn link" data-act="dl-csv2">CSV</button></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th>Borehole</th><th>Status</th><th>Over</th><th class="r">From (' + L + ')</th><th class="r">Deepest over</th><th class="r">Under again at</th><th class="r">Deepest tested</th><th>Sides</th></tr></thead><tbody>'
+    + rows.map(r => '<tr><td><button class="pick" data-pick="' + esc(r.b.id) + '" data-goto="log">' + esc(r.b.name) + '</button></td><td>' + chip(r.status) + '</td><td>' + (r.ovP.map(p => esc(LAB_PARAMS[p].label) + ' ' + fmtLab(r.pr[p].max.r) + ' <small class="note">at ' + fx(r.pr[p].max.d) + '</small>').join('<br>') || '—') + '</td><td class="r">' + fx(r.top) + '</td><td class="r">' + fx(r.deep) + '</td><td class="r">' + (r.base != null ? fx(r.base) : r.ovP.length ? '<b style="color:var(--negative)">none</b>' : '—') + '</td><td class="r">' + (r.tested ? fx(r.last) : '—') + '</td><td>' + side(r) + '</td></tr>').join('')
+    + '</tbody></table></div><p class="note" style="margin-top:6px">Sides: green, a borehole within reach is under the guideline to at least that depth; orange, the next borehole that way is over too; red, open. A non-detect with a limit above the guideline bounds nothing. Soil results only.</p></div></section>';
+}
+/* ---------- quality control: what the lab reports say, and the field duplicates against their parents ---------- */
+const QC0 = { maxT: 10, rpdSoil: 50, rpdWater: 40, days: '' };
+const qcOpt = () => ({ ...QC0, ...(siteOf()?.labQc || {}) });
+/* the parent's results for a duplicate: a soil sample or a groundwater sample */
+function qcParent(d) { const [bid, sid] = (d.parent || '').split('|'), b = S.bh.get(bid); if (!b) return null; const sm = (b.samples || []).find(x => x.id === sid); if (sm) return { b, res: p => labVal(sm, p), date: sm.labMeta?.date || '' }; const g = (b.gwSamples || []).find(x => x.id === sid); return g ? { b, res: p => gwVal(g, p), date: g.date || '' } : null; }
+/* relative percent difference; only meaningful when both are at least five times the detection limit */
+function qcRpd(a, c, dl) {
+  if (!a || !c) return { t: 'not in both' };
+  if (a.lt && c.lt) return { t: 'both not detected', ok: true };
+  const near = a.lt || c.lt || dl == null || Math.min(a.v, c.v) < 5 * dl, v = a.lt || c.lt ? null : 200 * Math.abs(a.v - c.v) / ((a.v + c.v) || 1);
+  return { v, near, t: a.lt || c.lt ? 'detected in one only' : near ? (dl == null ? 'limit unknown' : 'under 5 × limit') : '' };
+}
+function labQcHTML(list) {
+  const st = siteOf() || {}, rep = Object.entries(st.labReports || {}), o = qcOpt(), ro = S.readOnly ? ' disabled' : '', all = list.flatMap(b => [...(b.samples || []).filter(sm => sm.labMeta?.report).map(sm => ({ b, id: b.name + ' ' + fx(sm.depth), rep: sm.labMeta.report, date: sm.labMeta.date, res: sm.lab || {}, labNo: sm.labMeta.labNo })), ...(b.gwSamples || []).filter(g => g.report).map(g => ({ b, id: wellId(b) || b.name, rep: g.report, date: g.date, res: g.res || {}, labNo: g.labNo, water: true }))]);
+  const set = '<section class="sec"><header><h3>Criteria</h3><span class="note">Yours to set</span></header><div class="body qc-set">' + crow('Cooler, at most', '<input type="number" step="any" data-qc="maxT" value="' + o.maxT + '"' + ro + '><span class="note">°C</span>') + crow('RPD, soil', '<input type="number" step="any" data-qc="rpdSoil" value="' + o.rpdSoil + '"' + ro + '><span class="note">%</span>') + crow('RPD, water', '<input type="number" step="any" data-qc="rpdWater" value="' + o.rpdWater + '"' + ro + '><span class="note">%</span>') + crow('Days to lab', '<input type="number" step="any" data-qc="days" placeholder="not set" value="' + o.days + '"' + ro + '><span class="note">days</span>') + '</div></section>';
+  if (!rep.length) return set + '<section class="sec"><div class="body lab-empty">' + svgI(NAV_ICON.contam) + '<h3>No report details yet</h3><p class="note">Import a lab report PDF. Reports imported before this version did not keep the cooler temperature, dates, raised limits or duplicates: import them again. Results are updated, not added twice.</p><div class="actions"><button class="btn primary" data-act="imp-lab"' + ro + '>Import lab results…</button></div></div></section>';
+  const day = (a, c) => a && c ? Math.round((Date.parse(c) - Date.parse(a)) / 864e5) : null;
+  const flags = [], card = rep.map(([k, r]) => { const sm = all.filter(x => x.rep === k), nd = sm.filter(x => !x.date), ds = sm.map(x => day(x.date, r.received)).filter(v => v != null), mx = ds.length ? Math.max(...ds) : null, dups = r.dups || [], ndup = dups.filter(d => !d.date);
+    if (r.cooler != null && r.cooler > o.maxT) flags.push(['bad', k + ': the cooler arrived at ' + r.cooler + ' °C, over ' + o.maxT + ' °C.']);
+    if (nd.length + ndup.length) flags.push(['warn', k + ': ' + (nd.length + ndup.length) + ' sample' + (nd.length + ndup.length === 1 ? ' has' : 's have') + ' no sample date (' + [...nd.map(x => x.id), ...ndup.map(d => d.id)].join(', ') + ').']);
+    if (ds.some(v => v < 0)) flags.push(['bad', k + ': a sample date is after the date received.']);
+    if (o.days !== '' && mx != null && mx > +o.days) flags.push(['bad', k + ': up to ' + mx + ' days from sampling to the lab, over ' + o.days + '.']);
+    for (const q of r.raised || []) { const x = sm.find(z => z.labNo === q.labNo); flags.push(['warn', k + ': detection limit raised for ' + q.what + ' in ' + (x ? x.id : 'lab sample ' + q.labNo) + '.']); }
+    for (const d of dups) { const b = S.bh.get(d.bh), dt = [...new Set(sm.filter(x => x.b === b && !!x.water === !!d.water).map(x => x.date).filter(Boolean))]; if (d.date && dt.length && !dt.includes(d.date)) flags.push(['warn', d.id + ' is dated ' + d.date + '; ' + b.name + ' was sampled ' + dt.join(', ') + '.']); }
+    const nS = sm.filter(x => !x.water).length, nW = sm.filter(x => x.water).length, dS = dups.filter(d => !d.water).length, dW = dups.length - dS, f = (d, n) => d + ' of ' + n + (n ? ' (' + (100 * d / n).toFixed(0) + ' %)' : '');
+    return '<tr><td>' + esc(k) + '</td><td>' + esc(r.lab || '—') + '</td><td>' + esc(r.received || '—') + '</td><td>' + esc(r.reported || '—') + '</td><td class="r"' + (r.cooler != null && r.cooler > o.maxT ? ' style="color:var(--negative);font-weight:600"' : '') + '>' + (r.cooler ?? '—') + '</td><td class="r">' + (mx == null ? '—' : mx) + '</td><td class="r">' + f(dS, nS) + '</td><td class="r">' + f(dW, nW) + '</td></tr>'; }).join('');
+  const g = projGuide(), gw = gwGuide(), hi = {}; for (const x of all) for (const [p, r] of Object.entries(x.res)) { const lim = (x.water ? gw : g)[p]; if (r?.lt && lim != null && r.v > lim) (hi[(x.water ? 'Water ' : 'Soil ') + (LAB_PARAMS[p]?.label || p)] ||= []).push(x.id); }
+  for (const [p, ids] of Object.entries(hi)) flags.push(['bad', p + ': the detection limit is above the guideline in ' + ids.length + ' sample' + (ids.length === 1 ? '' : 's') + ' (' + ids.slice(0, 6).join(', ') + (ids.length > 6 ? '…' : '') + ').']);
+  if (!Object.keys(g).length) flags.push(['warn', 'No soil guideline is entered, so soil detection limits were not checked against one.']);
+  if (all.some(x => x.water) && !Object.keys(gw).length) flags.push(['warn', 'No groundwater guideline is entered, so groundwater detection limits were not checked against one.']);
+  // the usual limit of a parameter in a report: the lowest non-detect
+  const dl = (k, water, p) => { const v = [...all.filter(x => x.rep === k && !!x.water === water).map(x => x.res[p]), ...(st.labReports[k].dups || []).filter(d => !!d.water === water).map(d => d.res[p])].filter(r => r?.lt).map(r => r.v); return v.length ? Math.min(...v) : null; };
+  let nd2 = 0; const dupT = rep.flatMap(([k, r]) => (r.dups || []).map((d, i) => { const P = qcParent(d), b = S.bh.get(d.bh), opts = (b ? [b] : list).flatMap(q => d.water ? (q.gwSamples || []).map(x => [q.id + '|' + x.id, (wellId(q) || q.name) + ' ' + (x.date || '')]) : (q.samples || []).filter(sm => Object.keys(sm.lab || {}).length).map(sm => [q.id + '|' + sm.id, q.name + ' ' + sampleId(sm) + ' · ' + fx(sm.depth) + ' ' + LEN()]));
+    if (!P) nd2++;
+    const lim = d.water ? +o.rpdWater : +o.rpdSoil, sel = '<select data-qcpar="' + esc(k) + '|' + i + '"' + ro + '><option value="">Choose its parent…</option>' + opts.map(([v, t]) => '<option value="' + esc(v) + '"' + (v === d.parent ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select>';
+    const pr = P ? LAB_ORDER.filter(p => d.res[p] || P.res(p)) : [];
+    return (pr.length ? pr : [null]).map((p, j) => { const h = j ? '' : '<td rowspan="' + (pr.length || 1) + '">' + esc(d.id) + (d.labNo ? '<br><small class="note">' + esc(d.labNo) + '</small>' : '') + '</td><td rowspan="' + (pr.length || 1) + '">' + sel + '</td>'; if (!p) return '<tr>' + h + '<td colspan="5" class="note">' + Object.entries(d.res).map(([q, v]) => esc(LAB_PARAMS[q]?.label || q) + ' ' + fmtLab(v)).join(', ') + '</td></tr>';
+      const a = P.res(p), q = qcRpd(a, d.res[p], dl(k, !!d.water, p)), bad = q.v != null && !q.near && q.v > lim; if (bad) flags.push(['bad', d.id + ': ' + LAB_PARAMS[p].label + ' differs from its parent by ' + q.v.toFixed(0) + ' %, over ' + lim + ' %.']);
+      return '<tr>' + h + '<td>' + esc(LAB_PARAMS[p].label) + '</td><td class="r">' + fmtLab(a) + '</td><td class="r">' + fmtLab(d.res[p]) + '</td><td class="r">' + (q.v == null ? '—' : q.v.toFixed(1) + ' %') + '</td><td' + (bad ? ' style="color:var(--negative);font-weight:600"' : '') + '>' + (q.t || (bad ? 'over ' + lim + ' %' : 'meets ' + lim + ' %')) + '</td></tr>'; }).join(''); })).join('');
+  if (nd2) flags.push(['warn', nd2 + ' duplicate' + (nd2 === 1 ? ' needs its' : 's need their') + ' parent sample chosen below.']);
+  return '<section class="sec"><header><h3>Findings</h3><span class="note">' + flags.length + '</span><button class="btn link" data-act="qc-csv">CSV</button></header><div class="body">' + (flags.length ? '<ul class="ov-att">' + flags.map(([k, t]) => '<li data-qcf="' + k + '"><span class="ov-dot" style="background:' + (k === 'bad' ? '#c0392b' : '#d9822b') + '"></span><span>' + esc(t) + '</span></li>').join('') + '</ul>' : '<p class="note">Nothing flagged by these checks.</p>') + '</div></section>'
+    + '<section class="sec"><header><h3>Reports</h3></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th>Report</th><th>Laboratory</th><th>Received</th><th>Reported</th><th class="r">Cooler (°C)</th><th class="r">Most days to lab</th><th class="r">Soil duplicates</th><th class="r">Water duplicates</th></tr></thead><tbody>' + card + '</tbody></table></div><p class="note">Days to lab is sampling to receipt. The reports do not give extraction or analysis dates, so holding times themselves cannot be checked here.</p></div></section>'
+    + '<section class="sec"><header><h3>Field duplicates</h3><span class="note">RPD = difference ÷ mean</span></header><div class="body">' + (dupT ? '<div class="scroll-x"><table class="sum"><thead><tr><th>Duplicate</th><th>Parent</th><th>Parameter</th><th class="r">Parent</th><th class="r">Duplicate</th><th class="r">RPD</th><th></th></tr></thead><tbody>' + dupT + '</tbody></table></div><p class="note">The lab does not name a duplicate\'s parent: choose it from the field notes, not by which result is closest. RPD is judged only when both results are at least five times the detection limit.</p>' : '<p class="note">No duplicates in the imported reports.</p>') + '</div></section>' + set;
+}
+document.addEventListener('change', e => { const t = e.target, d = t.dataset || {}; if (S.readOnly) return;
+  if (d.dl) { const v = num(t.value); if (v > 0) setSite({ ...(siteOf() || {}), delin: { ...delinOpt(), [d.dl]: v } }); renderView(true); }
+  else if (d.qc) { const v = num(t.value); setSite({ ...(siteOf() || {}), labQc: { ...qcOpt(), [d.qc]: v == null ? QC0[d.qc] : v } }); renderView(true); }
+  else if (d.qcpar) { const c = d.qcpar.lastIndexOf('|'), k = d.qcpar.slice(0, c), i = +d.qcpar.slice(c + 1), st = siteOf() || {}, all = structuredClone(st.labReports || {}); if (all[k]?.dups?.[i]) { all[k].dups[i].parent = t.value; setSite({ ...st, labReports: all }); renderView(true); } } });
+document.addEventListener('click', e => { const a = e.target.closest?.('[data-act]')?.dataset.act; if (!/^(dl-csv2?|qc-csv)$/.test(a || '')) return; const base = (curProj() || 'project').replace(/[^\w .-]+/g, ' ').trim().slice(0, 60);
+  if (a === 'qc-csv') { csvOut(base + ' lab QC findings.csv', [['Level', 'Finding'], ...[...document.querySelectorAll('[data-qcf]')].map(li => [li.dataset.qcf === 'bad' ? 'Issue' : 'Check', li.textContent])]); return; }
+  const D = delineate(projList(), projGuide(), delinOpt());
+  if (a === 'dl-csv') csvOut(base + ' step-outs.csv', [['Name', 'Easting', 'Northing', 'EPSG', 'For', 'Deepest over (m)'], ...D.steps.map(q => [q.name, q.x.toFixed(2), q.y.toFixed(2), projEpsg(), q.for.join('; '), q.depth])]);
+  else csvOut(base + ' delineation.csv', [['Borehole', 'Status', 'Over', 'From (m)', 'Deepest over (m)', 'Under again at (m)', 'Deepest tested (m)', 'Open sides'], ...D.R.map(r => [r.b.name, DELIN_ST[r.status][0], r.ovP.map(p => LAB_PARAMS[p].label + ' ' + r.pr[p].max.r.v).join('; '), r.top, r.deep, r.base, r.tested ? r.last : '', (r.sides || []).filter(q => !q.by && !q.more).map(q => q.k).join(' ')])]); });
 /* the Lab page: a summary across the top, then one view at a time (map and ranking, lab results, cross-section, soil tests) */
 S.labView = lsGet('bhlog.labView') || 'map';
-const LAB_VIEWS = [['map', 'Map'], ['lab', 'Lab results'], ['sec', 'Cross-section'], ['soil', 'Soil tests']];
+const LAB_VIEWS = [['map', 'Map'], ['lab', 'Lab results'], ['delin', 'Delineation'], ['qc', 'Quality control'], ['sec', 'Cross-section'], ['soil', 'Soil tests']];
 function contamHTML(vw = 1000) {
   const list = projList(), thr = S.co.vThr ?? 100, rows = list.map(b => ({ b, s: vapourMax(b), n: (b.samples || []).filter(s => s.cvc != null).length })).sort((a, c) => (c.s?.cvc ?? -1) - (a.s?.cvc ?? -1));
   const over = rows.filter(r => r.s && r.s.cvc >= thr), withData = rows.filter(r => r.s), top = withData[0];
@@ -13205,6 +13322,8 @@ function contamHTML(vw = 1000) {
       : '<div class="lab-chips">' + pOver.map(q => '<span class="lab-chip' + (q.x ? ' bad' : g[q.p] != null ? ' good' : '') + '" title="' + esc(LAB_PARAMS[q.p].label) + ': ' + q.n + ' sample' + (q.n === 1 ? '' : 's') + (g[q.p] != null ? ', guideline ' + g[q.p] + ' ' + (LAB_PARAMS[q.p].unit || '') : ', no guideline entered') + '">' + esc(LAB_PARAMS[q.p].label) + ' <b>' + (g[q.p] != null ? q.x + '/' + q.n : q.n) + '</b>' + (g[q.p] != null ? ' over' : '') + '</span>').join('') + '</div>'
         + '<section class="sec"><header><h3>Laboratory results</h3><span class="note">Soil, by sample · ' + lsm.length + ' sample' + (lsm.length === 1 ? '' : 's') + '</span><button class="btn" data-act="imp-lab"' + (S.readOnly ? ' disabled' : '') + '>Import…</button></header><div class="body">' + labTableHTML(list) + '</div></section>') + gwT;
   } else if (v === 'sec') body = '<section class="sec"><header><h3>Cross-section with vapour</h3><span class="note">Bars to the right of each borehole: headspace on a log scale, 1 to 10,000 ppm</span></header><div class="body"><div class="scroll-x" id="csection"></div><p class="note" id="csection-note"></p></div></section>';
+  else if (v === 'delin') body = delinHTML(list, vw);
+  else if (v === 'qc') body = labQcHTML(list);
   else body = psaTablesHTML() + soilTestsHTML();
   return kpis + tabs + '<div class="lab-view">' + body + '</div>';
 }
@@ -14759,7 +14878,10 @@ function labRowsFromText(lines) {
     if (vals.length !== cols.length) continue;
     vals.forEach((v, j) => { const sm = smp.get(cols[j]), d = /@\s*(\d+(?:\.\d+)?)/.exec(sm.id); out.push([sm.id, name, v.replace(/\s+/g, ''), u[1], sm.date, rep, d ? d[1] : '', cols[j]]); n++; });
   }
-  return { rows: out, lab, rep, n };
+  const raised = []; for (const m of all.matchAll(/Sample\s+(\d{4,7})\s+detection limit increased\s+for\s+(.+?)\s+due to/gi)) raised.push({ labNo: m[1], what: m[2].replace(/\s+/g, ' ') });
+  const cool = [...all.matchAll(/temperature of the cooler was\s+(-?\d+(?:\.\d+)?)/gi)].map(m => +m[1]);
+  const qc = { received: isoDate((/Samples Received:\s*([A-Za-z]{3}-\d{1,2}-\d{4})/i.exec(all) || [])[1] || ''), reported: isoDate((/\b([A-Z][a-z]{2} \d{1,2}, \d{4})\b/.exec(all) || [])[1] || ''), cooler: cool.length ? Math.max(...cool) : null, raised };
+  return { rows: out, lab, rep, n, qc };
 }
 /* a laser-diffraction particle-size report (SRC's Beckman Coulter LS 13 320 attachment): per sample, "Sample ID: 26864A", the
    volume % in size classes (0.04, 4, 63, 200, 2000, 99999 µm) and the sizes 10, 25, 50, 75 and 90 % finer. Together they make
@@ -14836,6 +14958,8 @@ async function labPrepare(file) {
 function labDialog({ file, res, meta }) {
   S._labMeta = meta;
   S._labImp = res.samples.map(x => { const m = matchLabId(x); return { ...x, dup: /\bdup(licate)?\b|\bfd\b/i.test(x.id), m: /\bdup(licate)?\b|\bfd\b/i.test(x.id) ? { b: m.b, sm: null, depth: null } : m }; });
+  for (const x of S._labImp) if (x.m.sm && x.m.depth != null) { const near = S._labImp.filter(o => o.m.sm === x.m.sm && o.m.depth != null).sort((p, q) => Math.abs(p.m.depth - x.m.sm.depth) - Math.abs(q.m.depth - x.m.sm.depth))[0]; if (near !== x && Math.abs(near.m.depth - x.m.depth) > .005) x._apart = true; }
+  for (const x of S._labImp) if (x._apart) x.m = { ...x.m, sm: null };   // the nearest keeps the logged sample; the other becomes a new one
   const list = projList(), opts = (x, i) => {
     if (x.water) return `<select data-labmap="${i}" style="width:100%">${list.filter(b => b.well?.installed).map(b => `<option value="${esc(b.id)}|gw" ${x.m.b === b ? 'selected' : ''} ${editable(b) ? '' : 'disabled'}>Groundwater sample, ${esc(b.name)}${x.date ? ' · ' + esc(x.date) : ''}</option>`).join('')}<option value="" ${x.m.b?.well?.installed ? '' : 'selected'}>Skip this sample</option></select>`;
     const cur0 = x.m.sm ? `${x.m.b.id}|${x.m.sm.id}` : x.m.b && x.m.depth != null ? `${x.m.b.id}|new` : '';
@@ -14848,18 +14972,38 @@ function labDialog({ file, res, meta }) {
     ${res.unknown?.length ? `<p class="note">Not imported (not in this app’s parameter list): ${esc(res.unknown.slice(0, 12).join(', '))}${res.unknown.length > 12 ? ` and ${res.unknown.length - 12} more` : ''}.</p>` : ''}`,
     `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="lab-imp-go">Import results</button>`); $('#overlay .dialog')?.classList.add('wide');
 }
+/* a groundwater sample from a lab file: the same sample (its lab number, else its ID, date and report) is updated, not added again,
+   and any exact copies of it left by earlier imports are removed */
+function gwPut(b, g) {
+  const eq = (a, c) => !a || !c || a === c, same = o => (o.sid || '').trim().toLowerCase() === g.sid.trim().toLowerCase() && (o.date || '') === g.date && eq(o.report, g.report) && eq(o.labNo, g.labNo);
+  const L = (b.gwSamples ||= []), hits = L.filter(same), key = r => JSON.stringify(Object.keys(r || {}).sort().map(k => [k, r[k].v, !!r[k].lt]));
+  if (!hits.length) { L.push({ id: uid('gs'), ...g }); return; }
+  const keep = hits[0], k0 = key(keep.res), gone = new Set(hits.slice(1).filter(o => key(o.res) === k0 || key(o.res) === key(g.res)));
+  Object.assign(keep, { ...g, labNo: g.labNo || keep.labNo || '', report: g.report || keep.report || '', lab: g.lab || keep.lab || '', res: { ...keep.res, ...g.res } });
+  b.gwSamples = L.filter(o => !gone.has(o));
+}
+/* what the report says about quality, kept with the project by report number; a parent chosen for a duplicate is kept */
+function labQcPut(report, lab, meta, items) {
+  const st = siteOf() || {}, all = { ...(st.labReports || {}) }, k = report || 'No number', old = all[k] || {}, od = old.dups || [];
+  const dups = items.filter(x => x.dup).map(x => { const id = x.labno || x.id, o = od.find(d => (d.labNo || d.id) === id); return { id: x.id, labNo: x.labno || '', date: x.date || '', bh: x.m.b?.id || '', water: !!x.water, res: x.res, parent: o?.parent || '' }; });
+  const q = meta?.qc || {};
+  all[k] = { ...old, lab: lab || old.lab || '', received: q.received || old.received || '', reported: q.reported || old.reported || '', cooler: q.cooler ?? old.cooler ?? null, raised: q.raised?.length ? q.raised : old.raised || [],
+    dups: [...od.filter(o => !dups.some(d => (d.labNo || d.id) === (o.labNo || o.id))), ...dups] };
+  setSite({ ...st, labReports: all });
+}
 function importLabGo() {
   const lab = $('#li-lab')?.value.trim() || '', rep = $('#li-rep')?.value.trim() || '', touched = new Set(); let n = 0, ns = 0;
   (S._labImp || []).forEach((x, i) => {
     const v = $(`[data-labmap="${i}"]`)?.value || ''; if (!v) return;
     const [bid, sid] = v.split('|'), b = S.bh.get(bid); if (!b || !editable(b)) return;
-    if (sid === 'gw') { (b.gwSamples ||= []).push({ id: uid('gs'), date: x.date || '', sid: x.id, labNo: x.labno || '', lab, report: rep || x.rep || '', res: x.res, unit0: x.unit0 || 'mg/L' }); n += Object.keys(x.res).length; ns++; touched.add(b); return; }
+    if (sid === 'gw') { gwPut(b, { date: x.date || '', sid: x.id, labNo: x.labno || '', lab, report: rep || x.rep || '', res: x.res, unit0: x.unit0 || 'mg/L' }); n += Object.keys(x.res).length; ns++; touched.add(b); return; }
     let sm = sid === 'new' ? null : b.samples.find(s => s.id === sid);
     if (!sm) { const prev = [...b.samples].sort((a, c) => (a.no || 0) - (c.no || 0)).pop(); sm = { ...SHEETS.samples.blank(b, prev), type: 'G', depth: x.m.depth }; b.samples.push(sm); }
     sm.lab = { ...(sm.lab || {}), ...x.res }; sm.labMeta = { lab: lab || sm.labMeta?.lab || '', report: rep || x.rep || sm.labMeta?.report || '', date: x.date || sm.labMeta?.date || '', labNo: x.labno || sm.labMeta?.labNo || '' };
     n += Object.keys(x.res).length; ns++; touched.add(b);
   });
   for (const b of touched) { logChange(b, 'Laboratory results imported'); store.save(b); }
+  if (!S.readOnly) labQcPut(rep || (S._labImp || []).find(x => x.rep)?.rep || '', lab, S._labMeta, S._labImp || []);
   closeOverlay(); S.formStale = true; render(); if (S._labQueue?.length) setTimeout(labNext, 400);
   const over = projList().flatMap(b => b.samples.flatMap(sm => LAB_ORDER.filter(p => exceeds(labVal(sm, p), p)))).length;
   toast(`Imported ${n} result${n === 1 ? '' : 's'} for ${ns} sample${ns === 1 ? '' : 's'}.${Object.keys(projGuide()).length ? ` ${over} exceed${over === 1 ? 's' : ''} the guideline.` : ' Choose a guideline on Lab & contamination to flag exceedances.'}`);
