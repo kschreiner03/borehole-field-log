@@ -327,6 +327,11 @@ def in_grass_demfix(job, gs, tmp):
     to_grass(a, 'z'); gs.run_command('g.region', raster='z', quiet=True)
     code = np.zeros((ny, nx), np.uint8); notes = []
     win = int(prm.get('window', 5)); win += (win + 1) % 2
+    from scipy import ndimage
+    fin0 = np.isfinite(a); fv = a[fin0]
+    if fv.size:   # values far outside the model's own range (a no-data value read as ground, a bird, a blunder): code 6
+        p1, p99 = np.percentile(fv, [1, 99]); Rr = max(20.0, float(p99 - p1)); outl = fin0 & ((a < p1 - Rr) | (a > p99 + Rr))
+        if outl.any(): code[outl] = 6; notes.append('values more than %.0f m outside the model\'s range (%.1f to %.1f m)' % (Rr, p1, p99))
     if str(prm.get('spikes', 'yes')) != 'no':
         prog(0.15, 'r.neighbors: the median of every %d × %d window' % (win, win))
         gs.run_command('r.neighbors', input='z', output='med', method='median', size=win, overwrite=True, quiet=True)
@@ -339,30 +344,42 @@ def in_grass_demfix(job, gs, tmp):
         floor = float(prm.get('height') or 0) or 0.2
         lim = np.maximum(floor, k * 1.4826 * np.nan_to_num(mad))
         ok = np.isfinite(a) & np.isfinite(dev)
-        code[ok & (dev > lim)] = 1; code[ok & (dev < -lim)] = 2
+        code[ok & (dev > lim) & (code == 0)] = 1; code[ok & (dev < -lim) & (code == 0)] = 2
         notes.append('spikes and pits: more than %.2f m, or %g× the local variation, from the median of %d × %d cells' % (floor, k, win, win))
+        if str(prm.get('clusters', 'yes')) != 'no':   # clumps of noise too wide for that window: the same test over a window three times as wide, on every few cells
+            w2 = min(51, max(15, win * 3)); st = max(1, w2 // 9); med = np.where(np.isfinite(dev), a - dev, np.nan)
+            zf = np.where(fin0 & (code == 0), a, np.where(np.isfinite(med), med, np.nanmedian(fv)))
+            mc = ndimage.median_filter(zf[::st, ::st], size=max(3, (w2 // st) | 1)); m2 = ndimage.zoom(mc, (ny / mc.shape[0], nx / mc.shape[1]), order=1)[:ny, :nx]
+            d2 = a - m2; ac = ndimage.median_filter(np.abs(np.nan_to_num(d2))[::st, ::st], size=max(3, (w2 // st) | 1)); mad2 = ndimage.zoom(ac, (ny / ac.shape[0], nx / ac.shape[1]), order=1)[:ny, :nx]
+            lim2 = np.maximum(floor * 2, k * 1.5 * 1.4826 * mad2)
+            c1 = fin0 & (code == 0) & (d2 > lim2); c2 = fin0 & (code == 0) & (d2 < -lim2); code[c1] = 1; code[c2] = 2
+            if c1.any() or c2.any(): notes.append('clumps of noise up to about %d cells across: %d cells against the median of %d × %d' % (w2 // 2, int(c1.sum() + c2.sum()), w2, w2))
     for sx, sy, sr in job.get('spots') or []:   # spots marked on the map
         X, Y = np.meshgrid(x0 + dx * (np.arange(nx) + .5), y1 - dy * (np.arange(ny) + .5))
         code[(np.hypot(X - sx, Y - sy) <= sr) & np.isfinite(a)] = 5
-    b = a.copy(); b[(code == 1) | (code == 2) | (code == 5)] = np.nan
+    b = a.copy(); b[(code == 1) | (code == 2) | (code == 5) | (code == 6)] = np.nan
     holes0 = ~np.isfinite(a)
-    # only holes inside the data are filled: no-data that reaches the edge of the grid is where the file stops, not a gap in it
-    from scipy import ndimage
+    # which missing ground is a hole: everything inside the file's outline, except a large gap reaching the outline or the grid's edge
+    # (ground not flown, past the end of the file); small gaps at the edge are holes too
+    foot = np.frombuffer(base64.b64decode(job['foot_b64']), np.uint8).reshape(ny, nx).astype(bool) if job.get('foot_b64') else np.ones((ny, nx), bool)
     labs, nl = ndimage.label(holes0)
-    edge = set(np.unique(np.concatenate([labs[0, :], labs[-1, :], labs[:, 0], labs[:, -1]]))) - {0}
-    outside = np.isin(labs, list(edge)) if edge else np.zeros(holes0.shape, bool)
+    rim = np.zeros((ny, nx), bool); rim[0, :] = rim[-1, :] = rim[:, 0] = rim[:, -1] = True; rim |= ndimage.binary_dilation(~foot)
+    sizes = np.bincount(labs.ravel(), minlength=nl + 1); big = max(50, int(.005 * fin0.sum()))
+    far = [i for i in set(np.unique(labs[rim]).tolist()) - {0} if sizes[i] > big]
+    outside = (np.isin(labs, far) if far else np.zeros(holes0.shape, bool)) | ~foot
+    if far: notes.append('%d large gap%s reaching the edge of the data left empty (ground not in the file)' % (len(far), '' if len(far) == 1 else 's'))
     holes0 = holes0 & ~outside
     fill = str(prm.get('holes', 'yes')) != 'no'
     prog(0.5, 'GDAL FillNodata: refilling %d cells from the ground around them' % int(np.isnan(b).sum() - (0 if fill else holes0.sum())))
     ds = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); bd = ds.GetRasterBand(1); bd.SetNoDataValue(-99999)
     bd.WriteArray(np.where(np.isfinite(b), b, -99999))
-    maxd = float(prm.get('maxfill') or 0) or max(10, round(max(nx, ny) / 10))
+    maxd = float(prm.get('maxfill') or 0) or max(nx, ny)   # every hole, however big
     gdal.FillNodata(targetBand=bd, maskBand=None, maxSearchDist=maxd, smoothingIterations=int(prm.get('smoothit', 1)))
     c = bd.ReadAsArray().astype(float); c[c <= -99998] = np.nan
     if not fill: c[holes0] = np.nan
     c[outside] = np.nan   # beyond the file stays empty
     code[holes0 & np.isfinite(c)] = 3
-    still = (np.isnan(c) & ((code == 1) | (code == 2) | (code == 5)))
+    still = (np.isnan(c) & ((code == 1) | (code == 2) | (code == 5) | (code == 6)))
     if still.any(): c[still] = a[still]; code[still] = 0; notes.append('%d flagged cells were too far from good ground to refill and were left' % int(still.sum()))
     if str(prm.get('sinks', 'no')) == 'yes':
         prog(0.7, 'r.fill.dir: filling false depressions')
@@ -376,7 +393,7 @@ def in_grass_demfix(job, gs, tmp):
     ds2 = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds2.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); b2 = ds2.GetRasterBand(1); b2.SetNoDataValue(-99999); b2.WriteArray(np.where(np.isfinite(c), c, -99999))
     out = terrain_products(ds2, b2, prm)
     both = np.isfinite(a) & np.isfinite(c); chg = np.abs(c - a)[both]
-    cnt = {k: int((code == v).sum()) for k, v in (('spikes', 1), ('pits', 2), ('holes', 3), ('sinks', 4), ('marked', 5))}
+    cnt = {k: int((code == v).sum()) for k, v in (('spikes', 1), ('pits', 2), ('holes', 3), ('sinks', 4), ('marked', 5), ('outliers', 6))}
     return {**out, 'code_b64': b64u8(code), 'counts': cnt, 'cell_area': dx * dy, 'maxchange': float(chg.max()) if chg.size else 0.0, 'notes': notes,
             'tool': 'GRASS GIS %s r.neighbors%s; GDAL %s FillNodata, gdaldem' % (ver, ', r.fill.dir' if str(prm.get('sinks', 'no')) == 'yes' else '', gdal.__version__), 'detail': '; '.join(notes)}
 
@@ -435,6 +452,18 @@ def find_trees_grid(job):
     a = np.frombuffer(base64.b64decode(job['values_b64']), dtype='<f4').astype(np.float32).reshape(ny, nx) * np.float32(zf); fin = np.isfinite(a)
     if not fin.any(): raise RuntimeError('The elevation layer has no values.')
     hmin = float(prm.get('hmin') or 2); gwin = float(prm.get('ground') or 12); notes = []
+    # noise first: values far outside the layer's range, and pits well below the cells round them (the ground filter would follow a pit down)
+    fv = a[fin]; p1, p99 = np.percentile(fv, [1, 99]); Rr = max(20.0, float(p99 - p1))
+    bad = fin & ((a < p1 - Rr) | (a > p99 + Rr))
+    lowq = ndimage.percentile_filter(np.where(fin & ~bad, a, np.float32(np.median(fv))), 20, size=7)
+    bad |= fin & (a < lowq - max(1.5, .5 * hmin))
+    st = max(1, int(round(.5 / cell))); zc = np.where(fin & ~bad, a, lowq)[::st, ::st]   # clumps of pits up to a few metres: below the 20th percentile of 9 m round them (compact, so ditches and channels stay)
+    q2 = ndimage.percentile_filter(zc, 20, size=max(5, int(round(9 / (cell * st))) | 1)); q2 = ndimage.zoom(q2, (ny / q2.shape[0], nx / q2.shape[1]), order=1)[:ny, :nx]
+    bad |= fin & (a < q2 - max(2.5, .5 * hmin))
+    if bad.any(): a = np.where(bad, np.float32(np.nan), a).astype(np.float32); fin = fin & ~bad; notes.append('%d noisy cells (pits and impossible heights) taken out first and filled from the ground round them' % int(bad.sum()))
+    hole = ~fin; hl, nh = ndimage.label(hole); hs_ = np.bincount(hl.ravel(), minlength=nh + 1)
+    edge_ids = set(np.unique(np.concatenate([hl[0, :], hl[-1, :], hl[:, 0], hl[:, -1]])).tolist()) - {0}
+    beyond = np.isin(hl, [i for i in edge_ids if hs_[i] > max(50, .005 * fin.sum())]) if edge_ids else np.zeros(hole.shape, bool)   # past the end of the data: stays empty
     if cell > 2.5: notes.append('the cells are %.1f m: single trees need cells of about 1 m or finer, so crowns run together and fewer trees are found' % cell)
     def disc(m):   # a disc m metres across in radius, in cells (an ellipse where the cells are not square, as in degrees)
         ry, rx = max(1, int(round(m / dym))), max(1, int(round(m / dxm))); yy, xx = np.mgrid[-ry:ry + 1, -rx:rx + 1]; return (xx / rx) ** 2 + (yy / ry) ** 2 <= 1
@@ -458,10 +487,10 @@ def find_trees_grid(job):
     prog(0.35, 'GDAL FillNodata: refilling %d vegetation cells from the ground around them' % int(veg.sum()))
     ds = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); bd = ds.GetRasterBand(1); bd.SetNoDataValue(-99999)
     bd.WriteArray(np.where(fin & ~veg, a, -99999))
-    gdal.FillNodata(targetBand=bd, maskBand=None, maxSearchDist=max(10, int(gwin * 2 / cell)), smoothingIterations=2)
+    gdal.FillNodata(targetBand=bd, maskBand=None, maxSearchDist=max(nx, ny), smoothingIterations=2)   # the trees and every hole
     g = bd.ReadAsArray().astype(float); g[g <= -99998] = np.nan; g = np.where(np.isfinite(g), g, op)
     gsm = ndimage.gaussian_filter(g, sigma=sig(1.0, 1))
-    g = np.where(veg, np.minimum(gsm, a), np.minimum(g, a)); g[~fin] = np.nan
+    g = np.where(veg, np.minimum(gsm, a), np.where(fin, np.minimum(g, a), gsm)); g[beyond] = np.nan
     # 2. the canopy height model
     chm = np.where(fin, np.maximum(a - np.nan_to_num(g), 0), 0)
     sm = {'fine': 0.35, 'medium': 0.6, 'coarse': 1.0}.get(str(prm.get('separate', 'medium')), 0.6)
@@ -1478,6 +1507,20 @@ def dem(job):
     elif sr.IsProjected(): sres = abs(gt[1]) * sr.GetLinearUnits()
     else:   # geographic (degrees): measure a cell once warped to the project's coordinates
         tmp = gdal.Warp('/vsimem/bfl_probe.vrt', src, format='VRT', dstSRS='EPSG:%d' % job['epsg']); sres = abs(tmp.GetGeoTransform()[1]); tmp = None; gdal.Unlink('/vsimem/bfl_probe.vrt')
+    # no-data the file uses but does not declare (-9999, -32767, -3.4e38, or 0 far below the ground), found on a sample of the file
+    # and set before warping, so it is not averaged into the good ground round each hole as ramps and odd heights
+    b0 = src.GetRasterBand(1); nd0 = b0.GetNoDataValue(); W0, H0 = src.RasterXSize, src.RasterYSize; s0 = min(1.0, 1500.0 / max(W0, H0)); notes = []
+    pv = b0.ReadAsArray(buf_xsize=max(1, int(W0 * s0)), buf_ysize=max(1, int(H0 * s0)), resample_alg=gdal.GRIORA_NearestNeighbour).astype(float).ravel()
+    pv = pv[np.isfinite(pv)]
+    if nd0 is not None and np.isfinite(nd0): pv = pv[pv != nd0]
+    zu = (sr.GetLinearUnits() if sr is not None and sr.IsProjected() else 1.0) or 1.0; lo_ok, hi_ok = -500.0 / zu, 9000.0 / zu   # heights on Earth, in the file's unit
+    sentinel = None
+    if pv.size:
+        badv = pv[(pv < lo_ok) | (pv > hi_ok)]
+        if badv.size: vals, cnt = np.unique(badv, return_counts=True); sentinel = float(vals[np.argmax(cnt)])
+        elif (pv == 0).mean() > .002 and (pv != 0).any() and np.percentile(pv[pv != 0], 1) > 100.0 / zu: sentinel = 0.0
+    src_nd = nd0 if nd0 is not None and np.isfinite(nd0) else sentinel
+    if sentinel is not None and src_nd == sentinel: notes.append('the file marks missing ground with %g without saying so: read as holes' % sentinel)
     span = max(x1 - x0, y1 - y0)
     if prm.get('cellsize'): res = float(prm['cellsize'])
     elif str(prm.get('cells', '400')) == 'source': res = sres
@@ -1486,17 +1529,39 @@ def dem(job):
     while (x1 - x0) / res * (y1 - y0) / res > 4.2e6: res *= 1.25; capped = True
     alg = 'average' if res > sres * 1.05 else 'bilinear'
     prog(0.2, 'gdalwarp: to EPSG:%d at %.2f m (%s; the file is %.2f m)' % (job['epsg'], res, alg, sres))
-    w = gdal.Warp('/vsimem/bfl_dem.tif', src, format='GTiff', dstSRS='EPSG:%d' % job['epsg'], srcSRS=('EPSG:%d' % job['epsg']) if assumed else None, outputBounds=[x0, y0, x1, y1], xRes=res, yRes=res, resampleAlg=alg, dstNodata=-99999, outputType=gdal.GDT_Float32)
+    w = gdal.Warp('/vsimem/bfl_dem.tif', src, format='GTiff', dstSRS='EPSG:%d' % job['epsg'], srcSRS=('EPSG:%d' % job['epsg']) if assumed else None, outputBounds=[x0, y0, x1, y1], xRes=res, yRes=res, resampleAlg=alg, dstNodata=-99999, outputType=gdal.GDT_Float32, **({'srcNodata': src_nd} if src_nd is not None else {}))
     b = w.GetRasterBand(1)
     shift = float(prm.get('shift') or 0)
-    if shift:   # onto the boreholes' datum
-        a = b.ReadAsArray().astype(float); a[a > -99998] += shift; b.WriteArray(a)
-    a = b.ReadAsArray()
+    a = b.ReadAsArray().astype(float); ok = a > -99998
+    imp = ok & ((a < lo_ok) | (a > hi_ok))   # heights no ground has (a second no-data value, or one averaged in): holes
+    if imp.any(): a[imp] = -99999; ok &= ~imp; notes.append('%d cells with impossible heights were read as holes' % int(imp.sum()))
+    if shift: a[ok] += shift   # onto the boreholes' datum
+    b.WriteArray(a)
+    # where the file has ground at all: its outline in the project's coordinates (a hole is missing ground inside it)
+    foot = None
+    try:
+        from osgeo import ogr
+        g0 = src.GetGeoTransform(); ring = ogr.Geometry(ogr.wkbLinearRing)
+        for px_, py_ in [(t * W0 / 20, 0) for t in range(20)] + [(W0, t * H0 / 20) for t in range(20)] + [(W0 - t * W0 / 20, H0) for t in range(20)] + [(0, H0 - t * H0 / 20) for t in range(21)]:
+            ring.AddPoint_2D(g0[0] + px_ * g0[1] + py_ * g0[2], g0[3] + px_ * g0[4] + py_ * g0[5])
+        poly = ogr.Geometry(ogr.wkbPolygon); poly.AddGeometry(ring)
+        s_src = osr.SpatialReference(wkt=wkt) if wkt else srs_of(job['epsg']); s_src.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+        poly.Transform(osr.CoordinateTransformation(s_src, srs_of(job['epsg'])))
+        md = ogr.GetDriverByName('Memory').CreateDataSource(''); ly = md.CreateLayer('f'); ft = ogr.Feature(ly.GetLayerDefn()); ft.SetGeometry(poly); ly.CreateFeature(ft)
+        fm = gdal.GetDriverByName('MEM').Create('', w.RasterXSize, w.RasterYSize, 1, gdal.GDT_Byte); fm.SetGeoTransform(w.GetGeoTransform())
+        gdal.RasterizeLayer(fm, [1], ly, burn_values=[1], options=['ALL_TOUCHED=TRUE']); foot = fm.GetRasterBand(1).ReadAsArray().astype(bool)
+        if foot.all(): foot = None
+    except Exception: foot = None
+    inside = foot if foot is not None else np.ones(a.shape, bool)
+    from scipy import ndimage
+    hl, nh = ndimage.label(~ok & inside); rim = np.zeros(a.shape, bool); rim[0, :] = rim[-1, :] = rim[:, 0] = rim[:, -1] = True; rim |= ndimage.binary_dilation(~inside)
+    hsz = np.bincount(hl.ravel(), minlength=nh + 1); far = [i for i in set(np.unique(hl[rim]).tolist()) - {0} if hsz[i] > max(50, .005 * ok.sum())]
+    holes = int(((hl > 0) & ~np.isin(hl, far)).sum()) if nh else 0   # as Fix bad spots will see them: large gaps at the edge are ground not in the file
     if not (a > -99998).any(): w = None; gdal.Unlink('/vsimem/bfl_dem.tif'); raise RuntimeError('The file does not cover this area (after reprojecting it to EPSG:%d).' % job['epsg'])
     ny, nx = a.shape; gt2 = w.GetGeoTransform()
     out = terrain_products(w, b, prm)
     w = None; gdal.Unlink('/vsimem/bfl_dem.tif')
-    return {**out, 'box': [gt2[0], gt2[3] + gt2[5] * ny, gt2[0] + gt2[1] * nx, gt2[3]], 'nx': nx, 'ny': ny, 'res': res, 'src_res': sres, 'capped': capped, 'resample': alg, 'shift': shift,
+    return {**out, 'holes': holes, 'notes': notes, 'nodata': src_nd, **({'foot_b64': b64u8(foot.astype(np.uint8))} if foot is not None else {}), 'box': [gt2[0], gt2[3] + gt2[5] * ny, gt2[0] + gt2[1] * nx, gt2[3]], 'nx': nx, 'ny': ny, 'res': res, 'src_res': sres, 'capped': capped, 'resample': alg, 'shift': shift,
             'tool': 'GDAL %s gdalwarp, gdaldem, gdal_contour' % gdal.__version__,
             'detail': '%s file, %s, %.2f m cells; reprojected to EPSG:%d at %.2f m (%s)%s' % (drv, sname, sres, job['epsg'], res, 'averaged' if alg == 'average' else 'bilinear', ', shifted %+.2f m onto the boreholes\' datum' % shift if shift else ''), 'assumed': assumed}
 
