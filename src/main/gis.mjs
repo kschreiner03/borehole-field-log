@@ -191,6 +191,11 @@ export function checkJob(job) {
     if (!(Number.isInteger(job.nx) && Number.isInteger(job.ny) && job.nx >= 3 && job.ny >= 3 && job.nx * job.ny <= 4.5e6) || Math.ceil(job.nx * job.ny * 4 / 3) * 4 !== job.values_b64.length) return 'The grid does not match its size.';
     if (!nums([job.box], 4)) return 'No area.';
     if (job.spots != null && (!nums(job.spots, 3) || job.spots.length > 300)) return 'Spots must be [x, y, radius].';
+  } else if (kind === 'otrees') {
+    if (typeof job.image_b64 !== 'string' || job.image_b64.length > 90e6 || !/^[A-Za-z0-9+/=]+$/.test(job.image_b64.slice(0, 200)) || !['image/png', 'image/webp'].includes(job.mime)) return 'The orthophoto is missing, too large, or not PNG or WebP.';
+    if (!nums([job.ibox], 4) || !nums([job.box], 4)) return 'No area.';
+    if (typeof job.values_b64 !== 'string' || !(Number.isInteger(job.nx) && Number.isInteger(job.ny) && job.nx >= 3 && job.ny >= 3 && job.nx * job.ny <= 4.5e6) || Math.ceil(job.nx * job.ny * 4 / 3) * 4 !== job.values_b64.length) return 'The ground grid does not match its size.';
+    if (!Array.isArray(job.trees) || job.trees.length > 200000 || (job.trees.length && !nums(job.trees, 5))) return 'Trees must be [x, y, ground, height, radius].';
   } else if (kind === 'volume') {
     if (!nums(job.pts, 4) || job.pts.length < 4 || job.pts.length > 2000) return 'Samples must be 4 to 2000 [x, y, depth, value].';
     if (!nums([job.box3], 6) || !(job.nx >= 2 && job.ny >= 2 && job.nz >= 1 && job.nx * job.ny * job.nz <= 200000)) return 'Block grid outside the limits.';

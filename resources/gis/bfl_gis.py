@@ -438,10 +438,10 @@ def find_trees(job):
     trees = []
     if n:
         mk = np.zeros(cs.shape, np.int32); mk[tops[:, 0], tops[:, 1]] = np.arange(1, n + 1)
-        mk[(cs < max(0.5, hmin * 0.5)) & (mk == 0)] = -1
-        img = np.clip((cs.max() - cs) / (cs.max() or 1) * 65000, 0, 65000).astype(np.uint16)
-        seg = ndimage.watershed_ift(img, mk, structure=np.ones((3, 3), int)); seg = np.where(seg > 0, seg, 0)
-        hh = np.array(ndimage.maximum(chm, seg, range(1, n + 1)), float)
+        low = cs < max(0.5, hmin * 0.5)
+        img = np.where(low, 65535, np.clip((cs.max() - cs) / (cs.max() or 1) * 60000, 0, 60000)).astype(np.uint16)   # no background markers: SciPy's IFT lets them flood the crowns; the ground is flooded last and cut off below
+        seg = ndimage.watershed_ift(img, mk, structure=np.ones((3, 3), int)); seg = np.where((seg > 0) & ~low, seg, 0)
+        hh = ndimage.maximum_filter(chm, size=3)[tops[:, 0], tops[:, 1]].astype(float)   # the height at the top itself
         h_of = np.concatenate([[np.inf], hh])[seg]
         seg2 = np.where((seg > 0) & (cs >= 0.5 * h_of), seg, 0)
         area = np.array(ndimage.sum(np.ones(cs.shape), seg2, range(1, n + 1)), float) * dx * dy
@@ -457,6 +457,139 @@ def find_trees(job):
     return {**out, 'trees': trees, 'veg_cells': int(veg.sum()), 'canopy_area': float(can.sum() * dx * dy), 'area': float(fin.sum() * dx * dy), 'cell': cell, 'notes': notes,
             'tool': 'SciPy %s ndimage (grey_opening, maximum_filter, watershed_ift); GDAL %s FillNodata, gdaldem' % (scipy.__version__, gdal.__version__),
             'detail': 'ground: opening with a %.0f m disc, cells more than %.2f m above it refilled; trees: tops at least %.1f m tall, window from crown width 1 + 0.17 x height (jack pine)' % (gwin, thr, hmin)}
+
+def ortho_trees(job):
+    """tree crowns in an orthophoto, and the trees lined up with them. Crowns: the excess-green index on chromatic coordinates
+    ((2G - R - B) / (R + G + B)), smoothed, split from the ground at Otsu's threshold, opened and cleaned of specks; crowns that touch
+    are separated by a marker-controlled watershed (SciPy watershed_ift) on the smoothed distance to the crown's edge. The markers are
+    the trees already found (each snapped to the nearest crown pixel), so each tree claims its own crown, plus the photo's own crown
+    centres (maxima of that distance) where no tree is near. Each tree moves to the middle of its crown and takes its size and colour;
+    crowns with no tree become trees, their height from the crown size scaled to the trees that matched; trees with no crown are marked.
+    Optionally the ground is painted in where the crowns were (GDAL FillNodata, with the ground's grain added back)."""
+    import numpy as np
+    from scipy import ndimage
+    from scipy.spatial import cKDTree
+    from osgeo import gdal
+    gdal.UseExceptions()
+    prm = job.get('params', {}); notes = []
+    fn = '/vsimem/bfl_o.' + ('webp' if job.get('mime') == 'image/webp' else 'png'); gdal.FileFromMemBuffer(fn, base64.b64decode(job['image_b64'])); ds = gdal.Open(fn)
+    W0, H0 = ds.RasterXSize, ds.RasterYSize; x0, y0, x1, y1 = job['ibox']; px0 = (x1 - x0) / W0
+    sc = min(1.0, 4000.0 / max(W0, H0), px0 / 0.06)   # analysed at 6 cm at the finest and 4,000 px at the most
+    W, H = max(8, int(W0 * sc)), max(8, int(H0 * sc)); px, py = (x1 - x0) / W, (y1 - y0) / H; cell = (px + py) / 2
+    prog(0.08, 'Reading the orthophoto: %d × %d px at %.2f m' % (W, H, cell))
+    bands = [ds.GetRasterBand(i + 1).ReadAsArray(buf_xsize=W, buf_ysize=H, resample_alg=gdal.GRIORA_Average).astype(float) for i in range(min(4, ds.RasterCount))]
+    ds = None; gdal.Unlink(fn)
+    if len(bands) < 3: raise RuntimeError('The orthophoto needs colour (red, green and blue) to tell crowns from the ground.')
+    R, G, B = bands[:3]; A = bands[3] if len(bands) > 3 else np.full(R.shape, 255.0); valid = A > 127
+    if valid.sum() < 100: raise RuntimeError('The orthophoto is empty.')
+    def disc(r):
+        r = max(1, int(round(r))); yy, xx = np.mgrid[-r:r + 1, -r:r + 1]; return (xx * xx + yy * yy) <= r * r
+    # 1. crowns: excess green, Otsu
+    prog(0.18, 'Excess-green index and Otsu threshold')
+    s = R + G + B + 1e-6; exg = np.where(valid, (2 * G - R - B) / s, np.nan)
+    exs = ndimage.gaussian_filter(np.nan_to_num(exg, nan=np.nanmin(exg)), max(.5, .15 / cell))
+    v = exs[valid]; hist, ed = np.histogram(v, 256); c = (ed[:-1] + ed[1:]) / 2; w = np.cumsum(hist).astype(float); m = np.cumsum(hist * c); wt, mt = w[-1], m[-1]
+    bv = (mt * w / wt - m) ** 2 / np.maximum(w * (wt - w), 1); t = float(c[np.argmax(bv)]) + {'more': -.03, 'less': .03}.get(str(prm.get('sense', 'auto')), 0)
+    veg = valid & (exs > t)
+    rmin = float(prm.get('rmin') or .6)
+    veg = ndimage.binary_opening(veg, structure=disc(max(1, .2 / cell)))
+    lab0, n0 = ndimage.label(veg)
+    if n0:
+        sizes = np.asarray(ndimage.sum(np.ones(veg.shape), lab0, range(1, n0 + 1))); tiny = np.where(sizes * cell * cell < np.pi * (rmin * .6) ** 2)[0] + 1
+        if tiny.size: veg &= ~np.isin(lab0, tiny)
+    frac = veg.sum() / valid.sum()
+    if frac > .8: notes.append('%.0f%% of the photo reads as crown: the ground may be as green as the trees (grass, leaves), so crowns run together; try Green threshold: Higher' % (100 * frac))
+    if frac < .005: notes.append('almost nothing in the photo reads as crown; try Green threshold: Lower')
+    # 2. the distance to the crown's edge, and the photo's own crown centres
+    prog(0.32, 'Distance transform and crown centres')
+    dist = ndimage.distance_transform_edt(veg) * cell
+    sd = ndimage.gaussian_filter(dist, max(.5, .25 / cell))
+    mx = ndimage.maximum_filter(sd, footprint=disc(max(1, rmin / cell)))
+    pk = veg & (sd >= mx - 1e-9) & (dist >= rmin * .5)
+    plab, npk = ndimage.label(pk, structure=np.ones((3, 3)))
+    pc = np.array(ndimage.center_of_mass(pk, plab, range(1, npk + 1))).reshape(-1, 2)
+    # 3. markers: the trees (snapped to the nearest crown pixel), then the photo's crowns with no tree near
+    T = [list(map(float, q[:5])) for q in (job.get('trees') or [])]; nT = len(T)
+    _, (ir, ic) = ndimage.distance_transform_edt(~veg, return_indices=True)
+    mk = np.zeros(veg.shape, np.int32); seeded = np.zeros(nT, bool)
+    claim = {}   # each tree's seed on the crown centre (deepest point) within its radius; a centre two trees reach goes to the nearer
+    for k, (E, N, gz, h, r) in enumerate(T):
+        rr_, cc_ = (y1 - N) / py, (E - x0) / px; rs = max(1.0, .9 * r)
+        if not (0 <= rr_ < H and 0 <= cc_ < W): continue
+        i0, i1, j0, j1 = max(0, int(rr_ - rs / py)), min(H, int(rr_ + rs / py) + 2), max(0, int(cc_ - rs / px)), min(W, int(cc_ + rs / px) + 2)
+        yy, xx = np.mgrid[i0:i1, j0:j1]; dd = np.hypot((yy + .5 - rr_) * py, (xx + .5 - cc_) * px); win = np.where(veg[i0:i1, j0:j1] & (dd <= rs), sd[i0:i1, j0:j1], -1)
+        if win.max() <= 0: continue
+        a, b = np.unravel_index(np.argmax(win), win.shape); a, b, d0 = a + i0, b + j0, dd[a, b]
+        if (a, b) not in claim or d0 < claim[(a, b)][1]: claim[(a, b)] = (k, d0)
+    for (a, b), (k, _) in claim.items(): mk[a, b] = k + 1; seeded[k] = True
+    extra = []
+    if npk:
+        far = np.ones(npk, bool)
+        if nT:
+            xy = np.array([[q[0], q[1]] for q in T]); kd = cKDTree(xy); pE, pN = x0 + (pc[:, 1] + .5) * px, y1 - (pc[:, 0] + .5) * py
+            dd, ii = kd.query(np.c_[pE, pN]); far = dd > np.array([T[i][4] for i in ii]) + .5
+        for j in np.where(far)[0]:
+            a, b = int(round(pc[j, 0])), int(round(pc[j, 1]))
+            if veg[a, b] and mk[a, b] == 0: extra.append(j); mk[a, b] = nT + len(extra)
+    nm = nT + len(extra)
+    prog(0.5, 'Watershed: each crown from its tree (%d trees, %d crowns only in the photo)' % (int(seeded.sum()), len(extra)))
+    img = np.where(veg, np.clip((sd.max() - sd) / (sd.max() or 1) * 60000, 0, 60000), 65535).astype(np.uint16)   # the ground last
+    seg = ndimage.watershed_ift(img, mk, structure=np.ones((3, 3), int)); seg = np.where(veg & (seg > 0), seg, 0)
+    vl, nvl = ndimage.label(veg); has = np.zeros(nvl + 1, bool); has[np.unique(vl[mk > 0])] = True; seg[~has[vl]] = 0   # a crown with no tree and no centre of its own is left out
+    idx = range(1, nm + 1)
+    area = np.asarray(ndimage.sum(np.ones(veg.shape), seg, idx), float) * px * py
+    cen = np.array(ndimage.center_of_mass(veg, seg, idx)).reshape(-1, 2) if nm else np.zeros((0, 2))
+    mrgb = [np.asarray(ndimage.mean(X, seg, idx), float) for X in (R, G, B)] if nm else [np.zeros(0)] * 3
+    allc = [float(X[seg > 0].mean()) if (seg > 0).any() else 1.0 for X in (R, G, B)]
+    # the ground under each tree from the elevation layer
+    gx0, gy0, gx1, gy1 = job['box']; gnx, gny = int(job['nx']), int(job['ny']); Gz = np.frombuffer(base64.b64decode(job['values_b64']), dtype='<f4').reshape(gny, gnx)
+    def ground(E, N, fb):
+        i, j = int((gy1 - N) / (gy1 - gy0) * gny), int((E - gx0) / (gx1 - gx0) * gnx)
+        if 0 <= i < gny and 0 <= j < gnx and np.isfinite(Gz[i, j]): return float(Gz[i, j])
+        return fb
+    def col(k): return [round(float(min(1.3, max(.7, (mrgb[q][k] / allc[q]) if np.isfinite(mrgb[q][k]) and allc[q] else 1))), 2) for q in range(3)]
+    amin = np.pi * (rmin * .6) ** 2
+    out, shifts, ratio = [], [], []
+    for k, (E, N, gz, h, r) in enumerate(T):
+        if seeded[k] and area[k] >= amin and np.all(np.isfinite(cen[k])):
+            cE, cN = x0 + (cen[k, 1] + .5) * px, y1 - (cen[k, 0] + .5) * py; rp = float(np.sqrt(area[k] / np.pi))
+            if np.hypot(cE - E, cN - N) <= max(2.0, 2 * r):
+                shifts.append([cE - E, cN - N]); ratio.append(h / max(rp, .3))
+                out.append([round(cE, 2), round(cN, 2), round(ground(cE, cN, gz), 2), round(h, 2), round(min(2 * r, max(.5 * r, rp)), 2), 1] + col(k)); continue
+        out.append([round(E, 2), round(N, 2), round(gz, 2), round(h, 2), round(r, 2), 0, 1, 1, 1])
+    n_none = sum(1 for q in out if q[5] == 0); drop = str(prm.get('nocrown', 'keep')) == 'drop'
+    if drop: out = [q for q in out if q[5] == 1]
+    hr = float(np.median(ratio)) if ratio else None; hmax = max([q[3] for q in T], default=25.0); added = 0
+    if str(prm.get('added', 'yes')) != 'no':
+        for e, j in enumerate(extra):
+            k = nT + e
+            if area[k] < np.pi * rmin * rmin or not np.all(np.isfinite(cen[k])): continue
+            rp = float(np.sqrt(area[k] / np.pi)); cE, cN = x0 + (cen[k, 1] + .5) * px, y1 - (cen[k, 0] + .5) * py
+            h = rp * hr if hr else (2 * rp - 1) / .17; h = float(min(max(h, 2.0), hmax * 1.05))
+            out.append([round(cE, 2), round(cN, 2), round(ground(cE, cN, float(np.nanmedian(Gz))), 2), round(h, 2), round(rp, 2), 2] + col(k)); added += 1
+    sh = np.array(shifts) if shifts else np.zeros((0, 2))
+    res = {'trees': out, 'matched': len(shifts), 'added': added, 'nocrown': n_none, 'dropped': n_none if drop else 0,
+           'shift_median': float(np.median(np.hypot(sh[:, 0], sh[:, 1]))) if len(sh) else 0.0, 'shift_max': float(np.hypot(sh[:, 0], sh[:, 1]).max()) if len(sh) else 0.0,
+           'offset': [float(np.median(sh[:, 0])), float(np.median(sh[:, 1]))] if len(sh) else [0.0, 0.0], 'crown_frac': float(frac), 'threshold': t, 'cell': cell, 'w': W, 'h': H, 'h_per_r': hr, 'notes': notes,
+           'tool': 'SciPy %s ndimage (excess green, Otsu, distance transform, watershed_ift)%s' % (__import__('scipy').__version__, '; GDAL %s FillNodata' % gdal.__version__ if str(prm.get('fill', 'yes')) == 'yes' else ''),
+           'detail': 'crowns: excess green above %.3f (Otsu), analysed at %.2f m a pixel; each tree seeded its own crown' % (t, cell)}
+    # 4. the ground painted in where the crowns were
+    if str(prm.get('fill', 'yes')) == 'yes':
+        prog(0.75, 'GDAL FillNodata: painting the ground in under the crowns')
+        hole = ndimage.binary_dilation(seg > 0, structure=disc(max(1, .3 / cell))) & valid
+        md = gdal.GetDriverByName('MEM').Create('', W, H, 1, gdal.GDT_Byte); md.GetRasterBand(1).WriteArray((~hole).astype(np.uint8))
+        rng = np.random.default_rng(1); grain = []
+        for X in (R, G, B):
+            hf = X - ndimage.gaussian_filter(X, 2); grain.append(float(np.std(hf[valid & ~hole])) if (valid & ~hole).any() else 0.0)
+        noise = ndimage.gaussian_filter(rng.normal(0, 1, (H, W)), .8); noise /= (noise.std() or 1)
+        outb = []
+        for q, X in enumerate((R, G, B)):
+            dsb = gdal.GetDriverByName('MEM').Create('', W, H, 1, gdal.GDT_Float32); bb = dsb.GetRasterBand(1); bb.WriteArray(X)
+            gdal.FillNodata(targetBand=bb, maskBand=md.GetRasterBand(1), maxSearchDist=int(max(10, 6 / cell)), smoothingIterations=3)
+            f = bb.ReadAsArray().astype(float); outb.append(np.where(hole, f + noise * grain[q], X))
+        rgba = np.dstack([np.clip(b_, 0, 255) for b_ in outb] + [A]).astype(np.uint8)
+        res['image'], res['mime'] = pic_b64(rgba)
+    return res
 
 # ---------- raster tools on the app's layers (in a temporary GRASS project) ----------
 def grid_of(r):
@@ -1355,6 +1488,7 @@ def run(job):
     if job.get('kind') == 'georef': return georef(job)
     if job.get('kind') in ('hydro', 'demfix', 'rast'): return grass_run(job)
     if job.get('kind') == 'trees': return find_trees(job)
+    if job.get('kind') == 'otrees': return ortho_trees(job)
     if job.get('kind') == 'thiessen': return thiessen(job)
     if job.get('kind') == 'setback': return setback(job)
     if job.get('kind') == 'exportlayer': return export_layer(job)
