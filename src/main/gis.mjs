@@ -187,11 +187,13 @@ export function checkJob(job) {
       if (job.raster != null && !(typeof job.raster.b64 === 'string' && Math.ceil(job.raster.nx * job.raster.ny * 4 / 3) * 4 === job.raster.b64.length && nums([job.raster.box], 4))) return 'The grid does not match its size.';
     }
   } else if (kind === 'demfix' || kind === 'trees') {
+    if (job.epsg != null && !CRS_CODE.test(String(job.epsg))) return 'The coordinate system code is not valid.';
     if (typeof job.values_b64 !== 'string' || !/^[A-Za-z0-9+/=]+$/.test(job.values_b64.slice(0, 200)) || job.values_b64.length > 24e6) return 'The elevation grid is missing or too large.';
     if (!(Number.isInteger(job.nx) && Number.isInteger(job.ny) && job.nx >= 3 && job.ny >= 3 && job.nx * job.ny <= 4.5e6) || Math.ceil(job.nx * job.ny * 4 / 3) * 4 !== job.values_b64.length) return 'The grid does not match its size.';
     if (!nums([job.box], 4)) return 'No area.';
     if (job.spots != null && (!nums(job.spots, 3) || job.spots.length > 300)) return 'Spots must be [x, y, radius].';
   } else if (kind === 'otrees') {
+    if (job.epsg != null && !CRS_CODE.test(String(job.epsg))) return 'The coordinate system code is not valid.';
     if (typeof job.image_b64 !== 'string' || job.image_b64.length > 90e6 || !/^[A-Za-z0-9+/=]+$/.test(job.image_b64.slice(0, 200)) || !['image/png', 'image/webp'].includes(job.mime)) return 'The orthophoto is missing, too large, or not PNG or WebP.';
     if (!nums([job.ibox], 4) || !nums([job.box], 4)) return 'No area.';
     if (typeof job.values_b64 !== 'string' || !(Number.isInteger(job.nx) && Number.isInteger(job.ny) && job.nx >= 3 && job.ny >= 3 && job.nx * job.ny <= 4.5e6) || Math.ceil(job.nx * job.ny * 4 / 3) * 4 !== job.values_b64.length) return 'The ground grid does not match its size.';

@@ -11418,7 +11418,7 @@ async function gpFix(prm) {
 async function gpTrees(prm) {
   const L = GIS.layers.find(x => x.id === S.gp.trL && x.terrain && x.values); if (!L) { toast('Choose an elevation layer (make one first with Elevation map from a file).'); return; }
   const params = { hmin: prm.hmin > 0 ? +prm.hmin : 2, ground: prm.ground > 0 ? +prm.ground : 12, separate: prm.separate || 'medium', interval: L.step || 0, shade: L.shade || 'single', azimuth: 315, altitude: 45, zfactor: 1 };
-  const key = 'trees|' + Date.now(), pr = gisStart(key, { nocache: true, kind: 'trees', values_b64: f32b64(L.values), nx: L.nx, ny: L.ny, box: L.box, params }, 'Find trees (SciPy ndimage, GDAL FillNodata)', L.name);
+  const key = 'trees|' + Date.now(), pr = gisStart(key, { nocache: true, kind: 'trees', values_b64: f32b64(L.values), nx: L.nx, ny: L.ny, box: L.box, epsg: projEpsg(), params }, 'Find trees (SciPy ndimage, GDAL FillNodata)', L.name);
   const j = [...GIS.jobs.values()].find(x => x.key === key); if (j) { j.tool = 'elev_trees'; j.kind = 'hydro'; }
   renderView(true);
   const r = await pr; if (!r?.ok) return;
@@ -11440,7 +11440,7 @@ async function gpOrthoTrees(prm) {
   const u8 = new Uint8Array(await bl.arrayBuffer()); let bin = ''; for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
   const base = (L.treesLidar || L.trees || []).filter(t => t.slice(0, 5).every(v => v != null && isFinite(v))).map(t => t.slice(0, 5));
   const params = { added: prm.added || 'yes', nocrown: prm.nocrown || 'keep', fill: prm.fill || 'yes', rmin: prm.rmin > 0 ? +prm.rmin : .6, sense: prm.sense || 'auto' };
-  const key = 'otrees|' + Date.now(), pr = gisStart(key, { nocache: true, kind: 'otrees', image_b64: btoa(bin), mime: bl.type === 'image/webp' ? 'image/webp' : 'image/png', ibox: I.box.map(v => +v), trees: base, values_b64: f32b64(L.values), nx: L.nx, ny: L.ny, box: L.box.map(v => +v), params }, 'Match trees to the orthophoto (SciPy ndimage)', I.name + ' with ' + base.length + ' trees');
+  const key = 'otrees|' + Date.now(), pr = gisStart(key, { nocache: true, kind: 'otrees', image_b64: btoa(bin), mime: bl.type === 'image/webp' ? 'image/webp' : 'image/png', ibox: I.box.map(v => +v), trees: base, values_b64: f32b64(L.values), nx: L.nx, ny: L.ny, box: L.box.map(v => +v), epsg: projEpsg(), params }, 'Match trees to the orthophoto (SciPy ndimage)', I.name + ' with ' + base.length + ' trees');
   const j = [...GIS.jobs.values()].find(x => x.key === key); if (j) { j.tool = 'trees_ortho'; j.kind = 'hydro'; }
   renderView(true);
   const r = await pr; if (!r?.ok) return;
