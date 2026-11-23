@@ -10306,6 +10306,60 @@ function siteHTML() {
   </div>`;
 }
 /* the soil test charts: on the Lab page, after the results */
+/* size (mm) at which a given % passes, read from the curve on a log scale */
+function sizeAt(gsd, p) {
+  const pts = (gsd || []).filter(q => q.size > 0 && q.passing != null).sort((a, c) => a.size - c.size);
+  for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], c = pts[i]; if (p >= a.passing && p <= c.passing && c.passing > a.passing) return Math.exp(Math.log(a.size) + (Math.log(c.size) - Math.log(a.size)) * (p - a.passing) / (c.passing - a.passing)); }
+  return null;
+}
+const umTxt = mm => mm == null ? '—' : mm >= 1 ? (+mm.toPrecision(3)).toLocaleString('en-CA') + ' mm' : (+(mm * 1000).toPrecision(3)).toLocaleString('en-CA') + ' µm';
+/* Folk and Ward (1957) words for the phi statistics */
+const fwSort = v => v == null ? '' : v < .35 ? 'very well sorted' : v < .5 ? 'well sorted' : v < .71 ? 'moderately well sorted' : v < 1 ? 'moderately sorted' : v < 2 ? 'poorly sorted' : v < 4 ? 'very poorly sorted' : 'extremely poorly sorted';
+const fwSkew = v => v == null ? '' : v > .3 ? 'strongly fine skewed' : v > .1 ? 'fine skewed' : v >= -.1 ? 'symmetrical' : v >= -.3 ? 'coarse skewed' : 'strongly coarse skewed';
+const fwKurt = v => v == null ? '' : v < .67 ? 'very platykurtic' : v < .9 ? 'platykurtic' : v < 1.11 ? 'mesokurtic' : v < 1.5 ? 'leptokurtic' : v < 3 ? 'very leptokurtic' : 'extremely leptokurtic';
+/* every sample with a grain-size curve: fractions, texture and characteristic sizes; then, for laser diffraction, the
+   lab's statistics and its size classes, as the report gives them */
+function psaTablesHTML(list = projList()) {
+  const rows = list.flatMap(b => (b.samples || []).filter(sm => sm.gsd?.length > 1).map(sm => ({ b, sm }))); if (!rows.length) return '';
+  const f1 = v => v == null ? '—' : (+v).toFixed(1), n3 = v => v == null || !isFinite(v) ? '—' : (+(+v).toPrecision(3)).toLocaleString('en-CA');
+  const head = '<td><button class="pick" data-pick="', name = ({ b, sm }) => head + esc(b.id) + '" data-goto="log">' + esc(b.name) + '</button></td><td>' + esc(sampleId(sm)) + '</td><td class="r">' + fx(sm.depth) + '</td>';
+  const t1 = '<section class="sec"><header><h3>Grain size</h3><span class="note">' + rows.length + ' sample' + (rows.length === 1 ? '' : 's') + ' with a curve · CSSC fractions, % of the whole sample</span></header><div class="body"><div class="scroll-x"><table class="sum">'
+    + '<thead><tr><th>Borehole</th><th>Sample</th><th class="r">Depth (' + LEN() + ')</th><th>Lab ID</th><th>Method</th><th class="r">Gravel</th><th class="r">Sand</th><th class="r">Silt</th><th class="r">Clay</th><th>CSSC texture</th><th class="r">D10</th><th class="r">D30</th><th class="r">D50</th><th class="r">D60</th><th class="r">D90</th><th class="r" title="Uniformity, D60 / D10">Cu</th><th class="r" title="Curvature, D30² / (D10 × D60)">Cc</th></tr></thead><tbody>'
+    + rows.map(r => { const g = r.sm.gsd, p2 = passingAt(g, 2), p05 = passingAt(g, .05), p002 = passingAt(g, .002), t = csscOf(r.sm), d = q => sizeAt(g, q), d10 = d(10), d30 = d(30), d60 = d(60);
+      return '<tr>' + name(r) + '<td>' + esc(r.sm.psa?.labId || r.sm.gsdMeta?.labId || r.sm.labMeta?.labNo || '—') + '</td><td>' + esc(r.sm.gsdMeta?.method ? 'Laser diffraction' : 'Sieve / hydrometer') + '</td>'
+        + '<td class="r">' + f1(p2 == null ? null : 100 - p2) + '</td><td class="r">' + f1(p2 != null && p05 != null ? p2 - p05 : null) + '</td><td class="r">' + f1(p05 != null && p002 != null ? p05 - p002 : null) + '</td><td class="r">' + f1(p002) + '</td>'
+        + '<td>' + (t ? esc(t.label) : '—') + '</td><td class="r">' + umTxt(d10) + '</td><td class="r">' + umTxt(d30) + '</td><td class="r">' + umTxt(d(50)) + '</td><td class="r">' + umTxt(d60) + '</td><td class="r">' + umTxt(d(90)) + '</td>'
+        + '<td class="r">' + n3(d10 && d60 ? d60 / d10 : null) + '</td><td class="r">' + n3(d10 && d30 && d60 ? d30 * d30 / (d10 * d60) : null) + '</td></tr>'; }).join('')
+    + '</tbody></table></div><p class="note" style="margin-top:6px">Sizes are read from each curve (log scale between its points). Laser diffraction gives % by volume, a sieve and hydrometer % by mass. Gravel over 2 mm, sand 0.05–2 mm, silt 0.002–0.05 mm, clay under 0.002 mm (CSSC).</p></div></section>';
+  const L = rows.filter(r => r.sm.psa); if (!L.length) return t1;
+  const t2 = '<section class="sec"><header><h3>Laser diffraction statistics</h3><span class="note">As reported · ' + esc([...new Set(L.map(r => r.sm.psa.instrument).filter(Boolean))].join(', ')) + '</span></header><div class="body"><div class="scroll-x"><table class="sum">'
+    + '<thead><tr><th>Borehole</th><th>Sample</th><th class="r">Depth (' + LEN() + ')</th><th>Lab ID</th><th class="r">Mean (µm)</th><th class="r">Median</th><th class="r">Mode</th><th class="r">D(3,2)</th><th class="r">S.D.</th><th class="r">C.V. %</th><th>Skewness</th><th>Kurtosis</th><th class="r">Mean φ</th><th>Sorting (σφ)</th><th>Skewness (φ)</th><th>Kurtosis (φ)</th><th>Tested</th><th>Notes</th></tr></thead><tbody>'
+    + L.map(r => { const p = r.sm.psa, s2 = p.stats || {}, fw = s2.fw || {};
+      return '<tr>' + name(r) + '<td>' + esc(p.labId) + '</td><td class="r">' + n3(s2.mean) + '</td><td class="r">' + n3(s2.median) + '</td><td class="r">' + n3(s2.mode) + '</td><td class="r">' + n3(s2.d32) + '</td><td class="r">' + n3(s2.sd) + '</td><td class="r">' + n3(s2.cv) + '</td>'
+        + '<td>' + (s2.skew != null ? n3(s2.skew) + (s2.skewTxt ? ' <small class="note">' + esc(s2.skewTxt.toLowerCase()) + '</small>' : '') : '—') + '</td><td>' + (s2.kurt != null ? n3(s2.kurt) + (s2.kurtTxt ? ' <small class="note">' + esc(s2.kurtTxt.toLowerCase()) + '</small>' : '') : '—') + '</td>'
+        + '<td class="r">' + n3(fw.mean) + '</td><td>' + (fw.sd != null ? n3(fw.sd) + ' <small class="note">' + fwSort(fw.sd) + '</small>' : '—') + '</td><td>' + (fw.skew != null ? n3(fw.skew) + ' <small class="note">' + fwSkew(fw.skew) + '</small>' : '—') + '</td><td>' + (fw.kurt != null ? n3(fw.kurt) + ' <small class="note">' + fwKurt(fw.kurt) + '</small>' : '—') + '</td>'
+        + '<td>' + esc([p.date, p.operator].filter(Boolean).join(' · ') || '—') + '</td><td>' + esc((p.comments || []).join('; ') || '—') + '</td></tr>'; }).join('')
+    + '</tbody></table></div><p class="note" style="margin-top:6px">Arithmetic statistics by volume, in µm; Folk and Ward (1957) statistics in phi units, with their usual words. Report ' + esc([...new Set(L.map(r => r.sm.psa.report).filter(Boolean))].join(', ') || '—') + '.</p></div></section>';
+  const key = c => c[0] + '|' + c[1], cls = [...new Map(L.flatMap(r => r.sm.psa.classes || []).map(c => [key(c), c])).values()].sort((a, c) => a[0] - c[0]);
+  const lab = c => (c[1] >= 99999 ? 'over ' + (+c[0]).toLocaleString('en-CA') : (+c[0]).toLocaleString('en-CA') + '–' + (+c[1]).toLocaleString('en-CA')) + ' µm';
+  const t3 = !cls.length ? '' : '<section class="sec"><header><h3>Size classes</h3><span class="note">Volume % in each class, as reported</span></header><div class="body"><div class="scroll-x"><table class="sum">'
+    + '<thead><tr><th>Borehole</th><th>Sample</th><th class="r">Depth (' + LEN() + ')</th><th>Lab ID</th>' + cls.map(c => '<th class="r">' + lab(c) + '</th>').join('') + '<th class="r">d10</th><th class="r">d25</th><th class="r">d50</th><th class="r">d75</th><th class="r">d90</th></tr></thead><tbody>'
+    + L.map(r => { const p = r.sm.psa, at = q => (p.pct || []).find(x => x[0] === q)?.[1];
+      return '<tr>' + name(r) + '<td>' + esc(p.labId) + '</td>' + cls.map(c => { const v = (p.classes || []).find(x => key(x) === key(c)); return '<td class="r">' + (v ? (+v[2]).toFixed(1) : '—') + '</td>'; }).join('') + [10, 25, 50, 75, 90].map(q => '<td class="r">' + (at(q) != null ? n3(at(q)) + ' µm' : '—') + '</td>').join('') + '</tr>'; }).join('')
+    + '</tbody></table></div><p class="note" style="margin-top:6px">dNN: the size that NN % of the sample (by volume) is finer than.</p></div></section>';
+  return t1 + t2 + t3;
+}
+/* groundwater chemistry: every well's lab samples, mg/L */
+function gwChemHTML(list = projList()) {
+  const rows = list.flatMap(b => (b.gwSamples || []).map(g => ({ b, g }))).filter(x => Object.keys(x.g.res || {}).length).sort((a, c) => (wellId(a.b) || a.b.name).localeCompare(wellId(c.b) || c.b.name, undefined, { numeric: true }) || (a.g.date || '').localeCompare(c.g.date || ''));
+  if (!rows.length) return '';
+  const ps = GW_PARAMS.concat(['f3', 'f4']).filter((p, i, a) => a.indexOf(p) === i && rows.some(x => labVal({ lab: x.g.res }, p)));
+  return '<section class="sec"><header><h3>Groundwater chemistry</h3><span class="note">' + rows.length + ' sample' + (rows.length === 1 ? '' : 's') + ' · mg/L</span></header><div class="body"><div class="scroll-x"><table class="sum">'
+    + '<thead><tr><th>Well</th><th>Borehole</th><th>Sampled</th><th>Lab no.</th><th>Report</th>' + ps.map(p => '<th class="r">' + esc(LAB_PARAMS[p].label) + '</th>').join('') + '</tr></thead><tbody>'
+    + rows.map(({ b, g }) => '<tr><td>' + esc(wellId(b) || g.sid || '—') + '</td><td><button class="pick" data-pick="' + esc(b.id) + '" data-goto="edit">' + esc(b.name) + '</button></td><td>' + esc(g.date || '—') + '</td><td>' + esc(g.labNo || '—') + '</td><td>' + esc([g.lab && g.lab.replace(/\s*\(.*\)/, ''), g.report].filter(Boolean).join(' ') || '—') + '</td>'
+      + ps.map(p => { const r = labVal({ lab: g.res }, p); return '<td class="r"' + (r && !r.lt ? ' style="font-weight:600"' : '') + '>' + (r ? fmtLab(r) : '—') + '</td>'; }).join('') + '</tr>').join('')
+    + '</tbody></table></div><p class="note" style="margin-top:6px">Detections in bold; &lt; is below the detection limit shown. Results reported in µg/L are shown in mg/L. F1 − BTEX as reported by the lab where it reports it.</p></div></section>';
+}
 function soilTestsHTML() {
   return `<div class="site-grid">
     <section class="sec"><header><h3>Plasticity chart</h3><span class="note">CFEM / Modified USCS</span></header><div class="body"><div id="pchart" class="scroll-x"></div></div></section>
@@ -13146,11 +13200,12 @@ function contamHTML(vw = 1000) {
       + '<p class="note lab-caveat">Shading and contours are interpolated between boreholes (log scale), inside the outer boreholes only: a guide for sampling, not a measured boundary. Change the result, depths and look in Settings.</p></div></section>'
       + '<section class="sec"><header><h3>By borehole</h3><span class="note">Highest headspace reading</span></header><div class="body">' + rank + '</div></section></div>';
   } else if (v === 'lab') {
-    body = !ps.length ? '<section class="sec"><div class="body lab-empty">' + svgI(NAV_ICON.contam) + '<h3>No laboratory results yet</h3><p class="note">Import the laboratory\'s data file (EDD, CSV or Excel from ALS, Bureau Veritas, Element and others): each result is matched to its borehole and sample, and you check the matches before anything is saved. Or type results in against each sample.</p><div class="actions"><button class="btn primary" data-act="imp-lab"' + (S.readOnly ? ' disabled' : '') + '>Import lab results…</button><button class="btn" data-act="go-lab">Add results by hand</button></div></div></section>'
+    const gwT = gwChemHTML(list);
+    body = (!ps.length && gwT ? '' : !ps.length ? '<section class="sec"><div class="body lab-empty">' + svgI(NAV_ICON.contam) + '<h3>No laboratory results yet</h3><p class="note">Import the laboratory\'s data file (EDD, CSV or Excel from ALS, Bureau Veritas, Element and others): each result is matched to its borehole and sample, and you check the matches before anything is saved. Or type results in against each sample.</p><div class="actions"><button class="btn primary" data-act="imp-lab"' + (S.readOnly ? ' disabled' : '') + '>Import lab results…</button><button class="btn" data-act="go-lab">Add results by hand</button></div></div></section>'
       : '<div class="lab-chips">' + pOver.map(q => '<span class="lab-chip' + (q.x ? ' bad' : g[q.p] != null ? ' good' : '') + '" title="' + esc(LAB_PARAMS[q.p].label) + ': ' + q.n + ' sample' + (q.n === 1 ? '' : 's') + (g[q.p] != null ? ', guideline ' + g[q.p] + ' ' + (LAB_PARAMS[q.p].unit || '') : ', no guideline entered') + '">' + esc(LAB_PARAMS[q.p].label) + ' <b>' + (g[q.p] != null ? q.x + '/' + q.n : q.n) + '</b>' + (g[q.p] != null ? ' over' : '') + '</span>').join('') + '</div>'
-        + '<section class="sec"><header><h3>Laboratory results</h3><span class="note">Soil, by sample · ' + lsm.length + ' sample' + (lsm.length === 1 ? '' : 's') + '</span><button class="btn" data-act="imp-lab"' + (S.readOnly ? ' disabled' : '') + '>Import…</button></header><div class="body">' + labTableHTML(list) + '</div></section>';
+        + '<section class="sec"><header><h3>Laboratory results</h3><span class="note">Soil, by sample · ' + lsm.length + ' sample' + (lsm.length === 1 ? '' : 's') + '</span><button class="btn" data-act="imp-lab"' + (S.readOnly ? ' disabled' : '') + '>Import…</button></header><div class="body">' + labTableHTML(list) + '</div></section>') + gwT;
   } else if (v === 'sec') body = '<section class="sec"><header><h3>Cross-section with vapour</h3><span class="note">Bars to the right of each borehole: headspace on a log scale, 1 to 10,000 ppm</span></header><div class="body"><div class="scroll-x" id="csection"></div><p class="note" id="csection-note"></p></div></section>';
-  else body = soilTestsHTML();
+  else body = psaTablesHTML() + soilTestsHTML();
   return kpis + tabs + '<div class="lab-view">' + body + '</div>';
 }
 document.addEventListener('click', e => { const t = e.target.closest?.('[data-labview]'); if (!t) return; S.labView = t.dataset.labview; lsSet('bhlog.labView', S.labView); renderView(true); });
@@ -14568,9 +14623,9 @@ function labTableHTML(list) {
   if (!ps.length) return '<p class="note">No laboratory results yet. Add them on each sample under Data, Samples &amp; tests, Laboratory analysis.</p>';
   const rows = list.flatMap(b => (b.samples || []).filter(sm => ps.some(p => labVal(sm, p))).sort((a, c) => a.depth - c.depth).map(sm => ({ b, sm })));
   const ed = !S.readOnly;
-  return `<div class="scroll-x"><table class="sum lab-res"><thead><tr><th>Borehole</th><th>Sample</th><th class="r">Depth (${LEN()})</th>${ps.map(p => `<th class="r">${esc(LAB_PARAMS[p].label)}<br><span class="note">${esc(LAB_PARAMS[p].unit || '—')}</span></th>`).join('')}</tr>
-    <tr class="guide-row"><th colspan="3">Guideline${site.guideSrc ? ` <span class="note">(${esc(site.guideSrc)})</span>` : ''}</th>${ps.map(p => `<th class="r">${ed && !LAB_PARAMS[p].computed ? `<input type="number" step="any" data-guide="${p}" value="${esc(g[p] ?? '')}" placeholder="—" aria-label="Guideline for ${esc(LAB_PARAMS[p].label)}" style="width:84px;text-align:right">` : LAB_PARAMS[p].computed && ed ? `<input type="number" step="any" data-guide="${p}" value="${esc(g[p] ?? '')}" placeholder="—" style="width:84px;text-align:right">` : (g[p] ?? '—')}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(({ b, sm }) => `<tr><td><button class="pick" data-pick="${esc(b.id)}" data-goto="log">${esc(b.name)}</button></td><td>${esc(sampleId(sm))}</td><td class="r">${fx(sm.depth)}</td>${ps.map(p => { const r = labVal(sm, p), x = exceeds(r, p); return `<td class="r"${x ? ` style="color:var(--negative);font-weight:600;background:rgba(192,57,43,.08)" title="Exceeds the guideline of ${g[p]}"` : ''}>${fmtLab(r)}${x ? ' ▲' : ''}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
+  return `<div class="scroll-x"><table class="sum lab-res"><thead><tr><th>Borehole</th><th>Sample</th><th class="r">Depth (${LEN()})</th><th>Lab no.</th><th>Sampled</th>${ps.map(p => `<th class="r">${esc(LAB_PARAMS[p].label)}<br><span class="note">${esc(LAB_PARAMS[p].unit || '—')}</span></th>`).join('')}</tr>
+    <tr class="guide-row"><th colspan="5">Guideline${site.guideSrc ? ` <span class="note">(${esc(site.guideSrc)})</span>` : ''}</th>${ps.map(p => `<th class="r">${ed && !LAB_PARAMS[p].computed ? `<input type="number" step="any" data-guide="${p}" value="${esc(g[p] ?? '')}" placeholder="—" aria-label="Guideline for ${esc(LAB_PARAMS[p].label)}" style="width:84px;text-align:right">` : LAB_PARAMS[p].computed && ed ? `<input type="number" step="any" data-guide="${p}" value="${esc(g[p] ?? '')}" placeholder="—" style="width:84px;text-align:right">` : (g[p] ?? '—')}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(({ b, sm }) => `<tr><td><button class="pick" data-pick="${esc(b.id)}" data-goto="log">${esc(b.name)}</button></td><td>${esc(sampleId(sm))}</td><td class="r">${fx(sm.depth)}</td><td>${esc(sm.labMeta?.labNo || '—')}</td><td>${esc(sm.labMeta?.date || '—')}</td>${ps.map(p => { const r = labVal(sm, p), x = exceeds(r, p); return `<td class="r"${x ? ` style="color:var(--negative);font-weight:600;background:rgba(192,57,43,.08)" title="Exceeds the guideline of ${g[p]}"` : ''}>${fmtLab(r)}${x ? ' ▲' : ''}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
     <div class="fields" style="margin-top:12px;grid-template-columns:minmax(0,1fr) auto"><div class="fld"><label for="guide-src">Guideline source</label><input id="guide-src" type="text" value="${esc(site.guideSrc || '')}" placeholder="e.g. Alberta Tier 1, fine-grained, residential/parkland, 2022" ${ed ? '' : 'readonly'}></div></div>
     ${guideSetHTML(ed)}
     <p class="note">Enter the guideline that applies to this project in the Guideline row, or apply one saved earlier. Bold red with ▲ marks a detected result above it; &lt; is below the detection limit. F1 − BTEX is calculated from F1 minus the four BTEX results.</p>`;
@@ -14712,11 +14767,19 @@ function labRowsFromText(lines) {
    not by mass as a sieve and hydrometer give: close for mineral soil, and said so on the sample */
 const PSA_RE = /LS Particle Size Analyzer|Beckman Coulter|LS 13 320/i;
 function psaPrepare(file, lines) {
-  const items = new Map(), all = lines.join('\n'), rep = (/File ID:\s*(\d{4}-\d+)/i.exec(all) || /(\d{4}-\d{3,6})\s/.exec(all) || [])[1] || ''; let cur = null, tab = false;
+  const items = new Map(), all = lines.join('\n'), rep = (/File ID:\s*(\d{4}-\d+)/i.exec(all) || /(\d{4}-\d{3,6})\s/.exec(all) || [])[1] || '', instr = (/Beckman Coulter LS ?\d+ ?\d*|LS 13 320/i.exec(all) || ['Laser diffraction'])[0]; let cur = null, tab = false, pageDate = '';
   for (const ln of lines) {
     if (ln === '\f') { tab = false; continue; }
-    const m = /^Sample ID:?\s*(\S+)/i.exec(ln); if (m) { cur = items.get(m[1]) || { id: m[1], labNo: (/^\d+/.exec(m[1]) || [''])[0], bins: [], pct: [], head: null }; items.set(m[1], cur); continue; }
+    const m = /^Sample ID:?\s*(\S+)/i.exec(ln); if (m) { cur = items.get(m[1]) || { id: m[1], labNo: (/^\d+/.exec(m[1]) || [''])[0], bins: [], pct: [], head: null, st: {}, info: { date: pageDate } }; items.set(m[1], cur); continue; }
+    const dm = /^(?:.*\s)?(\d{1,2} [A-Z][a-z]{2} \d{4})(?:\s+\d{1,2}:\d{2})?$/.exec(ln); if (dm) { pageDate = dm[1]; if (cur && !cur.info.date) cur.info.date = dm[1]; }
     if (!cur) continue;
+    if (/Folk and Ward/i.test(ln)) { cur.fw = true; continue; } if (/^Volume Statistics/i.test(ln)) cur.fw = false;
+    let q = /^Operator:\s*(.+)$/i.exec(ln); if (q) { cur.info.operator = q[1].trim(); continue; }
+    q = /^Comment\s*\d:\s*(.+)$/i.exec(ln); if (q) { (cur.info.comments ||= []).push(q[1].trim()); continue; }
+    q = /^Optical model:\s*(.+)$/i.exec(ln); if (q) { cur.info.model = q[1].trim(); continue; }
+    for (const k of ln.matchAll(/(Mean\/Median ratio|Mean|Median|D\(3,2\)|Mode|S\.D\.|Variance|C\.V\.|Skewness|Kurtosis|Deviation)\s*:\s*(-?[\d.]+(?:e[-+]?\d+)?)(?:\s*(?:[µμu]m\d?|%))?(?:\s+(Right skewed|Left skewed|Symmetric(?:al)?|Leptokurtic|Platykurtic|Mesokurtic))?/gi)) {
+      const key = { 'mean/median ratio': 'ratio', mean: 'mean', median: 'median', 'd(3,2)': 'd32', mode: 'mode', 's.d.': 'sd', variance: 'variance', 'c.v.': 'cv', skewness: 'skew', kurtosis: 'kurt', deviation: 'sd' }[k[1].toLowerCase()];
+      const tgt = cur.fw ? (cur.st.fw ||= {}) : cur.st; if (key && tgt[key] == null) { tgt[key] = parseFloat(k[2]); if (k[3]) tgt[key + 'Txt'] = k[3]; } }
     if (/<\s*10\s*%.*<\s*90\s*%/.test(ln)) { cur.head = (ln.match(/<\s*(\d+)\s*%/g) || []).map(x => +x.replace(/\D/g, '')); continue; }
     if (cur.head && !cur.pct.length) { const v = ln.match(/\d+(?:\.\d+)?(?=\s*[µμu]m)/g); if (v && v.length === cur.head.length) { cur.pct = v.map((x, i) => [+x / 1000, cur.head[i]]); continue; } }
     if (/^Particle\b/i.test(ln)) { tab = true; continue; }
@@ -14727,7 +14790,8 @@ function psaPrepare(file, lines) {
     it.bins.forEach(([sz, v], i) => { if (i === 0) pts.push([sz, 0]); if (v != null && it.bins[i + 1]) { cum += v; pts.push([it.bins[i + 1][0], Math.min(100, +cum.toFixed(2))]); } });
     for (const p of it.pct) pts.push(p);
     const g = []; for (const [size, passing] of pts.filter(p => p[0] > 0).sort((a, c) => c[0] - a[0])) { if (g.length && (size === g.at(-1).size || passing > g.at(-1).passing)) continue; g.push({ size: +size.toPrecision(4), passing }); }
-    return { ...it, gsd: g };
+    const classes = it.bins.map(([sz, v], i) => v != null && it.bins[i + 1] ? [sz * 1000, it.bins[i + 1][0] * 1000, v] : null).filter(Boolean);
+    return { ...it, gsd: g, classes, instr };
   }).filter(it => it.gsd.length >= 3);
   if (!out.length) { toast('No particle-size results could be read from ' + file.name + '.'); return null; }
   return { kind: 'psa', file, items: out, rep };
@@ -14747,7 +14811,8 @@ function psaDialog({ file, items, rep }) {
 function psaGo() {
   const touched = new Set(); let n = 0;
   (S._psaImp || []).forEach((x, i) => { const v = $('[data-psamap="' + i + '"]')?.value || ''; if (!v) return; const [bid, sid] = v.split('|'), b = S.bh.get(bid), sm = b?.samples.find(q => q.id === sid); if (!sm || !editable(b)) return;
-    sm.gsd = x.gsd.map(p => ({ ...p })); sm.gsdMeta = { method: 'Laser diffraction, % by volume', lab: S._labMeta?.lab || 'SRC (Saskatchewan Research Council)', report: x.rep, labId: x.id }; n++; touched.add(b); });
+    sm.gsd = x.gsd.map(p => ({ ...p })); sm.gsdMeta = { method: 'Laser diffraction, % by volume', lab: S._labMeta?.lab || 'SRC (Saskatchewan Research Council)', report: x.rep, labId: x.id };
+    sm.psa = { labId: x.id, report: x.rep, instrument: x.instr, ...x.info, stats: x.st, pct: x.pct.map(([mm, p]) => [p, +(mm * 1000).toPrecision(4)]), classes: x.classes }; n++; touched.add(b); });
   for (const b of touched) { logChange(b, 'Particle size imported'); store.save(b); }
   closeOverlay(); S.formStale = true; render(); toast('Imported ' + n + ' grain-size curve' + (n === 1 ? '' : 's') + '.'); if (S._labQueue?.length) setTimeout(labNext, 400);
 }
