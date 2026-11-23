@@ -335,7 +335,14 @@ def in_grass_demfix(job, gs, tmp):
     if fv.size:   # values far outside the model's own range (a no-data value read as ground, a bird, a blunder): code 6
         p1, p99 = np.percentile(fv, [1, 99]); Rr = max(20.0, float(p99 - p1)); outl = fin0 & ((a < p1 - Rr) | (a > p99 + Rr))
         if outl.any(): code[outl] = 6; notes.append('values more than %.0f m outside the model\'s range (%.1f to %.1f m)' % (Rr, p1, p99))
-    if str(prm.get('spikes', 'yes')) != 'no':
+    ux, uy, _, _ = units_of(job, (x0 + x1) / 2, (y0 + y1) / 2); cellm = ((dx * ux) * (dy * uy)) ** .5
+    smode = str(prm.get('spikes', 'auto'))
+    if smode == 'auto' and fv.size:   # trees or buildings: cells more than 2 m above a 10 m ground filter (on about 1 m cells)
+        st0 = max(1, int(round(1.0 / max(cellm, 1e-9)))); sub = np.where(fin0, a, float(np.median(fv)))[::st0, ::st0]; rr0 = max(1, int(round(5.0 / (cellm * st0))))
+        yy0, xx0 = np.mgrid[-rr0:rr0 + 1, -rr0:rr0 + 1]; op0 = ndimage.grey_opening(sub, footprint=(xx0 ** 2 + yy0 ** 2) <= rr0 ** 2); frac = float(((sub - op0) > 2.0)[fin0[::st0, ::st0]].mean())
+        smode = 'pits' if frac > .02 else 'yes'
+        notes.append('%.0f%% of the surface stands more than 2 m above the ground (trees, buildings): %s' % (100 * frac, 'pits only, the spikes kept' if smode == 'pits' else 'spikes and pits'))
+    if smode != 'no':
         prog(0.15, 'r.neighbors: the median of every %d × %d window' % (win, win))
         gs.run_command('r.neighbors', input='z', output='med', method='median', size=win, overwrite=True, quiet=True)
         gs.run_command('r.mapcalc', expression='dev = z - med', overwrite=True, quiet=True)
@@ -347,7 +354,7 @@ def in_grass_demfix(job, gs, tmp):
         floor = float(prm.get('height') or 0) or 0.2
         lim = np.maximum(floor, k * 1.4826 * np.nan_to_num(mad))
         ok = np.isfinite(a) & np.isfinite(dev)
-        pits_only = str(prm.get('spikes', 'yes')) == 'pits'
+        pits_only = smode == 'pits'
         if not pits_only: code[ok & (dev > lim) & (code == 0)] = 1
         code[ok & (dev < -lim) & (code == 0)] = 2
         notes.append('spikes and pits: more than %.2f m, or %g× the local variation, from the median of %d × %d cells' % (floor, k, win, win))
@@ -432,7 +439,40 @@ def in_grass_demfix(job, gs, tmp):
         prog(0.78, 'r.neighbors: light smoothing (average of %d × %d)' % (sm, sm))
         to_grass(c, 'c3'); gs.run_command('r.neighbors', input='c3', output='c4', method='average', size=sm, overwrite=True, quiet=True)
         c4 = read('c4'); c = np.where(np.isfinite(c4) & np.isfinite(c), c4, c); notes.append('smoothed with a %d × %d average' % (sm, sm))
-    trimmed = 0; tr = float(prm.get('trim') or 0)
+    rebuilt = np.isin(code, [1, 2, 3, 5, 6, 7]) & np.isfinite(c)
+    if rebuilt.any() and str(prm.get('texture', 'yes')) == 'yes':
+        valid = np.isfinite(c); near = ndimage.distance_transform_edt(~valid, return_distances=False, return_indices=True); cf = c[tuple(near)]
+        hf = cf - ndimage.gaussian_filter(cf, max(.7, 1.0 / max(cellm, 1e-9)))
+        gnd = valid & ~rebuilt & (code == 0); h = np.abs(hf[gnd])
+        if h.size > 100:
+            sd = float(np.std(hf[gnd][h < np.percentile(h, 80)]))   # the ground's grain, not the trees'
+            nz = ndimage.gaussian_filter(np.random.default_rng(7).normal(0, 1, c.shape), .8); nz /= (nz.std() or 1)
+            c = np.where(rebuilt, c + nz * sd, c); notes.append('rebuilt places given the grain of the ground round them (%.2f m)' % sd)
+    trimmed = 0; trs = str(prm.get('trim', 'auto')).strip(); tr = 0.0
+    if trs == 'auto' and np.isfinite(c).any() and (~np.isfinite(c)).any():
+        # how far in the edge is bad: the roughness (against a 3 m median) of each 1 m ring in from where the data stops, against the inside
+        valid = np.isfinite(c); dist = ndimage.distance_transform_edt(np.pad(valid, 1, constant_values=True), sampling=(dy * uy, dx * ux))[1:-1, 1:-1]
+        # the terrain carried out from inside: each cell against the nearest cell at least 8 m in, plus the slope there times the offset
+        inner = valid & (dist > 10)
+        if inner.sum() > 200:
+            ii, jj = ndimage.distance_transform_edt(~inner, return_distances=False, return_indices=True)
+            near = ndimage.distance_transform_edt(~valid, return_distances=False, return_indices=True); cf = c[tuple(near)]
+            st1 = max(1, int(round(1.0 / max(cellm, 1e-9)))); r1 = max(1, int(round(5.0 / (cellm * st1)))); yy1, xx1 = np.mgrid[-r1:r1 + 1, -r1:r1 + 1]   # the ground (trees and buildings off), not the surface
+            og = ndimage.grey_opening(cf[::st1, ::st1], footprint=(xx1 ** 2 + yy1 ** 2) <= r1 ** 2); og = ndimage.zoom(og, (c.shape[0] / og.shape[0], c.shape[1] / og.shape[1]), order=1)[:c.shape[0], :c.shape[1]]
+            cs = ndimage.gaussian_filter(og, max(1.0, 2.0 / max(cellm, 1e-9))); gr, gc = np.gradient(cs)
+            R, C = np.indices(c.shape); ref = cs[ii, jj] + gr[ii, jj] * (R - ii) + gc[ii, jj] * (C - jj); dev = c - ref
+            grain = float(np.median(np.abs(cf - ndimage.gaussian_filter(cf, max(.7, 1.0 / max(cellm, 1e-9))))[inner]))
+            thr = max(1.0, 4 * grain)
+            for r_ in range(1, 16):
+                ring = valid & (dist > r_ - 1) & (dist <= r_)
+                if ring.sum() < 20: break
+                lo_ = np.maximum(-dev[ring], 0); st_ = max(-float(np.median(dev[ring])), float(np.percentile(lo_, 75)))   # below the ground carried out: a dip, or streaks (trees above it do not count)
+                if st_ <= thr: break
+                tr = float(r_)
+            if tr: notes.append('the last %g m before the data stops dipped or streaked away from the terrain inside (more than %.1f m): trimmed' % (tr, thr))
+    elif trs not in ('auto', '', '0'):
+        try: tr = float(trs)
+        except ValueError: tr = 0.0
     if tr > 0:   # the last metres before the data stops (not the edge of the area, where the data goes on)
         valid = np.isfinite(c); dist = ndimage.distance_transform_edt(np.pad(valid, 1, constant_values=True), sampling=(dym, dxm))[1:-1, 1:-1]
         cut = valid & (dist <= tr)
