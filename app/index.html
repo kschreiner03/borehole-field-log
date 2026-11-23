@@ -469,6 +469,23 @@ body.proj-home .shell { --sidebar-width: 0px; grid-template-columns: 0 0 minmax(
 .pj-exc svg { width: 20px; height: 20px; color: var(--accent); flex: none; } .pj-exc span { display: grid; } .pj-exc small { color: var(--muted); font-size: 12px; }
 .pj-none { padding: 30px 0; text-align: center; } .pj-last { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
 .pj-empty .step .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+/* Overview page */
+.kpi-go { cursor: pointer; } .kpi-go:hover { border-color: var(--accent); border-left-color: inherit; background: var(--hover); }
+.ov-prog { display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: var(--rule); overflow: hidden; } .ov-prog i { display: block; height: 100%; background: var(--ok, #2e8b57); }
+.ov-dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 13px; } .ov-dl dt { color: var(--muted); } .ov-dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; } .ov-notes { margin: 8px 0 0; white-space: pre-wrap; }
+.ov-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.ov-st { display: flex; align-items: center; gap: 10px; padding: 5px 2px; } .ov-sd { flex: 1; min-width: 0; display: grid; } .ov-sd b { font-size: 13px; font-weight: 600; } .ov-sd small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-ck { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; color: #fff; } .ov-ck svg { width: 13px; height: 13px; stroke-width: 3; }
+.st-done .ov-ck { background: var(--ok, #2e8b57); border-color: var(--ok, #2e8b57); } .st-notneeded .ov-ck { border-color: var(--muted); color: var(--muted); } .st-inprogress .ov-ck { border-color: #d9822b; color: #d9822b; }
+.st-done .ov-sd b { color: var(--muted); }
+.ov-att, .ov-recent { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.ov-att li { display: flex; align-items: center; gap: 8px; } .ov-att li > span:nth-child(2) { flex: 1; min-width: 0; } .ov-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; } .ov-dot.rv { background: #d9822b; } .ov-dot.td { background: #c9a227; }
+.ov-recent li { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; } .ov-recent li small { grid-column: 2; color: var(--muted); font-size: 11.5px; } .ov-recent li > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-bh .bhg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 6px; color: var(--ink); }
+.ov-depth { display: inline-block; width: 70px; height: 6px; border-radius: 3px; background: var(--rule); vertical-align: middle; overflow: hidden; margin-right: 8px; } .ov-depth i { display: block; height: 100%; background: #a3876a; } .ov-dn { font-variant-numeric: tabular-nums; }
+.ov-sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; border: 1px solid rgba(0,0,0,.35); margin-right: 6px; vertical-align: -1px; }
+.ov-x { color: var(--negative); font-weight: 600; font-size: 12px; } .ov-ok svg { width: 15px; height: 15px; color: var(--ok, #2e8b57); stroke-width: 2.4; }
+.lab-map + .sec { margin-top: var(--gap, 16px); }
 /* Water page */
 .kpi-needle { width: 20px; height: 20px; flex: none; }
 .gw-side { display: grid; gap: var(--gap, 16px); align-content: start; min-width: 0; }
@@ -3656,7 +3673,7 @@ function renderView(full) {
   else if (S.tab === 'xsec') { v.innerHTML = xsecHTML(); drawXsec(); }
   else if (S.tab === 'gwm') { v.innerHTML = gwmHTML(); gwEnsure(); }
   else if (S.tab === 'v3d') { v.innerHTML = v3dHTML(); v3dBuild(); gwAutoEnsure(); }
-  else if (S.tab === 'home') { v.innerHTML = homeHTML(); }
+  else if (S.tab === 'home') { v.innerHTML = homeHTML(v.clientWidth || 1000); }
   else if (S.tab === 'gp') { S.tab = 'site'; S.gpPanel = S.gp.tool; v.innerHTML = siteHTML(); drawSite(); }
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
   else if (S.tab === 'soil') { v.innerHTML = soilHTML(); drawSoil(); }
@@ -13147,35 +13164,52 @@ function bhNeeds(b) {
   if (b.well?.installed && (b.well.screenTop == null || b.well.screenBottom == null)) out.push(['Well screen not entered', 'water']);
   return out;
 }
-function homeHTML() {
-  const list = projList(), F = gwFlow(), wells = list.filter(b => b.well?.installed).length;
-  const vmax = list.map(b => ({ b, s: vapourMax(b, null, null) })).filter(x => x.s).sort((a, c) => c.s.cvc - a.s.cvc)[0];
-  const todo = list.map(b => ({ b, n: bhNeeds(b) })).filter(x => x.n.length), review = list.filter(b => b.status === 'review'), draft = list.filter(b => b.status === 'draft');
-  const facts = [!F.error && !F.flat ? `groundwater flows ${Math.round(F.az)}° (${F.dir}), i = ${F.i.toFixed(4)}` : '', vmax ? `highest vapour ${vmax.s.cvc.toLocaleString('en-CA')} ppm (${vmax.b.name})` : ''].filter(Boolean);
-  const labN = list.reduce((a, b) => a + (b.samples || []).filter(sm => Object.values(sm.lab || {}).some(r => r?.v != null)).length, 0), exN = list.reduce((a, b) => a + (b.samples || []).filter(sm => Object.keys(sm.lab || {}).some(p => exceeds(labVal(sm, p), p))).length, 0);
-  const rounds = roundDates().length, located = list.filter(b => b.easting != null).length, issued = list.filter(b => b.status === 'issued').length, p0 = list[0] || {};
+/* the project at a glance: tiles, the site plan, the project card, steps, what needs attention, recent work, every borehole */
+function homeHTML(vw = 1000) {
+  const list = projList(), F = gwFlow(), L = LEN(), wells = list.filter(b => b.well?.installed).length, p = curProj(), m = projMeta(p);
+  const vmax = list.map(b => ({ b, s: vapourMax(b, null, null) })).filter(x => x.s).sort((a, c) => c.s.cvc - a.s.cvc)[0], thr = S.co.vThr ?? 100;
+  const todo = list.map(b => ({ b, n: bhNeeds(b) })).filter(x => x.n.length), review = list.filter(b => b.status === 'review'), draft = list.filter(b => (b.status || 'draft') === 'draft'), issued = list.filter(b => b.status === 'issued');
+  const ps = labParamsUsed(list), labN = list.reduce((a, b) => a + (b.samples || []).filter(sm => Object.values(sm.lab || {}).some(r => r?.v != null)).length, 0), exN = list.reduce((a, b) => a + (b.samples || []).filter(sm => Object.keys(sm.lab || {}).some(q => exceeds(labVal(sm, q), q))).length, 0);
+  const rounds = roundDates(), located = list.filter(b => b.easting != null).length, p0 = list[0] || {};
   const steps = [
-    ['Set up the project', [p0.projNo, p0.client, p0.location].every(Boolean) ? 'Done' : 'To do', [p0.projNo, p0.client, p0.location].filter(Boolean).join(' · ') || 'Project number, client and location', 'proj-details', 'Project details'],
-    ['Log boreholes', !list.length ? 'To do' : issued === list.length ? 'Done' : 'In progress', `${list.length} logged · ${review.length} for review · ${issued} issued`, 'new', 'New borehole'],
-    ['Lab results', labN ? 'In progress' : 'To do', labN ? `${labN} sample${labN === 1 ? '' : 's'} with results${exN ? ` · ${exN} exceed guidelines` : ''}` : 'Enter results against each sample', 'go-lab', 'Add results'],
-    ['Groundwater', rounds ? 'Done' : wells ? 'To do' : 'Not needed', rounds ? `${rounds} monitoring round${rounds === 1 ? '' : 's'}${!F.error && !F.flat ? ` · flow ${Math.round(F.az)}° ${F.dir}` : ''}` : wells ? `${wells} well${wells === 1 ? '' : 's'} to read` : 'No wells installed', 'round', 'Monitoring round'],
-    ['Map and sections', located === list.length && list.length ? 'Done' : 'To do', `${located} of ${list.length} located${siteOf()?.img || imageryOf().length ? ' · site drawing or imagery added' : ''}`, 'go-site', 'Open map'],
-    ['Report', siteOf()?.report ? 'In progress' : 'To do', siteOf()?.report ? `${siteOf().report.pages.length} pages laid out` : 'Choose a template and lay out the pages', 'go-compose', 'Open reports'],
-  ];
-  return `${facts.filter(Boolean).length ? `<p class="finding">${esc(facts.filter(Boolean).join(' · '))}</p>` : ''}
-  <section class="sec"><header><h3>Project steps</h3><span class="note">Work down the list; each step opens the right page</span></header><div class="body"><ol class="steps-list">${steps.map(([t, st, d, act, cta], i) => `<li><span class="sn${st === 'Done' ? ' done' : ''}">${i + 1}</span><span class="sd"><b>${t}</b><span class="note">${esc(d)}</span></span><span class="sb sb-${st.replace(/\s/g, '').toLowerCase()}">${st}</span><button class="btn" data-act="${act}" ${S.readOnly && act === 'new' ? 'disabled' : ''}>${cta}</button></li>`).join('')}</ol></div></section>
-  <div class="home-grid">
-    <section class="sec"><header><h3>Site plan</h3><button class="btn link" data-tab="site">Open site plan & sections</button></header><div class="body map-box" id="home-plan">${planSVG(640, 420, false)}</div></section>
-    <section class="sec"><header><h3>Needs attention</h3><span class="note">${todo.length + review.length ? `${todo.length + review.length} item${todo.length + review.length === 1 ? '' : 's'}` : ''}</span></header><div class="body att">
-      ${review.map(b => `<div class="att-row"><b>${esc(b.name)}</b><span>Ready for review</span><button class="btn" data-pick="${esc(b.id)}" data-goto="log">Review</button></div>`).join('')}
-      ${todo.slice(0, 8).map(({ b, n }) => `<div class="att-row"><b>${esc(b.name)}</b><span>${esc(n.map(x => x[0]).join(', '))}</span><button class="btn" data-qlpick="${esc(b.id)}" data-qlstep="${n[0][1]}">Fix</button></div>`).join('')}
-      ${todo.length > 8 ? `<p class="note">and ${todo.length - 8} more.</p>` : ''}
-      ${!todo.length && !review.length ? `<p class="note">Nothing missing. ${draft.length ? `${draft.length} draft log${draft.length === 1 ? '' : 's'} can go for review.` : 'All logs are reviewed or issued.'}</p>` : ''}
-      <div class="actions"><button class="btn" data-act="new">New borehole</button><button class="btn" data-tab="reports">Reports</button></div></div></section>
-  </div>
-  <section class="sec"><header><h3>Boreholes</h3><span class="note">Click a name to open its log</span></header><div class="body"><div class="scroll-x"><table class="sum">
-    <thead><tr><th>Borehole</th><th>Status</th><th class="r">Depth (${LEN()})</th><th class="r">Ground el. (${LEN()})</th><th>Well</th><th class="r">Latest water (${LEN()})</th><th class="r">Max vapour (ppm)</th><th class="r">Samples</th><th>Missing</th></tr></thead>
-    <tbody>${list.map(b => { const w = latestWater(b), v = vapourMax(b, null, null), n = bhNeeds(b); return `<tr><td><button class="pick" data-pick="${esc(b.id)}" data-goto="log">${esc(b.name)}</button></td><td>${statusPill(b)}</td><td class="r">${fx(depthOf(b))}</td><td class="r">${fx(b.elevation)}</td><td>${b.well?.installed ? (b.well.type === 'well' ? 'Monitoring well' : 'Standpipe') : '—'}</td><td class="r">${w ? fx(w.depth) : b.gwNone ? 'Dry' : '—'}</td><td class="r">${v ? v.cvc.toLocaleString('en-CA') : '—'}</td><td class="r">${(b.samples || []).length}</td><td>${n.length ? `<span class="note">${esc(n.map(x => x[0]).join(', '))}</span>` : '—'}</td></tr>`; }).join('')}</tbody></table></div></div></section>`;
+    ['Set up the project', [m.projNo || p0.projNo, m.client || p0.client, m.location || p0.location].every(Boolean) ? 'Done' : 'To do', [m.projNo, m.client].filter(Boolean).join(' · ') || 'Number, client and location', 'proj-details', 'Details'],
+    ['Log boreholes', !list.length ? 'To do' : issued.length === list.length ? 'Done' : 'In progress', list.length + ' logged · ' + review.length + ' for review · ' + issued.length + ' issued', 'new', 'New borehole'],
+    ['Lab results', labN ? 'In progress' : 'To do', labN ? labN + ' sample' + (labN === 1 ? '' : 's') + (exN ? ' · ' + exN + ' over a guideline' : '') : 'Enter or import results', 'imp-lab', 'Import'],
+    ['Groundwater', rounds.length ? 'Done' : wells ? 'To do' : 'Not needed', rounds.length ? rounds.length + ' round' + (rounds.length === 1 ? '' : 's') + (!F.error && !F.flat ? ' · flow ' + Math.round(F.az) + '° ' + F.dir : '') : wells ? wells + ' well' + (wells === 1 ? '' : 's') + ' to read' : 'No wells installed', 'round', 'Round'],
+    ['Map and sections', located === list.length && list.length ? 'Done' : 'To do', located + ' of ' + list.length + ' located' + (siteOf()?.img || imageryOf().length ? ' · imagery' : ''), 'go-site', 'Map'],
+    ['Report', siteOf()?.report ? 'In progress' : 'To do', siteOf()?.report ? siteOf().report.pages.length + ' pages laid out' : 'Choose a template', 'go-compose', 'Outputs']];
+  const done = steps.filter(x => x[1] === 'Done' || x[1] === 'Not needed').length;
+  const kpi = (lab, val, sub, tone = '', go = '') => '<div class="kpi' + (tone ? ' ' + tone : '') + (go ? ' kpi-go" data-tab="' + go + '" role="button" tabindex="0' : '') + '"><span class="kpi-l">' + lab + '</span><span class="kpi-v">' + val + '</span><span class="kpi-s">' + sub + '</span></div>';
+  const kpis = '<div class="lab-kpis">'
+    + kpi('Boreholes', list.length + (wells ? '<small> · ' + wells + ' well' + (wells === 1 ? '' : 's') + '</small>' : ''), draft.length + ' draft · ' + review.length + ' for review · ' + issued.length + ' issued', '', 'table')
+    + kpi('Groundwater flow', F.error ? '—' : F.flat ? 'Flat' : Math.round(F.az) + '°<small> ' + F.dir + '</small>', F.error ? (rounds.length ? 'Needs 3 wells with levels' : 'No monitoring rounds yet') : 'i = ' + F.i.toFixed(4) + ' · ' + rounds.length + ' round' + (rounds.length === 1 ? '' : 's'), '', 'gw')
+    + kpi('Highest vapour', vmax ? vmax.s.cvc.toLocaleString('en-CA') + '<small> ppm</small>' : '—', vmax ? esc(vmax.b.name) + ' at ' + esc(fu(vmax.s.depth)) : 'No headspace readings', vmax && vmax.s.cvc >= thr ? 'bad' : '', 'contam')
+    + kpi('Lab results', labN ? String(labN) + '<small> sample' + (labN === 1 ? '' : 's') + '</small>' : '—', labN ? (exN ? exN + ' over a guideline' : ps.length + ' parameter' + (ps.length === 1 ? '' : 's') + ', none over') : 'None entered yet', exN ? 'bad' : labN ? 'good' : '', 'contam')
+    + kpi('Progress', done + '<small> of ' + steps.length + ' steps</small>', '<span class="ov-prog"><i style="width:' + (done / steps.length * 100).toFixed(0) + '%"></i></span>', done === steps.length ? 'good' : '')
+    + '</div>';
+  const stack = vw < 900, mw = Math.max(420, Math.round(stack ? vw - 34 : (vw - 16) * 1.75 / 2.75 - 34)), mh = Math.max(320, Math.min(640, Math.round(mw * .66)));
+  const ic = { Done: '<path d="M5 12l5 5 9-10"/>', 'Not needed': '<path d="M6 12h12"/>', 'In progress': '<circle cx="12" cy="12" r="3" fill="currentColor"/>', 'To do': '' };
+  const stepsHTML = '<ol class="ov-steps">' + steps.map(([t, st, d, act, cta]) => '<li class="ov-st st-' + st.replace(/\s/g, '').toLowerCase() + '"><span class="ov-ck">' + (ic[st] ? svgI(ic[st]) : '') + '</span><span class="ov-sd"><b>' + t + '</b><small>' + esc(d) + '</small></span><button class="btn link" data-act="' + act + '"' + (S.readOnly && ['new', 'imp-lab', 'round'].includes(act) ? ' disabled' : '') + '>' + cta + '</button></li>').join('') + '</ol>';
+  const att = [...review.map(b => '<li><span class="ov-dot rv"></span><span><b>' + esc(b.name) + '</b> ready for review</span><button class="btn link" data-pick="' + esc(b.id) + '" data-goto="log">Review</button></li>'),
+    ...todo.slice(0, 8).map(({ b, n }) => '<li><span class="ov-dot td"></span><span><b>' + esc(b.name) + '</b> ' + esc(n.map(x => x[0].toLowerCase()).join(', ')) + '</span><button class="btn link" data-qlpick="' + esc(b.id) + '" data-qlstep="' + n[0][1] + '">Fix</button></li>')];
+  const recent = list.flatMap(b => (b.history || []).map(h => ({ b, h }))).filter(x => x.h.at).sort((a, c) => c.h.at.localeCompare(a.h.at)).slice(0, 6);
+  const projCard = '<section class="sec"><header><h3>Project</h3><button class="btn link" data-act="proj-details">Edit</button></header><div class="body"><dl class="ov-dl">'
+    + [[S.co.projLabel || 'Project No.', m.projNo || p0.projNo], ['Client', m.client || p0.client], ['Location', m.location || p0.location], ['Coordinates', 'EPSG:' + projEpsg() + (crsName('EPSG:' + projEpsg()) ? ' · ' + crsName('EPSG:' + projEpsg()) : '')], ['Guideline', siteOf()?.guideSrc], ['Created', m.created ? new Date(m.created).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }) : '']].filter(x => x[1]).map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('')
+    + '</dl>' + (m.notes ? '<p class="note ov-notes">' + esc(m.notes) + '</p>' : '') + '</div></section>';
+  const side = '<div class="gw-side">' + projCard
+    + '<section class="sec"><header><h3>Steps</h3><span class="note">' + done + ' of ' + steps.length + ' done</span></header><div class="body">' + stepsHTML + '</div></section>'
+    + '<section class="sec"><header><h3>Needs attention</h3><span class="note">' + (att.length ? att.length + (todo.length > 8 ? '+' : '') : '') + '</span></header><div class="body">' + (att.length ? '<ul class="ov-att">' + att.join('') + '</ul>' + (todo.length > 8 ? '<p class="note">and ' + (todo.length - 8) + ' more.</p>' : '') : '<p class="note">Nothing missing. ' + (draft.length ? draft.length + ' draft log' + (draft.length === 1 ? '' : 's') + ' can go for review.' : 'All logs are reviewed or issued.') + '</p>') + '</div></section>'
+    + (recent.length ? '<section class="sec"><header><h3>Recent work</h3></header><div class="body"><ul class="ov-recent">' + recent.map(({ b, h }) => '<li><button class="pick" data-pick="' + esc(b.id) + '" data-goto="log">' + esc(b.name) + '</button><span>' + esc(h.what) + '</span><small>' + esc(agoTxt(h.at)) + (h.by ? ' · ' + esc(h.by) : '') + '</small></li>').join('') + '</ul></div></section>' : '') + '</div>';
+  const dmax = Math.max(1, ...list.map(b => depthOf(b) || 0));
+  const table = '<section class="sec"><header><h3>Boreholes</h3><span class="note">Click a name to open its log</span><button class="btn link" data-tab="table">All data tables</button></header><div class="body"><div class="scroll-x"><table class="sum ov-bh">'
+    + '<thead><tr><th>Borehole</th><th>Status</th><th>Depth (' + L + ')</th><th class="r">Ground el.</th><th>Well</th><th class="r">Water (' + L + ')</th><th class="r">Max vapour (ppm)</th><th class="r">Samples</th><th>Missing</th></tr></thead><tbody>'
+    + list.map(b => { const w = latestWater(b), v = vapourMax(b, null, null), n = bhNeeds(b), d = depthOf(b), xl = (b.samples || []).filter(sm => Object.keys(sm.lab || {}).some(q => exceeds(labVal(sm, q), q))).length;
+      return '<tr><td><button class="pick" data-pick="' + esc(b.id) + '" data-goto="log">' + bhGlyph(b.well?.installed) + esc(b.name) + '</button></td><td>' + statusPill(b) + '</td>'
+        + '<td><span class="ov-depth"><i style="width:' + ((d || 0) / dmax * 100).toFixed(0) + '%"></i></span><span class="ov-dn">' + fx(d) + '</span></td><td class="r">' + fx(b.elevation) + '</td><td>' + (b.well?.installed ? (b.well.type === 'well' ? 'Monitoring well' : 'Standpipe') : '<span class="muted">—</span>') + '</td>'
+        + '<td class="r">' + (w ? fx(w.depth) : b.gwNone ? 'Dry' : '—') + '</td><td class="r">' + (v ? '<span class="ov-sw" style="background:' + symFill(resColour('cvc', { v: v.cvc })) + '"></span>' + (v.cvc >= thr ? '<b style="color:var(--negative)">' + v.cvc.toLocaleString('en-CA') + '</b>' : v.cvc.toLocaleString('en-CA')) : '—') + '</td>'
+        + '<td class="r">' + (b.samples || []).length + (xl ? ' <span class="ov-x" title="' + xl + ' over a guideline">' + xl + ' ▲</span>' : '') + '</td><td>' + (n.length ? '<span class="note">' + esc(n.map(x => x[0]).join(', ')) + '</span>' : '<span class="ov-ok">' + svgI('<path d="M5 12l5 5 9-10"/>') + '</span>') + '</td></tr>'; }).join('')
+    + '</tbody></table></div></div></section>';
+  return kpis + '<div class="lab-map' + (stack ? ' stack' : '') + '"><section class="sec"><header><h3>Site plan</h3><span class="note">' + located + ' of ' + list.length + ' located</span><button class="btn link" data-tab="site">Open the map</button></header><div class="body map-box" id="home-plan">' + planSVG(mw, mh, false) + '</div></section>' + side + '</div>' + table;
 }
 
 /* ---------- reports: every output and what goes on the logs, in one place ---------- */
