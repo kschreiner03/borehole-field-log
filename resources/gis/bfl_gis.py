@@ -532,7 +532,7 @@ def find_trees(job):
         try:
             r = find_trees_grid(job)
             if half: r['notes'] = r.get('notes', []) + ['there was not enough memory at the layer\'s %d × %d cells, so this ran on %d × %d (cells %d times as big); make the elevation map over a smaller area for the full detail' % (nx, ny, int(job['nx']), int(job['ny']), 2 ** half)]
-            r['notes'] = pre + r.get('notes', []); r['nx'], r['ny'] = int(job['nx']), int(job['ny']); return r
+            r['notes'] = pre + r.get('notes', []); r['nx'], r['ny'] = int(job['nx']), int(job['ny']); r['box'] = [float(v) for v in job['box']]; return r   # the grid's own extent (cells combined, so not the layer's cell size)
         except MemoryError:
             gc.collect(); half += 1
             if half > 3: raise RuntimeError('Not enough memory to find trees on a %d × %d grid, even at an eighth of it. Close other programs, or make the elevation map over a smaller area or at a coarser resolution.' % (nx, ny))
