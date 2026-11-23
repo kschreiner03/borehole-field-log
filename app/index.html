@@ -435,6 +435,41 @@ table.kv th { text-align: left; width: 38%; font-weight: 600; white-space: norma
 @media (max-width: 1150px) { .flow-grid { grid-template-columns: minmax(0, 1fr); } }
 .finding { margin: 0 0 14px; font-size: 15px; color: var(--ink); }
 .home-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: var(--gap); align-items: start; }
+/* Lab page */
+.lab-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 0 0 14px; }
+.kpi { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--rule); border-radius: var(--r-sm, 4px); min-width: 0; }
+.kpi.bad { border-left-color: var(--negative, #c0392b); } .kpi.good { border-left-color: var(--ok, #2e8b57); }
+.kpi-l { font-size: 12px; color: var(--muted); }
+.kpi-v { display: flex; align-items: center; gap: 8px; font: 600 22px/1.15 var(--f-body); color: var(--ink); } .kpi-v small { font-size: 13px; font-weight: 500; color: var(--muted); }
+.kpi.bad .kpi-v { color: var(--negative, #c0392b); }
+.kpi-s { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpi-sw { width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(0,0,0,.35); flex: none; }
+.lab-tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--line); margin: 0 0 14px; }
+.lab-tabs button { border: 0; background: none; padding: 8px 14px; font: 500 13.5px var(--f-body); color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.lab-tabs button:hover { color: var(--ink); background: var(--hover); }
+.lab-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.lab-badge { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 9px; background: var(--rule); color: var(--ink); }
+.lab-map { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(280px, 1fr); gap: var(--gap, 16px); align-items: start; } .lab-map.stack { grid-template-columns: minmax(0, 1fr); }
+.lab-caveat { margin-top: 6px; font-size: 12px; }
+.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.rk { display: flex; align-items: flex-start; gap: 8px; padding: 4px 2px; border-radius: var(--r-sm, 4px); }
+.rk:hover { background: var(--hover); }
+.rk > input { width: 15px; height: 15px; margin: 6px 0 0; flex: none; accent-color: var(--accent); }
+.rk-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; border: 0; background: none; padding: 2px 0; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
+.rk-top { display: flex; align-items: baseline; gap: 8px; } .rk-nm { font-weight: 600; font-size: 13px; color: var(--accent); }
+.rk-v { margin-left: auto; font: 600 13px var(--f-body); font-variant-numeric: tabular-nums; } .rk-v small { font-weight: 400; color: var(--muted); } .rk-v.hi { color: var(--negative, #c0392b); }
+.rk-bar { position: relative; display: block; height: 8px; border-radius: 4px; background: var(--rule); overflow: hidden; }
+.rk-bar i { position: absolute; inset: 0 auto 0 0; border-right: 1px solid rgba(0,0,0,.35); }
+.rk-bar b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--negative, #c0392b); }
+.rk-sub { font-size: 11.5px; color: var(--muted); }
+.rk.off .rk-nm, .rk.off .rk-v { color: var(--muted); } .rk.off .rk-bar { opacity: .45; }
+.rk-scale { display: flex; justify-content: space-between; margin: 4px 0 6px 25px; font-size: 10.5px; color: var(--muted); }
+.lab-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 36px 16px !important; }
+.lab-empty > svg { width: 36px; height: 36px; color: var(--muted); } .lab-empty h3 { margin: 0; font-size: 16px; } .lab-empty p { max-width: 560px; margin: 0; }
+.lab-empty .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+.lab-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.lab-chip { font-size: 12px; padding: 3px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.lab-chip.bad { border-color: var(--negative, #c0392b); color: var(--negative, #c0392b); } .lab-chip.good { border-color: var(--ok, #2e8b57); }
 .two-col { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--gap); align-items: start; }
 .map-box svg { max-width: 100%; height: auto; display: block; border-radius: var(--r-sm); }
 .att { display: grid; gap: 2px; }
@@ -3409,7 +3444,7 @@ function renderView(full) {
   else if (S.tab === 'gp') { S.tab = 'site'; S.gpPanel = S.gp.tool; v.innerHTML = siteHTML(); drawSite(); }
   else if (S.tab === 'table') { v.innerHTML = tableHTML(); }
   else if (S.tab === 'soil') { v.innerHTML = soilHTML(); drawSoil(); }
-  else if (S.tab === 'contam') { v.innerHTML = contamHTML(); drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); drawPlasticity(); }
+  else if (S.tab === 'contam') { v.innerHTML = contamHTML(v.clientWidth || 1000); if ($('#csection')) drawSection($('#csection'), $('#csection-note'), undefined, mapList(), true); if ($('#pchart')) drawPlasticity(); }
   else if (S.tab === 'reports') { v.innerHTML = reportsHubHTML(b); }
   else if (S.tab === 'compose') { v.innerHTML = composeHTML(); requestAnimationFrame(() => { if (S.cout) { fillOutputs(); return; } drawCompose(); fillThumbs(); gwComposeEnsure(); }); }
   else { v.innerHTML = nextSteps(b) + (editable(b) ? '<div class="lt-new"><label for="lt-new">Add a layer by typing</label><input id="lt-new" autocomplete="off" spellcheck="false" placeholder="e.g. 2.4-3.1 CL silty clay, stiff, moist, brown (depths optional: it starts at the bottom of the log)"><span class="note" id="lt-new-read"></span></div>' : '') + (editable(b) ? '<p class="log-hint">Click any layer, sample, water level or the standpipe on the log to edit it. Click empty space in a column to add one at that depth.</p>' : '') + sheetHTML(b) + logLegendHTML(b); const el = $('#log'); el.innerHTML = logSVG(b, Math.max(el.clientWidth, 900)); }
@@ -10121,7 +10156,7 @@ CTL.soil = () => soilCtl();
 CTL.contam = () => { const list = projList(), p = S.mapParam && LAB_PARAMS[S.mapParam] ? S.mapParam : 'cvc', thr = S.co.vThr ?? 100; return [
   { id: 'lab-map', title: 'Map', icon: NAV_ICON.contam, sum: p === 'cvc' ? 'Vapour' : LAB_PARAMS[p].label, html: `<div class="map-layers">
     ${crow('Show', `<select id="map-param"><option value="">Vapour (headspace)</option>${labParamsUsed(list).map(k => `<option value="${k}" ${S.mapParam === k ? 'selected' : ''}>${esc(LAB_PARAMS[k].label)}</option>`).join('')}</select>`, 'map-param')}
-    ${crow(`Depth (${LEN()})`, `<input id="v-from" type="number" step="any" placeholder="top" value="${S.vFrom != null ? f(S.vFrom, 2) : ''}"><span class="note">to</span><input id="v-to" type="number" step="any" placeholder="bottom" value="${S.vTo != null ? f(S.vTo, 2) : ''}" aria-label="Depth to">`, 'v-from')}
+    ${crow(`Depth (${LEN()})`, `<input id="v-from" type="number" step="any" placeholder="top" value="${S.vFrom != null ? f(S.vFrom, 2) : ''}"><span class="note">to</span><input id="v-to" type="number" step="any" placeholder="base" value="${S.vTo != null ? f(S.vTo, 2) : ''}" aria-label="Depth to">`, 'v-from')}
     ${crow('Screening', `<input id="v-thr" type="number" min="1" step="any" value="${thr}"><span class="note">ppm</span>`, 'v-thr')}
     <p class="note">Readings at or over the screening level are flagged in red and drawn as the outline, unless one is set under Style. Blank depths take every sample.</p></div>` },
   { id: 'lab-style', title: 'Style and contours', icon: CTL_I.style, html: `<div class="map-layers">${resStyleHTML(p)}</div>` },
@@ -12754,7 +12789,7 @@ function resStyleHTML(p) {
     <h4>Between boreholes</h4>
     ${crow('Method', `<select id="rs-interp" data-rs="interp" ${ro}><optgroup label="Built in">${opt(RES_INTERP, s.interp)}</optgroup><optgroup label="GIS software${gisOn() ? '' : ' (install under Settings)'}">${Object.entries(GIS_2D).filter(([k]) => !(desktopWin() && GIS_NO_WIN.has(k))).map(([k, [l, d]]) => `<option value="gis:${k}" title="${esc(d)}" ${s.interp === 'gis:' + k ? 'selected' : ''} ${gisOn() || s.interp === 'gis:' + k ? '' : 'disabled'}>${esc(l)}</option>`).join('')}</optgroup></select>`, 'rs-interp')}${s.interp === 'auto' ? `<p class="note" data-resauto="${esc(p)}">${esc(resAutoText(RES_AUTO_LAST[p]))}</p>` : ''}${s.interp?.startsWith('gis:') ? `<p class="note gis-note">${esc(gisNote(s.interp.slice(4), GIS_LAST[p]?.key))}</p>` : ''}
     ${window.desktop?.gis ? `<button class="btn" data-act="gis-export" data-p="${esc(p)}" ${gisOn() ? '' : 'disabled title="Needs the GIS engines (Settings › GIS engines)"'}>Export to GIS (GeoTIFF, GeoPackage)…</button>` : ''}
-    ${crow('Reach', `<input id="rs-reach" type="number" step="any" min="0" data-rs="reach" value="${s.reach ?? ''}" placeholder="no limit" ${ro} data-tip="How far from a borehole the shading may reach. Blank: as far as the outer boreholes."><span class="note">m from a borehole</span>`, 'rs-reach')}
+    ${crow('Reach', `<input id="rs-reach" type="number" step="any" min="0" data-rs="reach" value="${s.reach ?? ''}" placeholder="any" ${ro} data-tip="How far from a borehole the shading may reach. Blank: as far as the outer boreholes."><span class="note">m from a borehole</span>`, 'rs-reach')}
     ${crow('Outline', `<input type="checkbox" data-rs="limit" ${s.limit ? 'checked' : ''} ${ro} aria-label="Draw a limit outline"><input type="number" step="any" min="0" data-rs="lim" value="${s.lim ?? ''}" placeholder="${p === 'cvc' ? (S.co.vThr ?? 100) : projGuide()[p] ?? 'value'}" ${ro} aria-label="Outline at"><span class="note">${esc(u)}</span>`)}
     <h4>Points and values</h4>
     ${crow('Values', `<select id="rs-labels" data-rs="labels" ${ro}>${opt({ value: 'Value', id: 'Borehole and value', none: 'None' }, s.labels)}</select>`, 'rs-labels')}
@@ -12785,23 +12820,49 @@ function vapourMapSVG(W, H) {
   LBL_AVOID = null; o.push(...F.tail);
   return o.join('');
 }
-function contamHTML() {
+/* the Lab page: a summary across the top, then one view at a time (map and ranking, lab results, cross-section, soil tests) */
+S.labView = lsGet('bhlog.labView') || 'map';
+const LAB_VIEWS = [['map', 'Map'], ['lab', 'Lab results'], ['sec', 'Cross-section'], ['soil', 'Soil tests']];
+function contamHTML(vw = 1000) {
   const list = projList(), thr = S.co.vThr ?? 100, rows = list.map(b => ({ b, s: vapourMax(b), n: (b.samples || []).filter(s => s.cvc != null).length })).sort((a, c) => (c.s?.cvc ?? -1) - (a.s?.cvc ?? -1));
-  const over = rows.filter(r => r.s && r.s.cvc >= thr), withData = rows.filter(r => r.s);
-  const finding = !withData.length ? 'No vapour readings in this project yet.' : over.length ? `${over.length} of ${withData.length} boreholes read ${thr.toLocaleString('en-CA')} ppm or more; highest ${withData[0].s.cvc.toLocaleString('en-CA')} ppm in ${withData[0].b.name} at ${fu(withData[0].s.depth)}.` : `No borehole reaches ${thr.toLocaleString('en-CA')} ppm; highest ${withData[0].s.cvc.toLocaleString('en-CA')} ppm in ${withData[0].b.name}.`;
-  return `<p class="finding">${esc(finding)}</p>
-  <div class="two-col">
-    <section class="sec"><header><h3>${S.mapParam && LAB_PARAMS[S.mapParam] ? esc(LAB_PARAMS[S.mapParam].label) + ' map' : 'Vapour map'}</h3><span class="note">${S.vFrom != null || S.vTo != null ? 'Chosen depths' : 'Highest in each borehole'}</span></header>
-      <div class="body"><div class="scroll-x map-box">${vapourMapSVG(620, 460)}</div>
-      <div class="legend">${legendRows('vap', mapList()).filter(r => !r.head).map(r => `<span><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true">${r.sym(11, 7)}</svg>${esc(r.t)}</span>`).join('')}</div>
-      <p class="note">Shading, contours and the outline are interpolated between boreholes in log₁₀, only inside the outer boreholes: an interpretation to guide sampling, not a measured boundary. Confirm with laboratory analysis. Settings are in the panel on the right.</p></div></section>
-    <section class="sec"><header><h3>Highest reading by borehole</h3></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th title="Untick to leave a borehole out of the shading and contours; it stays on the map">Use</th><th>Borehole</th><th class="r">Max (ppm)</th><th class="r">Depth (${LEN()})</th><th>Sample</th><th class="r">Readings</th></tr></thead><tbody>
-      ${rows.map(r => `<tr${r.b.resOff ? ' class="muted"' : ''}><td><input type="checkbox" data-resuse="${esc(r.b.id)}" ${r.b.resOff ? '' : 'checked'} ${S.readOnly ? 'disabled' : ''} aria-label="Use ${esc(r.b.name)} in the contours"></td><td><button class="pick" data-pick="${esc(r.b.id)}" data-goto="log">${r.s ? `<span class="dot sq" style="background:${symFill(resColour('cvc', { v: r.s.cvc }))};border:1px solid var(--ink)"></span>` : '<span class="dot sq" style="background:var(--panel);border:1px dashed var(--muted)"></span>'}${esc(r.b.name)}</button></td><td class="r">${r.s ? `<b${r.s.cvc >= thr ? ' style="color:var(--negative)"' : ''}>${r.s.cvc.toLocaleString('en-CA')}</b>` : '—'}</td><td class="r">${r.s ? fx(r.s.depth) : '—'}</td><td>${r.s ? esc(sampleId(r.s)) : '—'}</td><td class="r">${r.n}</td></tr>`).join('')}</tbody></table></div></div></section>
-  </div>
-  <section class="sec"><header><h3>Laboratory results</h3><span class="note">Soil, by sample</span></header><div class="body">${labTableHTML(list)}</div></section>
-  <section class="sec"><header><h3>Cross-section with vapour</h3><span class="note">Bars to the right of each borehole: headspace on a log scale, 1 to 10,000 ppm</span></header><div class="body"><div class="scroll-x" id="csection"></div><p class="note" id="csection-note"></p></div></section>
-  ${soilTestsHTML()}`;
+  const over = rows.filter(r => r.s && r.s.cvc >= thr), withData = rows.filter(r => r.s), top = withData[0];
+  // the lab results: samples with any, those over a guideline, and which parameters
+  const ps = labParamsUsed(list), g = projGuide(), lsm = list.flatMap(b => (b.samples || []).filter(sm => ps.some(p => labVal(sm, p))).map(sm => ({ b, sm })));
+  const pOver = ps.map(p => ({ p, n: lsm.filter(x => labVal(x.sm, p)).length, x: lsm.filter(x => exceeds(labVal(x.sm, p), p)).length })), smOver = lsm.filter(x => ps.some(p => exceeds(labVal(x.sm, p), p))).length;
+  const kpi = (lab, val, sub, tone = '', sw = '') => '<div class="kpi' + (tone ? ' ' + tone : '') + '"><span class="kpi-l">' + lab + '</span><span class="kpi-v">' + sw + val + '</span><span class="kpi-s">' + sub + '</span></div>';
+  const kpis = '<div class="lab-kpis">'
+    + kpi('Highest vapour', top ? top.s.cvc.toLocaleString('en-CA') + '<small> ppm</small>' : '—', top ? esc(top.b.name) + ' at ' + esc(fu(top.s.depth)) : 'No headspace readings yet', top && top.s.cvc >= thr ? 'bad' : '', top ? '<i class="kpi-sw" style="background:' + symFill(resColour('cvc', { v: top.s.cvc })) + '"></i>' : '')
+    + kpi('Over screening', withData.length ? over.length + '<small> of ' + withData.length + '</small>' : '—', 'boreholes at ' + thr.toLocaleString('en-CA') + ' ppm or more', over.length ? 'bad' : withData.length ? 'good' : '')
+    + kpi('Lab samples', lsm.length ? String(lsm.length) : '—', lsm.length ? (smOver ? smOver + ' over a guideline' : Object.keys(g).length ? 'none over the guidelines' : 'no guidelines entered') : 'No results entered yet', smOver ? 'bad' : lsm.length && Object.keys(g).length ? 'good' : '')
+    + kpi('Over the guideline', pOver.some(q => q.x) ? String(pOver.filter(q => q.x).length) + '<small> parameter' + (pOver.filter(q => q.x).length === 1 ? '' : 's') + '</small>' : lsm.length ? '0' : '—', pOver.some(q => q.x) ? esc(pOver.filter(q => q.x).map(q => LAB_PARAMS[q.p].label).join(', ')) : lsm.length ? 'of ' + ps.length + ' analysed' : 'Import or add lab results', pOver.some(q => q.x) ? 'bad' : '')
+    + '</div>';
+  const v = LAB_VIEWS.some(x => x[0] === S.labView) ? S.labView : 'map', badge = { lab: lsm.length || '', soil: '' };
+  const tabs = '<div class="lab-tabs" role="tablist" aria-label="Lab page views">' + LAB_VIEWS.map(([k, t]) => '<button type="button" role="tab" data-labview="' + k + '" aria-selected="' + (v === k) + '">' + t + (badge[k] ? '<span class="lab-badge">' + badge[k] + '</span>' : '') + '</button>').join('') + '</div>';
+  let body = '';
+  if (v === 'map') {
+    const stack = vw < 760, mw = Math.max(420, Math.round(stack ? vw - 34 : (vw - 16) * 1.75 / 2.75 - 34)), mh = Math.max(340, Math.min(720, Math.round(mw * .72)));
+    const pct = x => Math.max(0, Math.min(100, Math.log10(Math.max(1, x)) / 4 * 100)), tp = pct(thr);
+    const rank = withData.length ? '<ul class="rank">' + rows.map(r => { const c = r.s ? symFill(resColour('cvc', { v: r.s.cvc })) : 'transparent', hi = r.s && r.s.cvc >= thr;
+      return '<li class="rk' + (r.b.resOff ? ' off' : '') + '"><input type="checkbox" data-resuse="' + esc(r.b.id) + '"' + (r.b.resOff ? '' : ' checked') + (S.readOnly ? ' disabled' : '') + ' aria-label="Use ' + esc(r.b.name) + ' in the shading and contours" title="Use in the shading and contours">'
+        + '<button type="button" class="rk-main" data-pick="' + esc(r.b.id) + '" data-goto="log" title="Open the log of ' + esc(r.b.name) + '"><span class="rk-top"><span class="rk-nm">' + esc(r.b.name) + '</span><span class="rk-v' + (hi ? ' hi' : '') + '">' + (r.s ? r.s.cvc.toLocaleString('en-CA') + '<small> ppm</small>' : '<small>no readings</small>') + '</span></span>'
+        + '<span class="rk-bar" aria-hidden="true">' + (r.s ? '<i style="width:' + pct(r.s.cvc).toFixed(1) + '%;background:' + c + '"></i>' : '') + '<b style="left:' + tp.toFixed(1) + '%"></b></span>'
+        + '<span class="rk-sub">' + (r.s ? 'at ' + esc(fu(r.s.depth)) + ' · ' + esc(sampleId(r.s)) + ' · ' : '') + r.n + ' reading' + (r.n === 1 ? '' : 's') + '</span></button></li>'; }).join('') + '</ul>'
+      + '<div class="rk-scale" aria-hidden="true"><span>1</span><span>10</span><span>100</span><span>1,000</span><span>10,000 ppm</span></div><p class="note">The line on each bar is the ' + thr.toLocaleString('en-CA') + ' ppm screening level. Untick a borehole to leave it out of the shading and contours; it stays on the map.</p>'
+      : '<p class="note">No headspace readings yet. Enter them on each sample (Log &amp; data › Samples), or import them with Import Excel.</p>';
+    body = '<div class="lab-map' + (stack ? ' stack' : '') + '"><section class="sec"><header><h3>' + (S.mapParam && LAB_PARAMS[S.mapParam] ? esc(LAB_PARAMS[S.mapParam].label) : 'Headspace vapour') + '</h3><span class="note">' + (S.vFrom != null || S.vTo != null ? 'Chosen depths' : 'Highest in each borehole') + '</span></header>'
+      + '<div class="body"><div class="map-box">' + vapourMapSVG(mw, mh) + '</div>'
+      + '<div class="legend">' + legendRows('vap', mapList()).filter(r => !r.head).map(r => '<span><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true">' + r.sym(11, 7) + '</svg>' + esc(r.t) + '</span>').join('') + '</div>'
+      + '<p class="note lab-caveat">Shading and contours are interpolated between boreholes (log scale), inside the outer boreholes only: a guide for sampling, not a measured boundary. Change the result, depths and look in Settings.</p></div></section>'
+      + '<section class="sec"><header><h3>By borehole</h3><span class="note">Highest headspace reading</span></header><div class="body">' + rank + '</div></section></div>';
+  } else if (v === 'lab') {
+    body = !ps.length ? '<section class="sec"><div class="body lab-empty">' + svgI(NAV_ICON.contam) + '<h3>No laboratory results yet</h3><p class="note">Import the laboratory\'s data file (EDD, CSV or Excel from ALS, Bureau Veritas, Element and others): each result is matched to its borehole and sample, and you check the matches before anything is saved. Or type results in against each sample.</p><div class="actions"><button class="btn primary" data-act="imp-lab"' + (S.readOnly ? ' disabled' : '') + '>Import lab results…</button><button class="btn" data-act="go-lab">Add results by hand</button></div></div></section>'
+      : '<div class="lab-chips">' + pOver.map(q => '<span class="lab-chip' + (q.x ? ' bad' : g[q.p] != null ? ' good' : '') + '" title="' + esc(LAB_PARAMS[q.p].label) + ': ' + q.n + ' sample' + (q.n === 1 ? '' : 's') + (g[q.p] != null ? ', guideline ' + g[q.p] + ' ' + (LAB_PARAMS[q.p].unit || '') : ', no guideline entered') + '">' + esc(LAB_PARAMS[q.p].label) + ' <b>' + (g[q.p] != null ? q.x + '/' + q.n : q.n) + '</b>' + (g[q.p] != null ? ' over' : '') + '</span>').join('') + '</div>'
+        + '<section class="sec"><header><h3>Laboratory results</h3><span class="note">Soil, by sample · ' + lsm.length + ' sample' + (lsm.length === 1 ? '' : 's') + '</span><button class="btn" data-act="imp-lab"' + (S.readOnly ? ' disabled' : '') + '>Import…</button></header><div class="body">' + labTableHTML(list) + '</div></section>';
+  } else if (v === 'sec') body = '<section class="sec"><header><h3>Cross-section with vapour</h3><span class="note">Bars to the right of each borehole: headspace on a log scale, 1 to 10,000 ppm</span></header><div class="body"><div class="scroll-x" id="csection"></div><p class="note" id="csection-note"></p></div></section>';
+  else body = soilTestsHTML();
+  return kpis + tabs + '<div class="lab-view">' + body + '</div>';
 }
+document.addEventListener('click', e => { const t = e.target.closest?.('[data-labview]'); if (!t) return; S.labView = t.dataset.labview; lsSet('bhlog.labView', S.labView); renderView(true); });
 
 /* ---------- project overview: where is this investigation at? ---------- */
 function bhNeeds(b) {
@@ -14200,7 +14261,7 @@ function labTableHTML(list) {
   const ed = !S.readOnly;
   return `<div class="scroll-x"><table class="sum lab-res"><thead><tr><th>Borehole</th><th>Sample</th><th class="r">Depth (${LEN()})</th>${ps.map(p => `<th class="r">${esc(LAB_PARAMS[p].label)}<br><span class="note">${esc(LAB_PARAMS[p].unit || '—')}</span></th>`).join('')}</tr>
     <tr class="guide-row"><th colspan="3">Guideline${site.guideSrc ? ` <span class="note">(${esc(site.guideSrc)})</span>` : ''}</th>${ps.map(p => `<th class="r">${ed && !LAB_PARAMS[p].computed ? `<input type="number" step="any" data-guide="${p}" value="${esc(g[p] ?? '')}" placeholder="—" aria-label="Guideline for ${esc(LAB_PARAMS[p].label)}" style="width:84px;text-align:right">` : LAB_PARAMS[p].computed && ed ? `<input type="number" step="any" data-guide="${p}" value="${esc(g[p] ?? '')}" placeholder="—" style="width:84px;text-align:right">` : (g[p] ?? '—')}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(({ b, sm }) => `<tr><td><button class="pick" data-pick="${esc(b.id)}" data-goto="log">${esc(b.name)}</button></td><td>${esc(sampleId(sm))}</td><td class="r">${fx(sm.depth)}</td>${ps.map(p => { const r = labVal(sm, p), x = exceeds(r, p); return `<td class="r"${x ? ` style="color:var(--negative);font-weight:600" title="Exceeds the guideline of ${g[p]}"` : ''}>${fmtLab(r)}${x ? ' ▲' : ''}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
+    <tbody>${rows.map(({ b, sm }) => `<tr><td><button class="pick" data-pick="${esc(b.id)}" data-goto="log">${esc(b.name)}</button></td><td>${esc(sampleId(sm))}</td><td class="r">${fx(sm.depth)}</td>${ps.map(p => { const r = labVal(sm, p), x = exceeds(r, p); return `<td class="r"${x ? ` style="color:var(--negative);font-weight:600;background:rgba(192,57,43,.08)" title="Exceeds the guideline of ${g[p]}"` : ''}>${fmtLab(r)}${x ? ' ▲' : ''}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
     <div class="fields" style="margin-top:12px;grid-template-columns:minmax(0,1fr) auto"><div class="fld"><label for="guide-src">Guideline source</label><input id="guide-src" type="text" value="${esc(site.guideSrc || '')}" placeholder="e.g. Alberta Tier 1, fine-grained, residential/parkland, 2022" ${ed ? '' : 'readonly'}></div></div>
     ${guideSetHTML(ed)}
     <p class="note">Enter the guideline that applies to this project in the Guideline row, or apply one saved earlier. Bold red with ▲ marks a detected result above it; &lt; is below the detection limit. F1 − BTEX is calculated from F1 minus the four BTEX results.</p>`;
