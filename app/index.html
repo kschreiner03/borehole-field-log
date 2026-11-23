@@ -447,7 +447,9 @@ body.proj-home .shell { --sidebar-width: 0px; grid-template-columns: 0 0 minmax(
 .pj-pop button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; padding: 6px 10px; border: 0; border-radius: 4px; background: none; font: 13px var(--f-body); color: var(--ink); text-align: left; cursor: pointer; }
 .pj-pop button:hover, .pj-pop button:focus-visible { background: var(--hover); outline: none; } .pj-pop button[aria-current="true"] { background: var(--active); }
 .pj-pop button small { color: var(--muted); font-size: 11.5px; } .pj-pop hr { border: 0; border-top: 1px solid var(--rule); margin: 4px 0; } .pj-pop-h { margin: 4px 10px; font-size: 11.5px; color: var(--muted); }
-.pj-home { max-width: 1240px; margin: 0 auto; padding: 22px 8px 40px; display: grid; gap: 14px; }
+.pj-home { width: 100%; box-sizing: border-box; padding: 24px 32px 40px; display: grid; gap: 16px; align-content: start; }
+.pj-home .pj-grid, .pj-home .pj-ex { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.pj-home .pj-thumb { height: 130px; } .pj-home .pj-more { top: 136px; }
 .pj-head { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; } .pj-head h2 { margin: 0; font-size: 24px; } .pj-head .note { margin: 2px 0 0; } .pj-head .sp { flex: 1; }
 .pj-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .pj-tools input[type="search"] { flex: 1 1 320px; max-width: 480px; min-height: 36px; } .pj-tools select { width: auto; min-height: 36px; }
 .pj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
