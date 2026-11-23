@@ -469,6 +469,7 @@ body.proj-home .shell { --sidebar-width: 0px; grid-template-columns: 0 0 minmax(
 .pj-exc svg { width: 20px; height: 20px; color: var(--accent); flex: none; } .pj-exc span { display: grid; } .pj-exc small { color: var(--muted); font-size: 12px; }
 .pj-none { padding: 30px 0; text-align: center; } .pj-last { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
 .pj-empty .step .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.dialog.wide { width: min(980px, 94vw); max-width: none; }
 /* Overview page */
 .kpi-go { cursor: pointer; } .kpi-go:hover { border-color: var(--accent); border-left-color: inherit; background: var(--hover); }
 .ov-prog { display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: var(--rule); overflow: hidden; } .ov-prog i { display: block; height: 100%; background: var(--ok, #2e8b57); }
@@ -14590,7 +14591,7 @@ const labParam = name => { const t = String(name || '').toLowerCase().replace(/[
 const LAB_HEAD = { id: ['clientsampleid', 'clientsamplename', 'clientid', 'fieldsampleid', 'fieldid', 'sampleid', 'samplename', 'sample', 'sampledescription', 'clientsampleidentification', 'location'],
   an: ['analyte', 'parameter', 'analytename', 'parametername', 'compound', 'chemical', 'determinand', 'test', 'analysis'], res: ['result', 'resultvalue', 'reportedresult', 'finalresult', 'value', 'concentration', 'conc'],
   unit: ['unit', 'units', 'resultunits', 'reportingunits', 'resultunit'], dl: ['rdl', 'dl', 'mdl', 'detectionlimit', 'reportinglimit', 'lor', 'rl', 'loq', 'methoddetectionlimit'], q: ['qualifier', 'resultqualifier', 'flag', 'qual', 'lessthan', 'symbol', 'operator'],
-  depth: ['depth', 'sampledepth', 'topdepth', 'depthfrom', 'upperdepth', 'depthtop', 'fromdepth'], date: ['sampledate', 'datesampled', 'collectiondate', 'sampleddate', 'date'], rep: ['workorder', 'reportno', 'reportnumber', 'jobno', 'jobnumber', 'labjob', 'batch', 'certificate'] };
+  depth: ['depth', 'sampledepth', 'topdepth', 'depthfrom', 'upperdepth', 'depthtop', 'fromdepth'], date: ['sampledate', 'datesampled', 'collectiondate', 'sampleddate', 'date'], labno: ['labno', 'labnumber', 'labsampleid', 'labid', 'labsampleno'], rep: ['workorder', 'reportno', 'reportnumber', 'jobno', 'jobnumber', 'labjob', 'batch', 'certificate'] };
 const findCol = (h, keys) => { for (const k of keys) { const i = h.indexOf(k); if (i >= 0) return i; } return -1; };
 /* saturated-paste extracts are reported per litre but are soil results */
 const PASTE = ['ec', 'sar', 'cl', 'ph'];
@@ -14628,7 +14629,7 @@ function parseLabTable(rows) {
       for (const r of rows.slice(hi + 1)) {
         const p = labParam(r[c.an]); if (p === undefined) { if (String(r[c.an] ?? '').trim()) unknown.add(String(r[c.an]).trim()); continue; } if (!p) continue;
         const x = labCell(r[c.res], c.dl >= 0 ? r[c.dl] : null, c.q >= 0 ? r[c.q] : null); if (!x) continue;
-        const sm = add(r[c.id], { depth: c.depth >= 0 ? numv(r[c.depth]) : null, date: c.date >= 0 ? isoDate(r[c.date]) : '', rep: c.rep >= 0 ? String(r[c.rep] ?? '') : '' }); if (!sm) continue;
+        const sm = add(r[c.id], { depth: c.depth >= 0 ? numv(r[c.depth]) : null, date: c.date >= 0 ? isoDate(r[c.date]) : '', rep: c.rep >= 0 ? String(r[c.rep] ?? '') : '', labno: c.labno >= 0 ? String(r[c.labno] ?? '').trim() : '' }); if (!sm) continue;
         const un = c.unit >= 0 ? String(r[c.unit] ?? '').trim() : '', f = labUnitConv(p, un); if (f == null) { unknown.add(`${r[c.an]} in ${un}`); continue; } x.v = +(x.v * f).toPrecision(6); sm.res[p] = x; if (/\/\s*l$/i.test(un) && !PASTE.includes(p)) { sm.water = true; sm.unit0 = un; }
       }
       return { samples: [...out.values()], unknown: [...unknown], form: 'one row per result' };
@@ -14674,7 +14675,7 @@ function matchLabId(x) {
 /* a laboratory's PDF report (SRC and similar layouts): each page names its samples ("26785 07/21/2026 BH26-1 @1.20 *SOIL*"),
    then a table of analytes with their units and one column of results per sample. The text is read from the PDF (a scanned
    report has none) and turned into one row per result, which the table importer then reads like any lab file */
-async function pdfLabRows(file) {
+async function pdfLines(file) {
   if (!window.pdfjsLib) throw new Error('pdfjs');
   const pdf = await openPdf(new Uint8Array(await file.arrayBuffer())).promise, lines = [];
   for (let i = 1; i <= pdf.numPages; i++) {
@@ -14683,10 +14684,10 @@ async function pdfLabRows(file) {
     rows.sort((a, c) => c.y - a.y).forEach(r => lines.push(r.it.sort((a, c) => a.x - c.x).map(q => q.t).join(' ').replace(/\s+/g, ' ').trim()));
     lines.push('\f');
   }
-  return labRowsFromText(lines);
+  return lines;
 }
 function labRowsFromText(lines) {
-  const all = lines.join('\n'), out = [['Sample ID', 'Analyte', 'Result', 'Units', 'Sample date', 'Report No', 'Depth']];
+  const all = lines.join('\n'), out = [['Sample ID', 'Analyte', 'Result', 'Units', 'Sample date', 'Report No', 'Depth', 'Lab No']];
   const rep = (/SRC Group\s*#\s*([\w-]+)/i.exec(all) || /(?:work order|report (?:no\.?|number)|job (?:no\.?|number))\s*[:#]?\s*([\w-]+)/i.exec(all) || [])[1] || '';
   const lab = /saskatchewan research council|src\.sk\.ca/i.test(all) ? 'SRC (Saskatchewan Research Council)' : /\bALS\b/.test(all) ? 'ALS' : /bureau veritas/i.test(all) ? 'Bureau Veritas' : /element materials|element labs/i.test(all) ? 'Element' : '';
   const UNIT = /\s(ug\/g|µg\/g|mg\/kg|ug\/kg|µg\/kg|ug\/L|µg\/L|mg\/L|ng\/L|dS\/m|uS\/cm|µS\/cm|mS\/cm|vol ?%|wt ?%|%|pH units)(?=\s|$)/i;
@@ -14701,19 +14702,73 @@ function labRowsFromText(lines) {
     const name = L.slice(0, u.index).trim().replace(/\*+$/, '').trim(); if (!name || /^lab section/i.test(name)) continue;
     const vals = L.slice(u.index + u[0].length).match(/[<>]\s*\d+(?:\.\d+)?|-?\d+(?:\.\d+)?|see attached|not analy[sz]ed|n\/a|\bnd\b/gi) || [];
     if (vals.length !== cols.length) continue;
-    vals.forEach((v, j) => { const sm = smp.get(cols[j]), d = /@\s*(\d+(?:\.\d+)?)/.exec(sm.id); out.push([sm.id, name, v.replace(/\s+/g, ''), u[1], sm.date, rep, d ? d[1] : '']); n++; });
+    vals.forEach((v, j) => { const sm = smp.get(cols[j]), d = /@\s*(\d+(?:\.\d+)?)/.exec(sm.id); out.push([sm.id, name, v.replace(/\s+/g, ''), u[1], sm.date, rep, d ? d[1] : '', cols[j]]); n++; });
   }
   return { rows: out, lab, rep, n };
 }
-function importLab() {
-  const f = document.createElement('input'); f.type = 'file'; f.accept = '.csv,.txt,.xlsx,.xls,.pdf';
-  f.onchange = async () => { const file = f.files[0]; if (file) importLabFile(file); }; f.click();
+/* a laser-diffraction particle-size report (SRC's Beckman Coulter LS 13 320 attachment): per sample, "Sample ID: 26864A", the
+   volume % in size classes (0.04, 4, 63, 200, 2000, 99999 µm) and the sizes 10, 25, 50, 75 and 90 % finer. Together they make
+   the sample's grain-size curve (mm, % finer), from which the app reads the CSSC texture and the CFEM fractions. By volume,
+   not by mass as a sieve and hydrometer give: close for mineral soil, and said so on the sample */
+const PSA_RE = /LS Particle Size Analyzer|Beckman Coulter|LS 13 320/i;
+function psaPrepare(file, lines) {
+  const items = new Map(), all = lines.join('\n'), rep = (/File ID:\s*(\d{4}-\d+)/i.exec(all) || /(\d{4}-\d{3,6})\s/.exec(all) || [])[1] || ''; let cur = null, tab = false;
+  for (const ln of lines) {
+    if (ln === '\f') { tab = false; continue; }
+    const m = /^Sample ID:?\s*(\S+)/i.exec(ln); if (m) { cur = items.get(m[1]) || { id: m[1], labNo: (/^\d+/.exec(m[1]) || [''])[0], bins: [], pct: [], head: null }; items.set(m[1], cur); continue; }
+    if (!cur) continue;
+    if (/<\s*10\s*%.*<\s*90\s*%/.test(ln)) { cur.head = (ln.match(/<\s*(\d+)\s*%/g) || []).map(x => +x.replace(/\D/g, '')); continue; }
+    if (cur.head && !cur.pct.length) { const v = ln.match(/\d+(?:\.\d+)?(?=\s*[µμu]m)/g); if (v && v.length === cur.head.length) { cur.pct = v.map((x, i) => [+x / 1000, cur.head[i]]); continue; } }
+    if (/^Particle\b/i.test(ln)) { tab = true; continue; }
+    if (tab) { const t = /^(\d+(?:\.\d+)?)(?:\s+(\d+(?:\.\d+)?))?$/.exec(ln); if (t) cur.bins.push([+t[1] / 1000, t[2] != null ? +t[2] : null]); }
+  }
+  const out = [...items.values()].map(it => {
+    const pts = []; let cum = 0;
+    it.bins.forEach(([sz, v], i) => { if (i === 0) pts.push([sz, 0]); if (v != null && it.bins[i + 1]) { cum += v; pts.push([it.bins[i + 1][0], Math.min(100, +cum.toFixed(2))]); } });
+    for (const p of it.pct) pts.push(p);
+    const g = []; for (const [size, passing] of pts.filter(p => p[0] > 0).sort((a, c) => c[0] - a[0])) { if (g.length && (size === g.at(-1).size || passing > g.at(-1).passing)) continue; g.push({ size: +size.toPrecision(4), passing }); }
+    return { ...it, gsd: g };
+  }).filter(it => it.gsd.length >= 3);
+  if (!out.length) { toast('No particle-size results could be read from ' + file.name + '.'); return null; }
+  return { kind: 'psa', file, items: out, rep };
 }
-async function importLabFile(file) {
+function psaDialog({ file, items, rep }) {
+  const list = projList(), all = list.flatMap(b => b.samples.map(sm => ({ b, sm }))), f1 = v => v == null ? '—' : v.toFixed(1);
+  S._psaImp = items.map(it => ({ ...it, hit: all.find(x => it.labNo && x.sm.labMeta?.labNo === it.labNo) || null, rep }));
+  const unk = S._psaImp.filter(x => !x.hit).length;
+  dialog('Import particle size from ' + esc(file.name), '<p class="note" style="margin:0">' + items.length + ' sample' + (items.length === 1 ? '' : 's') + ' by laser diffraction. Each becomes the sample\'s grain-size curve, from which its texture (CSSC) and fractions are worked out. Matched by the lab\'s sample number' + (unk ? '; ' + unk + ' could not be matched: import the lab\'s results report first (or with this file), or choose the sample' : '') + '.</p>'
+    + '<div class="scroll-x" style="max-height:340px;overflow:auto"><table class="sum"><thead><tr><th>Lab sample</th><th style="min-width:240px">Goes to</th><th class="r">Gravel</th><th class="r">Sand</th><th class="r">Silt</th><th class="r">Clay</th></tr></thead><tbody>'
+    + S._psaImp.map((x, i) => { const p2 = passingAt(x.gsd, 2), p05 = passingAt(x.gsd, .05), p002 = passingAt(x.gsd, .002);
+      return '<tr><td>' + esc(x.id) + '</td><td><select data-psamap="' + i + '" style="width:100%"><option value="">Skip this sample</option>' + list.map(b => '<optgroup label="' + esc(b.name) + '">' + b.samples.map(sm => '<option value="' + esc(b.id) + '|' + esc(sm.id) + '"' + (x.hit?.sm === sm ? ' selected' : '') + (editable(b) ? '' : ' disabled') + '>' + esc(b.name) + ' ' + esc(sampleId(sm)) + ' · ' + fx(sm.depth) + ' ' + LEN() + (sm.gsd?.length ? ' (has a curve)' : '') + '</option>').join('') + '</optgroup>').join('') + '</select></td>'
+        + '<td class="r">' + f1(p2 == null ? null : 100 - p2) + '</td><td class="r">' + f1(p2 != null && p05 != null ? p2 - p05 : null) + '</td><td class="r">' + f1(p05 != null && p002 != null ? p05 - p002 : null) + '</td><td class="r">' + f1(p002) + '</td></tr>'; }).join('')
+    + '</tbody></table></div><p class="note" style="margin:0">Percent by volume (laser diffraction), CSSC limits: sand 0.05–2 mm, silt 0.002–0.05 mm, clay under 0.002 mm, gravel over 2 mm. A curve already on a sample is replaced.</p>',
+    '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="psa-go">Import curves</button>'); $('#overlay .dialog')?.classList.add('wide');
+}
+function psaGo() {
+  const touched = new Set(); let n = 0;
+  (S._psaImp || []).forEach((x, i) => { const v = $('[data-psamap="' + i + '"]')?.value || ''; if (!v) return; const [bid, sid] = v.split('|'), b = S.bh.get(bid), sm = b?.samples.find(q => q.id === sid); if (!sm || !editable(b)) return;
+    sm.gsd = x.gsd.map(p => ({ ...p })); sm.gsdMeta = { method: 'Laser diffraction, % by volume', lab: S._labMeta?.lab || 'SRC (Saskatchewan Research Council)', report: x.rep, labId: x.id }; n++; touched.add(b); });
+  for (const b of touched) { logChange(b, 'Particle size imported'); store.save(b); }
+  closeOverlay(); S.formStale = true; render(); toast('Imported ' + n + ' grain-size curve' + (n === 1 ? '' : 's') + '.'); if (S._labQueue?.length) setTimeout(labNext, 400);
+}
+function importLab() {
+  const f = document.createElement('input'); f.type = 'file'; f.accept = '.csv,.txt,.xlsx,.xls,.pdf'; f.multiple = true;
+  f.onchange = async () => { if (f.files.length) importLabFiles([...f.files]); }; f.click();
+}
+const importLabFile = file => importLabFiles([file]);
+async function importLabFiles(files) {
+  const steps = []; for (const file of files) { const st = await labPrepare(file); if (st) steps.push(st); }
+  steps.sort((a, c) => (a.kind === 'psa') - (c.kind === 'psa')); S._labQueue = steps; labNext();
+}
+function labNext() { const st = S._labQueue?.shift(); if (st) (st.kind === 'psa' ? psaDialog : labDialog)(st); }
+async function labPrepare(file) {
   let res, meta = {}; const pdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
-  try { if (pdf) { meta = await pdfLabRows(file); res = parseLabTable(meta.rows); res.form = 'read from the PDF report'; } else res = parseLabTable(await readTable(file)); }
+  try { if (pdf) { const lines = await pdfLines(file); if (PSA_RE.test(lines.join('\n'))) return psaPrepare(file, lines); meta = labRowsFromText(lines); res = parseLabTable(meta.rows); res.form = 'read from the PDF report'; } else res = parseLabTable(await readTable(file)); }
   catch (e) { if (e?.message === 'pdfjs') { toast('The PDF reader did not load (it needs an internet connection the first time). Try again, or import the lab\'s Excel or CSV file.'); return; } res = { samples: [] }; }
   if (!res.samples.length) { toast(pdf ? `No lab results could be read from ${file.name}. Its text needs sample lines (e.g. "26785 07/21/2026 BH26-1 @1.20 *SOIL*") and a table of analytes with units; a scanned report has no text to read. Import the lab's Excel or CSV file instead.` : `No lab results found in ${file.name}. The file needs a sample ID column and results for BTEX, PHC F1–F4, salinity or metals.`); return; }
+  return { kind: 'table', file, res, meta };
+}
+function labDialog({ file, res, meta }) {
   S._labMeta = meta;
   S._labImp = res.samples.map(x => { const m = matchLabId(x); return { ...x, dup: /\bdup(licate)?\b|\bfd\b/i.test(x.id), m: /\bdup(licate)?\b|\bfd\b/i.test(x.id) ? { b: m.b, sm: null, depth: null } : m }; });
   const list = projList(), opts = (x, i) => {
@@ -14726,21 +14781,21 @@ async function importLabFile(file) {
     <div class="scroll-x" style="max-height:340px;overflow:auto"><table class="sum"><thead><tr><th>Lab sample ID</th><th style="min-width:260px">Goes to</th><th class="r">Results</th></tr></thead><tbody>${S._labImp.map((x, i) => `<tr><td>${esc(x.id)}${x.dup ? ' <small class="note">field duplicate: skipped unless you choose a sample</small>' : ''}${x.water ? ' <small class="note">water</small>' : ''}</td><td>${opts(x, i)}</td><td class="r">${Object.keys(x.res).length}</td></tr>`).join('')}</tbody></table></div>
     <div class="fields" style="grid-template-columns:1fr 1fr"><div class="fld"><label for="li-lab">Laboratory</label><input id="li-lab" value="${esc(S._labMeta?.lab || (/als|bureau|veritas|element|maxxam|exova|agat|caro|saskatchewan research|src/i.exec(file.name) || [''])[0])}"></div><div class="fld"><label for="li-rep">Report or work order</label><input id="li-rep" value="${esc(S._labImp.find(x => x.rep)?.rep || '')}"></div></div>
     ${res.unknown?.length ? `<p class="note">Not imported (not in this app’s parameter list): ${esc(res.unknown.slice(0, 12).join(', '))}${res.unknown.length > 12 ? ` and ${res.unknown.length - 12} more` : ''}.</p>` : ''}`,
-    `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="lab-imp-go">Import results</button>`);
+    `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="lab-imp-go">Import results</button>`); $('#overlay .dialog')?.classList.add('wide');
 }
 function importLabGo() {
   const lab = $('#li-lab')?.value.trim() || '', rep = $('#li-rep')?.value.trim() || '', touched = new Set(); let n = 0, ns = 0;
   (S._labImp || []).forEach((x, i) => {
     const v = $(`[data-labmap="${i}"]`)?.value || ''; if (!v) return;
     const [bid, sid] = v.split('|'), b = S.bh.get(bid); if (!b || !editable(b)) return;
-    if (sid === 'gw') { (b.gwSamples ||= []).push({ id: uid('gs'), date: x.date || '', sid: x.id, lab, report: rep || x.rep || '', res: x.res, unit0: x.unit0 || 'mg/L' }); n += Object.keys(x.res).length; ns++; touched.add(b); return; }
+    if (sid === 'gw') { (b.gwSamples ||= []).push({ id: uid('gs'), date: x.date || '', sid: x.id, labNo: x.labno || '', lab, report: rep || x.rep || '', res: x.res, unit0: x.unit0 || 'mg/L' }); n += Object.keys(x.res).length; ns++; touched.add(b); return; }
     let sm = sid === 'new' ? null : b.samples.find(s => s.id === sid);
     if (!sm) { const prev = [...b.samples].sort((a, c) => (a.no || 0) - (c.no || 0)).pop(); sm = { ...SHEETS.samples.blank(b, prev), type: 'G', depth: x.m.depth }; b.samples.push(sm); }
-    sm.lab = { ...(sm.lab || {}), ...x.res }; sm.labMeta = { lab: lab || sm.labMeta?.lab || '', report: rep || x.rep || sm.labMeta?.report || '', date: x.date || sm.labMeta?.date || '' };
+    sm.lab = { ...(sm.lab || {}), ...x.res }; sm.labMeta = { lab: lab || sm.labMeta?.lab || '', report: rep || x.rep || sm.labMeta?.report || '', date: x.date || sm.labMeta?.date || '', labNo: x.labno || sm.labMeta?.labNo || '' };
     n += Object.keys(x.res).length; ns++; touched.add(b);
   });
   for (const b of touched) { logChange(b, 'Laboratory results imported'); store.save(b); }
-  closeOverlay(); S.formStale = true; render();
+  closeOverlay(); S.formStale = true; render(); if (S._labQueue?.length) setTimeout(labNext, 400);
   const over = projList().flatMap(b => b.samples.flatMap(sm => LAB_ORDER.filter(p => exceeds(labVal(sm, p), p)))).length;
   toast(`Imported ${n} result${n === 1 ? '' : 's'} for ${ns} sample${ns === 1 ? '' : 's'}.${Object.keys(projGuide()).length ? ` ${over} exceed${over === 1 ? 's' : ''} the guideline.` : ' Choose a guideline on Lab & contamination to flag exceedances.'}`);
 }
@@ -15705,6 +15760,7 @@ document.addEventListener('click', e => {
     case 'save-proj': saveProject(); break;
     case 'same-above': { const l = b?.layers[S.layer], up = b?.layers[S.layer - 1]; if (!l || !up || !editable(b)) break; for (const k of LAYER_COPY) l[k] = up[k] ?? ''; logChange(b, 'Soil layers'); store.save(b); refreshLayerEditor(b); break; }
     case 'imp-lab': if (!S.readOnly) importLab(); break;
+    case 'psa-go': psaGo(); break;
     case 'lab-imp-go': importLabGo(); break;
     case 'guide-save': { const st = siteOf() || {}; dialog('Save guideline', `<div class="fld"><label for="gs-name">Name</label><input id="gs-name" value="${esc(st.guideSrc || '')}" placeholder="e.g. Alberta Tier 1, fine, residential/parkland"></div><p class="note">Saves the ${Object.keys(projGuide()).length} values in the Guideline row with your company settings, to apply to other projects.</p>`, `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="guide-save-go">Save</button>`); $('#gs-name')?.focus(); break; }
     case 'guide-save-go': { const name = $('#gs-name').value.trim(); if (!name) { $('#gs-name').classList.add('bad'); return; } S.co.guideSets = [...(S.co.guideSets || []).filter(g => g.name !== name), { name, values: { ...projGuide() } }]; store.saveCompany(); closeOverlay(); renderView(true); toast(`Saved “${name}”. Apply it to any project from Lab & contamination.`); break; }
