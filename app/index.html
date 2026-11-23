@@ -435,8 +435,17 @@ table.kv th { text-align: left; width: 38%; font-weight: 600; white-space: norma
 @media (max-width: 1150px) { .flow-grid { grid-template-columns: minmax(0, 1fr); } }
 .finding { margin: 0 0 14px; font-size: 15px; color: var(--ink); }
 .home-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: var(--gap); align-items: start; }
+/* Water page */
+.kpi-needle { width: 20px; height: 20px; flex: none; }
+.gw-side { display: grid; gap: var(--gap, 16px); align-content: start; min-width: 0; }
+.gw-flow { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; } .gw-dial { flex: none; }
+.gw-dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 0; font-size: 13px; } .gw-dl dt { color: var(--muted); } .gw-dl dd { margin: 0; font-weight: 600; } .gw-dl small { font-weight: 400; color: var(--muted); }
+.gw-wl .rk-top { align-items: center; } .gw-wl .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.gw-spark { flex: none; margin-left: auto; } .gw-wl .rk-v { margin-left: 8px; min-width: 52px; text-align: right; }
+.gw-read td.gw-b { font-weight: 600; } .gw-read td.gw-tc { white-space: nowrap; } .gw-read td.gw-tc .gw-spark { vertical-align: middle; margin-right: 6px; } .gw-read th, .gw-read td { padding-left: 8px; padding-right: 8px; } .gw-read small.note { font-size: 11px; }
+.gw-addslug { display: inline-flex; gap: 6px; align-items: center; } .gw-addslug select { min-height: 30px; }
 /* Lab page */
-.lab-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 0 0 14px; }
+.lab-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0 0 14px; }
 .kpi { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--rule); border-radius: var(--r-sm, 4px); min-width: 0; }
 .kpi.bad { border-left-color: var(--negative, #c0392b); } .kpi.good { border-left-color: var(--ok, #2e8b57); }
 .kpi-l { font-size: 12px; color: var(--muted); }
@@ -3434,7 +3443,7 @@ function renderView(full) {
   if (S.tab === 'edit') {
     if (full || !v.querySelector('.edit')) { v.innerHTML = wsHTML(b); loadPhotos(b); wsDecorate(b); }
     checkLayers(b); refreshCalc(b); wsLog();
-  } else if (S.tab === 'gw') { v.innerHTML = gwHTML(); drawGW(); }
+  } else if (S.tab === 'gw') { v.innerHTML = gwHTML(v.clientWidth || 1000); if ($('#hydro')) drawHydro(undefined, undefined, { H: 420 }); }
   else if (S.tab === 'report') { v.innerHTML = reportHTML(b); }
   else if (S.tab === 'site') { v.innerHTML = siteHTML(); drawSite(); }
   else if (S.tab === 'xsec') { v.innerHTML = xsecHTML(); drawXsec(); }
@@ -6805,32 +6814,91 @@ function commonDatum(list) { const d = [...new Set(list.map(b => b.datum).filter
 const COLORS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'];
 const colorOf = id => COLORS[Math.max(0, projList().findIndex(b => b.id === id)) % COLORS.length];
 function changeHTML(rise) { if (rise == null) return '<span class="muted">—</span>'; if (Math.abs(rise) < .005) return 'No change'; return `<span class="${rise > 0 ? 'rise' : 'fall'}">${rise > 0 ? 'Up' : 'Down'} ${fx(Math.abs(rise))}</span>`; }
-function gwHTML() {
-  let html = '';
-  const all = projList(), L = LEN(), dates = roundDates();
-  if (S.round && !dates.includes(S.round)) S.round = '';
-  const withW = all.filter(b => (b.water || []).some(w => w.depth != null));
-  html = `<section class="sec"><header><h3>Summary</h3></header><div class="body">
-      <div class="scroll-x"><table class="sum">
-        <thead><tr><th>Borehole</th><th class="r">Ground el. (${L})</th><th class="r">Seepage while drilling (${L})</th><th class="r">Upon completion (${L})</th><th class="r">Latest standpipe (${L})</th><th>Date</th><th class="r">Water el. (${L})</th><th class="r">Seasonal high (${L})</th><th>Date</th><th class="r">High el. (${L})</th><th>Change</th></tr></thead>
-        <tbody>${all.map(b => {
-          const s = b.water.find(w => w.kind === 'strike' && w.depth != null), c = b.water.find(w => w.kind === 'completion' && w.depth != null);
-          const m = monitoring(b).sort(byDate), lw = m[m.length - 1];
-          return `<tr><td><button class="pick" data-pick="${esc(b.id)}" data-goto="edit"><span class="dot" style="background:var(--${colorOf(b.id)})"></span>${esc(b.name)}</button></td>
-            <td class="r">${fx(b.elevation)}</td><td class="r">${fx(s?.depth)}</td><td class="r">${b.gwNone && !c ? 'Dry' : fx(c?.depth)}</td>
-            <td class="r">${fx(lw?.depth)}</td><td>${esc(lw?.date || '—')}</td><td class="r">${lw && b.elevation != null ? fx(b.elevation - lw.depth) : '—'}</td>${(() => { const hi = m.slice().sort((a, c) => a.depth - c.depth)[0]; return `<td class="r">${fx(hi?.depth)}</td><td>${esc(hi?.date || '—')}</td><td class="r">${hi && b.elevation != null ? fx(b.elevation - hi.depth) : '—'}</td>`; })()}<td>${changeHTML(trendOf(b))}</td></tr>`;
-        }).join('')}</tbody>
-      </table></div><p class="note" style="margin-top:6px">Depths below ground surface. Seasonal high = shallowest standpipe reading on record; more readings across seasons make it more reliable. Change compares the last two standpipe readings.</p></div></section>`;
-  html += wtMapHTML() + flowHTML();
-  html += slugHTML(cur());
-  return html + `
-    <section class="sec"><header><h3>Water levels over time</h3><span class="seg" role="group" aria-label="Plot as"><button data-gw="elev" aria-pressed="${S.gw === 'elev'}">Elevation</button><button data-gw="depth" aria-pressed="${S.gw === 'depth'}">Depth</button></span></header><div class="body">
-      <div class="toggles">${withW.map(b => `<label><input type="checkbox" data-series="${esc(b.id)}" ${S.hidden.has(b.id) ? '' : 'checked'}><span class="dot" style="background:var(--${colorOf(b.id)})"></span>${esc(b.name)}</label>`).join('')}</div>
-      <div class="scroll-x" id="hydro"></div>
-      <div class="legend"><span><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4" style="fill:var(--panel);stroke:var(--muted)" stroke-width="1.6"/></svg>Seepage while drilling</span><span><svg width="12" height="12" aria-hidden="true"><rect x="2" y="2" width="8" height="8" style="fill:var(--panel);stroke:var(--muted)" stroke-width="1.6"/></svg>Upon completion</span><span><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4" style="fill:var(--muted)"/></svg>Standpipe readings (joined)</span></div>
-    </div></section>
-`;
+/* the Water page: a summary across the top, then one view at a time. Its settings (which water levels, the round, porosity,
+   what the site plan shows) are in the panel on the right, shared by the flow direction, the water-table map and the map contours */
+S.gwView = lsGet('bhlog.gwView') || 'over';
+const GW_VIEWS = [['over', 'Overview'], ['flow', 'Flow direction'], ['hydro', 'Levels over time'], ['read', 'Readings'], ['slug', 'Slug tests']];
+/* a well's standpipe readings as a small line: up is shallower water */
+function gwSpark(b, w = 70, h = 20) {
+  const m = monitoring(b).filter(x => x.date && isFinite(Date.parse(x.date))).sort(byDate); if (m.length < 2) return '';
+  const ts = m.map(x => Date.parse(x.date)), ds = m.map(x => x.depth), t0 = Math.min(...ts), t1 = Math.max(...ts) || t0 + 1, d0 = Math.min(...ds), d1 = Math.max(...ds), X = t => 2 + (t - t0) / ((t1 - t0) || 1) * (w - 4), Y = d => 2 + (d - d0) / ((d1 - d0) || 1) * (h - 4);
+  const p = m.map((x, i) => (i ? 'L' : 'M') + X(ts[i]).toFixed(1) + ' ' + Y(x.depth).toFixed(1)).join('');
+  return '<svg class="gw-spark" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" aria-hidden="true"><path d="' + p + '" fill="none" style="stroke:var(--' + colorOf(b.id) + ')" stroke-width="1.6" stroke-linejoin="round"/><circle cx="' + X(ts.at(-1)).toFixed(1) + '" cy="' + Y(ds.at(-1)).toFixed(1) + '" r="2.4" style="fill:var(--' + colorOf(b.id) + ')"/></svg>';
 }
+/* the flow direction as a compass dial: the arrow, its 90 % range, north up */
+function gwDial(F, r = 54) {
+  const c = r + 14, S2 = c * 2, pt = (az, rr) => [c + rr * Math.sin(az * Math.PI / 180), c - rr * Math.cos(az * Math.PI / 180)].map(v => v.toFixed(1)).join(' ');
+  let o = '<svg class="gw-dial" width="' + S2 + '" height="' + S2 + '" viewBox="0 0 ' + S2 + ' ' + S2 + '" role="img" aria-label="Flow direction ' + Math.round(F.az) + ' degrees"><circle cx="' + c + '" cy="' + c + '" r="' + r + '" style="fill:var(--panel-2,#f6f8fa);stroke:var(--line)"/>';
+  for (let k = 0; k < 16; k++) o += '<path d="M' + pt(k * 22.5, r) + 'L' + pt(k * 22.5, r - (k % 4 ? 4 : 8)) + '" style="stroke:var(--muted)" stroke-width="' + (k % 4 ? .8 : 1.4) + '"/>';
+  [['N', 0], ['E', 90], ['S', 180], ['W', 270]].forEach(([t, az]) => { o += '<text x="' + pt(az, r + 8).split(' ')[0] + '" y="' + (+pt(az, r + 8).split(' ')[1] + 4) + '" text-anchor="middle" style="font:600 10px var(--f-body);fill:var(--muted)">' + t + '</text>'; });
+  if (F.range && !F.flat) { const lo = F.range.lo, hi = F.range.hi, big = ((hi - lo + 360) % 360) > 180 ? 1 : 0; o += '<path d="M' + c + ' ' + c + 'L' + pt(lo, r - 2) + 'A' + (r - 2) + ' ' + (r - 2) + ' 0 ' + big + ' 1 ' + pt(hi, r - 2) + 'Z" style="fill:var(--water)" fill-opacity=".16"/>'; }
+  if (!F.flat) o += '<path d="M' + pt(F.az + 180, r * .55) + 'L' + pt(F.az, r - 12) + '" style="stroke:var(--water)" stroke-width="3.5" stroke-linecap="round"/><path d="M' + pt(F.az, r - 2) + 'L' + pt(F.az + 160, r - 22) + 'L' + pt(F.az - 160, r - 22) + 'Z" style="fill:var(--water)"/>';
+  return o + '<circle cx="' + c + '" cy="' + c + '" r="3" style="fill:var(--ink)"/></svg>';
+}
+function gwHTML(vw = 1000) {
+  const all = projList(), L = LEN(), dates = roundDates(), F = gwFlow();
+  if (S.round && !dates.includes(S.round)) S.round = '';
+  const wells = all.filter(b => b.well?.installed), last = dates[0], readLast = all.filter(b => monitoring(b).some(w => w.date === last)).length;
+  const latest = all.map(b => ({ b, w: monitoring(b).filter(x => x.date).sort(byDate).at(-1) })).filter(x => x.w), tr = all.map(b => ({ b, t: trendOf(b) })).filter(x => x.t != null);
+  const avgT = tr.length ? tr.reduce((q, x) => q + x.t, 0) / tr.length : null, tests = all.flatMap(b => (b.slug || []).map((t, i) => ({ b, t, i, r: hvorslev(t) })));
+  const Ks = tests.filter(x => x.r?.K > 0).map(x => x.r.K), Kg = Ks.length ? 10 ** (Ks.reduce((q, k) => q + Math.log10(k), 0) / Ks.length) : null;
+  const kpi = (lab, val, sub, tone = '', pre = '') => '<div class="kpi' + (tone ? ' ' + tone : '') + '"><span class="kpi-l">' + lab + '</span><span class="kpi-v">' + pre + val + '</span><span class="kpi-s">' + sub + '</span></div>';
+  const needle = az => '<svg class="kpi-needle" viewBox="0 0 20 20" aria-hidden="true" style="transform:rotate(' + Math.round(az) + 'deg)"><path d="M10 2l4 9h-3v7H9v-7H6z" style="fill:var(--water)"/></svg>';
+  const kpis = '<div class="lab-kpis">'
+    + kpi('Flow direction', F.error ? '—' : F.flat ? 'Flat' : Math.round(F.az) + '°<small> ' + F.dir + '</small>', F.error ? esc(F.error.length > 60 ? 'Needs water levels in 3 or more wells' : F.error) : 'i = ' + F.i.toFixed(4) + (F.range && !F.flat ? ' · ±' + Math.round(F.range.half) + '°' : '') + ' · ' + F.n + ' wells', '', F.error || F.flat ? '' : needle(F.az))
+    + kpi('Latest round', last ? esc(last) : '—', last ? readLast + ' of ' + (wells.length || all.length) + ' ' + (wells.length ? 'wells' : 'boreholes') + ' read' : 'No monitoring rounds yet')
+    + kpi('Depth to water', latest.length ? fx(Math.min(...latest.map(x => x.w.depth))) + '–' + fx(Math.max(...latest.map(x => x.w.depth))) + '<small> ' + L + '</small>' : '—', latest.length ? 'latest standpipe readings, below ground' : 'No standpipe readings yet')
+    + kpi('Change', avgT == null ? '—' : Math.abs(avgT) < .005 ? 'Steady' : (avgT > 0 ? '▲ ' : '▼ ') + fx(Math.abs(avgT)) + '<small> ' + L + '</small>', avgT == null ? 'Needs two readings in a well' : (avgT > 0 ? 'rise' : 'fall') + ' on average, last two readings, ' + tr.length + ' well' + (tr.length === 1 ? '' : 's'))
+    + kpi('Hydraulic conductivity', Kg ? sciU(Kg) + '<small> m/s</small>' : '—', Kg ? 'geometric mean of ' + Ks.length + ' slug test' + (Ks.length === 1 ? '' : 's') : 'No slug or bail tests yet')
+    + '</div>';
+  const v = GW_VIEWS.some(x => x[0] === S.gwView) ? S.gwView : 'over', badge = { slug: tests.length || '', read: '' };
+  const tabs = '<div class="lab-tabs" role="tablist" aria-label="Water page views">' + GW_VIEWS.map(([k, t]) => '<button type="button" role="tab" data-gwview="' + k + '" aria-selected="' + (v === k) + '">' + t + (badge[k] ? '<span class="lab-badge">' + badge[k] + '</span>' : '') + '</button>').join('') + '</div>';
+  let body = '';
+  if (v === 'over') {
+    const stack = vw < 760, mw = Math.max(420, Math.round(stack ? vw - 34 : (vw - 16) * 1.75 / 2.75 - 34)), mh = Math.max(340, Math.min(700, Math.round(mw * .75))), M = wtMapSVG(mw, mh);
+    const map = M ? '<section class="sec"><header><h3>Water table</h3><span class="note">' + (M.round ? 'Round ' + esc(M.round) : S.gwSrc.from === 'round' ? 'Latest readings' : esc(GW_SRC[S.gwSrc.from])) + ' · contours every ' + (+M.iv.toFixed(3)) + ' ' + L + '</span></header><div class="body"><div class="map-box">' + M.svg + '</div><p class="note lab-caveat">Head (ground elevation − depth to water) at ' + M.wells.length + ' wells, contoured with a thin-plate spline through every well; nothing is drawn beyond the outer wells. Contours between wells are an interpretation.</p></div></section>'
+      : '<section class="sec"><div class="body lab-empty">' + svgI(NAV_ICON.gw) + '<h3>No water-table map yet</h3><p class="note">Needs water levels (' + esc(GW_SRC[S.gwSrc.from].toLowerCase()) + ') in at least 3 ' + (S.gwSrc.wells ? 'wells' : 'boreholes') + ' with coordinates and ground elevations. Choose which water levels are used in Settings.</p><div class="actions"><button class="btn primary" data-act="round"' + (S.readOnly ? ' disabled' : '') + '>Enter a monitoring round…</button></div></div></section>';
+    const facts = F.error ? '<p class="note">' + esc(F.error) + '</p>' : '<div class="gw-flow">' + gwDial(F) + '<dl class="gw-dl"><dt>Direction</dt><dd>' + (F.flat ? 'Flat' : Math.round(F.az) + '° towards ' + F.dir) + (F.range && !F.flat ? ' <small>±' + Math.round(F.range.half) + '°</small>' : '') + '</dd><dt>Gradient</dt><dd>' + F.i.toFixed(4) + ' m/m</dd>'
+      + (F.v != null ? '<dt>Velocity</dt><dd>' + (F.v * 31557600).toPrecision(2) + ' m/yr <small>v = K·i/nₑ</small></dd>' : '<dt>Velocity</dt><dd><small>needs a slug test</small></dd>') + '<dt>From</dt><dd><small>' + esc(F.method) + ', ' + F.n + ' wells</small></dd></dl></div>';
+    const rows = all.filter(b => b.well?.installed || monitoring(b).length).map(b => { const m = monitoring(b).filter(x => x.date).sort(byDate), lw = m.at(-1), t = trendOf(b);
+      return '<li class="gw-wl"><button type="button" class="rk-main" data-pick="' + esc(b.id) + '" data-goto="edit" title="Open ' + esc(b.name) + '"><span class="rk-top"><span class="dot" style="background:var(--' + colorOf(b.id) + ')"></span><span class="rk-nm">' + esc(gwName(b) || b.name) + '</span>' + gwSpark(b) + '<span class="rk-v">' + (lw ? fx(lw.depth) + '<small> ' + L + '</small>' : '<small>not read</small>') + '</span></span>'
+        + '<span class="rk-sub">' + (lw ? (b.elevation != null ? 'el. ' + fx(b.elevation - lw.depth) + ' · ' : '') + esc(lw.date) : 'no standpipe reading') + (t != null ? ' · ' + changeHTML(t) : '') + '</span></button></li>'; }).join('');
+    body = '<div class="lab-map' + (stack ? ' stack' : '') + '">' + map + '<div class="gw-side"><section class="sec"><header><h3>Flow</h3><button class="btn link" data-gwview="flow">Details</button></header><div class="body">' + facts + '</div></section>'
+      + '<section class="sec"><header><h3>Wells</h3><span class="note">Latest depth to water</span></header><div class="body">' + (rows ? '<ul class="rank">' + rows + '</ul><p class="note">The line beside each well is its readings over time; up is shallower.</p>' : '<p class="note">No wells or standpipe readings yet.</p>') + '</div></section></div></div>';
+  } else if (v === 'flow') body = flowHTML();
+  else if (v === 'hydro') { const withW = all.filter(b => (b.water || []).some(w => w.depth != null));
+    body = '<section class="sec"><header><h3>Water levels over time</h3><span class="seg" role="group" aria-label="Plot as"><button data-gw="elev" aria-pressed="' + (S.gw === 'elev') + '">Elevation</button><button data-gw="depth" aria-pressed="' + (S.gw === 'depth') + '">Depth</button></span></header><div class="body">'
+      + '<div class="toggles">' + withW.map(b => '<label><input type="checkbox" data-series="' + esc(b.id) + '"' + (S.hidden.has(b.id) ? '' : ' checked') + '><span class="dot" style="background:var(--' + colorOf(b.id) + ')"></span>' + esc(b.name) + '</label>').join('') + '</div>'
+      + '<div class="scroll-x" id="hydro"></div><div class="legend"><span><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4" style="fill:var(--panel);stroke:var(--muted)" stroke-width="1.6"/></svg>Seepage while drilling</span><span><svg width="12" height="12" aria-hidden="true"><rect x="2" y="2" width="8" height="8" style="fill:var(--panel);stroke:var(--muted)" stroke-width="1.6"/></svg>Upon completion</span><span><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4" style="fill:var(--muted)"/></svg>Standpipe readings (joined)</span></div></div></section>'; }
+  else if (v === 'read') {
+    body = '<section class="sec"><header><h3>Water levels by borehole</h3><span class="note">Depths below ground surface (' + L + ')</span><button class="btn" data-act="round"' + (S.readOnly ? ' disabled' : '') + '>Monitoring round…</button></header><div class="body"><div class="scroll-x"><table class="sum gw-read"><thead>'
+      + '<tr><th>Borehole</th><th class="r">Ground el.</th><th class="r" title="Seepage while drilling">Seepage</th><th class="r" title="Upon completion of drilling">Completion</th><th class="r gw-b" title="Latest standpipe reading">Latest</th><th>Date</th><th class="r">Water el.</th><th class="r gw-b" title="Shallowest standpipe reading on record">Seasonal high</th><th>Date</th><th class="r">High el.</th><th>Trend and change</th></tr></thead><tbody>'
+      + all.map(b => { const s2 = b.water.find(w => w.kind === 'strike' && w.depth != null), c = b.water.find(w => w.kind === 'completion' && w.depth != null), m = monitoring(b).sort(byDate), lw = m.at(-1), hi = m.slice().sort((p, q) => p.depth - q.depth)[0];
+        return '<tr><td><button class="pick" data-pick="' + esc(b.id) + '" data-goto="edit"><span class="dot" style="background:var(--' + colorOf(b.id) + ')"></span>' + esc(b.name) + '</button>' + (b.well?.installed ? '' : ' <small class="note">no standpipe</small>') + '</td><td class="r">' + fx(b.elevation) + '</td><td class="r">' + fx(s2?.depth) + '</td><td class="r">' + (b.gwNone && !c ? 'Dry' : fx(c?.depth)) + '</td>'
+          + '<td class="r gw-b">' + fx(lw?.depth) + '</td><td>' + esc(lw?.date || '—') + '</td><td class="r">' + (lw && b.elevation != null ? fx(b.elevation - lw.depth) : '—') + '</td><td class="r gw-b">' + fx(hi?.depth) + '</td><td>' + esc(hi?.date || '—') + '</td><td class="r">' + (hi && b.elevation != null ? fx(b.elevation - hi.depth) : '—') + '</td><td class="gw-tc">' + (gwSpark(b, 56, 18) || '') + changeHTML(trendOf(b)) + '</td></tr>'; }).join('')
+      + '</tbody></table></div><p class="note" style="margin-top:6px">Seasonal high = the shallowest standpipe reading on record; readings across the seasons make it more reliable. Change compares the last two standpipe readings.</p></div></section>';
+  } else {
+    const can = all.filter(b => editable(b)), sel = cur() && can.includes(cur()) ? cur() : can[0];
+    body = '<section class="sec"><header><h3>Slug and bail tests</h3><span class="note">' + (Kg ? 'K geometric mean ' + sciU(Kg) + ' m/s' : 'Hvorslev (1951)') + '</span>' + (sel ? '<span class="gw-addslug"><select data-slugfor aria-label="Borehole for the new test">' + can.map(b => '<option value="' + esc(b.id) + '"' + (b === sel ? ' selected' : '') + '>' + esc(b.name) + '</option>').join('') + '</select><button class="btn" data-act="slug-new">Add a test</button></span>' : '') + '</header><div class="body">'
+      + (tests.length ? '<div class="scroll-x"><table class="sum"><thead><tr><th>Borehole</th><th>Date</th><th>Test</th><th class="r">K (m/s)</th><th class="r">T₀ (s)</th><th class="r">r²</th><th>Check</th><th></th></tr></thead><tbody>'
+        + tests.map(({ b, t, i, r }) => '<tr><td><button class="pick" data-pick="' + esc(b.id) + '" data-goto="edit">' + esc(b.name) + '</button></td><td>' + esc(t.date || '') + '</td><td>' + (t.kind === 'falling' ? 'Falling head (slug)' : 'Rising head (bail)') + '</td><td class="r"><b>' + (r ? r.K.toExponential(2) : '—') + '</b></td><td class="r">' + (r ? r0(r.T0) : '—') + '</td><td class="r">' + (r ? r.r2.toFixed(3) : '—') + '</td><td>' + (r ? (r.valid ? 'Le/R > 8' : '<span style="color:var(--warn)">Le/R ≤ 8: outside the Hvorslev assumption</span>') : 'Needs data') + '</td><td><button class="btn link" data-slugb="' + esc(b.id) + '" data-slug="' + i + '">Open</button></td></tr>').join('') + '</tbody></table></div>'
+        : '<div class="lab-empty">' + svgI(NAV_ICON.gw) + '<h3>No slug or bail tests yet</h3><p class="note">Enter the head readings of a slug (falling head) or bail (rising head) test and the well geometry: K comes from a straight-line fit of ln(h/H₀) against time. With K, the flow card gives the groundwater velocity.</p></div>')
+      + '<p class="note" style="margin-top:6px">Hvorslev (1951): K = rc² ln(Le/R) / (2 Le T₀). Bouwer–Rice is not included.</p></div></section>';
+  }
+  return kpis + tabs + '<div class="lab-view">' + body + '</div>';
+}
+document.addEventListener('click', e => { const t = e.target.closest?.('[data-gwview]'); if (!t) return; S.gwView = t.dataset.gwview; lsSet('bhlog.gwView', S.gwView); renderView(true); });
+document.addEventListener('click', e => { const t = e.target.closest?.('[data-slugb]'); if (t && t.dataset.slugb !== S.sel) S.sel = t.dataset.slugb; }, true);   // open a test of any borehole: it becomes the chosen one first
+document.addEventListener('change', e => { if (e.target.dataset?.slugfor == null) return; S.sel = e.target.value; renderList(sortedList()); });
+/* the Water page's settings */
+CTL.gw = () => { const dates = roundDates(); return [
+  { id: 'gw-src', title: 'Water levels used', icon: NAV_ICON.gw, sum: GW_SRC[S.gwSrc.from].replace(/\s*\(.*$/, ''), html: '<div class="map-layers">'
+    + crow('From', '<select id="gw-src">' + Object.entries(GW_SRC).map(([k, t]) => '<option value="' + k + '"' + (k === S.gwSrc.from ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select>', 'gw-src')
+    + (S.gwSrc.from === 'round' ? crow('Round', '<select id="flow-round"><option value="">Latest</option>' + dates.map(d => '<option value="' + d + '"' + (d === S.round ? ' selected' : '') + '>Near ' + d + '</option>').join('') + '</select>', 'flow-round') : '')
+    + '<label class="check"><input type="checkbox" id="gw-wells"' + (S.gwSrc.wells ? ' checked' : '') + '> Wells only</label>'
+    + crow('Porosity nₑ', '<input id="gw-ne" type="number" step="0.01" min="0.01" max="0.6" value="' + (S.co.ne ?? 0.25) + '">', 'gw-ne')
+    + '<p class="note">Used for the flow direction, the water-table map and the site plan contours. Effective porosity is about 0.1 for clay till and 0.2 to 0.3 for sand; it sets the velocity.</p></div>' },
+  { id: 'gw-plan', title: 'On the site plan', icon: NAV_ICON.site, html: '<div class="map-layers"><label class="check"><input type="checkbox" id="opt-flow"' + (S.flowArrow !== false ? ' checked' : '') + '> Flow arrow</label><label class="check"><input type="checkbox" data-lyr="contours"' + (S.contours ? ' checked' : '') + '> Water-table contours</label><label class="check"><input type="checkbox" data-lyr="wl"' + (S.lyr.wl !== false ? ' checked' : '') + '> Water elevations at the wells</label></div>' }]; };
 function drawGW() { drawHydro(); }
 function fmtDate(t, span) { const d = new Date(t); return span < 120 * 864e5 ? d.toLocaleDateString('en-CA', { day: 'numeric', month: 'short' }) : d.toLocaleDateString('en-CA', { month: 'short', year: 'numeric' }); }
 function niceTicks(min, max, n) { const st = niceStep(max - min || 1, n); const out = []; for (let v = Math.ceil(min / st - 1e-9) * st; v <= max + 1e-9; v += st) out.push(+v.toFixed(6)); return out; }
@@ -10702,9 +10770,7 @@ function flowOptHTML(F) {
 }
 function flowHTML() {
   const F = gwFlow(), dates = roundDates();
-  return `<section class="sec"><header><h3>Groundwater flow direction</h3>
-      ${gwSrcHTML()}${S.gwSrc.from === 'round' ? `<select id="flow-round" style="width:auto" aria-label="Monitoring round"><option value="">Latest monitoring round</option>${dates.map(d => `<option value="${d}" ${d === S.round ? 'selected' : ''}>Round near ${d}</option>`).join('')}</select>` : ''}
-      <label class="note" for="gw-ne">Effective porosity nₑ</label><input id="gw-ne" type="number" step="0.01" min="0.01" max="0.6" value="${S.co.ne ?? 0.25}" style="width:80px" data-tip="Drainable pore fraction, typically 0.1 for clay till, 0.2 to 0.3 for sand."></header>
+  return `<section class="sec"><header><h3>Groundwater flow direction</h3><span class="note">${esc(GW_SRC[S.gwSrc.from])}${S.gwSrc.from === 'round' ? ' · ' + (S.round ? 'round near ' + S.round : 'latest round') : ''} · nₑ ${S.co.ne ?? 0.25} · change in Settings</span></header>
     <div class="body">${flowOptHTML(F)}${F.error ? `<p class="note">${esc(F.error)}</p>` : `<div class="flow-grid"><div class="scroll-x">${flowPlanSVG(F, 520, 420)}</div><div>
       <table class="sum kv"><tbody>${flowResultRows(F).map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table>
       <div class="scroll-x" style="margin-top:10px"><table class="sum"><thead><tr><th>Use</th><th>Well</th><th class="r">Easting</th><th class="r">Northing</th><th class="r">Water depth (${LEN()})</th><th>Date</th><th class="r">Head (${LEN()})</th>${F.n > 3 ? `<th class="r">Fit residual (${LEN()})</th>` : ''}${F.robust ? '<th class="r">Weight</th>' : ''}${F.loo?.length ? '<th class="r" title="How far the flow direction moves when this well is left out">Without it</th>' : ''}</tr></thead><tbody>
@@ -10713,7 +10779,7 @@ function flowHTML() {
       ${F.tris?.length ? `<details class="flow-tris"><summary class="note">${F.tris.length} triangle solutions</summary><table class="sum"><thead><tr><th>Wells</th><th class="r">Direction</th><th class="r">Gradient</th></tr></thead><tbody>${F.tris.map(x => `<tr><td>${esc(x.wells.map(w => gwName(w.b)).join(', '))}</td><td class="r">${Math.round(x.az)}° ${COMPASS[Math.round(x.az / 22.5) % 16]}</td><td class="r">${x.i.toFixed(4)}</td></tr>`).join('')}</tbody></table></details>` : ''}</div></div>`}
       ${gwSkipHTML(F.skip)}
       <p class="note" style="margin-top:10px">${esc(FLOW_NOTE)}</p>
-      <div class="actions"><label class="check"><input type="checkbox" id="opt-flow" ${S.flowArrow !== false ? 'checked' : ''}> Show the flow arrow on the site plan and location plan</label></div></div></section>`;
+</div></section>`;
 }
 /* a framed report page: a map, its key lines, a table and the method note */
 function mapPageBody(svg, keys, heads, rows, note) {
@@ -15176,7 +15242,7 @@ document.addEventListener('click', e => {
   if (t.dataset.tdel != null) { const tbl = t.closest('.dgrid'), { rows, sh } = gridCtx({ dataset: { r: t.dataset.tdel, c: 0 }, closest: () => tbl }), row = rows[+t.dataset.tdel]; if (row && editable(row.b)) { row.b[sh.key] = row.b[sh.key].filter(x => x !== row.r); logChange(row.b, S.tab === 'edit' ? 'Log & data' : 'Data tables'); store.save(row.b); gridRedraw(); toast(`Row deleted. ${MOD}Z undoes it.`); } return; }
   if (t.dataset.gadd) { wsAddRow(t.dataset.gadd); return; }
   if (t.dataset.tab) { S.tab = t.dataset.tab; lsSet('bhlog.tab', S.tab); S.formStale = true; S.drawer = null; renderDrawer(); renderMain(); renderList(sortedList()); return; }
-  if (t.dataset.gw) { S.gw = t.dataset.gw; renderView(true); return; }
+  if (t.dataset.gw && !t.dataset.gwview) { S.gw = t.dataset.gw; renderView(true); return; }
   if (t.dataset.add) { addRow(t.dataset.add); return; }
   if (t.dataset.del) { const b = cur(); if (!editable(b)) return; b[t.dataset.del].splice(+t.dataset.i, 1); store.save(b); renderView(true); renderList(sortedList()); renderFacts(b); return; }
   if (t.dataset.delAnn) { const b = cur(); if (!editable(b)) return; b.well.annulus.splice(+t.dataset.delAnn, 1); store.save(b); renderView(true); return; }
@@ -15482,7 +15548,7 @@ document.addEventListener('change', e => {
   else if (t.dataset.delpick != null) delCount();
   else if (t.id === 'opt-contours') { S.contours = t.checked; lsSet('bhlog.contours', t.checked ? '1' : ''); drawPlan(); renderList(sortedList()); }
   else if (t.id === 'opt-units') { S.showUnits = t.checked; drawSection($('#section'), $('#section-note'), undefined, sectionList()); }
-  else if (t.dataset.series) { t.checked ? S.hidden.delete(t.dataset.series) : S.hidden.add(t.dataset.series); drawHydro(); }
+  else if (t.dataset.series) { t.checked ? S.hidden.delete(t.dataset.series) : S.hidden.add(t.dataset.series); drawHydro(undefined, undefined, S.tab === 'gw' ? { H: 420 } : {}); }
   else if (t.type === 'checkbox' && t.closest('.edit')) onField(e);
 });
 document.addEventListener('input', e => { if (e.target.id === 'q') { S.q = e.target.value; renderList(sortedList()); return; } if (e.target.closest('.edit') && e.target.type !== 'checkbox') onField(e); });
