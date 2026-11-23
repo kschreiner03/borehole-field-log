@@ -2177,7 +2177,7 @@ function autosaveSoon(p) {
 }
 async function autosaveNow() { clearTimeout(autoT); const ps = [...autoDirty]; autoDirty.clear(); for (const q of ps) { if (S.fh.has(q)) await saveProject(false, q, true); } if (ps.some(q => !S.fh.has(q)) && S.fh.has(WS_KEY)) await backup(false, true); }
 /* write anything still waiting, when the window closes (the desktop app waits for this before closing) */
-window.flushSaves = async () => { if (store.localTimer) store.saveLocal(); if (autoDirty.size) await autosaveNow(); await Promise.all(dataStore.pending.values()); return S.storeFail && S.mode === 'local' && !S.fh.size ? 'unsaved' : 'saved'; };
+window.flushSaves = async () => { try { await window.gisFlush?.(); } catch { /* best effort */ } if (store.localTimer) store.saveLocal(); if (autoDirty.size) await autosaveNow(); await Promise.all(dataStore.pending.values()); return S.storeFail && S.mode === 'local' && !S.fh.size ? 'unsaved' : 'saved'; };
 addEventListener('pagehide', () => { if (store.localTimer) store.saveLocal(); });
 function writeError(e) {
   if (e?.code === 'invalid_argument') { S.readOnly = true; toast('You can view these logs but not change them.'); render(); }
@@ -7213,7 +7213,7 @@ S.fh = new Map(); S.fileAt = new Map();   // project -> file handle and time of 
 const MOD = /Mac|iP(hone|ad|od)/.test(navigator.platform) ? '⌘' : 'Ctrl+';
 const fileSlug = s => (s || '').replace(/[\\/:*?"<>|#%]+/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
 const canPick = () => 'showSaveFilePicker' in window && window.self === window.top;
-const projDirty = (p = projKey(projList()[0])) => { const at = S.fileAt.get(p); return !!at && (sortedList().some(b => projKey(b) === p && (b.updated || '') > at) || (S.site?.projects?.[p]?.edited || '') > at); };
+const projDirty = (p = projKey(projList()[0])) => { const at = S.fileAt.get(p); return !!at && (sortedList().some(b => projKey(b) === p && (b.updated || '') > at) || (S.site?.projects?.[p]?.edited || '') > at || (S.gisEdited?.[p] || '') > at); };
 async function photosFor(ids) { try { const all = await photoStore.all(); return ids ? all.filter(ph => ids.has(ph.bhId)) : all; } catch { return []; } }
 async function saveProject(as, proj, quiet) {
   const list = proj == null ? projList() : sortedList().filter(b => projKey(b) === proj); if (!list.length && !surveyOf().points.length) { if (!quiet) toast('There are no boreholes in this project to save.'); return; }
@@ -7221,11 +7221,13 @@ async function saveProject(as, proj, quiet) {
   const st = S.site?.projects ? (S.site.projects[p] || S.site.projects['*'] || null) : (S.site?.img ? S.site : null);
   const used = new Set(((S.site?.projects?.[p] || (S.site?.projects ? null : S.site))?.report?.pages || []).filter(pg => pg.kind === 'pdf').map(pg => pg.file));   // imports the report still uses; deleted ones stay behind
   const photos = (await photosFor(new Set([...list.map(b => b.id), 'imagery:' + p, REPORT_FILE_KEY(p), OUT_KEY(p)]))).filter(ph => ph.bhId !== REPORT_FILE_KEY(p) || used.has(ph.id) || ph.kind === 'output');
-  const data = { app: 'borehole-field-log', kind: 'project', version: 4, saved: new Date().toISOString(), project: p, projNo: no, company: S.co, site: st, boreholes: list, photos };
+  const gis = await gisFileData(p);
+  const data = { app: 'borehole-field-log', kind: 'project', version: 4, saved: new Date().toISOString(), project: p, projNo: no, company: S.co, site: st, boreholes: list, photos, ...(gis ? { gis } : {}) };
   await saveTo(p, `${fileSlug([no, p].filter(Boolean).join(' ')) || surveyOf().survey?.name || 'Borehole project'}.bhp`, 'bhp', data, as, quiet);
 }
 async function backup(as, quiet) {
-  const data = { app: 'borehole-field-log', kind: 'workspace', version: 4, saved: new Date().toISOString(), company: S.co, site: S.site || null, boreholes: sortedList(), photos: await photosFor() };
+  const gis = {}; for (const q of new Set([...sortedList().map(projKey), ...(GIS.proj !== undefined ? [GIS.proj] : [])])) { const g = await gisFileData(q); if (g) gis[q] = g; }
+  const data = { app: 'borehole-field-log', kind: 'workspace', version: 4, saved: new Date().toISOString(), company: S.co, site: S.site || null, boreholes: sortedList(), photos: await photosFor(), ...(Object.keys(gis).length ? { gis } : {}) };
   await saveTo(WS_KEY, `Borehole workspace ${today()}.bhlog`, 'bhlog', data, as, quiet);
 }
 async function saveTo(key, name, ext, data, as, quiet) {
@@ -7324,7 +7326,8 @@ async function restore(file, handle) {
     for (const raw of list) { if (keep.has(raw.id)) { got.push(S.bh.get(raw.id)); continue; } const b = normalize(structuredClone(raw)); b.id ||= uid('bh-'); S.bh.set(b.id, b); store.save(b); got.push(b); }
     let lost = 0; for (const ph of data.photos || []) { try { await photoStore.put(ph); } catch { lost++; } }
     if (lost) toast(`${lost} photo${lost === 1 ? '' : 's'} or imported file${lost === 1 ? '' : 's'} could not be saved here; those pages may be blank.`);
-    if (data.kind === 'project') { if (data.site) setSite(data.site, data.project ?? projKey(got[0]), false); }
+    if (data.kind === 'project') { if (data.site) setSite(data.site, data.project ?? projKey(got[0]), false); if (data.gis) await gisAdopt(data.project ?? projKey(got[0]), data.gis, true); }
+    else if (data.gis && typeof data.gis === 'object') for (const [q, g] of Object.entries(data.gis)) await gisAdopt(q, g, false);
     else if (data.site) { S.site = data.site; saveSite(); }
     if (S.mode === 'local') store.saveLocal();
     const p = data.kind === 'project' ? (data.project ?? projKey(got[0])) : null, at = new Date().toISOString();
@@ -11248,6 +11251,88 @@ const fmtT = d => d < 60 ? Math.round(d) + ' days' : d < 730 ? (d / 30.4).toFixe
 GIS.layers = [];
 let gisLayerSeq = 0;
 function gisAddLayer(L) { L.id = 'L' + (++gisLayerSeq); L.on = true; GIS.layers = [L, ...GIS.layers.filter(x => x.tool !== L.tool || x.name !== L.name)].slice(0, 12); return L; }
+/* ---------- Toolbox layers are kept with their project: on this computer (IndexedDB, as they are: grids as typed arrays, pictures as
+   files) and in project and workspace files (grids gzipped in base64; slope left out and worked out again when opened). A light check
+   every 2 s saves any change (a tool's result, a layer turned on or off, a colour, a label) and follows the project that is open. ---------- */
+GIS.proj = undefined; let gisSig = '', gisBusy = false; S.gisEdited = {};
+const GIS_TA = { Float32Array, Float64Array, Uint8Array, Int8Array, Uint16Array, Int16Array, Uint32Array, Int32Array };
+const gisSigOf = () => GIS.layers.map(L => [L.id, L.name, L.on ? 1 : 0, L.show, L.ramp, L.op, L.shade, L.showTrees, L.under, L.note, L.treesPhoto, JSON.stringify(L.lab || null), L.trees ? L.trees.length + ':' + L.trees[0]?.[0] + ':' + L.trees.at(-1)?.[1] : '', L.values?.length, L.box?.join()].join('|')).join('\n') + '#' + JSON.stringify(S.v3dTerrain || null);
+async function gisRecs() {   // the layers as plain records: no blob URLs; a picture's file read once and kept
+  return Promise.all(GIS.layers.map(async L => {
+    const o = {}; for (const [k, v] of Object.entries(L)) if (k !== 'url' && !k.startsWith('_') && typeof v !== 'function' && !(v instanceof Node)) o[k] = v;
+    if (L.kind === 'image' && L.url) { if (!L._blob) try { L._blob = await (await fetch(L.url)).blob(); } catch { L._blob = null; } if (L._blob) o.imgBlob = L._blob; }
+    return o; }));
+}
+function gisFromRec(r) { const L = { ...r }; delete L.imgBlob; L.url = r.imgBlob ? URL.createObjectURL(r.imgBlob) : null; if (r.imgBlob) L._blob = r.imgBlob; return L; }
+async function gisPersist(p) {
+  if (S.readOnly || p === undefined) return;
+  const rec = { v: 1, at: new Date().toISOString(), layers: await gisRecs(), v3dTerrain: S.v3dTerrain || null, seq: gisLayerSeq };
+  try { await dataStore.put('gis:' + p, rec); } catch { if (!S.gisWarned) { S.gisWarned = true; toast('The map layers could not be saved on this computer (storage full or blocked). Save the project to a file to keep them.'); } }
+}
+async function gisLoad(p) {
+  let rec = null; try { rec = await dataStore.get('gis:' + p); } catch { /* none */ }
+  for (const L of GIS.layers) if (L.url && !(rec?.layers || []).some(r => r.id === L.id && r.url === L.url)) URL.revokeObjectURL(L.url);
+  GIS.layers = (rec?.layers || []).map(gisFromRec);
+  gisLayerSeq = Math.max(gisLayerSeq, rec?.seq || 0, ...GIS.layers.map(L => +String(L.id).replace(/\D/g, '') || 0));
+  S.v3dTerrain = rec?.v3dTerrain || null;
+  const T = GIS.layers.find(L => L.terrain && L.values && L.on && /^Elevation: /.test(L.name)); GIS.dem = T ? { values: T.values, box: T.box, nx: T.nx, ny: T.ny, name: T.name.replace(/^Elevation: /, '') } : null;
+  GIS.proj = p; gisSig = gisSigOf();
+}
+async function gisWatch() {
+  if (gisBusy || S.loadFail) return; const p = projKey(projList()[0]);
+  gisBusy = true;
+  try {
+    if (p !== GIS.proj) {   // another project: what was open is saved (if it changed), this one's layers are loaded
+      if (GIS.proj !== undefined && gisSigOf() !== gisSig) await gisPersist(GIS.proj);
+      await gisLoad(p); if (['site', 'v3d'].includes(S.tab)) renderView(true); return;
+    }
+    const sg = gisSigOf(); if (sg === gisSig) return;
+    gisSig = sg; await gisPersist(p); S.gisEdited[p] = new Date().toISOString(); autosaveSoon(p); setSync?.();
+  } finally { gisBusy = false; }
+}
+setInterval(gisWatch, 2000);
+window.gisFlush = async () => { if (GIS.proj !== undefined && gisSigOf() !== gisSig) { gisSig = gisSigOf(); await gisPersist(GIS.proj); } };
+/* for files */
+const gzB64 = async u => { const z = new Uint8Array(await new Response(new Blob([u]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()); let t = ''; for (let i = 0; i < z.length; i += 0x8000) t += String.fromCharCode.apply(null, z.subarray(i, i + 0x8000)); return btoa(t); };
+const unB64 = async (b, gz) => { const u = b64bytes(b); return gz ? new Uint8Array(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()) : u; };
+async function gisPack(v, key) {
+  if (key === 'slope' && ArrayBuffer.isView(v)) return { $slope: 1 };   // worked out again when opened
+  if (ArrayBuffer.isView(v)) return { $ta: v.constructor.name, z: await gzB64(new Uint8Array(v.buffer, v.byteOffset, v.byteLength)) };
+  if (v instanceof Blob) { const u = new Uint8Array(await v.arrayBuffer()); let t = ''; for (let i = 0; i < u.length; i += 0x8000) t += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return { $blob: v.type || 'image/png', b: btoa(t) }; }
+  if (Array.isArray(v)) return v.some(x => x && typeof x === 'object') ? Promise.all(v.map(x => gisPack(x))) : v;
+  if (v && typeof v === 'object') { const o = {}; for (const [k, x] of Object.entries(v)) o[k] = await gisPack(x, k); return o; }
+  return v;
+}
+async function gisUnpack(v) {
+  if (Array.isArray(v)) return v.some(x => x && typeof x === 'object') ? Promise.all(v.map(gisUnpack)) : v;
+  if (!v || typeof v !== 'object') return v;
+  if (v.$ta && GIS_TA[v.$ta]) { const u = await unB64(v.z, true); return new GIS_TA[v.$ta](u.buffer, u.byteOffset, u.byteLength / GIS_TA[v.$ta].BYTES_PER_ELEMENT); }
+  if (v.$blob) return new Blob([await unB64(v.b, false)], { type: v.$blob });
+  const o = {}; for (const [k, x] of Object.entries(v)) o[k] = await gisUnpack(x); return o;
+}
+function gisSlopeOf(L) {   // slope in degrees (Horn's method, as gdaldem), for a grid opened from a file
+  const { nx, ny } = L, z = L.values, dx = (L.box[2] - L.box[0]) / nx, dy = (L.box[3] - L.box[1]) / ny, s = new Float32Array(nx * ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const c = z[j * nx + i]; if (!isFinite(c)) { s[j * nx + i] = NaN; continue; }
+    const at = (a, b) => { a = Math.max(0, Math.min(nx - 1, a)); b = Math.max(0, Math.min(ny - 1, b)); const v = z[b * nx + a]; return isFinite(v) ? v : c; };
+    const gx = ((at(i + 1, j - 1) + 2 * at(i + 1, j) + at(i + 1, j + 1)) - (at(i - 1, j - 1) + 2 * at(i - 1, j) + at(i - 1, j + 1))) / (8 * dx), gy = ((at(i - 1, j + 1) + 2 * at(i, j + 1) + at(i + 1, j + 1)) - (at(i - 1, j - 1) + 2 * at(i, j - 1) + at(i + 1, j - 1))) / (8 * dy);
+    s[j * nx + i] = Math.atan(Math.hypot(gx, gy)) * 180 / Math.PI;
+  }
+  return s;
+}
+async function gisFileData(p) {   // a project's layers for its file (null when it has none)
+  let rec; if (p === GIS.proj) rec = { at: S.gisEdited[p] || new Date().toISOString(), layers: await gisRecs(), v3dTerrain: S.v3dTerrain || null }; else { try { rec = await dataStore.get('gis:' + p); } catch { rec = null; } }
+  if (!rec?.layers?.length) return null;
+  return { v: 1, at: rec.at, v3dTerrain: rec.v3dTerrain || null, layers: await Promise.all(rec.layers.map(r => gisPack(r))) };
+}
+async function gisAdopt(p, g, replace) {   // layers from a file into this computer's store; a workspace file only replaces older ones
+  if (!g?.layers) return;
+  if (!replace) { let have = null; try { have = await dataStore.get('gis:' + p); } catch { /* none */ } if (have?.layers?.length && (have.at || '') > (g.at || '')) return; }
+  const layers = await Promise.all(g.layers.map(gisUnpack));
+  for (const L of layers) if (L.slope?.$slope) L.slope = L.values ? gisSlopeOf(L) : null;
+  try { await dataStore.put('gis:' + p, { v: 1, at: g.at || new Date().toISOString(), layers, v3dTerrain: g.v3dTerrain || null }); } catch { toast('The map layers in the file could not be saved on this computer.'); return; }
+  if (p === GIS.proj) { gisBusy = true; try { await gisLoad(p); } finally { gisBusy = false; } }
+}
 /* run a groundwater or area tool: its job, then the layer and a plain summary */
 async function gpHydro(k, T) {
   const prm = gpParams(k), lab = T.name + ' (' + T.by + ')';
