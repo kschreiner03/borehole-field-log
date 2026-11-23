@@ -435,6 +435,38 @@ table.kv th { text-align: left; width: 38%; font-weight: 600; white-space: norma
 @media (max-width: 1150px) { .flow-grid { grid-template-columns: minmax(0, 1fr); } }
 .finding { margin: 0 0 14px; font-size: 15px; color: var(--ink); }
 .home-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: var(--gap); align-items: start; }
+/* Projects: the home screen, the top-bar breadcrumb and its menus */
+body.proj-home .prail, body.proj-home .side { display: none; }
+body.proj-home .shell { --sidebar-width: 0px; grid-template-columns: 0 0 minmax(0, 1fr) 0; }
+.tb-proj { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.tb-proj button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--r-sm, 4px); background: none; color: inherit; font: 500 13.5px var(--f-body); cursor: pointer; white-space: nowrap; }
+.tb-proj button svg { width: 16px; height: 16px; flex: none; } .tb-proj button:hover { background: var(--hover); border-color: var(--border, var(--line)); }
+.tbp-home.on { font-weight: 600; } .tbp-sep { color: var(--muted); }
+.tbp-name { font-weight: 600 !important; max-width: min(340px, 24vw); min-width: 0; } .tbp-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .tb-proj { flex: 0 1 auto; }
+.pj-pop { position: fixed; z-index: 60; min-width: 240px; max-width: 360px; padding: 6px; background: var(--surface, #fff); border: 1px solid var(--border, var(--line)); border-radius: 6px; box-shadow: 0 8px 24px rgba(16, 32, 48, .18); display: flex; flex-direction: column; }
+.pj-pop button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; padding: 6px 10px; border: 0; border-radius: 4px; background: none; font: 13px var(--f-body); color: var(--ink); text-align: left; cursor: pointer; }
+.pj-pop button:hover, .pj-pop button:focus-visible { background: var(--hover); outline: none; } .pj-pop button[aria-current="true"] { background: var(--active); }
+.pj-pop button small { color: var(--muted); font-size: 11.5px; } .pj-pop hr { border: 0; border-top: 1px solid var(--rule); margin: 4px 0; } .pj-pop-h { margin: 4px 10px; font-size: 11.5px; color: var(--muted); }
+.pj-home { max-width: 1240px; margin: 0 auto; padding: 22px 8px 40px; display: grid; gap: 14px; }
+.pj-head { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; } .pj-head h2 { margin: 0; font-size: 24px; } .pj-head .note { margin: 2px 0 0; } .pj-head .sp { flex: 1; }
+.pj-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .pj-tools input[type="search"] { flex: 1 1 320px; max-width: 480px; min-height: 36px; } .pj-tools select { width: auto; min-height: 36px; }
+.pj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.pj-card { position: relative; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer; transition: box-shadow .12s, border-color .12s; }
+.pj-card:hover, .pj-card:focus-visible { border-color: var(--accent); box-shadow: 0 4px 16px rgba(16, 32, 48, .1); outline: none; }
+.pj-card.cur { border-color: var(--accent); box-shadow: inset 0 3px 0 var(--accent); } .pj-card.arch { opacity: .75; }
+.pj-thumb { position: relative; height: 110px; background: var(--panel-2, #f4f6f8); color: var(--accent); border-bottom: 1px solid var(--rule); display: grid; place-items: center; } .pj-thumb > svg { width: 100%; height: 100%; }
+.pj-noloc { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; } .pj-noloc svg { width: 28px; height: 28px; }
+.pj-tag { position: absolute; top: 8px; left: 8px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: var(--accent); color: #fff; } .pj-card.arch .pj-tag { background: var(--muted); }
+.pj-body { padding: 10px 14px 12px; display: grid; gap: 2px; } .pj-body h3 { margin: 0 28px 2px 0; font-size: 15px; line-height: 1.3; }
+.pj-sub, .pj-loc, .pj-st, .pj-time { margin: 0; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .pj-sub { color: var(--ink); }
+.pj-stats { margin: 6px 0 2px; font-size: 13px; } .pj-time { margin-top: 4px; font-size: 11.5px; }
+.pj-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--rule); margin: 4px 0 2px; } .pj-bar i.d { background: #c9a227; } .pj-bar i.r { background: #d9822b; } .pj-bar i.i { background: var(--ok, #2e8b57); }
+.pj-more { position: absolute; right: 6px; top: 116px; min-height: 26px; padding: 0 4px; color: var(--muted); } .pj-more svg { width: 18px; height: 18px; }
+.pj-h3 { margin: 12px 0 0; font-size: 14px; } .pj-ex { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.pj-exc { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; background: none; text-align: left; cursor: pointer; font: inherit; color: var(--ink); } .pj-exc:hover { border-color: var(--accent); background: var(--hover); }
+.pj-exc svg { width: 20px; height: 20px; color: var(--accent); flex: none; } .pj-exc span { display: grid; } .pj-exc small { color: var(--muted); font-size: 12px; }
+.pj-none { padding: 30px 0; text-align: center; } .pj-last { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+.pj-empty .step .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 /* Water page */
 .kpi-needle { width: 20px; height: 20px; flex: none; }
 .gw-side { display: grid; gap: var(--gap, 16px); align-content: start; min-width: 0; }
@@ -1561,7 +1593,7 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
     <svg class="mark" viewBox="0 0 22 22" aria-hidden="true"><rect x="5" y="1" width="12" height="20" rx="3" fill="#ead08c"/><rect x="5" y="1" width="12" height="6" rx="3" fill="#8a6b4b"/><rect x="5" y="5" width="12" height="2" fill="#8a6b4b"/><rect x="5" y="7" width="12" height="7" fill="#a3afa8"/><path d="M5 14.5h12" stroke="#2f70bb" stroke-width="1.6"/></svg>
     <h1>Borehole Field Log</h1>
     <span class="co" id="tb-co"></span>
-    <div class="proj-pick tb-proj"><label for="proj" class="sr">Project</label><select id="proj" aria-label="Project"></select></div>
+    <nav class="tb-proj" id="proj" aria-label="Project"></nav>
     <div class="tb-actions">
       <span class="tb-sep" aria-hidden="true"></span>
       <button class="tb" data-act="new" title="New borehole in this project"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">New borehole</span></button>
@@ -1649,6 +1681,7 @@ const dataStore = {
       .catch(e => { this.db = null; throw e; });
   },
   async get(k) { const d = await this.open(); return new Promise((res, rej) => { const q = d.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result ?? null); q.onerror = () => rej(q.error); }); },
+  async del(k) { const d = await this.open(); await new Promise(res => { const tx = d.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = res; tx.onerror = res; }); },
   async put(k, v) { const d = await this.open(); await new Promise((res, rej) => { const tx = d.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = tx.onabort = () => rej(tx.error); }); },
 };
 async function dataGet(k) {
@@ -1756,6 +1789,7 @@ const pageDepth = b => {
 const pageDepthLabel = () => S.pageFit ? `fitted to each borehole's depth (up to ${FIT_MAX()} ${S.units} on one page)` : `${fixedDepth()} ${S.units} per page`;
 S.pageFit = lsGet('bhlog.pageFit') !== '0';
 if (!['log', 'edit', 'gw', 'report', 'site'].includes(S.tab)) S.tab = 'log';
+S.proj = lsGet('bhlog.proj') ?? null;
 
 const LEN = () => S.units;
 const toD = m => m == null ? null : (S.units === 'ft' ? m * FT : m);
@@ -1789,7 +1823,16 @@ function trendOf(b) { const m = monitoring(b).filter(w => w.date).sort(byDate); 
 function sortedList() { return [...S.bh.values()].sort((a, c) => (a.name || '').localeCompare(c.name || '', undefined, { numeric: true })); }
 const cur = () => S.bh.get(S.sel) || null;
 /* boreholes in the selected borehole's project: site plan, sections, lab, groundwater and report pages work one project at a time */
-function projList() { const p = (cur() || sortedList()[0])?.project || ''; return sortedList().filter(b => (b.project || '') === p); }
+/* projects are records: each has an entry in S.site.projects (its site data, and under .meta its id and details), so a project
+   exists before it has boreholes, travels in project files and backups, and is renamed in one step (renameProject). The current
+   project is the chosen borehole's, else S.proj (an empty project), else the first */
+function projNames() { return [...new Set([...sortedList().map(b => b.project || ''), ...Object.entries(S.site?.projects || {}).filter(([k, r]) => k !== '*' && r?.meta).map(([k]) => k)])]; }
+function curProj() {
+  const b = cur(); if (b) { const p = b.project || ''; if (S.proj !== p) { S.proj = p; lsSet('bhlog.proj', p); } return p; }
+  if (S.proj != null && projNames().includes(S.proj)) return S.proj;
+  return sortedList()[0]?.project || '';
+}
+function projList() { const p = curProj(); return sortedList().filter(b => (b.project || '') === p); }
 function sptN(s) { return s.b2 != null && s.b3 != null ? s.b2 + s.b3 : num(s.n); }
 function blowStr(s) { return [s.b1, s.b2, s.b3].some(v => v != null) ? [s.b1, s.b2, s.b3].map(v => v ?? '–').join('-') : ''; }
 const sampleId = s => String(s.name || '').trim() || `${s.type || ''}${s.no ?? ''}`;   // the logger's own name, or type and number (SS2)
@@ -2261,7 +2304,7 @@ function writeError(e) {
 function setSync(state) {
   const el = $('#sync');
   el.textContent = state === 'saving' ? 'Saving…' : S.readOnly ? 'View only' : S.mode === 'local' ? 'Saved on this computer' : 'All changes saved';
-  const h = S.fh?.get(projKey(projList()[0]));
+  const h = S.fh?.get(curProj());
   if (h && state !== 'saving') { el.textContent = projDirty() ? `${h.name} · saving…` : `Saved to ${h.name}`; el.title = `Changes save to ${h.name} automatically.`; } else el.title = '';
   const fail = S.storeFail && S.mode === 'local' && !h;
   el.classList.toggle('fail', !!fail); el.classList.toggle('busy', !fail && (state === 'saving' || el.textContent.endsWith('saving…')));
@@ -2278,7 +2321,7 @@ function renderBrand() {
 /* ---------- render: shell ---------- */
 function render() {
   const list = sortedList();
-  if (!S.sel || !S.bh.has(S.sel)) { S.sel = list[0]?.id || null; S.layer = 0; S.formStale = true; }
+  if (!S.sel || !S.bh.has(S.sel)) { const pp = S.proj != null && projNames().includes(S.proj) ? S.proj : null; S.sel = (pp != null ? list.filter(b => (b.project || '') === pp) : list)[0]?.id || null; S.layer = 0; S.formStale = true; }
   updateRibbon();
   renderList(list);
   renderMain();
@@ -2352,8 +2395,9 @@ const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" strok
 const CTL = {}, CTL_ICON = '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>';
 S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {}, ...jsonLS('bhlog.ui', {}) };
 const uiSave = () => lsSet('bhlog.ui', JSON.stringify(S.ui));
+if (S.ui.openLast === false) S.tab = 'projects';
 const ctlClamp = w => Math.round(Math.min(480, Math.max(240, +w || 300)));
-function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); document.body.classList.toggle('side-off', S.tab === 'compose'); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
+function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); document.body.classList.toggle('side-off', S.tab === 'compose'); document.body.classList.toggle('proj-home', S.tab === 'projects'); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
 /* the panel's column is set before a page draws, so drawings measure the work area they will really have */
 function ctlLayout() {
   const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
@@ -2527,7 +2571,7 @@ function mapGoTo(q) {
     if (!projList().some(b => /zone\s*\d/i.test(b.crs || ''))) setSite({ ...(siteOf() || {}), zone: zoneOfLon(dls.center[1]) });
     setSite({ ...(siteOf() || {}), goto: dls.center.map(v => +v.toFixed(6)), gotoBox: { label: dls.label, poly: dls.poly.map(p => p.map(v => +v.toFixed(6))) } });
     const [e, n] = llToUtm(dls.center[0], dls.center[1], crsZone()), W = S._plan?.W || 800, H = S._plan?.H || 460;
-    S.mv = { cx: e, cy: n, sc: Math.min(W, H) / (dls.size * 1.6) }; S.mvProj = projKey(projList()[0]); renderView(true);
+    S.mv = { cx: e, cy: n, sc: Math.min(W, H) / (dls.size * 1.6) }; S.mvProj = curProj(); renderView(true);
     toast(`${dls.label}: outlined on the map. Computed from the survey grid, so it can be off by a few hundred metres.`); return;
   }
   const v = String(q).replace(/[°NE]/gi, ' ').match(/-?\d+(?:\.\d+)?\s*W?/gi)?.map(x => /w/i.test(x) ? -Math.abs(parseFloat(x)) : parseFloat(x)) || [];
@@ -2540,7 +2584,7 @@ function mapGoTo(q) {
   if (en) ll = utmToLL(en[0], en[1], crsZone());
   setSite({ ...(siteOf() || {}), goto: [+ll[0].toFixed(6), +ll[1].toFixed(6)], gotoBox: null });
   const [e, n] = llToUtm(ll[0], ll[1], crsZone()), W = S._plan?.W || 800, H = S._plan?.H || 460;
-  S.mv = { cx: e, cy: n, sc: Math.min(W, H) / 800 }; S.mvProj = projKey(projList()[0]); renderView(true);
+  S.mv = { cx: e, cy: n, sc: Math.min(W, H) / 800 }; S.mvProj = curProj(); renderView(true);
 }
 /* the Toolbox's form and lists */
 document.addEventListener('change', e => { if (e.target.dataset?.vdatum == null || S.readOnly) return; setSite({ ...(siteOf() || {}), vdatum: e.target.value }); });
@@ -2764,7 +2808,7 @@ function tocExtent(id) {
 function tocZoom(id) {
   const b = tocExtent(id); if (!b) { toast('This layer has nothing to zoom to.'); return; }
   const W = S._plan?.W || 800, H = S._plan?.H || 600, w = Math.max(b[2] - b[0], 10), h = Math.max(b[3] - b[1], 10);
-  S.mv = { cx: (b[0] + b[2]) / 2, cy: (b[1] + b[3]) / 2, sc: Math.min(W / w, H / h) * .9 }; S.mvProj = projKey(projList()[0]); drawPlan();
+  S.mv = { cx: (b[0] + b[2]) / 2, cy: (b[1] + b[3]) / 2, sc: Math.min(W / w, H / h) * .9 }; S.mvProj = curProj(); drawPlan();
 }
 document.addEventListener('click', e => {
   const f = e.target.closest?.('[data-tocfold]'); if (f) { const k = f.dataset.tocfold; S.tocFold.has(k) ? S.tocFold.delete(k) : S.tocFold.add(k); tocSave(); ctlRender(); return; }
@@ -2786,6 +2830,166 @@ document.addEventListener('dragover', e => { const r = e.target.closest?.('[data
 document.addEventListener('drop', e => { const r = e.target.closest?.('[data-tocdrag]'); if (!tocDrag || !r) return; e.preventDefault(); const after = r.classList.contains('drop-after'), id = tocDrag, to = r.dataset.tocdrag; tocDrag = null; tocDropClear(); if (id === to) return;
   const L = GIS.layers.find(x => x.id === id); if (!L) return; const rest = GIS.layers.filter(x => x !== L); let i = rest.findIndex(x => x.id === to); if (i < 0) return; if (after) i++; rest.splice(i, 0, L); GIS.layers = rest; renderView(true); });
 document.addEventListener('dragend', () => { tocDrag = null; tocDropClear(); });
+/* ---------- projects: the home screen, the switcher, details, rename, duplicate, archive and delete ---------- */
+function projRecs() { return { ...(S.site?.projects || (S.site?.img ? { '*': S.site } : {})) }; }
+function projMeta(name) {
+  const r = S.site?.projects?.[name]?.meta || {}, b0 = sortedList().find(b => (b.project || '') === name) || {};
+  return { id: r.id || '', created: r.created || '', archived: !!r.archived, notes: r.notes || '', projNo: r.projNo ?? b0.projNo ?? '', client: r.client ?? b0.client ?? '', location: r.location ?? b0.location ?? '' };
+}
+function setProjMeta(name, patch) {
+  const P = projRecs(), base = P[name] || (P['*'] ? structuredClone(P['*']) : {});
+  P[name] = { ...base, meta: { ...(base.meta || {}), id: base.meta?.id || uid('pj'), created: base.meta?.created || new Date().toISOString(), ...patch } };
+  S.site = { projects: P }; saveSite(); autosaveSoon(name);
+}
+const projOpened = name => { const op = jsonLS('bhlog.projOpened', {}); op[name] = new Date().toISOString(); lsSet('bhlog.projOpened', JSON.stringify(op)); };
+function openProject(name) {
+  closeProjPop(); S.proj = name; lsSet('bhlog.proj', name); projOpened(name);
+  S.sel = sortedList().find(b => (b.project || '') === name)?.id || null; S.layer = 0; S.secIds = new Set(); S.mv = null; S.tocSel = null; S.gpPanel = null;
+  if (S.tab === 'projects') S.tab = 'home'; lsSet('bhlog.tab', S.tab); S.formStale = true; render();
+}
+const agoTxt = iso => { const t = Date.parse(iso || ''); if (!isFinite(t)) return ''; const m = (Date.now() - t) / 6e4; return m < 1 ? 'just now' : m < 60 ? Math.round(m) + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : m < 1440 * 30 ? Math.round(m / 1440) + ' d ago' : new Date(t).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }); };
+function projInfo(name) {
+  const bs = sortedList().filter(b => (b.project || '') === name), m = projMeta(name), st = { draft: 0, review: 0, issued: 0 }; for (const b of bs) st[b.status || 'draft'] = (st[b.status || 'draft'] || 0) + 1;
+  const rec = S.site?.projects?.[name], edited = [rec?.edited || '', ...bs.map(b => b.updated || '')].sort().pop();
+  return { name, m, bs, st, wells: bs.filter(b => b.well?.installed).length, edited, opened: jsonLS('bhlog.projOpened', {})[name] || '', img: (rec?.imagery || []).length };
+}
+/* a project's boreholes as dots, scaled to the card */
+function projThumb(bs) {
+  const P = bs.filter(b => b.easting != null && b.northing != null); if (!P.length) return '<div class="pj-noloc">' + svgI(NAV_ICON.site) + '<span>' + (bs.length ? 'No locations yet' : 'No boreholes yet') + '</span></div>';
+  const xs = P.map(b => b.easting), ys = P.map(b => b.northing), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), sp = Math.max(x1 - x0, y1 - y0, 20), W = 240, H = 110, k = Math.min((W - 40) / sp, (H - 30) / sp), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' + P.map(b => { const x = (W / 2 + (b.easting - cx) * k).toFixed(1), y = (H / 2 - (b.northing - cy) * k).toFixed(1); return b.well?.installed ? '<circle cx="' + x + '" cy="' + y + '" r="4" fill="#fff" stroke="currentColor" stroke-width="1.6"/><circle cx="' + x + '" cy="' + y + '" r="1.4" fill="currentColor"/>' : '<circle cx="' + x + '" cy="' + y + '" r="3.4" fill="currentColor"/>'; }).join('') + '</svg>';
+}
+S.pq = ''; S.psort = lsGet('bhlog.psort') || 'recent'; S.parch = false;
+function projectsHomeHTML() {
+  const all = projNames().map(projInfo), q = S.pq.trim().toLowerCase(), cp = S.proj, arch = all.filter(x => x.m.archived).length;
+  let L = all.filter(x => (S.parch ? x.m.archived : !x.m.archived) && (!q || [x.name, x.m.projNo, x.m.client, x.m.location].some(v => String(v || '').toLowerCase().includes(q))));
+  L.sort(S.psort === 'name' ? (a, c) => a.name.localeCompare(c.name, undefined, { numeric: true }) : S.psort === 'no' ? (a, c) => String(a.m.projNo).localeCompare(String(c.m.projNo), undefined, { numeric: true }) : (a, c) => ((c.opened > c.edited ? c.opened : c.edited) || '').localeCompare((a.opened > a.edited ? a.opened : a.edited) || ''));
+  const card = x => { const n = x.bs.length, tot = n || 1;
+    return '<article class="pj-card' + (x.name === cp ? ' cur' : '') + (x.m.archived ? ' arch' : '') + '" data-popen="' + esc(x.name) + '" tabindex="0" aria-label="Open ' + esc(x.name || 'No project') + '">'
+      + '<div class="pj-thumb">' + projThumb(x.bs) + (x.name === cp ? '<span class="pj-tag">Open now</span>' : x.m.archived ? '<span class="pj-tag">Archived</span>' : '') + '</div>'
+      + '<div class="pj-body"><h3>' + esc(x.name || 'No project') + '</h3><p class="pj-sub">' + esc([x.m.projNo, x.m.client].filter(Boolean).join(' · ') || ' ') + '</p><p class="pj-loc">' + esc(x.m.location || ' ') + '</p>'
+      + '<p class="pj-stats"><b>' + n + '</b> borehole' + (n === 1 ? '' : 's') + (x.wells ? ' · <b>' + x.wells + '</b> well' + (x.wells === 1 ? '' : 's') : '') + (x.img ? ' · imagery' : '') + '</p>'
+      + (n ? '<div class="pj-bar" title="' + x.st.draft + ' draft, ' + x.st.review + ' for review, ' + x.st.issued + ' issued"><i class="d" style="width:' + (x.st.draft / tot * 100) + '%"></i><i class="r" style="width:' + (x.st.review / tot * 100) + '%"></i><i class="i" style="width:' + (x.st.issued / tot * 100) + '%"></i></div><p class="pj-st">' + [x.st.draft && x.st.draft + ' draft', x.st.review && x.st.review + ' for review', x.st.issued && x.st.issued + ' issued'].filter(Boolean).join(' · ') + '</p>' : '<p class="pj-st">Empty project</p>')
+      + '<p class="pj-time">' + [x.opened && 'Opened ' + agoTxt(x.opened), x.edited && 'edited ' + agoTxt(x.edited)].filter(Boolean).join(' · ') + '</p></div>'
+      + '<button type="button" class="tb pj-more" data-pmenu="' + esc(x.name) + '" aria-label="More for ' + esc(x.name || 'No project') + '" title="More">' + svgI(MORE_I) + '</button></article>'; };
+  const ex = EXAMPLES.filter(x => !all.some(p => p.name === x[2]()));
+  return '<div class="pj-home"><div class="pj-head"><div><h2>Projects</h2><p class="note">' + all.length + ' project' + (all.length === 1 ? '' : 's') + ' on this computer' + (arch ? ', ' + arch + ' archived' : '') + '</p></div><span class="sp"></span>'
+    + '<button class="btn" data-act="open-file">Open a file…</button><button class="btn primary" data-act="new-project"' + (S.readOnly ? ' disabled' : '') + '>New project</button></div>'
+    + '<div class="pj-tools"><input type="search" id="pj-q" placeholder="Search by name, number, client or location" value="' + esc(S.pq) + '" aria-label="Search projects" autocomplete="off">'
+    + '<label class="note" for="pj-sort">Sort</label><select id="pj-sort">' + [['recent', 'Most recent'], ['name', 'Name'], ['no', esc(S.co.projLabel || 'Project No.')]].map(([v, t]) => '<option value="' + v + '"' + (S.psort === v ? ' selected' : '') + '>' + t + '</option>').join('') + '</select>'
+    + (arch || S.parch ? '<button type="button" class="chip" data-parch aria-pressed="' + S.parch + '">Archived ' + arch + '</button>' : '') + '</div>'
+    + (L.length ? '<div class="pj-grid">' + L.map(card).join('') + '</div>' : '<p class="note pj-none">' + (all.length ? (S.parch ? 'No archived projects match.' : 'No projects match.') : 'No projects yet. Start one, open a project file, or try an example below.') + '</p>')
+    + (ex.length && !S.parch && !S.readOnly ? '<h3 class="pj-h3">Examples</h3><div class="pj-ex">' + ex.map(x => '<button type="button" class="pj-exc" data-act="' + x[0] + '">' + svgI('<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.3 6L12 16.5 6.6 19.4l1.3-6L3.4 9.3l6-.7z"/>') + '<span><b>' + esc(x[1][0].toUpperCase() + x[1].slice(1)) + '</b><small>Example project: load it to explore</small></span></button>').join('') + '</div>' : '')
+    + '<label class="check pj-last"><input type="checkbox" data-openlast' + (S.ui.openLast !== false ? ' checked' : '') + '> Open the last project when the app starts</label></div>';
+}
+function emptyProjectHTML(p) {
+  const m = projMeta(p);
+  return '<div class="start pj-empty"><p class="note">Project</p><h2>' + esc(p || 'No project') + '</h2><p>' + esc([m.projNo, m.client, m.location].filter(Boolean).join(' · ')) + '</p>'
+    + '<div class="steps"><div class="step"><span class="n">1</span><h3>Add boreholes</h3><p>Add the first borehole, or bring a set in from Excel. Each copies the project\'s details.</p><div class="actions"><button class="btn primary" data-act="new"' + (S.readOnly ? ' disabled' : '') + '>Add the first borehole</button><button class="btn" data-act="import"' + (S.readOnly ? ' disabled' : '') + '>Import from Excel…</button></div></div>'
+    + '<div class="step"><span class="n">2</span><h3>Check the details</h3><p>Project number, client, location and notes, shared by every log in the project.</p><div class="actions"><button class="btn" data-act="proj-details">Project details…</button></div></div>'
+    + '<div class="step"><span class="n">3</span><h3>Or open a file</h3><p>A project file (.bhp) or a workspace backup from another computer.</p><div class="actions"><button class="btn" data-act="open-file">Open a file…</button></div></div></div>'
+    + '<div class="actions"><button class="btn link" data-act="projects">‹ All projects</button></div></div>';
+}
+/* a small menu under a button: the project switcher and each card's menu */
+function closeProjPop() { $('#pj-pop')?.remove(); }
+function projPop(anchor, html) {
+  closeProjPop(); const r = anchor.getBoundingClientRect(), d = document.createElement('div'); d.id = 'pj-pop'; d.className = 'pj-pop'; d.setAttribute('role', 'menu'); d.innerHTML = html; document.body.append(d);
+  const w = d.offsetWidth; d.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + 'px'; d.style.top = (r.bottom + 4) + 'px'; d.querySelector('button')?.focus();
+}
+function projSwitchPop(anchor) {
+  if ($('#pj-pop')) { closeProjPop(); return; }
+  const cp = curProj(), op = jsonLS('bhlog.projOpened', {}), L = projNames().filter(n => !projMeta(n).archived).sort((a, c) => (op[c] || '').localeCompare(op[a] || '') || a.localeCompare(c)).slice(0, 8);
+  projPop(anchor, '<p class="pj-pop-h">Recent projects</p>' + L.map(n => '<button type="button" role="menuitem" data-popen="' + esc(n) + '"' + (n === cp ? ' aria-current="true"' : '') + '><b>' + esc(n || 'No project') + '</b><small>' + esc([projMeta(n).projNo, projInfo(n).bs.length + ' boreholes'].filter(Boolean).join(' · ')) + '</small></button>').join('')
+    + '<hr><button type="button" role="menuitem" data-act="proj-details">Project details…</button><button type="button" role="menuitem" data-act="projects">All projects…</button><button type="button" role="menuitem" data-act="new-project"' + (S.readOnly ? ' disabled' : '') + '>New project…</button>');
+}
+function projCardPop(anchor, name) {
+  const m = projMeta(name), ro = S.readOnly ? ' disabled' : '';
+  projPop(anchor, '<button type="button" role="menuitem" data-popen="' + esc(name) + '">Open</button><button type="button" role="menuitem" data-pact="details" data-pname="' + esc(name) + '">Details and rename…</button><button type="button" role="menuitem" data-pact="dup" data-pname="' + esc(name) + '"' + ro + '>Duplicate</button><button type="button" role="menuitem" data-pact="save" data-pname="' + esc(name) + '">Save to a file…</button>'
+    + '<button type="button" role="menuitem" data-pact="arch" data-pname="' + esc(name) + '"' + ro + '>' + (m.archived ? 'Unarchive' : 'Archive') + '</button><hr><button type="button" role="menuitem" class="danger-text" data-pact="del" data-pname="' + esc(name) + '"' + ro + '>Delete…</button>');
+}
+/* one place for the project's details; a new name moves everything that belongs to the project */
+function openProjDetails(name) {
+  if (name !== curProj()) openProject(name);
+  const m = projMeta(name), bs = projList(), iss = bs.filter(b => b.status === 'issued').length, ed = !S.readOnly ? '' : ' readonly', site = siteOf() || {};
+  dialog('Project details', '<div class="fields" style="grid-template-columns:1fr 1fr">'
+    + '<div class="fld wide"><label for="pd-name">Project name</label><input id="pd-name" type="text" value="' + esc(name) + '"' + ed + '></div>'
+    + '<div class="fld"><label for="pd-no">' + esc(S.co.projLabel || 'Project No.') + '</label><input id="pd-no" type="text" value="' + esc(m.projNo) + '"' + ed + '></div>'
+    + '<div class="fld"><label for="pd-client">Client</label><input id="pd-client" type="text" value="' + esc(m.client) + '"' + ed + '></div>'
+    + '<div class="fld wide"><label for="pd-loc">Location</label><input id="pd-loc" type="text" value="' + esc(m.location) + '"' + ed + '></div>'
+    + '<div class="fld wide"><label for="pd-guide">Guideline source</label><input id="pd-guide" type="text" value="' + esc(site.guideSrc || '') + '" placeholder="e.g. Alberta Tier 1, fine-grained, residential/parkland"' + ed + '></div>'
+    + '<div class="fld wide"><label for="pd-notes">Notes</label><textarea id="pd-notes" rows="3"' + ed + '>' + esc(m.notes) + '</textarea></div></div>'
+    + '<p class="note" style="margin:0">Coordinate system: <b>EPSG:' + projEpsg() + '</b> ' + esc(crsName('EPSG:' + projEpsg()) || '') + ' <button class="btn link" data-act="crs-project"' + (S.readOnly ? ' disabled' : '') + '>Change…</button></p>'
+    + '<p class="note" style="margin:0">' + bs.length + ' borehole' + (bs.length === 1 ? '' : 's') + '. The number, client and location go on every log that is not issued' + (iss ? ' (' + iss + ' issued log' + (iss === 1 ? ' keeps' : 's keep') + ' theirs until revised)' : '') + '. A new name moves the boreholes, map, layers, imagery and outputs with it.' + (m.created ? ' Created ' + agoTxt(m.created) + '.' : '') + '</p>',
+    '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="pd-save"' + (S.readOnly ? ' disabled' : '') + '>Save</button>');
+  S._pdName = name; $('#pd-name')?.focus();
+}
+async function saveProjDetails() {
+  if (S.readOnly) return; const old = S._pdName, nm = $('#pd-name').value.trim(), v = id => $(id).value.trim();
+  if (!nm) { $('#pd-name').classList.add('bad'); return; }
+  if (nm !== old && projNames().includes(nm)) { $('#pd-name').classList.add('bad'); toast('There is already a project called ' + nm + '.'); return; }
+  const patch = { projNo: v('#pd-no'), client: v('#pd-client'), location: v('#pd-loc'), notes: $('#pd-notes').value.trim() }, guide = v('#pd-guide');
+  closeOverlay(); if (nm !== old) await renameProject(old, nm);
+  setProjMeta(nm, patch); if ((siteOf()?.guideSrc || '') !== guide) setSite({ ...(siteOf() || {}), guideSrc: guide }, nm);
+  let n = 0; for (const b of sortedList()) if ((b.project || '') === nm && editable(b) && ['projNo', 'client', 'location'].some(k => (b[k] || '') !== patch[k])) { b.projNo = patch.projNo; b.client = patch.client; b.location = patch.location; logChange(b, 'Project details changed'); store.save(b); n++; }
+  S.formStale = true; render(); toast((nm !== old ? 'Renamed to ' + nm + '. ' : '') + 'Project details saved' + (n ? ', and ' + n + ' log' + (n === 1 ? '' : 's') + ' updated' : '') + '.');
+}
+/* everything kept under the project's name moves to the new one: boreholes, site record, map layers, imagery, report files and
+   outputs, the linked project file, and when it was opened */
+async function renameProject(old, nw) {
+  if (GIS.proj === old) { try { await gisPersist(old); } catch {} }
+  try { const g = await dataStore.get('gis:' + old); if (g) { await dataStore.put('gis:' + nw, g); await dataStore.del('gis:' + old); } } catch {}
+  if (GIS.proj === old) GIS.proj = nw;
+  for (const f of [q => 'imagery:' + q, REPORT_FILE_KEY, OUT_KEY]) { try { for (const ph of await photoStore.all(f(old))) await photoStore.put({ ...ph, bhId: f(nw) }); } catch {} }
+  const P = projRecs(); if (P[old]) { P[nw] = P[old]; delete P[old]; S.site = { projects: P }; saveSite(); }
+  for (const b of sortedList()) if ((b.project || '') === old) { b.project = nw; if (b.status !== 'issued') logChange(b, 'Project renamed from ' + (old || 'No project')); store.save(b); }
+  for (const M of [S.fh, S.fileAt]) if (M.has(old)) { M.set(nw, M.get(old)); M.delete(old); }
+  const fl = fileLinks(); if (fl[old]) { fl[nw] = fl[old]; delete fl[old]; lsSet('bhlog.files', JSON.stringify(fl)); }
+  const op = jsonLS('bhlog.projOpened', {}); if (op[old]) { op[nw] = op[old]; delete op[old]; lsSet('bhlog.projOpened', JSON.stringify(op)); }
+  if (S.proj === old) { S.proj = nw; lsSet('bhlog.proj', nw); }
+  if (S.mode === 'local') store.saveLocal();
+}
+async function duplicateProject(name) {
+  let nn = name + ' (copy)', k = 2; while (projNames().includes(nn)) nn = name + ' (copy ' + k++ + ')';
+  toast('Copying ' + name + '…');
+  for (const b of sortedList().filter(x => (x.project || '') === name)) { const c = normalize(structuredClone(b)); c.id = uid('bh-'); c.project = nn; if (c.status === 'issued') { c.status = 'draft'; delete c.issued; } S.bh.set(c.id, c); store.save(c);
+    try { for (const ph of await photoStore.all(b.id)) await photoStore.put({ ...ph, id: uid('ph'), bhId: c.id }); } catch {} }
+  const P = projRecs(), r = P[name] ? structuredClone(P[name]) : {};
+  r.meta = { ...(r.meta || {}), id: uid('pj'), created: new Date().toISOString(), archived: false };
+  try { const ims = await photoStore.all('imagery:' + name); r.imagery = await Promise.all((r.imagery || []).map(async i => { const ph = ims.find(x => x.id === i.id), nid = uid('im'); if (ph) await photoStore.put({ ...ph, id: nid, bhId: 'imagery:' + nn }); return { ...i, id: nid }; })); } catch {}
+  try { const fs2 = await photoStore.all(REPORT_FILE_KEY(name)), map = {}; for (const ph of fs2) { map[ph.id] = uid('rf'); await photoStore.put({ ...ph, id: map[ph.id], bhId: REPORT_FILE_KEY(nn) }); } for (const pg of r.report?.pages || []) if (pg.file && map[pg.file]) pg.file = map[pg.file]; } catch {}
+  P[nn] = r; S.site = { projects: P }; saveSite();
+  try { if (GIS.proj === name) await gisPersist(name); const g = await dataStore.get('gis:' + name); if (g) await dataStore.put('gis:' + nn, g); } catch {}
+  if (S.mode === 'local') store.saveLocal(); render(); toast('Made ' + nn + '. Issued logs in the copy are drafts.');
+}
+async function deleteProject(name) {
+  const bs = sortedList().filter(b => (b.project || '') === name);
+  if (!confirm('Delete ' + (name || 'No project') + ' from this computer?\n\nThis removes its ' + bs.length + ' borehole' + (bs.length === 1 ? '' : 's') + (bs.some(b => b.status === 'issued') ? ' (issued logs included)' : '') + ', map, layers, imagery and output pages. Project files saved elsewhere are not touched. This cannot be undone.')) return;
+  for (const f of [q => 'imagery:' + q, REPORT_FILE_KEY, OUT_KEY]) { try { for (const ph of await photoStore.all(f(name))) await photoStore.remove(ph.id); } catch {} }
+  S.fh.delete(name); S.fileAt.delete(name);
+  for (const b of bs) { store.remove(b.id); photoStore.all(b.id).then(ps => ps.forEach(p => photoStore.remove(p.id))).catch(() => {}); }
+  if (GIS.proj === name) { GIS.layers = []; GIS.proj = undefined; }
+  try { await dataStore.del('gis:' + name); } catch {}
+  const P = projRecs(); delete P[name]; S.site = { projects: P }; saveSite();
+  const fl = fileLinks(); if (fl[name]) { delete fl[name]; lsSet('bhlog.files', JSON.stringify(fl)); }
+  const op = jsonLS('bhlog.projOpened', {}); delete op[name]; lsSet('bhlog.projOpened', JSON.stringify(op));
+  if (S.proj === name) { S.proj = null; lsSet('bhlog.proj', ''); }
+  S.sel = null; S.tab = 'projects'; render(); toast('Deleted ' + (name || 'No project') + '.');
+}
+document.addEventListener('click', e => {
+  const pop = $('#pj-pop');
+  if (pop && !pop.contains(e.target) && !e.target.closest('[data-act="proj-switch"], [data-pmenu]')) closeProjPop();
+  if (pop && pop.contains(e.target) && e.target.closest('[data-act]')) setTimeout(closeProjPop);
+  const mn = e.target.closest?.('[data-pmenu]'); if (mn) { e.stopPropagation(); if ($('#pj-pop') && S._pmenu === mn.dataset.pmenu) { closeProjPop(); S._pmenu = null; return; } S._pmenu = mn.dataset.pmenu; projCardPop(mn, mn.dataset.pmenu); return; }
+  const pa = e.target.closest?.('[data-pact]'); if (pa) { const n = pa.dataset.pname, k = pa.dataset.pact; closeProjPop();
+    if (k === 'details') openProjDetails(n); else if (k === 'dup') duplicateProject(n); else if (k === 'save') saveProject(true, n); else if (k === 'del') deleteProject(n);
+    else if (k === 'arch') { const a = !projMeta(n).archived; setProjMeta(n, { archived: a }); if (a && S.proj === n && S.tab !== 'projects') S.tab = 'projects'; render(); toast((a ? 'Archived ' : 'Unarchived ') + (n || 'No project') + '.'); }
+    return; }
+  const o = e.target.closest?.('[data-popen]'); if (o) { openProject(o.dataset.popen); return; }
+  if (e.target.closest?.('[data-parch]')) { S.parch = !S.parch; render(); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#pj-pop')) { closeProjPop(); return; } if (e.key === 'Enter' && e.target.matches?.('.pj-card')) openProject(e.target.dataset.popen); });
+document.addEventListener('input', e => { if (e.target.id !== 'pj-q') return; S.pq = e.target.value; const pos = e.target.selectionStart; renderMain(); const q = $('#pj-q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } });
+document.addEventListener('change', e => { if (e.target.id === 'pj-sort') { S.psort = e.target.value; lsSet('bhlog.psort', S.psort); renderMain(); } else if (e.target.dataset?.openlast != null) { S.ui.openLast = e.target.checked; uiSave(); } });
 /* page header: where you are, and the tools for this page */
 const PAGE_TOOLS = {
   home: [['new', 'New borehole'], ['import', 'Import Excel'], ['round', 'Monitoring round'], ['apply-project', 'Copy details to all boreholes']],
@@ -2931,11 +3135,10 @@ function renderRail() {
   el.innerHTML = RAIL.map(x => typeof x === 'string' ? `<span class="rl">${x === 'Borehole' && b ? esc(b.name) : x}</span>` : `<button data-tab="${x[0]}" aria-current="${S.tab === x[0] ? 'page' : 'false'}" ${b ? '' : 'disabled'}>${x[2]}<span>${x[1]}</span></button>`).join('')
     + '';
 }
-function renderProjPick(list = sortedList()) {
-  const el = $('#proj'); if (!el) return;
-  const ps = [...new Set(list.map(projKey))], curP = projKey(cur() || list[0]);
-  el.innerHTML = (ps.length ? '' : '<option value="" selected disabled>No projects yet</option>') + ps.map(p => `<option value="${esc(p)}" ${p === curP ? 'selected' : ''}>${esc(p || 'No project')} (${list.filter(b => projKey(b) === p).length})</option>`).join('') + (S.readOnly ? '' : '<option value="__new">+ New project…</option>' + exampleOpts(ps));
-  el.disabled = !list.length && S.readOnly;
+function renderProjPick() {
+  const el = $('#proj'); if (!el) return; const home = S.tab === 'projects', p = curProj(), has = projNames().includes(p);
+  el.innerHTML = '<button type="button" class="tbp-home' + (home ? ' on' : '') + '" data-act="projects" title="All projects">' + svgI('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>') + '<span>Projects</span></button>'
+    + (!home && has ? '<span class="tbp-sep" aria-hidden="true">›</span><button type="button" class="tbp-name" data-act="proj-switch" title="' + esc(p || 'No project') + ': switch project or edit its details" aria-haspopup="menu"><span class="tbp-t">' + esc(p || 'No project') + '</span>' + svgI('<path d="M6 9l6 6 6-6"/>') + '</button>' : '');
 }
 /* examples not yet loaded, offered at the foot of the project picker; once loaded they list as ordinary projects */
 const EXAMPLES = [['load-xs', 'cross-section and plume', () => XS_PROJ, () => loadXsExample()], ['load-dl', 'Dawn Lake excavation', () => DL_PROJ, () => loadDlExample()], ['load-sk', 'service-station plume', () => SK_PROJ, () => loadSkExample()], ['load-lloyd', 'oil lease delineation', () => LLOYD_PROJ, () => loadLloydExample()]];
@@ -2949,7 +3152,7 @@ function openNewProject() {
       <div class="fld"><label for="np-no">${esc(S.co.projLabel || 'Project No.')}</label><input id="np-no" type="text"></div>
       <div class="fld"><label for="np-client">Client</label><input id="np-client" type="text"></div>
       <div class="fld wide"><label for="np-loc">Location</label><input id="np-loc" type="text" placeholder="e.g. LSD 08-12-049-02 W4M"></div></div>
-    <p class="note" style="margin:0">Creates the first borehole of the project. Boreholes you add next copy these details.</p>`,
+    <label class="check"><input type="checkbox" id="np-first" checked> Add the first borehole now (BH01)</label><p class="note" style="margin:0">Boreholes you add copy these details. Change them later in Project details.</p>`,
     `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="np-save">Create project</button>`);
   $('#np-name').focus();
 }
@@ -3389,6 +3592,8 @@ function renderMain() {
   const main = $('#main');
   if (!S.loaded) return;
   const b = cur();
+  if (S.tab === 'projects' || (!b && !projNames().length && S.tab !== 'soil')) { S.tab = 'projects'; uiApply(); renderRail(); ctlLayout(); main.dataset.bh = ''; main.innerHTML = projectsHomeHTML(); return; }
+  if (!b && S.tab !== 'soil') { renderRail(); ctlLayout(); main.dataset.bh = ''; main.innerHTML = emptyProjectHTML(curProj()); return; }
   if (!b && S.tab === 'soil') { renderRail(); ctlLayout(); main.dataset.bh = ''; main.innerHTML = '<div id="view"></div>'; renderView(true); return; }   // a soil survey needs no borehole
   if (!b) {
     renderRail(); ctlLayout();
@@ -3437,7 +3642,7 @@ function renderFacts(b) {
 }
 function formFocused() { const a = document.activeElement; return !!(a && a.closest && a.closest('.edit')); }
 function renderView(full) {
-  const v = $('#view'); if (!v) return; ctlLayout();
+  const v = $('#view'); if (!v || S.tab === 'projects') return; ctlLayout();
   if (S.tab === 'reports') S.tab = 'compose';   // the Reports page and the report editor are one page
   const b = cur();
   if (S.tab === 'edit') {
@@ -7509,7 +7714,7 @@ S.fh = new Map(); S.fileAt = new Map();   // project -> file handle and time of 
 const MOD = /Mac|iP(hone|ad|od)/.test(navigator.platform) ? '⌘' : 'Ctrl+';
 const fileSlug = s => (s || '').replace(/[\\/:*?"<>|#%]+/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
 const canPick = () => 'showSaveFilePicker' in window && window.self === window.top;
-const projDirty = (p = projKey(projList()[0])) => { const at = S.fileAt.get(p); return !!at && (sortedList().some(b => projKey(b) === p && (b.updated || '') > at) || (S.site?.projects?.[p]?.edited || '') > at || (S.gisEdited?.[p] || '') > at); };
+const projDirty = (p = curProj()) => { const at = S.fileAt.get(p); return !!at && (sortedList().some(b => projKey(b) === p && (b.updated || '') > at) || (S.site?.projects?.[p]?.edited || '') > at || (S.gisEdited?.[p] || '') > at); };
 async function photosFor(ids) { try { const all = await photoStore.all(); return ids ? all.filter(ph => ids.has(ph.bhId)) : all; } catch { return []; } }
 async function saveProject(as, proj, quiet) {
   const list = proj == null ? projList() : sortedList().filter(b => projKey(b) === proj); if (!list.length && !surveyOf().points.length) { if (!quiet) toast('There are no boreholes in this project to save.'); return; }
@@ -7638,7 +7843,7 @@ async function restore(file, handle) {
 }
 function openFileMenu() {
   if ($('#menu')) { closeMenu(); return; }
-  const p = projKey(projList()[0]), h = S.fh.get(p), at = S.fileAt.get(p), ws = S.fh.get(WS_KEY);
+  const p = curProj(), h = S.fh.get(p), at = S.fileAt.get(p), ws = S.fh.get(WS_KEY);
   const state = h ? `Linked to ${h.name}${projDirty(p) ? ' · changes not yet saved to it' : ' · up to date'}` : at ? `Downloaded ${fmtTime(at)}${projDirty(p) ? ' · changed since' : ''}` : 'Not saved to a file yet. Everything is also kept in this browser.';
   const I = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
   const items = [
@@ -9586,7 +9791,7 @@ function placeTyped() {
   b.easting = c.e; b.northing = c.n; if (!b.crs) b.crs = `UTM NAD83(CSRS) Zone ${c.zone}`;
   if (el != null) b.elevation = +fromD(el).toFixed(3);
   logChange(b, 'Location typed in on the site plan'); store.save(b);
-  const W = S._plan?.W || 800, H = S._plan?.H || 460; S.mv = { cx: c.e, cy: c.n, sc: S.mv?.sc || Math.min(W, H) / 800 }; S.mvProj = projKey(projList()[0]);
+  const W = S._plan?.W || 800, H = S._plan?.H || 460; S.mv = { cx: c.e, cy: c.n, sc: S.mv?.sc || Math.min(W, H) / 800 }; S.mvProj = curProj();
   toast(`${b.name} placed at ${c.e.toFixed(1)} E, ${c.n.toFixed(1)} N${el != null ? `, ground ${fu(b.elevation)}` : ''}${p.approx ? ' (approximate: the centre of the section)' : ''}.${warn}`);
   S.placeId = nextToPlace(); render();
 }
@@ -9781,7 +9986,7 @@ let mvT; const redrawSoon = () => { clearTimeout(mvT); mvT = setTimeout(() => dr
 function zoomAt(px, py, k) {
   const t = S._plan; if (!t) return;
   const we = t.cx + (px - t.W / 2) / t.sc, wn = t.cy - (py - t.H / 2) / t.sc, sc = Math.max(.003, Math.min(t.sc * k, 300));
-  S.mv = { sc, cx: we - (px - t.W / 2) / sc, cy: wn + (py - t.H / 2) / sc }; S.mvProj = projKey(projList()[0]);
+  S.mv = { sc, cx: we - (px - t.W / 2) / sc, cy: wn + (py - t.H / 2) / sc }; S.mvProj = curProj();
   previewView(); redrawSoon();
 }
 document.addEventListener('pointerdown', e => {   // marking bad spots for Fix bad spots in an elevation map
@@ -9804,14 +10009,14 @@ document.addEventListener('pointerdown', e => {
 document.addEventListener('pointermove', e => {
   if (!mPan) return;
   const dx = e.clientX - mPan.x, dy = e.clientY - mPan.y; if (Math.abs(dx) + Math.abs(dy) > 3) mPan.moved = true;
-  S.mv = { sc: mPan.v.sc, cx: mPan.v.cx - dx / mPan.v.sc, cy: mPan.v.cy + dy / mPan.v.sc }; S.mvProj = projKey(projList()[0]); previewView();
+  S.mv = { sc: mPan.v.sc, cx: mPan.v.cx - dx / mPan.v.sc, cy: mPan.v.cy + dy / mPan.v.sc }; S.mvProj = curProj(); previewView();
 });
 document.addEventListener('pointerup', () => { if (!mPan) return; const m = mPan; mPan = null; if (m.moved) drawPlan(); else if (S.mapEdit && S.mapSel) { S.mapSel = null; refreshMapEd(); } });
 
 /* ---------- imagery: orthomosaics and other georeferenced pictures, kept in the browser's picture store ---------- */
 S.imgCache = new Map();
 const imageryOf = () => siteOf()?.imagery || [];
-const imgKey = () => 'imagery:' + projKey(projList()[0]);
+const imgKey = () => 'imagery:' + curProj();
 async function loadImagery() {
   if (!imageryOf().some(i => !S.imgCache.has(i.id))) return;
   try { for (const p of await photoStore.all(imgKey())) { S.imgCache.set(p.id, p.data); const clear = await whiteEdgesClear(p.data).catch(() => null); if (clear) S.imgCache.set(p.id, clear); } } catch {}
@@ -9907,7 +10112,7 @@ async function addImageryGo() {
   try { await photoStore.put({ id, bhId: imgKey(), caption: $('#im-name').value || r.name, data: r.data, takenAt: new Date().toISOString() }); } catch { toast('The imagery could not be stored in this browser.'); return; }
   S.imgCache.set(id, r.data); S._imgPend = null;
   setSite({ ...(siteOf() || {}), imagery: [...imageryOf(), { id, name: $('#im-name').value || r.name, e0, n0, e1, n1, op: 1 }] }); S.lyr.ortho = true; lsSet('bhlog.lyr', JSON.stringify(S.lyr)); S.tocSel = 'img:' + id; S.tocFold.delete('ortho');
-  closeOverlay(); S.mv = { cx: (e0 + e1) / 2, cy: (n0 + n1) / 2, sc: Math.min((S._plan?.W || 800) / (e1 - e0), (S._plan?.H || 600) / (n1 - n0)) * .95 }; S.mvProj = projKey(projList()[0]);
+  closeOverlay(); S.mv = { cx: (e0 + e1) / 2, cy: (n0 + n1) / 2, sc: Math.min((S._plan?.W || 800) / (e1 - e0), (S._plan?.H || 600) / (n1 - n0)) * .95 }; S.mvProj = curProj();
   render(); toast('Imagery added. It is drawn under the boreholes and shapes.');
 }
 /* imagery with a white frame (added before see-through edges were kept, or exported that way): the near-white area joined to
@@ -9938,7 +10143,7 @@ function imageryAct(t) {
   const list = imageryOf(), i = list.find(x => x.id === (t.dataset.imop || t.dataset.imzoom || t.dataset.imdel || t.dataset.imclear)); if (!i) return;
   if (t.dataset.imclear) { clearImageryEdges(i); return; }
   if (t.dataset.imop) { i.op = +t.value; setSite({ ...siteOf(), imagery: list }); drawPlan(); return; }
-  if (t.dataset.imzoom) { S.mv = { cx: (i.e0 + i.e1) / 2, cy: (i.n0 + i.n1) / 2, sc: Math.min(S._plan.W / (i.e1 - i.e0), S._plan.H / (i.n1 - i.n0)) * .95 }; S.mvProj = projKey(projList()[0]); drawPlan(); return; }
+  if (t.dataset.imzoom) { S.mv = { cx: (i.e0 + i.e1) / 2, cy: (i.n0 + i.n1) / 2, sc: Math.min(S._plan.W / (i.e1 - i.e0), S._plan.H / (i.n1 - i.n0)) * .95 }; S.mvProj = curProj(); drawPlan(); return; }
   if (t.dataset.imdel) { setSite({ ...siteOf(), imagery: list.filter(x => x !== i) }); photoStore.remove(i.id).catch(() => {}); S.imgCache.delete(i.id); if (S.tocSel === 'img:' + i.id) S.tocSel = null; if ($('#map-ed-wrap')) refreshMapEd(); else renderView(true); }
 }
 
@@ -10106,11 +10311,11 @@ Object.defineProperty(S, 'secIds', {
   configurable: true,
   get() {
     if (RO.secDef) return (RO._secPick ||= new Set(RO.secDef.pick || []));
-    const p = projKey(projList()[0]); if (S._secP !== p) { S._secP = p; S._secSet = new Set((siteOf()?.secPick || []).filter(id => S.bh.has(id))); }
+    const p = curProj(); if (S._secP !== p) { S._secP = p; S._secSet = new Set((siteOf()?.secPick || []).filter(id => S.bh.has(id))); }
     return S._secSet;
   },
   // clearing on a project change reloads the project's own pick; a new order is kept (secPickSave writes it to the project)
-  set(v) { if (!v?.size) { S._secP = null; return; } S._secSet = v; S._secP = projKey(projList()[0]); },
+  set(v) { if (!v?.size) { S._secP = null; return; } S._secSet = v; S._secP = curProj(); },
 });
 function secPickSave() { if (S.readOnly) return; const st = { ...(siteOf() || {}) }, ids = [...S.secIds]; if (ids.length) st.secPick = ids; else delete st.secPick; setSite(st); }
 /* the section as it is now, to keep with an output page's section */
@@ -10136,7 +10341,7 @@ const secCandidates = () => mapList().filter(b => b.easting != null && b.northin
 const secWithin = (pts, buf) => secCandidates().filter(b => plProject(pts, b.easting, b.northing).dist <= buf).map(b => b.id);
 // changes the line in use (null: use picked boreholes instead; the lines stay)
 function setSecLine(l) { const ls = secLinesOf(), a = secActiveLine(); if (!l) { saveSecLines(ls, null); return; } if (a) saveSecLines(ls.map(x => x.id === a.id ? { ...a, ...l, id: a.id, name: a.name } : x), a.id); else { const n = { id: uid('ln'), name: nextSecName(), ...l }; saveSecLines([...ls, n], n.id); } }
-const sectionList = () => secLineOf() ? (() => { const L = secLineOf(), ids = new Set(L.ids || []); return mapList().filter(b => ids.has(b.id)); })() : S.secIds.size >= 2 ? [...S.secIds].map(id => S.bh.get(id)).filter(b => b && onMap(b) && projKey(b) === projKey(projList()[0])) : mapList();
+const sectionList = () => secLineOf() ? (() => { const L = secLineOf(), ids = new Set(L.ids || []); return mapList().filter(b => ids.has(b.id)); })() : S.secIds.size >= 2 ? [...S.secIds].map(id => S.bh.get(id)).filter(b => b && onMap(b) && projKey(b) === curProj()) : mapList();
 const SEC_OPTS = {
   h: { label: 'Height', opts: { s: ['Small', 320], m: ['Medium', 420], l: ['Large', 560] } },
   ve: { label: 'Vertical exaggeration', opts: { auto: ['Auto', 0], 1: ['×1', 1], 2: ['×2', 2], 5: ['×5', 5], 10: ['×10', 10], 20: ['×20', 20] } },
@@ -10327,7 +10532,7 @@ function planSVG(W, H, interactive) {
   const span = Math.max(x1 - x0, y1 - y0, 20) * 1.1; let cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   let sc = RO.scale ? PX_PER_M / RO.scale : Math.min((W - 2 * pad) / span, (H - 2 * pad) / span);
   if (interactive && S.mvTab === 'soil') { S.mv = null; S.mvTab = 'site'; }
-  if (interactive && S.mv && S.mvProj !== projKey(projList()[0])) S.mv = null;
+  if (interactive && S.mv && S.mvProj !== curProj()) S.mv = null;
   const free = RO.scale || RO.cx != null || (interactive && S.mv); if (interactive && S.mv) ({ cx, cy, sc } = S.mv);
   if (RO.cx != null) { cx = RO.cx; cy = RO.cy; }   // a report map's own view (set by pan & zoom)
   RO.cxd = cx; RO.cyd = cy;
@@ -11606,7 +11811,7 @@ async function gisLoad(p) {
   GIS.proj = p; gisSig = gisSigOf();
 }
 async function gisWatch() {
-  if (gisBusy || S.loadFail) return; const p = projKey(projList()[0]);
+  if (gisBusy || S.loadFail) return; const p = curProj();
   gisBusy = true;
   try {
     if (p !== GIS.proj) {   // another project: what was open is saved (if it changed), this one's layers are loaded
@@ -12948,7 +13153,7 @@ function homeHTML() {
   const labN = list.reduce((a, b) => a + (b.samples || []).filter(sm => Object.values(sm.lab || {}).some(r => r?.v != null)).length, 0), exN = list.reduce((a, b) => a + (b.samples || []).filter(sm => Object.keys(sm.lab || {}).some(p => exceeds(labVal(sm, p), p))).length, 0);
   const rounds = roundDates().length, located = list.filter(b => b.easting != null).length, issued = list.filter(b => b.status === 'issued').length, p0 = list[0] || {};
   const steps = [
-    ['Set up the project', [p0.projNo, p0.client, p0.location].every(Boolean) ? 'Done' : 'To do', [p0.projNo, p0.client, p0.location].filter(Boolean).join(' · ') || 'Project number, client and location', 'go-details', 'Edit details'],
+    ['Set up the project', [p0.projNo, p0.client, p0.location].every(Boolean) ? 'Done' : 'To do', [p0.projNo, p0.client, p0.location].filter(Boolean).join(' · ') || 'Project number, client and location', 'proj-details', 'Project details'],
     ['Log boreholes', !list.length ? 'To do' : issued === list.length ? 'Done' : 'In progress', `${list.length} logged · ${review.length} for review · ${issued} issued`, 'new', 'New borehole'],
     ['Lab results', labN ? 'In progress' : 'To do', labN ? `${labN} sample${labN === 1 ? '' : 's'} with results${exN ? ` · ${exN} exceed guidelines` : ''}` : 'Enter results against each sample', 'go-lab', 'Add results'],
     ['Groundwater', rounds ? 'Done' : wells ? 'To do' : 'Not needed', rounds ? `${rounds} monitoring round${rounds === 1 ? '' : 's'}${!F.error && !F.flat ? ` · flow ${Math.round(F.az)}° ${F.dir}` : ''}` : wells ? `${wells} well${wells === 1 ? '' : 's'} to read` : 'No wells installed', 'round', 'Monitoring round'],
@@ -13042,7 +13247,7 @@ const bytesDataUrl = (bytes, type) => new Promise((res, rej) => { const fr = new
 const openPdf = data => pdfjsLib.getDocument({ data, isEvalSupported: false });
 async function reportFile(id) {
   if (!RFILES.has(id)) RFILES.set(id, (async () => {
-    const rec = (await photoStore.all(REPORT_FILE_KEY(projKey(projList()[0])))).find(x => x.id === id) || (await photoStore.all()).find(x => x.id === id);
+    const rec = (await photoStore.all(REPORT_FILE_KEY(curProj()))).find(x => x.id === id) || (await photoStore.all()).find(x => x.id === id);
     if (!rec) throw new Error('The imported file is missing.');
     const bytes = dataUrlBytes(rec.data);
     return { bytes, rec, doc: await openPdf(bytes.slice()).promise };
@@ -13086,7 +13291,7 @@ const pageLabel = p => p.kind === 'free' || p.kind === 'pdf' ? (p.title || 'Unti
 const pageSub = p => p.kind === 'free' ? `${p.items.length} item${p.items.length === 1 ? '' : 's'}` : p.kind === 'pdf' ? `Imported PDF, page ${p.page}${p.rot ? `, turned ${p.rot}°` : ''}` : 'Fills itself from the data';
 async function importReportFiles(files, at = S.cpage) {
   if (S.readOnly) return 0;
-  const L = repLayout(), p = projKey(projList()[0]);
+  const L = repLayout(), p = curProj();
   let pos = Math.min(L.pages.length, (at ?? L.pages.length - 1) + 1), added = 0;
   for (const file of files) {
     if (/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name)) {
@@ -13112,7 +13317,7 @@ async function importReportFiles(files, at = S.cpage) {
   return added;
 }
 S.cpage = 0; S.csel = null;
-function repLayout() { const r = siteOf()?.report; if (r?.pages?.length) return r; return S._repDraft?.p === projKey(projList()[0]) ? S._repDraft.L : (S._repDraft = { p: projKey(projList()[0]), L: { pages: REPORT_PRESETS.standard[1]() } }).L; }
+function repLayout() { const r = siteOf()?.report; if (r?.pages?.length) return r; return S._repDraft?.p === curProj() ? S._repDraft.L : (S._repDraft = { p: curProj(), L: { pages: REPORT_PRESETS.standard[1]() } }).L; }
 function saveLayout(L) { if (S.readOnly) return; setSite({ ...(siteOf() || {}), report: L }); }
 const curPage = () => { const L = repLayout(); S.cpage = Math.max(0, Math.min(S.cpage, L.pages.length - 1)); return L.pages[S.cpage]; };
 
@@ -13458,18 +13663,18 @@ async function updateOutput() {
   const E = S.outEdit; if (!E) return null; const r = (await outputsOf()).find(x => x.id === E.id); if (!r) { toast('That output is no longer there; save these pages as a new output.'); return null; }
   const L = repLayout(), pages = await freezePages(L); if (!pages) { toast('There are no pages to save.'); return null; }
   const rec = { ...r, pages, marks: L.pages.map(pageLabel), layout: structuredClone(L), updatedAt: new Date().toISOString(), by: S.me || r.by || '' };
-  await photoStore.put(rec); autosaveSoon(projKey(projList()[0])); return rec;
+  await photoStore.put(rec); autosaveSoon(curProj()); return rec;
 }
 /* stop editing an output: the pages that were in the editor before come back */
 function closeOutputEdit() { const E = S.outEdit; if (!E) return; S.outEdit = null; if (E.keep) saveLayout(E.keep); S.cpage = 0; S.csel = null; S.cmulti = new Set(); S.cout = true; rerenderCompose(); }
 async function saveOutput(name, fig = false) {
-  const all = repLayout(), p = projKey(projList()[0]), L = fig ? { ...all, pages: [curPage()].filter(Boolean) } : all;
+  const all = repLayout(), p = curProj(), L = fig ? { ...all, pages: [curPage()].filter(Boolean) } : all;
   const pages = await freezePages(L); if (!pages) { toast('There are no pages to save.'); return null; }
   if (fig && !S.readOnly) saveLayout(all);   // the page's sections now keep their own section
   const rec = { id: uid('out'), bhId: OUT_KEY(p), kind: 'output', fig: fig || undefined, name: name || 'Output', takenAt: new Date().toISOString(), by: S.me || '', pages, marks: L.pages.map(pageLabel), layout: structuredClone(L) };
   await photoStore.put(rec); autosaveSoon(p); return rec;
 }
-const outputsOf = async () => { try { return (await photoStore.all(OUT_KEY(projKey(projList()[0])))).filter(r => r.kind === 'output').sort((a, c) => S.outSort === 'new' ? (c.updatedAt || c.takenAt || '').localeCompare(a.updatedAt || a.takenAt || '') : (a.name || '').localeCompare(c.name || '', undefined, { numeric: true }) || (c.takenAt || '').localeCompare(a.takenAt || '')); } catch { return []; } };
+const outputsOf = async () => { try { return (await photoStore.all(OUT_KEY(curProj()))).filter(r => r.kind === 'output').sort((a, c) => S.outSort === 'new' ? (c.updatedAt || c.takenAt || '').localeCompare(a.updatedAt || a.takenAt || '') : (a.name || '').localeCompare(c.name || '', undefined, { numeric: true }) || (c.takenAt || '').localeCompare(a.takenAt || '')); } catch { return []; } };
 S.outSel = new Set();
 const svgUrl = svg => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 async function fillOutputs() {
@@ -13505,15 +13710,15 @@ async function outputAct(act, id) {
   const r = (await outputsOf()).find(x => x.id === id); if (!r) return;
   if (act === 'pdf') { toast('Creating PDF…'); try { await saveFile(`${fileSlug(r.name) || 'output'}.pdf`, pdfBlob(await outputBytes(r))); } catch (e) { toast(e.message || 'The PDF could not be created.'); } return; }
   if (act === 'open') { dialog(esc(r.name), `<p class="note" style="margin:0">Saved ${new Date(r.takenAt).toLocaleString('en-CA')}. These pages stay as they were saved.</p><div class="out-view">${r.pages.map((q, i) => q.svg ? `<figure><img src="${svgUrl(q.svg)}" alt="Page ${i + 1}"><figcaption class="note">Page ${i + 1}</figcaption></figure>` : `<figure class="out-pdfpg"><span class="note">Page ${i + 1}: imported PDF page (${esc(q.pdf.title || '')})</span></figure>`).join('')}</div>`, `<button class="btn" data-act="close">Close</button><button class="btn primary" data-outact="pdf" data-out="${r.id}">PDF</button>`); return; }
-  if (act === 'rename') { const n = prompt('Name of this output', r.name); if (!n || !n.trim()) return; await photoStore.put({ ...r, name: n.trim() }); autosaveSoon(projKey(projList()[0])); fillOutputs(); return; }
-  if (act === 'del') { if (!confirm(`Delete the output “${r.name}”? This cannot be undone.`)) return; if (S.outEdit?.id === r.id) S.outEdit = { ...S.outEdit, id: null }; await photoStore.remove(r.id); autosaveSoon(projKey(projList()[0])); fillOutputs(); return; }
+  if (act === 'rename') { const n = prompt('Name of this output', r.name); if (!n || !n.trim()) return; await photoStore.put({ ...r, name: n.trim() }); autosaveSoon(curProj()); fillOutputs(); return; }
+  if (act === 'del') { if (!confirm(`Delete the output “${r.name}”? This cannot be undone.`)) return; if (S.outEdit?.id === r.id) S.outEdit = { ...S.outEdit, id: null }; await photoStore.remove(r.id); autosaveSoon(curProj()); fillOutputs(); return; }
   if (act === 'edit') { if (!confirm(`Put a copy of “${r.name}” in the editor? It replaces the pages being edited now (save those as an output first to keep them). The copy draws from the current map and data.`)) return;
     saveLayout(outputLayout(r)); S.outEdit = null; S.cout = false; S.csort = false; S.cpage = 0; S.csel = null; rerenderCompose(); toast(`A copy of ${r.name} is in the editor.`); }
   if (act === 'open-edit') { if (!r.layout?.pages?.length) { toast('This output has no pages to edit.'); return; }
     // the pages being edited now are kept, and come back when editing the output is closed
     const keep = S.outEdit ? S.outEdit.keep : structuredClone(repLayout());
     saveLayout(outputLayout(r)); S.outEdit = { id: r.id, name: r.name, keep }; S.cout = false; S.csort = false; S.cpage = 0; S.csel = null; S.cmulti = new Set(); rerenderCompose(); toast(`Editing ${r.name}. Update output saves your changes to it.`); return; }
-  if (act === 'dup') { const n = { ...structuredClone(r), id: uid('out'), name: r.name + ' (copy)', takenAt: new Date().toISOString(), by: S.me || r.by || '' }; delete n.updatedAt; await photoStore.put(n); autosaveSoon(projKey(projList()[0])); fillOutputs(); toast(`Made ${n.name}.`); return; }
+  if (act === 'dup') { const n = { ...structuredClone(r), id: uid('out'), name: r.name + ' (copy)', takenAt: new Date().toISOString(), by: S.me || r.by || '' }; delete n.updatedAt; await photoStore.put(n); autosaveSoon(curProj()); fillOutputs(); toast(`Made ${n.name}.`); return; }
 }
 async function buildReport() {
   if (!window.PDFLib) { toast('The PDF library did not load.'); return; }
@@ -14472,8 +14677,8 @@ function guideSetHTML(ed) {
 }
 /* ---------- site image (georeferenced by two corners) ---------- */
 /* site plan image per project (older saves held one image for every project; it stays as the fallback) */
-function siteOf() { const p = (cur() || sortedList()[0])?.project || ''; return S.site?.projects ? (S.site.projects[p] || S.site.projects['*'] || null) : (S.site?.img ? S.site : null); }
-function setSite(st, p = (cur() || sortedList()[0])?.project || '', stamp = true) {
+function siteOf() { const p = curProj(); return S.site?.projects ? (S.site.projects[p] || S.site.projects['*'] || null) : (S.site?.img ? S.site : null); }
+function setSite(st, p = curProj(), stamp = true) {
   const projects = { ...(S.site?.projects || (S.site?.img ? { '*': S.site } : {})) };
   if (st) projects[p] = stamp ? { ...st, edited: new Date().toISOString() } : st; else { delete projects[p]; delete projects['*']; }
   S.site = { projects }; saveSite(); autosaveSoon(p);
@@ -15328,8 +15533,15 @@ document.addEventListener('click', e => {
     case 'gp-show': { gpUse(GIS.jobs.get(t.dataset.id)); goTab('site'); break; }
     case 'gp-cmp-use': { const m = t.dataset.m; S.gp.tool = m; gpSave(); gpUse({ job: { method: m }, p0: S.gp.p, prm: {}, cell: S.gp.cell, label: GP_TOOLS[m].name + ' (' + GP_TOOLS[m].by + ')' }); renderView(true); break; }
     case 'new-project': openNewProject(); break;
+    case 'projects': closeProjPop(); S.tab = 'projects'; S.gpPanel = null; render(); break;
+    case 'proj-switch': projSwitchPop(e.target.closest('[data-act]')); break;
+    case 'proj-details': closeProjPop(); openProjDetails(curProj()); break;
+    case 'pd-save': saveProjDetails(); break;
     case 'np-save': {
       const name = $('#np-name').value.trim(); if (!name) { $('#np-name').classList.add('bad'); $('#np-name').focus(); return; }
+      if (projNames().includes(name)) { $('#np-name').classList.add('bad'); toast('There is already a project called ' + name + '.'); return; }
+      setProjMeta(name, { projNo: $('#np-no').value.trim(), client: $('#np-client').value.trim(), location: $('#np-loc').value.trim() }); projOpened(name);
+      if (!$('#np-first').checked) { closeOverlay(); openProject(name); toast('Project ' + name + ' created.'); break; }
       const nb = blankBorehole('BH01'); Object.assign(nb, { project: name, projNo: $('#np-no').value.trim(), client: $('#np-client').value.trim(), location: $('#np-loc').value.trim() });
       S.bh.set(nb.id, nb); store.save(nb); S.sel = nb.id; S.layer = 0; S.tab = 'edit'; closeOverlay(); S.formStale = true; render(); $('#f-name')?.focus(); $('#f-name')?.select(); toast(`Project created with ${nb.name}.`); break;
     }
@@ -15338,7 +15550,7 @@ document.addEventListener('click', e => {
         `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="new-go">Create borehole</button>`); break;
     }
     // falls through when there are no templates
-    case 'new-go': { if (S.readOnly) return; const tid = $('#nt-pick input:checked')?.value || ''; if (!$('#overlay').hidden) closeOverlay(); const nb = newFromTemplate(tid); if (S.qlOpen) closeQL(); S.bh.set(nb.id, nb); store.save(nb); S.sel = nb.id; S.layer = 0; S.tab = 'edit'; S.formStale = true; render(); $('#f-name')?.focus(); $('#f-name')?.select(); break; }
+    case 'new-go': { if (S.readOnly) return; const tid = $('#nt-pick input:checked')?.value || ''; if (!$('#overlay').hidden) closeOverlay(); const nb = newFromTemplate(tid); if (!b && projNames().includes(curProj())) { const m = projMeta(curProj()); Object.assign(nb, { project: curProj(), projNo: m.projNo, client: m.client, location: m.location }); } if (S.qlOpen) closeQL(); S.bh.set(nb.id, nb); store.save(nb); S.sel = nb.id; S.layer = 0; S.tab = 'edit'; S.formStale = true; render(); $('#f-name')?.focus(); $('#f-name')?.select(); break; }
     case 'duplicate': { if (S.readOnly || !b) return; const nb = blankBorehole(nextName()); for (const k of HEADER_COPY) nb[k] = b[k]; S.bh.set(nb.id, nb); store.save(nb); S.sel = nb.id; S.layer = 0; S.tab = 'edit'; S.formStale = true; render(); toast(`Created ${nb.name} with the same project and drilling details.`); break; }
     case 's-add': addRow('samples'); break;
     case 'ev-add': if (editable(b)) { S.dtab = 'notes'; (S.dsel ||= {}).events = b.events.length; { const l = b.layers[S.layer] || b.layers[0]; b.events.push({ id: uid('e'), time: new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 16), layer: l?.id || '', depth: l?.top ?? null, to: l?.bottom ?? null, text: '' }); } logChange(b, 'Drilling notes'); store.save(b); renderView(true); } break;
@@ -15587,7 +15799,7 @@ setSync();
    An item is [label, act, shortcut] ('tab:<page>' opens a page); '-' is a separator. Shortcuts are written Mod+S (Ctrl on
    Windows, ⌘ on Mac). Roles are native-only items the desktop app supplies itself (cut, copy, paste, zoom...). */
 const MENUS = [
-  ['File', [['New project…', 'new-project'], ['New borehole', 'new', 'Mod+N'], '-', ['Open…', 'open-file', 'Mod+O'], ['Save project', 'save-proj', 'Mod+S'], ['Save project as…', 'save-proj-as', 'Mod+Shift+S'], '-',
+  ['File', [['Projects…', 'projects'], ['New project…', 'new-project'], ['Project details…', 'proj-details'], ['New borehole', 'new', 'Mod+N'], '-', ['Open…', 'open-file', 'Mod+O'], ['Save project', 'save-proj', 'Mod+S'], ['Save project as…', 'save-proj-as', 'Mod+Shift+S'], '-',
     ['Import Excel into this project…', 'import'], ['Import lab results into this project…', 'imp-lab'], ['Import a borehole into this project (.bh)…', 'imp-bh'], '-',
     ['Export this borehole (.bh)…', 'save-bh'], ['Export Excel workbook…', 'export'], ['Export all data (Excel)…', 'export-data'], ['Export AGS 4…', 'ags'], ['Export GIS…', 'gis'], '-', ['Back up everything (.bhlog)…', 'backup'], '-', ['Settings…', 'prefs', 'Mod+,']]],
   ['Edit', [['Undo', 'undo', 'Mod+Z'], ['Redo', 'redo', 'Mod+Y'], '-', { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }, '-', ['Find…', 'find', 'Mod+F']]],
@@ -15668,7 +15880,7 @@ document.addEventListener('keydown', e => {
 });
 /* status bar: save state, project, borehole and its problems, units */
 function renderStatus() {
-  const b = cur(), p = projKey(b || projList()[0]), n = projList().length;
+  const b = cur(), p = curProj(), n = projList().length;
   const set = (id, h) => { const el = $('#' + id); if (el && el.innerHTML !== h) el.innerHTML = h; };
   set('sb-proj', p ? `Project <b>${esc(p.length > 60 ? p.slice(0, 58) + '…' : p)}</b>` : 'No project');
   set('sb-bh', b ? `Borehole <b>${esc(b.name || 'Untitled')}</b> · ${esc(STATUS_LABEL[b.status || 'draft'] || b.status || 'Draft')}${b.status === 'issued' ? ` Rev ${b.rev || 0} (locked)` : ''}` : 'No borehole selected');
