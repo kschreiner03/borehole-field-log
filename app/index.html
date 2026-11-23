@@ -473,8 +473,6 @@ body.proj-home .shell { --sidebar-width: 0px; grid-template-columns: 0 0 minmax(
 .dl-st { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; border: 1px solid var(--c); color: var(--c); white-space: nowrap; }
 .dl-sd { display: inline-block; width: 20px; margin-right: 3px; border-radius: 3px; text-align: center; font: 600 11px/18px var(--f-body); color: #fff; } .dl-sd.ok { background: #2e8b57; } .dl-sd.mo { background: #d9822b; } .dl-sd.no { background: #c0392b; }
 .gw-side { grid-template-columns: minmax(0, 1fr); } .lab-lock { margin: 0 0 8px; padding: 8px 12px; border-left: 4px solid #d9822b; background: rgba(217,130,43,.1); font-size: 13px; } .lab-lk { color: #a3470b; font-weight: 600; } .dl-warn { margin: 0 0 12px; } .qc-set { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px 16px; } .lab-view > .sec + .sec, .lab-map + .sec { margin-top: var(--gap, 16px); }
-.fg-bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin: 0 0 12px; font-size: 13px; } .fg-bar label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); } .fg-bar select { width: auto; min-height: 32px; }
-.fg-card .body { padding: 0 !important; } .fg-card svg { display: block; width: 100%; height: auto; } #fig-tip { position: fixed; z-index: 90; max-width: 320px; padding: 6px 10px; border-radius: 5px; background: #14181c; color: #fff; font: 12.5px var(--f-body); pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 /* Overview page */
 .kpi-go { cursor: pointer; } .kpi-go:hover { border-color: var(--accent); border-left-color: inherit; background: var(--hover); }
 .ov-prog { display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: var(--rule); overflow: hidden; } .ov-prog i { display: block; height: 100%; background: var(--ok, #2e8b57); }
@@ -2380,8 +2378,6 @@ const LAYER_DEFS = [   // top of the list draws on top, as in a GIS
   ['legend', 'Legend', '<rect x="1.5" y="2.5" width="13" height="11" rx="1.5" style="fill:#fff;stroke:var(--muted)"/><circle cx="4.5" cy="6" r="1.4" style="fill:var(--ink)"/><path d="M7 6h5M7 10h5" style="stroke:var(--muted)"/><circle cx="4.5" cy="10" r="1.4" style="fill:none;stroke:var(--ink)"/>'],
   ['labels', 'Borehole labels', '<text x="2" y="12" style="font:700 10px var(--f-body);fill:var(--ink)">Aa</text>'],
   ['res', 'Results: VOC and lab', '<circle cx="8" cy="8" r="6" style="fill:#f6a868;stroke:var(--ink)" stroke-width=".8"/><circle cx="8" cy="8" r="2" style="fill:var(--ink)"/>'],
-  ['cores', 'Core strips', '<rect x="5" y="1.5" width="6" height="13" rx="2" style="fill:var(--raised);stroke:var(--muted)"/><path d="M5 6h6M5 9.5h6" stroke="#b9500f" stroke-width="2.4"/>'],
-  ['sig', 'Fingerprint bars', '<path d="M1.5 6h7v4h-7z" fill="#2a78d6"/><path d="M9 6h3.5v4H9z" fill="#eb6834"/><path d="M13 6h1.5v4H13z" fill="#1baf7a"/>'],
   ['wl', 'Water elevations', '<text x="1" y="12" style="font:600 9.5px var(--f-body);fill:var(--water)">.42</text>'],
   ['sec', 'Section line A–A′', '<path d="M1 8h14" style="stroke:var(--accent)" stroke-width="2" stroke-dasharray="4 2"/>'],
   ['flow', 'Flow arrow', '<path d="M2 12L13 4M13 4H8.5M13 4v4.5" style="stroke:var(--water)" stroke-width="1.6" fill="none"/>'],
@@ -2392,7 +2388,7 @@ const LAYER_DEFS = [   // top of the list draws on top, as in a GIS
   ['ortho', 'Imagery (orthomosaics)', '<rect x="1.5" y="2.5" width="13" height="11" rx="1" style="fill:#9cb08a;stroke:var(--muted)"/><path d="M1.5 10l4-3 3 2 6-4" style="stroke:#fff" fill="none"/>'],
   ['img', 'Site drawing', '<rect x="1.5" y="2.5" width="13" height="11" rx="1" style="fill:var(--raised);stroke:var(--muted)"/><path d="M3 12l3.5-4 2.5 3 2-2 2 3" style="stroke:var(--muted)" fill="none"/>'],
 ];
-const lyrOn = k => k === 'flow' ? S.flowArrow !== false : k === 'contours' ? !!S.contours : k === 'res' || k === 'cores' || k === 'sig' ? S.lyr[k] === true : S.lyr[k] !== false;
+const lyrOn = k => k === 'flow' ? S.flowArrow !== false : k === 'contours' ? !!S.contours : k === 'res' ? S.lyr.res === true : S.lyr[k] !== false;
 function setLyr(k, on) {
   if (k === 'flow') { S.flowArrow = on; lsSet('bhlog.flow', on ? '1' : '0'); }
   else if (k === 'contours') { S.contours = on; lsSet('bhlog.contours', on ? '1' : ''); }
@@ -2790,10 +2786,6 @@ function contentsHTML() {
   const rp = resultParams(), M = S.mres, rOn = lyrOn('res') && rp.length && M.p && M.p !== 'none';
   o.push(tocRow({ id: 'res', name: rOn ? 'Results: ' + resLabel(M.p) : 'Results', note: rp.length ? '' : 'none yet', check: tocChk('data-lyr="res"', lyrOn('res'), 'results'), sw16: rOn ? '' : def('res'), cls: !rp.length ? 'na' : lyrOn('res') ? '' : 'off',
     kids: rOn ? tocLegend(resLegendRows(M.p).map(([t, c]) => ({ t: t + (c === 'none' ? ' (no shading)' : ''), sym: (x, y) => LG_SYM.dot(x, y, symFill(c)) }))) : '', props: tocActs(tocGo('map-res', 'Result and depths…')) }));
-  const cv = figVisible({}), cl = figClasses(figOpt().p);
-  o.push(tocRow({ id: 'cores', name: 'Core strips', note: cl.n ? figName(figOpt().p) : 'none yet', check: tocChk('data-lyr="cores"', lyrOn('cores'), 'core strips'), sw16: def('cores'), cls: !cl.n ? 'na' : lyrOn('cores') ? '' : 'off', kids: cv.cores && cl.n ? tocLegend(figMapRows().filter(r => /^fc/.test(r.k))) : '', props: '<p class="note">Each borehole\'s tested depths as a small core beside it. The result shown is chosen on Lab › Visuals.</p>' }));
-  o.push(tocRow({ id: 'sig', name: 'Fingerprint bars', note: sigPts().P.length ? '' : 'none yet', check: tocChk('data-lyr="sig"', lyrOn('sig'), 'fingerprint bars'), sw16: def('sig'), cls: !sigPts().P.length ? 'na' : lyrOn('sig') ? '' : 'off', kids: cv.sig && sigPts().P.length ? tocLegend(figMapRows().filter(r => /^fs/.test(r.k))) : '', props: '<p class="note">F2, F3 and F4 shares of the strongest sample in each borehole.</p>' }));
-  o.push(tocRow({ id: 'finset', name: 'Figure inset', note: FIGS[siteOf()?.figInset] ? FIGS[siteOf().figInset][0] : 'none', sw16: '<rect x="1.5" y="2.5" width="13" height="11" style="fill:none;stroke:var(--muted)"/><rect x="3" y="7.5" width="5" height="4.5" fill="#b9500f"/>', props: crow('Figure', '<select data-figinset' + (S.readOnly ? ' disabled' : '') + '><option value="">None</option>' + Object.entries(FIGS).map(([k, f]) => '<option value="' + k + '"' + (siteOf()?.figInset === k ? ' selected' : '') + '>' + f[0] + '</option>').join('') + '</select>') + crow('Corner', '<select data-figpos' + (S.readOnly ? ' disabled' : '') + '>' + [['bl', 'Bottom left'], ['tl', 'Top left'], ['tr', 'Top right']].map(([v, t]) => '<option value="' + v + '"' + ((siteOf()?.figInsetPos || 'bl') === v ? ' selected' : '') + '>' + t + '</option>').join('') + '</select>') }));
   o.push(simple('sec', 'Section line A–A′', sectionList().filter(b => b.easting != null).length < 2 && !secLinesOf().length, tocActs(tocGo('map-sec', 'Section line…'))));
   o.push(simple('flow', 'Flow arrow', !!F.error, tocActs(tocGo('map-wl', 'Water levels used…')), F.error ? '' : Math.round(F.az) + '° (' + F.dir + ')'));
   if (S.gwm?.run?.ok) o.push(simple('gwm', 'Groundwater model (MODFLOW 6)', false, ''));
@@ -9976,7 +9968,6 @@ function legendRows(kind, pts, MR) {
   if (fl && kind === 'flow' && fo.tri) R.push({ k: 'ftri', t: 'Three-point direction, per triangle', sym: sym('arrow', '#7a5ab8') });
   if (fl && kind === 'wt' && fo.lines) R.push({ k: 'flines', t: 'Flow line (from the contours)', sym: sym('line', 'var(--water)') });
   if ((kind === 'wt' || kind === 'flow') && H.skip.some(s => s.off)) R.push({ k: 'off', t: 'Well not used in the flow', sym: sym('ring', 'var(--muted)') });
-  if (kind === 'plan') { const v = figVisible(RO); R.push(...figMapRows().filter(r => /^fc/.test(r.k) ? v.cores : v.sig)); }
   if (kind === 'plan') R.push(...overlayLegendRows());   // every Toolbox layer and shape kind that is on, with its Contents symbols
   const rp = kind === 'vap' ? (S.mapParam && LAB_PARAMS[S.mapParam] ? S.mapParam : 'cvc') : MR?.p && MR.p !== 'none' ? MR.p : null;
   if (rp) {
@@ -10704,7 +10695,6 @@ function planSVG(W, H, interactive) {
       ${bhLabelSVG(b, X(b.easting), Y(b.northing), S.lyr.wl !== false && lw && b.elevation != null ? fx(b.elevation - lw.depth) : null, 'box', RO.names ?? S.lyr.labels !== false)}</g>`);
   }
   LBL_AVOID = null;
-  if (!keyMap) o.push(figMapSVG(pts, X, Y, W, H));
   if (RO.legend ?? lyrOn('legend')) o.push(mapLegendSVG(W, H, pts, RO.mres ? MR : lyrOn('res') ? MR : null));
   o.push(mapFurnSVG(W, H, sc));
   if (!RO.bare) o.push(`<text x="16" y="18" class="lbl2">${esc(pts[0]?.crs || '')}${RO.scale ? ` · scale 1:${RO.scale.toLocaleString('en-CA')} on Letter` : ''}${RO.grid ? ` · grid ${RO.grid} m` : ''}${S.contours && wp.length >= 3 ? ` · water-table contours (${LEN()}, interpolated)` : ''}</text></svg>`);
@@ -13239,161 +13229,6 @@ function delinHTML(list, vw) {
     + rows.map(r => '<tr><td><button class="pick" data-pick="' + esc(r.b.id) + '" data-goto="log">' + esc(r.b.name) + '</button></td><td>' + chip(r.status) + (r.status === 'none' && r.b.status === 'issued' ? ' <small class="note">issued: lab imports skip it until revised</small>' : '') + '</td><td>' + (r.ovP.map(p => esc(LAB_PARAMS[p].label) + ' ' + fmtLab(r.pr[p].max.r) + ' <small class="note">at ' + fx(r.pr[p].max.d) + '</small>').join('<br>') || '—') + '</td><td class="r">' + fx(r.top) + '</td><td class="r">' + fx(r.deep) + '</td><td class="r">' + (r.base != null ? fx(r.base) : r.ovP.length ? '<b style="color:var(--negative)">none</b>' : '—') + '</td><td class="r">' + (r.tested ? fx(r.last) : '—') + '</td><td>' + side(r) + '</td></tr>').join('')
     + '</tbody></table></div><p class="note" style="margin-top:6px">Sides: green, a borehole within reach is under the guideline to at least that depth; orange, the next borehole that way is over too; red, open. A non-detect with a limit above the guideline bounds nothing. Soil results only.</p></div></section>';
 }
-/* ---------- visuals: the core wall, the floating site block and the hydrocarbon fingerprint. Each is one SVG (w × h), used on the
-   Lab page, on report pages and as a map inset. Only tested depths are coloured; nothing is filled in between ---------- */
-const FIG0 = { p: '', order: 'name', theme: '', yaw: 30 };
-function figOpt() { const o = { ...FIG0, ...(siteOf()?.figs || {}) }; if (!o.p) { const u = labParamsUsed(projList()); o.p = u.includes('f2') && u.includes('f3') ? 'f2f3' : u.find(p => LAB_PARAMS[p].suite === 'phc' || LAB_PARAMS[p].suite === 'btex') || u[0] || 'f2f3'; } return o; }
-const figName = p => p === 'f2f3' ? 'F2 + F3' : LAB_PARAMS[p]?.label || p, figUnit = p => p === 'f2f3' ? 'mg/kg' : LAB_PARAMS[p]?.unit || '';
-function figVal(sm, p) {
-  if (p !== 'f2f3') return labVal(sm, p);
-  const a = labVal(sm, 'f2'), c = labVal(sm, 'f3'); if (!a || !c) return null;
-  return a.lt && c.lt ? { v: a.v + c.v, lt: true } : { v: +((a.lt ? 0 : a.v) + (c.lt ? 0 : c.v)).toPrecision(6), lt: false };   // non-detects add nothing
-}
-const figOver = (sm, p) => (p === 'f2f3' ? ['f2', 'f3'] : [p]).some(q => exceeds(labVal(sm, q), q));
-const figSamples = (b, p) => (b.samples || []).filter(sm => sm.depth != null).map(sm => ({ sm, d: sm.depth, r: figVal(sm, p), over: figOver(sm, p) })).filter(x => x.r).sort((a, c) => a.d - c.d);
-/* five classes on a log scale over the whole project (1-3-10 steps), so a colour means the same in every figure */
-function figClasses(p) {
-  const v = projList().flatMap(b => figSamples(b, p)).filter(x => !x.r.lt && x.r.v > 0).map(x => x.r.v), n = projList().reduce((t, b) => t + figSamples(b, p).length, 0);
-  const st = k => +((k % 2 ? 3 : 1) * 10 ** Math.floor(k / 2)).toPrecision(2), mx = v.length ? Math.max(...v) : 1; let top = -12; while (st(top + 1) <= mx) top++;
-  const cut = [top - 3, top - 2, top - 1, top].map(st), f = x => x.toLocaleString('en-CA', { maximumSignificantDigits: 3 });
-  return { n, cut, of: x => cut.filter(c => x >= c).length, lab: ['under ' + f(cut[0]), ...cut.slice(0, 3).map((c, i) => f(c) + ' to ' + f(cut[i + 1])), f(cut[3]) + ' and over'] };
-}
-const FIG_L = { bg: '#ffffff', bg2: '#f4f5f6', ink: '#14181c', sub: '#525a63', line: '#d9dde1', mark: '#14181c', ramp: ['#ec9a63', '#dc7330', '#b9500f', '#8a3607', '#5a2203'], dep: ['#86b6ef', '#5598e7', '#2a78d6', '#1c5cab', '#0d366b'], cat: ['#2a78d6', '#eb6834', '#1baf7a'] };
-const FIG_D = { bg: '#14171b', bg2: '#1c2025', ink: '#f0efec', sub: '#b9bec4', line: '#343a41', mark: '#ffffff', ramp: ['#8f3d0c', '#b9531a', '#e0763a', '#f7a571', '#ffd9bd'], dep: ['#184f95', '#256abf', '#3987e5', '#86b6ef', '#cde2fb'], cat: ['#3987e5', '#d95926', '#199e70'] };
-const figT = o => o.theme === 'dark' ? FIG_D : FIG_L, F1 = v => (+v).toFixed(1), figId = () => 'fg' + Math.random().toString(36).slice(2, 8);
-const figTx = (x, y, t, sz, fill, o = '') => '<text x="' + F1(x) + '" y="' + F1(y) + '" style="font-family:Arial,Helvetica,sans-serif;font-size:' + sz + 'px;fill:' + fill + (/font-weight="(\d+)"/.test(o) ? ';font-weight:' + /font-weight="(\d+)"/.exec(o)[1] : '') + '" ' + o + '>' + esc(t) + '</text>';
-const figTip = t => ' data-ft="' + esc(t) + '"';
-const figHead = (w, h, T, title, sub) => '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="' + esc(title) + '"><rect width="' + w + '" height="' + h + '" fill="' + T.bg + '"/>' + figTx(18, 28, title, 17, T.ink, 'font-weight="700"') + figTx(18, 46, sub, 11, T.sub);
-const figNone = (w, h, T, title, t) => figHead(w, h, T, title, '') + figTx(18, 70, t, 12, T.sub) + '</svg>';
-function figKey(x, y, w, T, C, p, extra = []) {
-  const it = [...C.lab.map((t, i) => [t, '<rect x="0" y="-9" width="14" height="10" rx="2" fill="' + T.ramp[i] + '"/>']), ['not detected', '<rect x=".7" y="-8.3" width="12.6" height="8.6" rx="2" fill="none" stroke="' + T.sub + '" stroke-width="1.2"/>'], ...extra]; let cx = x, cy = y; const o = [];
-  const head = figName(p) + (figUnit(p) ? ' (' + figUnit(p) + ')' : ''); o.push(figTx(cx, cy, head, 10.5, T.ink, 'font-weight="700"')); cx += head.length * 5.9 + 14;
-  for (const [t, g] of it) { const wd = 22 + t.length * 5.5 + 12; if (cx + wd > x + w) { cx = x; cy += 17; } o.push('<g transform="translate(' + F1(cx) + ' ' + F1(cy) + ')">' + g + '</g>', figTx(cx + 20, cy, t, 10.5, T.sub)); cx += wd; }
-  return { svg: o.join(''), h: cy - y + 17 };
-}
-/* one core: the hole as a bare tube, soil as a strip on its left edge, each tested depth as a band; its bottom torn when not bounded */
-function figCore(b, X, y0, k, cw, T, C, p, id, open, names) {
-  const S2 = figSamples(b, p), dep = Math.max(depthOf(b) || 0, ...S2.map(x => x.d)), bh = Math.max(5, Math.min(.24 * k, 13)), zz = Math.min(5, Math.max(2, cw / 4)), h = Math.max(12, dep * k, (S2.at(-1)?.d || 0) * k + bh / 2 + (open ? zz + 2 : 1)), l = X - cw / 2, r = X + cw / 2, o = [], n = 5, zig = open ? Array.from({ length: n + 1 }, (_, i) => F1(r - cw * i / n) + ' ' + F1(y0 + h + (i % 2 ? -zz : zz))).join('L') : '';
-  const d = 'M' + F1(l) + ' ' + F1(y0) + 'H' + F1(r) + 'V' + F1(y0 + h) + (open ? 'L' + zig : 'H' + F1(l)) + 'Z';
-  o.push('<clipPath id="' + id + '"><path d="' + d + '"/></clipPath><path d="' + d + '" fill="' + T.bg2 + '" stroke="' + T.line + '" stroke-width="1"/><g clip-path="url(#' + id + ')">');
-  const sw = Math.max(3, cw * .2); for (const q of b.layers || []) { const f = soilOf(q.uscs)?.fill; if (f && q.bottom != null) o.push('<rect x="' + F1(l) + '" y="' + F1(y0 + (q.top || 0) * k) + '" width="' + F1(sw) + '" height="' + F1(Math.max(0, (q.bottom - (q.top || 0)) * k)) + '" fill="var(--' + f + ')"/>'); }
-  for (const x of S2) { const y = y0 + x.d * k, c = x.r.lt || !(x.r.v > 0) ? null : T.ramp[C.of(x.r.v)], lx = l + sw + 1.5, wx = r - lx - 1.5; x.y = y;
-    if (c) o.push('<rect x="' + F1(lx) + '" y="' + F1(y - bh) + '" width="' + F1(wx) + '" height="' + F1(bh * 2) + '" rx="3" fill="' + c + '" opacity=".16"/><rect x="' + F1(lx) + '" y="' + F1(y - bh / 2) + '" width="' + F1(wx) + '" height="' + F1(bh) + '" rx="2" fill="' + c + '"/>');
-    else o.push('<rect x="' + F1(lx + .6) + '" y="' + F1(y - bh / 2 + .6) + '" width="' + F1(wx - 1.2) + '" height="' + F1(bh - 1.2) + '" rx="2" fill="' + T.bg + '" stroke="' + T.sub + '" stroke-width="1"/>'); }
-  o.push('<rect x="' + F1(l) + '" y="' + F1(y0) + '" width="' + F1(cw) + '" height="' + F1(h + 6) + '" fill="url(#' + id.replace(/_\d+$/, '') + 'g)"/></g><path d="' + d + '" fill="none" stroke="' + (open ? T.mark : T.sub) + '" stroke-width="' + (open ? 1.6 : .9) + '" stroke-linejoin="round"/>');
-  for (const x of S2) { if (x.over) o.push('<path d="M' + F1(r + 2.5) + ' ' + F1(x.y) + 'l5.5-3.5v7z" fill="' + T.mark + '"/>');
-    o.push('<rect x="' + F1(l - 4) + '" y="' + F1(x.y - Math.max(8, bh / 2)) + '" width="' + F1(cw + 14) + '" height="' + F1(Math.max(16, bh)) + '" fill="transparent"' + figTip(b.name + ' at ' + fu(x.d) + ': ' + figName(p) + ' ' + fmtLab(x.r) + ' ' + figUnit(p) + (x.over ? ', over the guideline' : '')) + '/>'); }
-  if (!S2.length && names) o.push(figTx(X, y0 + h / 2, 'not tested', 8.5, T.sub, 'text-anchor="middle" transform="rotate(-90 ' + F1(X) + ' ' + F1(y0 + h / 2) + ')"'));
-  return { svg: o.join(''), bottom: y0 + h, n: S2.length };
-}
-const figSheen = (id, T) => '<defs><linearGradient id="' + id + 'g" x1="0" x2="1"><stop offset="0" stop-color="#000" stop-opacity=".22"/><stop offset=".28" stop-color="#fff" stop-opacity="' + (T === FIG_D ? .12 : .34) + '"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".26"/></linearGradient></defs>';
-/* boreholes over the guideline at their deepest test of that result: nothing under it shows the bottom */
-function figOpenSet() { return new Set(delineate(projList(), projGuide(), delinOpt()).R.filter(r => r.status === 'open').map(r => r.b.id)); }
-function coreWallSVG(w, h, o) {
-  const T = figT(o), p = o.p, C = figClasses(p), open = figOpenSet(), id = figId(), L = LEN(), title = 'Core wall: ' + figName(p); if (!C.n) return figNone(w, h, T, title, 'No results for ' + figName(p) + ' yet.');
-  const mx = b => Math.max(-1, ...figSamples(b, p).map(x => x.r.lt ? 0 : x.r.v)), list = mapList().filter(b => figSamples(b, p).length || depthOf(b)).sort((a, c) => o.order === 'max' ? mx(c) - mx(a) : (a.name || '').localeCompare(c.name || '', undefined, { numeric: true }));
-  const extra = [...(Object.keys(projGuide()).length ? [['over the guideline', '<path d="M3 -4l8-4.5v9z" fill="' + T.mark + '"/>'], ['bottom not found', '<path d="M1 -9h12v7l-2.4 3-2.4-3-2.4 3-2.4-3-2.4 3z" fill="none" stroke="' + T.mark + '" stroke-width="1.4"/>']] : []), ['logged soil on the left edge', '<rect x="0" y="-9" width="4" height="10" fill="var(--s-sand)"/>']];
-  const K = figKey(18, 0, w - 36, T, C, p, extra), y0 = 92, yb = h - 26 - K.h, dm = Math.max(1, ...list.map(b => Math.max(depthOf(b) || 0, ...figSamples(b, p).map(x => x.d)))), k = (yb - y0 - 22) / dm, x0 = 46, sp = (w - x0 - 22) / Math.max(1, list.length), cw = Math.max(7, Math.min(34, sp * .56));
-  const s2 = [figHead(w, h, T, title, list.length + ' boreholes on one depth scale. Only tested depths are coloured.' + (Object.keys(projGuide()).length ? '' : ' Enter a guideline to mark results over it.')), figSheen(id, T)];
-  const st = niceStep(toD(dm), 6); for (let v = 0; v <= toD(dm) + 1e-9; v += st) { const y = y0 + fromD(v) * k; s2.push('<path d="M' + x0 + ' ' + F1(y) + 'H' + (w - 16) + '" stroke="' + T.line + '" stroke-width="' + (v ? .6 : 1.2) + '"/>', figTx(x0 - 7, y + 3.5, +v.toFixed(2) + '', 10, T.sub, 'text-anchor="end"')); }
-  s2.push(figTx(14, y0 - 24, 'Depth (' + L + ')', 9.5, T.sub));
-  list.forEach((b, i) => { const X = x0 + sp * (i + .5), c = figCore(b, X, y0, k, cw, T, C, p, id + '_' + i, open.has(b.id), true), nm = b.name || ''; s2.push(c.svg, sp < nm.length * 6.2 ? figTx(X, y0 - 7, nm, Math.min(10, sp * .8 + 3), T.ink, 'font-weight="600" transform="rotate(-40 ' + F1(X) + ' ' + (y0 - 7) + ')"') : figTx(X, y0 - 8, nm, 10.5, T.ink, 'text-anchor="middle" font-weight="600"')); if (open.has(b.id)) s2.push(figTx(X, c.bottom + 19, '?', 13, T.ink, 'text-anchor="middle" font-weight="700"')); });
-  return s2.join('') + figKey(18, h - 12 - K.h + 14, w - 36, T, C, p, extra).svg + '</svg>';
-}
-/* the ground picture lifted off, and each borehole hanging under its place; north arrow turned with it. Ground is drawn flat */
-function siteBlockSVG(w, h, o) {
-  const T = figT(o), p = o.p, C = figClasses(p), open = figOpenSet(), id = figId(), title = 'Site block: ' + figName(p), B = mapList().filter(b => b.easting != null && b.northing != null); if (!B.length) return figNone(w, h, T, title, 'Add easting and northing to the boreholes to see them in place.');
-  const xs = B.map(b => b.easting), ys = B.map(b => b.northing), cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2, R = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 10) / 2 * 1.18, a = (+o.yaw || 0) * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), sp = Math.sin(24 * Math.PI / 180);
-  const K = figKey(18, 0, w - 36, T, C, p), ext = R * (Math.abs(ca) + Math.abs(sa)), top = 62, av = h - top - 34 - K.h, k = Math.min((w - 70) / (2 * ext), av * .36 / (2 * ext * sp)), ph = 2 * ext * k * sp, gap = Math.min(26, av * .04), oy = top + ph / 2, oy2 = oy + ph + gap, dm = Math.max(1, ...B.map(b => Math.max(depthOf(b) || 0, ...figSamples(b, p).map(x => x.d)))), kz = Math.max(3, Math.min(...B.map(b => (h - 46 - K.h - (oy2 - k * sp * ((b.easting - cx) * sa + (b.northing - cy) * ca))) / Math.max(.5, depthOf(b) || 0, ...figSamples(b, p).map(x => x.d)))));
-  const PX = (e, n, y = oy) => { const x = e - cx, v = n - cy; return [w / 2 + k * (x * ca - v * sa), y - k * sp * (x * sa + v * ca)]; }, cor = [[-R, -R], [R, -R], [R, R], [-R, R]], path = y => 'M' + cor.map(q => PX(cx + q[0], cy + q[1], y).map(F1).join(' ')).join('L') + 'Z';
-  const ims = imageryOf().filter(i => !i.off && S.imgCache.has(i.id)).map(i => ({ u: S.imgCache.get(i.id), e0: i.e0, e1: i.e1, n0: i.n0, n1: i.n1 })), st = siteOf(); if (st?.img) ims.unshift({ u: st.img, e0: st.e0, e1: st.e1, n0: st.n0, n1: st.n1 });
-  for (const q of GIS.layers) if (q.on && q.kind === 'image' && q.url && q.box) ims.push({ u: q.url, e0: q.box[0], n0: q.box[1], e1: q.box[2], n1: q.box[3] });
-  const s2 = [figHead(w, h, T, title, 'Boreholes hang below their true position' + (ims.length ? ' on the site picture' : '') + '. Ground drawn flat; depth and distance have different scales.'), figSheen(id, T), '<clipPath id="' + id + 'c"><path d="' + path(oy) + '"/></clipPath>'];
-  // below first: the footprint, then far boreholes to near
-  s2.push('<path d="' + path(oy2) + '" fill="' + T.bg2 + '" stroke="' + T.line + '" stroke-width="1"/>');
-  for (const t of [-.5, 0, .5]) for (const q of [[[t, -1], [t, 1]], [[-1, t], [1, t]]]) s2.push('<path d="M' + q.map(z => PX(cx + z[0] * R, cy + z[1] * R, oy2).map(F1).join(' ')).join('L') + '" stroke="' + T.line + '" stroke-width=".6"/>');
-  const ord = B.map(b => ({ b, s: PX(b.easting, b.northing, oy2), t: PX(b.easting, b.northing) })).sort((q, z) => q.s[1] - z.s[1]), cw = Math.max(8, Math.min(15, w / 64));
-  for (const q of ord) s2.push('<path d="M' + F1(q.t[0]) + ' ' + F1(q.t[1]) + 'V' + F1(q.s[1]) + '" stroke="' + T.sub + '" stroke-width=".8" stroke-dasharray="2 3" opacity=".8"/>');
-  ord.forEach((q, i) => { const c = figCore(q.b, q.s[0], q.s[1], kz, cw, T, C, p, id + '_' + i, open.has(q.b.id), false); s2.push('<ellipse cx="' + F1(q.s[0]) + '" cy="' + F1(q.s[1]) + '" rx="' + F1(cw / 2 + 2) + '" ry="' + F1((cw / 2 + 2) * sp) + '" fill="none" stroke="' + T.sub + '"/>', c.svg); if (open.has(q.b.id)) s2.push(figTx(q.s[0], c.bottom + 18, '?', 12, T.ink, 'text-anchor="middle" font-weight="700"')); });
-  // the lifted picture
-  s2.push('<path d="' + path(oy + 7) + '" fill="#000" opacity="' + (T === FIG_D ? .45 : .14) + '"/><path d="' + path(oy) + '" fill="' + T.bg2 + '"/><g clip-path="url(#' + id + 'c)">');
-  for (const q of ims) { const [x, y] = PX(q.e0, q.n1), m = [k * ca, -k * sp * sa, k * sa, k * sp * ca]; s2.push('<image href="' + q.u + '" width="' + F1(q.e1 - q.e0) + '" height="' + F1(q.n1 - q.n0) + '" preserveAspectRatio="none" transform="matrix(' + m.map(v => v.toFixed(5)).join(' ') + ' ' + F1(x) + ' ' + F1(y) + ')"/>'); }
-  s2.push('</g><path d="' + path(oy) + '" fill="none" stroke="' + T.sub + '" stroke-width="1.2"/>');
-  const used = []; for (const q of ord) { const mx = figSamples(q.b, p).filter(x => !x.r.lt).sort((x, z) => z.r.v - x.r.v)[0]; s2.push('<circle cx="' + F1(q.t[0]) + '" cy="' + F1(q.t[1]) + '" r="5" fill="' + (mx ? T.ramp[C.of(mx.r.v)] : T.bg) + '" stroke="#fff" stroke-width="1.6"/><circle cx="' + F1(q.t[0]) + '" cy="' + F1(q.t[1]) + '" r="11" fill="transparent"' + figTip(q.b.name + ': ' + (mx ? 'highest ' + figName(p) + ' ' + fmtLab(mx.r) + ' ' + figUnit(p) + ' at ' + fu(mx.d) : figSamples(q.b, p).length ? 'not detected' : 'not tested')) + '/>');
-    const wd = (q.b.name || '').length * 6; let pos = [[8, 3.5], [-wd - 8, 3.5], [-wd / 2, -9], [-wd / 2, 17]].map(([dx, dy]) => [q.t[0] + dx, q.t[1] + dy, wd, 12]).find(z => !used.some(u => z[0] < u[0] + u[2] && u[0] < z[0] + z[2] && Math.abs(z[1] - u[1]) < 12)); if (pos) { used.push(pos); s2.push(figTx(pos[0], pos[1], q.b.name, 10, '#14181c', 'font-weight="700" stroke="#fff" stroke-width="3" paint-order="stroke" stroke-linejoin="round"')); } }
-  // depth scale at the left, and north
-  const zx = 30, zy = oy2, sd = niceStep(toD(dm), 4); s2.push('<path d="M' + zx + ' ' + F1(zy) + 'V' + F1(zy + dm * kz) + '" stroke="' + T.sub + '"/>'); for (let v = 0; v <= toD(dm) + 1e-9; v += sd) s2.push('<path d="M' + zx + ' ' + F1(zy + fromD(v) * kz) + 'h5" stroke="' + T.sub + '"/>', figTx(zx + 8, zy + fromD(v) * kz + 3.5, +v.toFixed(2) + (v ? '' : ' ' + LEN()), 9.5, T.sub));
-  const nd = [-sa, -sp * ca], nl = Math.hypot(...nd) || 1, nx = w - 40, ny = 56; s2.push('<path d="M' + F1(nx - nd[0] / nl * 14) + ' ' + F1(ny - nd[1] / nl * 14) + 'L' + F1(nx + nd[0] / nl * 14) + ' ' + F1(ny + nd[1] / nl * 14) + '" stroke="' + T.ink + '" stroke-width="2"/><circle cx="' + F1(nx + nd[0] / nl * 14) + '" cy="' + F1(ny + nd[1] / nl * 14) + '" r="3" fill="' + T.ink + '"/>', figTx(nx + nd[0] / nl * 25, ny + nd[1] / nl * 25 + 4, 'N', 11, T.ink, 'text-anchor="middle" font-weight="700"'));
-  return s2.join('') + figKey(18, h - 12 - K.h + 14, w - 36, T, C, p).svg + '</svg>';
-}
-/* samples with F2, F3 and F4 all reported and enough hydrocarbon for shares to mean anything: five times the summed detection limits */
-function sigPts() {
-  const all = projList().flatMap(b => (b.samples || []).map(sm => ({ b, sm, r: ['f2', 'f3', 'f4'].map(p => labVal(sm, p)) })).filter(x => x.r.every(Boolean)));
-  const dl = [0, 1, 2].map(i => { const v = all.map(x => x.r[i]).filter(r => r.lt).map(r => r.v); return v.length ? Math.min(...v) : 0; }), min = 5 * dl.reduce((t, v) => t + v, 0);
-  const P = all.map(x => { const v = x.r.map(r => r.lt ? r.v / 2 : r.v), t = v.reduce((q, z) => q + z, 0), det = x.r.reduce((q, r) => q + (r.lt ? 0 : r.v), 0); return { ...x, v, t, det, f: v.map(z => z / t) }; }).filter(x => x.det > 0 && x.det >= min);
-  return { P: P.sort((a, c) => c.det - a.det), n: all.length, min };
-}
-function sigSVG(w, h, o) {
-  const T = figT(o), { P, n, min } = sigPts(), title = 'Hydrocarbon fingerprint'; if (!P.length) return figNone(w, h, T, title, n ? 'Every sample is too close to its detection limits for shares to mean anything.' : 'Needs samples with F2, F3 and F4 results.');
-  const tw = w * .44, side = Math.min(tw - 90, (h - 236) / .866), x0 = 18 + (tw - 18 - side) / 2, yb = 112 + side * .866, V = [[x0, yb], [x0 + side, yb], [x0 + side / 2, yb - side * .866]], at = f => [0, 1].map(i => f[0] * V[0][i] + f[1] * V[1][i] + f[2] * V[2][i]);
-  const tm = Math.max(...P.map(x => x.det)), dm = Math.max(1, ...P.map(x => x.sm.depth || 0)), rr = x => 4 + 7 * Math.sqrt(x.det / tm), dc = x => Math.min(4, Math.floor((x.sm.depth || 0) / dm * 5)), tip = x => figTip(x.b.name + ' at ' + fu(x.sm.depth) + ': F2 ' + fmtLab(x.r[0]) + ', F3 ' + fmtLab(x.r[1]) + ', F4 ' + fmtLab(x.r[2]) + ' mg/kg (' + x.f.map(v => Math.round(v * 100)).join(' / ') + ' %)');
-  const dot = (x, X, Y) => '<circle cx="' + F1(X) + '" cy="' + F1(Y) + '" r="' + F1(rr(x)) + '" fill="' + T.dep[dc(x)] + '" stroke="' + T.bg2 + '" stroke-width="1.6"/><circle cx="' + F1(X) + '" cy="' + F1(Y) + '" r="' + F1(Math.max(9, rr(x))) + '" fill="transparent"' + tip(x) + '/>';
-  const s2 = [figHead(w, h, T, title, P.length + ' of ' + n + ' samples; the rest total under ' + fmtLab({ v: min }) + ' mg/kg, too close to detection limits. Half the limit is used for a non-detect.')];
-  s2.push('<path d="M' + V.map(q => q.map(F1).join(' ')).join('L') + 'Z" fill="' + T.bg2 + '" stroke="' + T.sub + '" stroke-width="1.2"/>');
-  for (const t of [.2, .4, .6, .8]) for (const [a, c] of [[[t, 1 - t, 0], [t, 0, 1 - t]], [[1 - t, t, 0], [0, t, 1 - t]], [[1 - t, 0, t], [0, 1 - t, t]]]) s2.push('<path d="M' + at(a).map(F1).join(' ') + 'L' + at(c).map(F1).join(' ') + '" stroke="' + T.line + '" stroke-width=".7"/>');
-  for (const t of [.2, .4, .6, .8]) { const c = at([0, 1 - t, t]); s2.push(figTx(c[0] + 7, c[1] + 3, Math.round(t * 100) + ' % F4', 9, T.sub)); }
-  s2.push(figTx(V[0][0], V[0][1] + 24, 'F2', 13, T.ink, 'font-weight="700" text-anchor="middle"'), figTx(V[1][0], V[1][1] + 24, 'F3', 13, T.ink, 'font-weight="700" text-anchor="middle"'), figTx(V[2][0], V[2][1] - 10, 'F4', 13, T.ink, 'font-weight="700" text-anchor="middle"'));
-  for (const x of P) s2.push(dot(x, ...at(x.f)));
-  // beside it: the samples that are mostly F2 and F3, by their F3 share, down the hole
-  const Q = P.filter(x => x.f[2] < .2).map(x => ({ ...x, u: x.f[1] / (x.f[0] + x.f[1]) })), px = tw + 44, pw = w - px - 66, py = 112, pb = h - 100, us = Q.map(x => x.u), u0 = Math.max(0, Math.floor((Math.min(...us) - .02) * 10) / 10), u1 = Math.min(1, Math.ceil((Math.max(...us) + .02) * 10) / 10), X = u => px + (u - u0) / ((u1 - u0) || 1) * pw, Y = d => py + d / dm * (pb - py);
-  if (Q.length) { s2.push(figTx(px, py - 28, 'F3 share of F2 + F3, by depth (' + LEN() + ')', 11.5, T.ink, 'font-weight="700"'));
-    for (let u = u0; u <= u1 + 1e-9; u += .1) s2.push('<path d="M' + F1(X(u)) + ' ' + py + 'V' + F1(pb) + '" stroke="' + T.line + '" stroke-width=".7"/>', figTx(X(u), py - 8, Math.round(u * 100) + ' %', 9.5, T.sub, 'text-anchor="middle"'));
-    const st = niceStep(toD(dm), 5); for (let v = 0; v <= toD(dm) + 1e-9; v += st) s2.push('<path d="M' + F1(px) + ' ' + F1(Y(fromD(v))) + 'H' + F1(px + pw) + '" stroke="' + T.line + '" stroke-width=".7"/>', figTx(px - 7, Y(fromD(v)) + 3.5, +v.toFixed(2) + '', 9.5, T.sub, 'text-anchor="end"'));
-    const by = new Map(), used = []; for (const x of Q) by.set(x.b.id, [...(by.get(x.b.id) || []), x]);
-    for (const L of by.values()) { L.sort((a, c) => a.sm.depth - c.sm.depth); if (L.length > 1) s2.push('<path d="M' + L.map(x => F1(X(x.u)) + ' ' + F1(Y(x.sm.depth))).join('L') + '" fill="none" stroke="' + T.sub + '" stroke-width="1" opacity=".55"/>'); }
-    for (const x of Q) { s2.push(dot(x, X(x.u), Y(x.sm.depth))); used.push([X(x.u) - rr(x), Y(x.sm.depth) + 4, rr(x) * 2]); }
-    for (const L of by.values()) { const x = L.at(-1), t = x.b.name, wd = t.length * 5.4, cx = X(x.u), cy = Y(x.sm.depth), r = rr(x), self = used.find(q => q[0] === cx - r), pos = [[r + 4, 3.5], [-wd - r - 4, 3.5], [-wd / 2, r + 12], [-wd / 2, -r - 5]].map(q => [cx + q[0], cy + q[1], wd]).find(z => z[0] > px - 4 && z[0] + wd < w - 6 && !used.some(q => q !== self && z[0] < q[0] + q[2] + 2 && q[0] < z[0] + z[2] + 2 && Math.abs(z[1] - q[1]) < 12)); if (pos) { used.push(pos); s2.push(figTx(pos[0], pos[1], t, 10, T.ink, 'font-weight="600" stroke="' + T.bg + '" stroke-width="3" paint-order="stroke"')); } } }
-  let kx = 18; const ky = h - 56; s2.push(figTx(kx, ky, 'Depth (' + LEN() + ')', 10.5, T.ink, 'font-weight="700"')); kx += 66; T.dep.forEach((c, i) => { s2.push('<rect x="' + kx + '" y="' + (ky - 9) + '" width="14" height="10" rx="2" fill="' + c + '"/>', figTx(kx + 18, ky, F1(toD(dm * i / 5)) + ' to ' + F1(toD(dm * (i + 1) / 5)), 10, T.sub)); kx += 78; });
-  kx += 10; if (kx + 270 < w) { s2.push(figTx(kx, ky, 'F2 + F3 + F4 (mg/kg)', 10.5, T.ink, 'font-weight="700"')); kx += 122; for (const v of [tm / 20, tm / 4, tm]) { const r = 4 + 7 * Math.sqrt(v / tm); s2.push('<circle cx="' + F1(kx + r) + '" cy="' + (ky - 4) + '" r="' + F1(r) + '" fill="none" stroke="' + T.sub + '" stroke-width="1.3"/>', figTx(kx + 2 * r + 4, ky, fmtLab({ v: +v.toPrecision(2) }), 10, T.sub)); kx += 2 * r + 36; } }
-  s2.push(figTx(18, h - 30, 'Samples that plot together have a similar make-up: a lead, not proof of one source. Weathering and soil type move the shares too.', 10, T.sub), figTx(18, h - 15, 'Shares are of F2 to F4 only. Lines join one borehole\'s samples by depth; they are not results in between.', 10, T.sub));
-  return s2.join('') + '</svg>';
-}
-const FIGS = { figcore: ['Core wall', 'Every borehole as a core, on one depth scale', coreWallSVG, .5, 420], figblock: ['Floating site block', 'The site picture lifted off, boreholes hanging in place', siteBlockSVG, .66, 520], figsig: ['Hydrocarbon fingerprint', 'F2, F3 and F4 shares of each sample', sigSVG, .5, 480] };
-/* ---------- on the map ---------- */
-const figVisible = ro => { const f = ro?.figs; return f == null || f === '' ? { cores: lyrOn('cores'), sig: lyrOn('sig') } : { cores: f === 'cores' || f === 'both', sig: f === 'sig' || f === 'both' }; };
-function figMapRows() {
-  const p = figOpt().p, C = figClasses(p), R = []; if (C.n) { R.push({ k: 'fc-h', t: figName(p) + (figUnit(p) ? ' (' + figUnit(p) + ')' : ''), head: true }); C.lab.forEach((t, i) => R.push({ k: 'fc' + i, t, sym: boxSym(FIG_L.ramp[i], FIG_L.ramp[i]) })); R.push({ k: 'fcn', t: 'Not detected', sym: boxSym('#fff', FIG_L.sub) }); }
-  if (sigPts().P.length) { R.push({ k: 'fs-h', t: 'Share of F2 to F4', head: true }); ['F2', 'F3', 'F4'].forEach((t, i) => R.push({ k: 'fs' + i, t, sym: boxSym(FIG_L.cat[i], FIG_L.cat[i]) })); }
-  return R;
-}
-function figMapSVG(pts, X, Y, W, H) {
-  const v = figVisible(RO), o = [], T = FIG_L, id = figId();
-  if (v.cores) { const p = figOpt().p, C = figClasses(p), open = figOpenSet(), dm = Math.max(1, ...pts.map(b => Math.max(depthOf(b) || 0, ...figSamples(b, p).map(x => x.d)))), k = 58 / dm; if (C.n) { o.push(figSheen(id, T)); pts.forEach((b, i) => { if (!figSamples(b, p).length) return; const x = X(b.easting) - 22, y = Y(b.northing) - 6; o.push('<g data-figcore="' + esc(b.id) + '"><path d="M' + F1(x + 6) + ' ' + F1(y + 4) + 'L' + F1(X(b.easting) - 8) + ' ' + F1(Y(b.northing)) + '" stroke="' + T.sub + '" stroke-width=".8"/>' + figCore(b, x, y, k, 12, T, C, p, id + '_' + i, open.has(b.id), false).svg + '</g>'); }); } }
-  if (v.sig) { const best = new Map(); for (const x of sigPts().P) if (!best.has(x.b.id)) best.set(x.b.id, x); for (const b of pts) { const q = best.get(b.id); if (!q) continue; const w0 = 44, x = X(b.easting) - 11, y = Y(b.northing) + 15; let cx = x; const t = 'Strongest at ' + fu(q.sm.depth) + ': F2 / F3 / F4 ' + q.f.map(z => Math.round(z * 100)).join(' / ') + ' %'; o.push('<g data-figsig="' + esc(b.id) + '"' + figTip(b.name + '. ' + t) + '><rect x="' + F1(x - 2) + '" y="' + F1(y - 2) + '" width="' + (w0 + 4) + '" height="12" rx="3" fill="#fff" stroke="' + T.line + '"/>' + q.f.map((z, i) => { const d = '<rect x="' + F1(cx) + '" y="' + F1(y) + '" width="' + F1(Math.max(0, w0 * z - (i < 2 ? 1 : 0))) + '" height="8" fill="' + T.cat[i] + '"/>'; cx += w0 * z; return d; }).join('') + '</g>'); } }
-  const ins = RO.inset != null && RO.inset !== '' ? RO.inset : siteOf()?.figInset; if (FIGS[ins]) { const iw = 720, ih = Math.round(iw * FIGS[ins][3]) + 60, pos = siteOf()?.figInsetPos || 'bl', sw = Math.max(170, Math.min(W * .34, 400)), sh = sw * ih / iw, x = pos === 'tr' ? W - sw - 64 : pos === 'tl' ? 70 : 12, y = pos[0] === 't' ? 30 : H - sh - 48; if (y > 0) o.push('<g data-figinset="1"><rect x="' + F1(x - 1) + '" y="' + F1(y - 1) + '" width="' + F1(sw + 2) + '" height="' + F1(sh + 2) + '" rx="3" fill="#fff" stroke="' + T.sub + '"/>' + withRO({}, () => FIGS[ins][2](iw, ih, { ...figOpt(), theme: '' })).replace(/^<svg xmlns="[^"]*" width="\d+" height="\d+"/, '<svg x="' + F1(x) + '" y="' + F1(y) + '" width="' + F1(sw) + '" height="' + F1(sh) + '"') + '</g>'); }
-  return o.join('');
-}
-/* ---------- Lab › Visuals ---------- */
-const figSize = (k, vw) => { const w = Math.max(560, Math.min(1500, Math.round(vw - 34))); return [w, Math.max(FIGS[k][4], Math.min(760, Math.round(w * FIGS[k][3])))]; };
-function figsHTML(vw) {
-  const o = figOpt(), used = labParamsUsed(projList()), ps = [...(used.includes('f2') && used.includes('f3') ? ['f2f3'] : []), ...used], ro = S.readOnly ? ' disabled' : ''; S._figW = vw;
-  if (!used.length) return '<section class="sec"><div class="body lab-empty">' + svgI(NAV_ICON.contam) + '<h3>No laboratory results yet</h3><p class="note">Import the lab report first.</p></div></section>';
-  return '<div class="fg-bar"><label>Result <select data-fig="p"' + ro + '>' + ps.map(p => '<option value="' + p + '"' + (p === o.p ? ' selected' : '') + '>' + esc(figName(p)) + '</option>').join('') + '</select></label><label>Order <select data-fig="order"' + ro + '><option value="name">By name</option><option value="max"' + (o.order === 'max' ? ' selected' : '') + '>Highest first</option></select></label><label>Background <select data-fig="theme"' + ro + '><option value="">White</option><option value="dark"' + (o.theme === 'dark' ? ' selected' : '') + '>Dark</option></select></label><label>Turn the block <input type="range" min="-60" max="60" step="5" value="' + o.yaw + '" data-fig="yaw"' + ro + '></label></div>'
-    + Object.entries(FIGS).map(([k, f]) => { const [w, h] = figSize(k, vw); return '<section class="sec fg-card"><header><h3>' + f[0] + '</h3><span class="note">' + f[1] + '</span><button class="btn" data-figact="png|' + k + '">PNG</button><button class="btn" data-figact="svg|' + k + '">SVG</button><button class="btn" data-figact="out|' + k + '"' + ro + '>Add to outputs</button><button class="btn" data-figact="map|' + k + '"' + ro + '>' + (siteOf()?.figInset === k ? 'Remove from map' : 'Add to map') + '</button></header><div class="body" id="fig-' + k + '">' + f[2](w, h, o) + '</div></section>'; }).join('')
-    + '<p class="note">On the Map page, Contents also has Core strips and Fingerprint bars, drawn at each borehole.</p>';
-}
-document.addEventListener('change', e => { const t = e.target, k = t.dataset?.fig; if (S.readOnly) return;
-  if (k) { const y = document.scrollingElement.scrollTop; setSite({ ...(siteOf() || {}), figs: { ...(siteOf()?.figs || {}), [k]: k === 'yaw' ? +t.value : t.value } }); renderView(true); document.scrollingElement.scrollTop = y; }
-  else if (t.dataset?.figpos != null) { setSite({ ...(siteOf() || {}), figInsetPos: t.value }); renderView(true); }
-  else if (t.dataset?.figinset != null) { setSite({ ...(siteOf() || {}), figInset: t.value }); renderView(true); } });
-document.addEventListener('click', async e => {
-  const a = e.target.closest?.('[data-figact]'); if (!a) return; const [act, k] = a.dataset.figact.split('|'), f = FIGS[k], nm = ((curProj() || 'project') + ' ' + f[0]).replace(/[^\w .-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
-  if (act === 'png' || act === 'svg') { await loadImagery(); const [w, h] = figSize(k, S._figW || 1000), svg = f[2](w, h, figOpt()).replace(/ data-ft="[^"]*"/g, ''); if (act === 'svg') { await saveFile(nm + '.svg', new Blob([standaloneSVG(svg)], { type: 'image/svg+xml' })); return; } const p = await svgToPng(svg, 3); if (!p) { toast('The picture could not be made.'); return; } await saveFile(nm + '.png', new Blob([b64bytes(p.data.slice(p.data.indexOf(',') + 1))], { type: 'image/png' })); return; }
-  if (S.readOnly) return;
-  if (act === 'map') { const on = siteOf()?.figInset === k; setSite({ ...(siteOf() || {}), figInset: on ? '' : k }); renderView(true); toast(on ? 'Removed from the map.' : f[0] + ' is an inset on the map. Change it in Map › Contents › Figure inset.'); return; }
-  const L = structuredClone(repLayout()), pg = newPage('free', { title: f[0].toUpperCase() }), bd = bodyOf(pg), it = newItem(k, bd.x, bd.y); it.w = bd.w; it.h = Math.min(it.h, bd.h); it.frame = false; pg.items = [it]; L.pages.push(pg); saveLayout(L); S.cpage = L.pages.length - 1; toast(f[0] + ' added to Outputs as page ' + L.pages.length + '.');
-});
-document.addEventListener('pointermove', e => { const t = e.target.closest?.('[data-ft]'); let d = $('#fig-tip'); if (!t) { if (d) d.hidden = true; return; } if (!d) { d = document.createElement('div'); d.id = 'fig-tip'; document.body.append(d); } d.hidden = false; d.textContent = t.dataset.ft; d.style.left = Math.min(innerWidth - d.offsetWidth - 8, e.clientX + 14) + 'px'; d.style.top = Math.min(innerHeight - d.offsetHeight - 8, e.clientY + 14) + 'px'; });
 /* ---------- quality control: what the lab reports say, and the field duplicates against their parents ---------- */
 const QC0 = { maxT: 10, rpdSoil: 50, rpdWater: 40, days: '' };
 const qcOpt = () => ({ ...QC0, ...(siteOf()?.labQc || {}) });
@@ -13449,7 +13284,7 @@ document.addEventListener('click', e => { const a = e.target.closest?.('[data-ac
   else csvOut(base + ' delineation.csv', [['Borehole', 'Status', 'Over', 'From (m)', 'Deepest over (m)', 'Under again at (m)', 'Deepest tested (m)', 'Open sides'], ...D.R.map(r => [r.b.name, DELIN_ST[r.status][0], r.ovP.map(p => LAB_PARAMS[p].label + ' ' + r.pr[p].max.r.v).join('; '), r.top, r.deep, r.base, r.tested ? r.last : '', (r.sides || []).filter(q => !q.by && !q.more).map(q => q.k).join(' ')])]); });
 /* the Lab page: a summary across the top, then one view at a time (map and ranking, lab results, cross-section, soil tests) */
 S.labView = lsGet('bhlog.labView') || 'map';
-const LAB_VIEWS = [['map', 'Map'], ['lab', 'Lab results'], ['delin', 'Delineation'], ['qc', 'Quality control'], ['figs', 'Visuals'], ['sec', 'Cross-section'], ['soil', 'Soil tests']];
+const LAB_VIEWS = [['map', 'Map'], ['lab', 'Lab results'], ['delin', 'Delineation'], ['qc', 'Quality control'], ['sec', 'Cross-section'], ['soil', 'Soil tests']];
 function contamHTML(vw = 1000) {
   const list = projList(), thr = S.co.vThr ?? 100, rows = list.map(b => ({ b, s: vapourMax(b), n: (b.samples || []).filter(s => s.cvc != null).length })).sort((a, c) => (c.s?.cvc ?? -1) - (a.s?.cvc ?? -1));
   const over = rows.filter(r => r.s && r.s.cvc >= thr), withData = rows.filter(r => r.s), top = withData[0];
@@ -13489,7 +13324,6 @@ function contamHTML(vw = 1000) {
   } else if (v === 'sec') body = '<section class="sec"><header><h3>Cross-section with vapour</h3><span class="note">Bars to the right of each borehole: headspace on a log scale, 1 to 10,000 ppm</span></header><div class="body"><div class="scroll-x" id="csection"></div><p class="note" id="csection-note"></p></div></section>';
   else if (v === 'delin') body = delinHTML(list, vw);
   else if (v === 'qc') body = labQcHTML(list);
-  else if (v === 'figs') body = figsHTML(vw);
   else body = psaTablesHTML() + soilTestsHTML();
   return kpis + tabs + '<div class="lab-view">' + body + '</div>';
 }
@@ -13579,17 +13413,14 @@ const RITEMS = {
   soilmap: ['Soil map', BODY.w, 560], soilgraph: ['Soil graph', BODY.w, 360], soiltable: ['Soil results table', BODY.w, 420], plan: ['Site plan', BODY.w, 560], section: ['Cross-section', BODY.w, 440], wt: ['Water-table map', BODY.w, 520], vap: ['Vapour map', BODY.w, 520],
   flow: ['Groundwater flow', BODY.w, 460], hydro: ['Hydrograph', BODY.w, 320], text: ['Text box', 360, 110], image: ['Picture', 360, 260],
   gwsum: ['Model summary', BODY.w, BODY.h], gwcal: ['Model calibration plot', BODY.w, 560], gwpar: ['Model parameters', BODY.w, 300], gwlim: ['Model limits', BODY.w, 300],
-  figcore: ['Core wall', BODY.w, 520], figblock: ['Floating site block', BODY.w, 620], figsig: ['Hydrocarbon fingerprint', BODY.w, 440],
   secmap: ['Section location map', 260, 200], extent: ['Extent map', 240, 180],
   scalebar: ['Scale bar', 300, 56], north: ['North arrow', 80, 96], legend: ['Legend', 220, 110], shape: ['Shape', 160, 100],
 };
 const RPAGES = { pdf: 'Imported page', free: 'Free page', xsec: 'Cross-section page (landscape)', key: 'Key to symbols', logs: 'Borehole logs', lab: 'Summary of tests', chem: 'Soil analytical results', gw: 'Groundwater observations', photos: 'Photographs' };
 const RTITLES = { key: 'KEY TO SYMBOLS AND TERMS', logs: 'BOREHOLE LOGS', lab: 'SUMMARY OF TESTS', chem: 'SOIL ANALYTICAL RESULTS', gw: 'GROUNDWATER OBSERVATIONS', photos: 'PHOTOGRAPHS' };
 const SCALES = [['', 'Fit to frame'], ...[100, 200, 250, 500, 750, 1000, 1500, 2000, 2500, 5000, 10000].map(n => [n, '1:' + n.toLocaleString('en-CA')])];
-const FIG_P = [['', 'As on Lab › Visuals'], ['f2', 'F2'], ['f3', 'F3'], ['f2f3', 'F2 + F3'], ['f4', 'F4'], ['f1', 'F1'], ['benzene', 'Benzene'], ['toluene', 'Toluene'], ['ethylbenzene', 'Ethylbenzene'], ['xylenes', 'Xylenes'], ['ec', 'EC'], ['cl', 'Chloride']], FIG_TH = ['theme', 'Background', [['', 'White'], ['dark', 'Dark']]];
 const ROPTS = {
-  figcore: [['p', 'Result', FIG_P], ['order', 'Order', [['', 'As on Lab › Visuals'], ['name', 'By name'], ['max', 'Highest first']]], FIG_TH], figblock: [['p', 'Result', FIG_P], ['yaw', 'Turned', [['', 'As on Lab › Visuals'], ...[-60, -45, -30, -15, 0, 15, 30, 45, 60].map(v => [String(v), v + '°'])]], FIG_TH], figsig: [FIG_TH],
-  plan: [['figs', 'Core strips and fingerprints', [['', 'As on the Map page'], ['cores', 'Core strips'], ['sig', 'Fingerprint bars'], ['both', 'Both'], ['0', 'None']]], ['inset', 'Figure inset', [['', 'As on the Map page'], ['figcore', 'Core wall'], ['figblock', 'Floating site block'], ['figsig', 'Hydrocarbon fingerprint'], ['0', 'None']]], ['scale', 'Scale', SCALES], ['legend', 'Legend on the map', [['', 'As on the Map page'], ['1', 'Show'], ['0', 'Hide']]], ['bare', 'North arrow and caption on the map', [['', 'Show'], ['1', 'Hide (the page has its own)']]], ['grid', 'Grid interval', [['', 'Auto'], ...[5, 10, 20, 25, 50, 100, 250].map(v => [v, v + ' m'])]]],
+  plan: [['scale', 'Scale', SCALES], ['legend', 'Legend on the map', [['', 'As on the Map page'], ['1', 'Show'], ['0', 'Hide']]], ['bare', 'North arrow and caption on the map', [['', 'Show'], ['1', 'Hide (the page has its own)']]], ['grid', 'Grid interval', [['', 'Auto'], ...[5, 10, 20, 25, 50, 100, 250].map(v => [v, v + ' m'])]]],
   section: [['ve', 'Vertical exaggeration', [['', 'As on the site page'], [1, '×1 (true scale)'], [2, '×2'], [5, '×5'], [10, '×10'], [20, '×20'], [50, '×50']]],
     ['tick', 'Elevation interval', [['', 'Auto'], [.1, '0.1'], [.25, '0.25'], [.5, '0.5'], [1, '1'], [2, '2'], [5, '5']]], ['bw', 'Borehole width', [['', 'As on the site page'], [12, 'Narrow'], [18, 'Normal'], [28, 'Wide'], [40, 'Extra wide']]]],
   wt: [['farrow', 'Flow arrow', [['', 'With its 90 % range'], ['arrow', 'Arrow only'], ['0', 'None']]], ['scale', 'Scale', SCALES], ['iv', 'Contour interval', [['', 'Auto'], [.02, '0.02'], [.05, '0.05'], [.1, '0.1'], [.25, '0.25'], [.5, '0.5'], [1, '1']]]],
@@ -13697,7 +13528,10 @@ async function importReportFiles(files, at = S.cpage) {
   return added;
 }
 S.cpage = 0; S.csel = null;
-function repLayout() { const r = siteOf()?.report; if (r?.pages?.length) return r; return S._repDraft?.p === curProj() ? S._repDraft.L : (S._repDraft = { p: curProj(), L: { pages: REPORT_PRESETS.standard[1]() } }).L; }
+/* figures that were in Outputs for a short while (core wall, site block, fingerprint) are dropped from saved layouts; a page that held nothing else goes too */
+const GONE_ITEMS = new Set(['figcore', 'figblock', 'figsig']);
+function dropGone(r) { const bad = p => (p.items || []).some(i => GONE_ITEMS.has(i.t)); if (!r.pages.some(bad)) return; r.pages = r.pages.filter(p => !bad(p) || (p.items = p.items.filter(i => !GONE_ITEMS.has(i.t))).length); }
+function repLayout() { const r = siteOf()?.report; if (r?.pages?.length) dropGone(r); if (r?.pages?.length) return r; return S._repDraft?.p === curProj() ? S._repDraft.L : (S._repDraft = { p: curProj(), L: { pages: REPORT_PRESETS.standard[1]() } }).L; }
 function saveLayout(L) { if (S.readOnly) return; setSite({ ...(siteOf() || {}), report: L }); }
 const curPage = () => { const L = repLayout(); S.cpage = Math.max(0, Math.min(S.cpage, L.pages.length - 1)); return L.pages[S.cpage]; };
 
@@ -13715,7 +13549,6 @@ function itemInner(it, w, h) {
   if (it.t === 'plan' && (o.legend === '1' || o.legend === '0')) ro.legend = o.legend === '1';
   if ((it.t === 'plan' || it.t === 'vap') && (o.names === '1' || o.names === '0')) ro.names = o.names === '1';
   if ((it.t === 'plan' || it.t === 'vap') && o.vlab) ro.vlab = o.vlab;
-  if (it.t === 'plan') { if (o.figs) ro.figs = o.figs; if (o.inset) ro.inset = o.inset; }
   if (it.t === 'plan' && o.rp) ro.mres = { p: o.rp, d0: o.rd0 !== '' && o.rd0 != null ? fromD(+o.rd0) : null, d1: o.rd1 !== '' && o.rd1 != null ? fromD(+o.rd1) : null };
   const msg = t => (delete ro.sc, `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#f6f8fa"/><text x="12" y="24" style="font:12px Arial,sans-serif;fill:#5d6a75">${esc(t)}</text></svg>`);
   const fromEl = (fn, none) => { const el = document.createElement('div'); fn(el); return el.querySelector('svg')?.outerHTML || msg(none); };
@@ -13725,7 +13558,6 @@ function itemInner(it, w, h) {
   if (it.t === 'shape') return shapeSVG(it, w, h);
   if (['gwsum', 'gwcal', 'gwpar', 'gwlim'].includes(it.t)) return gwReportSVG(it.t, w, h);
   const out = withRO(ro, () => {
-    if (FIGS[it.t]) return FIGS[it.t][2](w, h, { ...figOpt(), theme: '', ...Object.fromEntries(Object.entries(o).filter(([, v]) => v !== '' && v != null)) });
     if (it.t.startsWith('soil')) return soilItem(it.t, o, w, h);
     if (it.t === 'plan') { const r = planSVG(w, h, false); return r.startsWith('<svg') ? r : msg('Add easting and northing to plot boreholes.'); }
     if (it.t === 'section') return fromEl(el => { RO.xs = { shape: 'guided', style: 'graded', ...(o.xs || S.xs) }; if (o.secDef) RO.secDef = o.secDef; drawSection(el, {}, w, sectionList(), false, h); }, 'Log at least two boreholes to draw a cross-section.');
@@ -13894,7 +13726,7 @@ function northSVG(it, w, h) {
 const legendMap = it => { const maps = (PAGE_CTX || curPage())?.items?.filter(x => MAP_ITEMS.has(x.t)) || []; return maps.find(m => m.id === it.o?.link) || maps[0] || null; };
 function legendRowsFor(it) {
   const m = legendMap(it), o = m?.o || {}, MR = m?.t === 'plan' ? (o.rp ? { p: o.rp, d0: o.rd0 !== '' && o.rd0 != null ? fromD(+o.rd0) : null, d1: o.rd1 !== '' && o.rd1 != null ? fromD(+o.rd1) : null } : lyrOn('res') ? S.mres : null) : null;
-  return withRO({ ...RO, figs: m?.o?.figs }, () => legendRows(m?.t || 'plan', mapList(), MR));
+  return legendRows(m?.t || 'plan', mapList(), MR);
 }
 function legendSVG(it, w, h) {
   // the symbols are drawn inside the map's own symbol settings
@@ -14142,7 +13974,7 @@ function composeHTML() {
   if (pg.kind === 'free') {
     const d = pgDims(pg), bd = bodyOf(pg);
     stage = `<div class="cmp-tools">      <label class="cmp-zoom"><span class="note">Zoom</span><select id="cmp-zoom" aria-label="Zoom">${[['fit', 'Fit page'], ['width', 'Fit width'], ...[0.5, 0.75, 1, 1.5, 2, 4].map(v => [v, Math.round(v * 100) + ' %'])].map(([v, t]) => `<option value="${v}" ${String(S.czoom) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <span class="cmp-addwrap"><button class="btn primary" data-act="cmp-addmenu" aria-haspopup="true" ${S.readOnly ? 'disabled' : ''}>Add item ▾</button><div class="cmp-addmenu" role="menu" hidden>${(() => { const G = [['Maps and drawings', ['plan', 'section', 'secmap', 'extent', 'wt', 'vap', 'flow', 'hydro']], ['Visuals', ['figcore', 'figblock', 'figsig']], ['Soil survey', ['soilmap', 'soilgraph', 'soiltable']], ['Groundwater model', ['gwsum', 'gwcal', 'gwpar', 'gwlim']], ['Text and pictures', ['text', 'image']], ['Map parts', ['scalebar', 'north', 'legend', 'shape']]], seen = new Set(G.flatMap(g => g[1])), rest = Object.keys(RITEMS).filter(k => !seen.has(k)); return [...G, ...(rest.length ? [['Other', rest]] : [])].map(([t, ks]) => `<div class="cmp-addg"><b>${t}</b>${ks.filter(k => RITEMS[k]).map(k => `<button type="button" class="cmp-addi" role="menuitem" data-cadd="${k}">${esc(RITEMS[k][0])}</button>`).join('')}</div>`).join(''); })()}</div></span></div>
+      <span class="cmp-addwrap"><button class="btn primary" data-act="cmp-addmenu" aria-haspopup="true" ${S.readOnly ? 'disabled' : ''}>Add item ▾</button><div class="cmp-addmenu" role="menu" hidden>${(() => { const G = [['Maps and drawings', ['plan', 'section', 'secmap', 'extent', 'wt', 'vap', 'flow', 'hydro']], ['Soil survey', ['soilmap', 'soilgraph', 'soiltable']], ['Groundwater model', ['gwsum', 'gwcal', 'gwpar', 'gwlim']], ['Text and pictures', ['text', 'image']], ['Map parts', ['scalebar', 'north', 'legend', 'shape']]], seen = new Set(G.flatMap(g => g[1])), rest = Object.keys(RITEMS).filter(k => !seen.has(k)); return [...G, ...(rest.length ? [['Other', rest]] : [])].map(([t, ks]) => `<div class="cmp-addg"><b>${t}</b>${ks.filter(k => RITEMS[k]).map(k => `<button type="button" class="cmp-addi" role="menuitem" data-cadd="${k}">${esc(RITEMS[k][0])}</button>`).join('')}</div>`).join(''); })()}</div></span></div>
       <div class="cmp-canvas"><span class="rl-c" aria-hidden="true"></span><svg class="rl-x" id="rl-x" aria-hidden="true"></svg><svg class="rl-y" id="rl-y" aria-hidden="true"></svg>
       <div class="cmp-stage cmp-scroll" id="cmp-stage"><div class="cmp-sizer" id="cmp-sizer"><div class="cmp-paper" id="cmp-paper" style="width:${d.W}px;height:${d.H}px">${pageFrame(pg.title || '', S.cpage + 1, n, pageItemsSVG(pg), d)}
         <div class="cmp-body" style="left:${bd.x}px;top:${bd.y}px;width:${bd.w}px;height:${bd.h}px" aria-hidden="true"></div>
