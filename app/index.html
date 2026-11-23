@@ -472,7 +472,7 @@ body.proj-home .shell { --sidebar-width: 0px; grid-template-columns: 0 0 minmax(
 .dialog.wide { width: min(980px, 94vw); max-width: none; }
 .dl-st { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; border: 1px solid var(--c); color: var(--c); white-space: nowrap; }
 .dl-sd { display: inline-block; width: 20px; margin-right: 3px; border-radius: 3px; text-align: center; font: 600 11px/18px var(--f-body); color: #fff; } .dl-sd.ok { background: #2e8b57; } .dl-sd.mo { background: #d9822b; } .dl-sd.no { background: #c0392b; }
-.gw-side { grid-template-columns: minmax(0, 1fr); } .dl-warn { margin: 0 0 12px; } .qc-set { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px 16px; } .lab-view > .sec + .sec, .lab-map + .sec { margin-top: var(--gap, 16px); }
+.gw-side { grid-template-columns: minmax(0, 1fr); } .lab-lock { margin: 0 0 8px; padding: 8px 12px; border-left: 4px solid #d9822b; background: rgba(217,130,43,.1); font-size: 13px; } .lab-lk { color: #a3470b; font-weight: 600; } .dl-warn { margin: 0 0 12px; } .qc-set { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px 16px; } .lab-view > .sec + .sec, .lab-map + .sec { margin-top: var(--gap, 16px); }
 .fg-bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin: 0 0 12px; font-size: 13px; } .fg-bar label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); } .fg-bar select { width: auto; min-height: 32px; }
 .fg-card .body { padding: 0 !important; } .fg-card svg { display: block; width: 100%; height: auto; } #fig-tip { position: fixed; z-index: 90; max-width: 320px; padding: 6px 10px; border-radius: 5px; background: #14181c; color: #fff; font: 12.5px var(--f-body); pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 /* Overview page */
@@ -13236,7 +13236,7 @@ function delinHTML(list, vw) {
     + (D.steps.length ? '<div class="scroll-x"><table class="sum"><thead><tr><th>Point</th><th class="r">Easting</th><th class="r">Northing</th><th>For</th></tr></thead><tbody>' + D.steps.map(q => '<tr><td>' + q.name + '</td><td class="r">' + q.x.toFixed(1) + '</td><td class="r">' + q.y.toFixed(1) + '</td><td>' + esc(q.for.join(', ')) + '</td></tr>').join('') + '</tbody></table></div>' : '<p class="note">' + (D.nloc ? 'No open side found.' : 'Needs coordinates.') + '</p>')
     + '<p class="note">Starting points for a plan, placed by geometry alone. Check utilities, access, flow direction and property lines.</p></div></section></div></div>'
     + '<section class="sec"><header><h3>By borehole</h3><button class="btn link" data-act="dl-csv2">CSV</button></header><div class="body"><div class="scroll-x"><table class="sum"><thead><tr><th>Borehole</th><th>Status</th><th>Over</th><th class="r">From (' + L + ')</th><th class="r">Deepest over</th><th class="r">Under again at</th><th class="r">Deepest tested</th><th>Sides</th></tr></thead><tbody>'
-    + rows.map(r => '<tr><td><button class="pick" data-pick="' + esc(r.b.id) + '" data-goto="log">' + esc(r.b.name) + '</button></td><td>' + chip(r.status) + '</td><td>' + (r.ovP.map(p => esc(LAB_PARAMS[p].label) + ' ' + fmtLab(r.pr[p].max.r) + ' <small class="note">at ' + fx(r.pr[p].max.d) + '</small>').join('<br>') || '—') + '</td><td class="r">' + fx(r.top) + '</td><td class="r">' + fx(r.deep) + '</td><td class="r">' + (r.base != null ? fx(r.base) : r.ovP.length ? '<b style="color:var(--negative)">none</b>' : '—') + '</td><td class="r">' + (r.tested ? fx(r.last) : '—') + '</td><td>' + side(r) + '</td></tr>').join('')
+    + rows.map(r => '<tr><td><button class="pick" data-pick="' + esc(r.b.id) + '" data-goto="log">' + esc(r.b.name) + '</button></td><td>' + chip(r.status) + (r.status === 'none' && r.b.status === 'issued' ? ' <small class="note">issued: lab imports skip it until revised</small>' : '') + '</td><td>' + (r.ovP.map(p => esc(LAB_PARAMS[p].label) + ' ' + fmtLab(r.pr[p].max.r) + ' <small class="note">at ' + fx(r.pr[p].max.d) + '</small>').join('<br>') || '—') + '</td><td class="r">' + fx(r.top) + '</td><td class="r">' + fx(r.deep) + '</td><td class="r">' + (r.base != null ? fx(r.base) : r.ovP.length ? '<b style="color:var(--negative)">none</b>' : '—') + '</td><td class="r">' + (r.tested ? fx(r.last) : '—') + '</td><td>' + side(r) + '</td></tr>').join('')
     + '</tbody></table></div><p class="note" style="margin-top:6px">Sides: green, a borehole within reach is under the guideline to at least that depth; orange, the next borehole that way is over too; red, open. A non-detect with a limit above the guideline bounds nothing. Soil results only.</p></div></section>';
 }
 /* ---------- visuals: the core wall, the floating site block and the hydrocarbon fingerprint. Each is one SVG (w × h), used on the
@@ -15102,12 +15102,12 @@ function psaDialog({ file, items, rep }) {
     '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="psa-go">Import curves</button>'); $('#overlay .dialog')?.classList.add('wide');
 }
 function psaGo() {
-  const touched = new Set(); let n = 0;
-  (S._psaImp || []).forEach((x, i) => { const v = $('[data-psamap="' + i + '"]')?.value || ''; if (!v) return; const [bid, sid] = v.split('|'), b = S.bh.get(bid), sm = b?.samples.find(q => q.id === sid); if (!sm || !editable(b)) return;
+  const touched = new Set(), lockN = new Set(); let n = 0;
+  (S._psaImp || []).forEach((x, i) => { const v = $('[data-psamap="' + i + '"]')?.value || ''; if (!v) return; const [bid, sid] = v.split('|'), b = S.bh.get(bid), sm = b?.samples.find(q => q.id === sid); if (!sm) return; if (!editable(b)) { lockN.add(b.name); return; }
     sm.gsd = x.gsd.map(p => ({ ...p })); sm.gsdMeta = { method: 'Laser diffraction, % by volume', lab: S._labMeta?.lab || 'SRC (Saskatchewan Research Council)', report: x.rep, labId: x.id };
     sm.psa = { labId: x.id, report: x.rep, instrument: x.instr, ...x.info, stats: x.st, pct: x.pct.map(([mm, p]) => [p, +(mm * 1000).toPrecision(4)]), classes: x.classes }; n++; touched.add(b); });
   for (const b of touched) { logChange(b, 'Particle size imported'); store.save(b); }
-  closeOverlay(); S.formStale = true; render(); toast('Imported ' + n + ' grain-size curve' + (n === 1 ? '' : 's') + '.'); if (S._labQueue?.length) setTimeout(labNext, 400);
+  closeOverlay(); S.formStale = true; render(); toast('Imported ' + n + ' grain-size curve' + (n === 1 ? '' : 's') + '.' + (lockN.size ? ' Skipped, because the log is issued: ' + [...lockN].join(', ') + '.' : '')); if (S._labQueue?.length) setTimeout(labNext, 400);
 }
 function importLab() {
   const f = document.createElement('input'); f.type = 'file'; f.accept = '.csv,.txt,.xlsx,.xls,.pdf'; f.multiple = true;
@@ -15137,8 +15137,10 @@ function labDialog({ file, res, meta }) {
     return `<select data-labmap="${i}" style="width:100%">${x.m.b && x.m.depth != null ? `<option value="${esc(x.m.b.id)}|new" ${cur0.endsWith('|new') ? 'selected' : ''}>New sample in ${esc(x.m.b.name)} at ${fx(x.m.depth)} ${LEN()}</option>` : ''}${list.map(b => `<optgroup label="${esc(b.name)}">${b.samples.map(sm => `<option value="${esc(b.id)}|${esc(sm.id)}" ${cur0 === `${b.id}|${sm.id}` ? 'selected' : ''} ${editable(b) ? '' : 'disabled'}>${esc(b.name)} ${esc(sampleId(sm))} · ${fx(sm.depth)} ${LEN()}</option>`).join('')}</optgroup>`).join('')}<option value="" ${cur0 ? '' : 'selected'}>Skip this sample</option></select>`;
   };
   const params = [...new Set(S._labImp.flatMap(x => Object.keys(x.res)))];
-  dialog(`Import lab results from ${esc(file.name)}`, `<p class="note" style="margin:0">${S._labImp.length} sample${S._labImp.length === 1 ? '' : 's'}, ${res.form}. Parameters found: ${params.map(p => esc(LAB_PARAMS[p].label)).join(', ')}. Check each match; results replace any already entered for the same parameter.</p>
-    <div class="scroll-x" style="max-height:340px;overflow:auto"><table class="sum"><thead><tr><th>Lab sample ID</th><th style="min-width:260px">Goes to</th><th class="r">Results</th></tr></thead><tbody>${S._labImp.map((x, i) => `<tr><td>${esc(x.id)}${x.dup ? ' <small class="note">field duplicate: skipped unless you choose a sample</small>' : ''}${x.water ? ' <small class="note">water</small>' : ''}</td><td>${opts(x, i)}</td><td class="r">${Object.keys(x.res).length}</td></tr>`).join('')}</tbody></table></div>
+  const lockB = [...new Set(S._labImp.map(x => x.m.b).filter(b => b && b.status === 'issued'))], off = x => !x.water && x.m.sm && x.m.depth != null && Math.abs(x.m.sm.depth - x.m.depth) > .05;
+  const warn = (lockB.length ? `<p class="lab-lock"><b>${lockB.map(b => esc(b.name)).join(', ')}</b> ${lockB.length === 1 ? 'is issued' : 'are issued'}, so ${lockB.length === 1 ? 'its' : 'their'} results will be skipped. To import them, cancel, open the log, choose Revise, and import again.</p>` : '') + (S._labImp.some(off) ? `<p class="lab-lock">${S._labImp.filter(off).length} result${S._labImp.filter(off).length === 1 ? ' is' : 's are'} matched to a logged sample at another depth (marked below). Check each one.</p>` : '');
+  dialog(`Import lab results from ${esc(file.name)}`, warn + `<p class="note" style="margin:0">${S._labImp.length} sample${S._labImp.length === 1 ? '' : 's'}, ${res.form}. Parameters found: ${params.map(p => esc(LAB_PARAMS[p].label)).join(', ')}. Check each match; results replace any already entered for the same parameter.</p>
+    <div class="scroll-x" style="max-height:340px;overflow:auto"><table class="sum"><thead><tr><th>Lab sample ID</th><th style="min-width:260px">Goes to</th><th class="r">Results</th></tr></thead><tbody>${S._labImp.map((x, i) => `<tr><td>${esc(x.id)}${x.dup ? ' <small class="note">field duplicate: skipped unless you choose a sample</small>' : ''}${x.water ? ' <small class="note">water</small>' : ''}${x.m.b?.status === 'issued' ? ' <small class="lab-lk">issued: skipped</small>' : ''}${off(x) ? ' <small class="lab-lk">logged at ' + fx(x.m.sm.depth) + '</small>' : ''}</td><td>${opts(x, i)}</td><td class="r">${Object.keys(x.res).length}</td></tr>`).join('')}</tbody></table></div>
     <div class="fields" style="grid-template-columns:1fr 1fr"><div class="fld"><label for="li-lab">Laboratory</label><input id="li-lab" value="${esc(S._labMeta?.lab || (/als|bureau|veritas|element|maxxam|exova|agat|caro|saskatchewan research|src/i.exec(file.name) || [''])[0])}"></div><div class="fld"><label for="li-rep">Report or work order</label><input id="li-rep" value="${esc(S._labImp.find(x => x.rep)?.rep || '')}"></div></div>
     ${res.unknown?.length ? `<p class="note">Not imported (not in this app’s parameter list): ${esc(res.unknown.slice(0, 12).join(', '))}${res.unknown.length > 12 ? ` and ${res.unknown.length - 12} more` : ''}.</p>` : ''}`,
     `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="lab-imp-go">Import results</button>`); $('#overlay .dialog')?.classList.add('wide');
@@ -15163,10 +15165,10 @@ function labQcPut(report, lab, meta, items) {
   setSite({ ...st, labReports: all });
 }
 function importLabGo() {
-  const lab = $('#li-lab')?.value.trim() || '', rep = $('#li-rep')?.value.trim() || '', touched = new Set(); let n = 0, ns = 0;
+  const lab = $('#li-lab')?.value.trim() || '', rep = $('#li-rep')?.value.trim() || '', touched = new Set(), locked = new Map(); let n = 0, ns = 0;
   (S._labImp || []).forEach((x, i) => {
     const v = $(`[data-labmap="${i}"]`)?.value || ''; if (!v) return;
-    const [bid, sid] = v.split('|'), b = S.bh.get(bid); if (!b || !editable(b)) return;
+    const [bid, sid] = v.split('|'), b = S.bh.get(bid); if (!b) return; if (!editable(b)) { locked.set(b.name, (locked.get(b.name) || 0) + 1); return; }
     if (sid === 'gw') { gwPut(b, { date: x.date || '', sid: x.id, labNo: x.labno || '', lab, report: rep || x.rep || '', res: x.res, unit0: x.unit0 || 'mg/L' }); n += Object.keys(x.res).length; ns++; touched.add(b); return; }
     let sm = sid === 'new' ? null : b.samples.find(s => s.id === sid);
     if (!sm) { const prev = [...b.samples].sort((a, c) => (a.no || 0) - (c.no || 0)).pop(); sm = { ...SHEETS.samples.blank(b, prev), type: 'G', depth: x.m.depth }; b.samples.push(sm); }
@@ -15177,7 +15179,7 @@ function importLabGo() {
   if (!S.readOnly) labQcPut(rep || (S._labImp || []).find(x => x.rep)?.rep || '', lab, S._labMeta, S._labImp || []);
   closeOverlay(); S.formStale = true; render(); if (S._labQueue?.length) setTimeout(labNext, 400);
   const over = projList().flatMap(b => b.samples.flatMap(sm => LAB_ORDER.filter(p => exceeds(labVal(sm, p), p)))).length;
-  toast(`Imported ${n} result${n === 1 ? '' : 's'} for ${ns} sample${ns === 1 ? '' : 's'}.${Object.keys(projGuide()).length ? ` ${over} exceed${over === 1 ? 's' : ''} the guideline.` : ' Choose a guideline on Lab & contamination to flag exceedances.'}`);
+  toast(`Imported ${n} result${n === 1 ? '' : 's'} for ${ns} sample${ns === 1 ? '' : 's'}.${locked.size ? ' Skipped, because the log is issued: ' + [...locked].map(([k, c]) => k + ' (' + c + ')').join(', ') + '.' : ''}${Object.keys(projGuide()).length ? ` ${over} exceed${over === 1 ? 's' : ''} the guideline.` : ' Choose a guideline on Lab & contamination to flag exceedances.'}`);
 }
 /* guideline sets kept with the company settings, so a guideline entered once can be applied to any project */
 function guideSetHTML(ed) {
