@@ -2602,7 +2602,8 @@ function gpMenuList() {
   if (q) { const hits = tools.filter(hit); return hits.length ? `<p class="gp-mh">${hits.length} tool${hits.length === 1 ? '' : 's'} matching “${esc(S.gpMenuQ.trim())}”</p>` + hits.map(row).join('') : '<p class="gp-mh">No tool matches. Try “volume”, “water”, “export”.</p>'; }
   if (cat === 'recent') { const rec = (S.gp.recent || []).filter(id => GP_TOOLS[id] && tools.some(([x]) => x === id)); return rec.length ? '<p class="gp-mh">Used lately</p>' + rec.map(id => row([id, GP_TOOLS[id]])).join('') : '<p class="gp-mh">Tools you run appear here. Pick a category on the left, or type to search.</p>'; }
   const C = GP_CATS.find(c => c[0] === cat);
-  return C[3].map(gname => { const ts = tools.filter(([, t]) => t.group === gname); return ts.length ? (C[3].length > 1 ? `<p class="gp-mh">${esc(gname)}</p>` : '') + ts.map(row).join('') : ''; }).join('');
+  const shown = C[3].filter(g => tools.some(([, t]) => t.group === g));
+  return shown.map(gname => { const ts = tools.filter(([, t]) => t.group === gname); return (shown.length > 1 ? `<p class="gp-mh">${esc(gname)}</p>` : '') + ts.map(row).join(''); }).join('');
 }
 function openGpMenu(anchor) {
   if ($('#menu')) { closeMenu(); return; }
@@ -11553,17 +11554,23 @@ async function gpOrthoTrees(prm) {
 const WB_ICON = '<path d="M4 18l5-8 4 5 3-4 4 7"/><circle cx="17" cy="6" r="2"/><path d="M3 21h18"/>';
 const wbNice = n => n.replace(/([a-z\d])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').split(' ').map((w, i) => /^[A-Z\d]{2,}$/.test(w) ? w : i ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 const WB_TERR = /Gridding|TIN|Dem$|DEM|Dsm|DSM|FillDepressions|BreachDepressions|Smooth|Denoise|Interpolation|Elev|Height|RemoveOffTerrain|FillMissingData|Kriging|Idw|NaturalNeighbour|NearestNeighbour|RadialBasis/;
+/* each Whitebox group goes into the Toolbox category it belongs to, under its own heading after the app's own tools; lidar gets a category of its own */
+const WB_CAT = [[/^LiDAR/, 'lidar', 'Lidar'], [/^Hydrological/, 'gw', 'Hydrology'], [/^Stream Network/, 'gw', 'Stream networks'], [/^Geomorphometric/, 'terrain', 'Terrain (geomorphometry)'],
+  [/^GIS Analysis[/]Overlay/, 'analysis', 'Overlay'], [/^GIS Analysis[/]Distance/, 'analysis', 'Distance'], [/^GIS Analysis[/]Patch/, 'analysis', 'Patch shape'], [/^GIS Analysis/, 'analysis', 'GIS analysis'], [/^Machine/, 'analysis', 'Machine learning'],
+  [/^Math/, 'raster', 'Maths and statistics'], [/^Image Processing Tools[/]Filters/, 'raster', 'Image filters'], [/^Image Processing Tools[/]Image Enhancement/, 'raster', 'Image enhancement'], [/^Image Processing/, 'raster', 'Image processing'], [/^Data/, 'export', 'Data conversion']];
+const WB_INTERP = /^(IdwInterpolation|NaturalNeighbourInterpolation|NearestNeighbourGridding|RadialBasisFunctionInterpolation|ModifiedShepardInterpolation|TINGridding|BlockMinimumGridding|BlockMaximumGridding)$/;
 function wbInstall(cat, installed) {
   GIS.wbt = { version: cat.version, installed };
-  const groups = new Set();
+  if (!GP_CATS.some(c => c[0] === 'lidar')) GP_CATS.splice(GP_CATS.findIndex(c => c[0] === 'terrain') + 1, 0, ['lidar', 'Lidar', '<circle cx="6" cy="16" r="1"/><circle cx="10" cy="12" r="1"/><circle cx="14" cy="15" r="1"/><circle cx="18" cy="10" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="15" cy="6" r="1"/><path d="M3 20h18"/>', []]);
+  for (const C of GP_CATS) { if (C[0] === 'gw') C[1] = 'Water'; if (C[0] === 'export') C[1] = 'Data and export'; C[3] = C[3].filter(g => !g.startsWith('Whitebox: ')); }
+  const add = (ci, g) => { const C = GP_CATS.find(c => c[0] === ci); if (C && !C[3].includes(g)) C[3].push(g); };
   for (const t of cat.tools) {
-    const g = 'Whitebox: ' + t.toolbox.replace('Image Processing Tools', 'Image processing').replace('GIS Analysis', 'GIS analysis').replace('Math and Stats Tools', 'Maths and statistics').replace('LiDAR Tools', 'Lidar').replace('Data Tools', 'Data').replace('Hydrological Analysis', 'Hydrology').replace('Geomorphometric Analysis', 'Terrain (geomorphometry)').replace('Stream Network Analysis', 'Stream networks').replace('Machine Learning', 'Machine learning').replace('/', ' › ');
-    groups.add(g);
-    GP_TOOLS['wb_' + t.name] = { group: g, name: wbNice(t.name), by: 'WhiteboxTools ' + cat.version + ' · ' + t.name, kind: 'wbt', desc: t.desc, wb: t, prm: [] };
+    const m = WB_CAT.find(([re]) => re.test(t.toolbox)) || [null, 'analysis', 'GIS analysis'];
+    const [ci, g] = WB_INTERP.test(t.name) ? ['interp', 'Whitebox: Interpolation'] : [m[1], 'Whitebox: ' + m[2]];
+    add(ci, g); GP_TOOLS['wb_' + t.name] = { group: g, name: wbNice(t.name), by: 'WhiteboxTools ' + cat.version + ' · ' + t.name, kind: 'wbt', desc: t.desc, wb: t, prm: [] };
   }
-  const order = ['Lidar', 'Hydrology', 'Terrain', 'Stream', 'GIS', 'Image', 'Maths', 'Data', 'Machine'], rank = g => { const i = order.findIndex(o => g.slice(10).startsWith(o)); return i < 0 ? 99 : i; };
-  const list = [...groups].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
-  const C = GP_CATS.find(c => c[0] === 'whitebox'); if (C) C[3] = list; else GP_CATS.push(['whitebox', 'Whitebox', WB_ICON, list]);
+  const wi = GP_CATS.findIndex(c => c[0] === 'whitebox'); if (wi >= 0) GP_CATS.splice(wi, 1);
+  if (S.gpMenuCat === 'whitebox') S.gpMenuCat = 'lidar';
 }
 async function wbLoad() {
   if (GIS.wbt || GIS.wbtLoading || !gisOn() || !window.desktop?.gis) return; GIS.wbtLoading = true;
