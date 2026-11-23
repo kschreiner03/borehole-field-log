@@ -14478,6 +14478,7 @@ const LAB_ORDER = ['benzene', 'toluene', 'ethylbenzene', 'xylenes', 'f1', 'f1b',
 function labVal(sm, p) {
   const L = sm.lab || {};
   if (p !== 'f1b') return L[p] && L[p].v != null ? L[p] : null;
+  if (L.f1b && L.f1b.v != null) return L.f1b;   // reported by the lab
   const f1 = L.f1; if (!f1 || f1.v == null || !['benzene', 'toluene', 'ethylbenzene', 'xylenes'].every(k => L[k] && L[k].v != null)) return null;
   if (f1.lt) return { v: f1.v, lt: true };
   const sub = ['benzene', 'toluene', 'ethylbenzene', 'xylenes'].reduce((t, k) => t + (L[k].lt ? 0 : L[k].v), 0);
@@ -14578,7 +14579,7 @@ function labTableHTML(list) {
    and Element send them), wide files (one row per sample) and crosstabs (one column per sample) all work. Each sample ID is matched
    to a borehole and sample by name, then sample number or depth; every match is shown, and can be changed, before anything is written. ---------- */
 const LAB_MATCH = [   // first match wins; null = recognised but not stored (calculated here, or a partial)
-  [/f1\b.*btex|btex.*excluded/, null], [/m\s*[+&]\s*p|o-xylene|\bo xylene|m,p/, null], [/f4g|gravimetric/, null],
+  [/f1\b.*btex|btex.*excluded/, 'f1b'], [/m\s*[+&]\s*p|o-xylene|\bo xylene|m,p/, null], [/f4g|gravimetric/, null],
   [/^(phc\s*)?f1\b|c6\s*-\s*c10/, 'f1'], [/^(phc\s*)?f2\b|c10\s*-\s*c16/, 'f2'], [/^(phc\s*)?f3\b|c16\s*-\s*c34/, 'f3'], [/^(phc\s*)?f4\b|c34\s*-\s*c50/, 'f4'],
   [/^benzene\b/, 'benzene'], [/^toluene\b/, 'toluene'], [/^ethyl\s*-?\s*benzene/, 'ethylbenzene'], [/xylenes?\b.*total|total\s+xylenes?|^xylenes?$/, 'xylenes'],
   [/^(%\s*)?sand\b/, 'sand'], [/^(%\s*)?silt\b/, 'silt'], [/^(%\s*)?clay\b/, 'clay'], [/organic matter|^om\b/, 'om'],
@@ -14659,7 +14660,7 @@ function parseLabTable(rows) {
 /* a lab sample ID ("BH25-07 1.5-2.0", "BH01-SA3", "MW3 @ 0.75 m") → {b, sm, depth} in this project */
 function matchLabId(x) {
   const raw = String(x.id), list = projList();
-  const hit = list.map(b => { const pat = b.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[-\s_]+/g, '[-\\s_]*'); const m = new RegExp(`(^|[^a-z0-9])${pat}(?![0-9])`, 'i').exec(raw); return m ? { b, end: m.index + m[0].length, len: b.name.length } : null; }).filter(Boolean).sort((a, c) => c.len - a.len)[0];
+  const hit = list.flatMap(b => [b.name, wellId(b)].filter(Boolean).map(name => ({ b, name }))).map(({ b, name }) => { const pat = name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[-\s_]+/g, '[-\\s_]*'); const m = new RegExp(`(^|[^a-z0-9])${pat}(?![0-9])`, 'i').exec(raw); return m ? { b, end: m.index + m[0].length, len: name.length } : null; }).filter(Boolean).sort((a, c) => c.len - a.len)[0];
   if (!hit) return { b: null, sm: null, depth: x.depth };
   const rest = raw.slice(hit.end);
   const no = /(?:^|[\s\-_#@])(?:s|sa|ss|st|g|sample|smp)\s*-?\s*(\d+)\b/i.exec(rest)?.[1];
@@ -14670,14 +14671,51 @@ function matchLabId(x) {
   if (!sm && depth != null) { const near = [...b.samples].filter(s => s.depth != null).sort((a, c) => Math.abs(a.depth - depth) - Math.abs(c.depth - depth))[0]; if (near && Math.abs(near.depth - depth) <= .35) sm = near; }
   return { b, sm, depth };
 }
+/* a laboratory's PDF report (SRC and similar layouts): each page names its samples ("26785 07/21/2026 BH26-1 @1.20 *SOIL*"),
+   then a table of analytes with their units and one column of results per sample. The text is read from the PDF (a scanned
+   report has none) and turned into one row per result, which the table importer then reads like any lab file */
+async function pdfLabRows(file) {
+  if (!window.pdfjsLib) throw new Error('pdfjs');
+  const pdf = await openPdf(new Uint8Array(await file.arrayBuffer())).promise, lines = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const tc = await (await pdf.getPage(i)).getTextContent(), rows = [];
+    for (const it of tc.items) { const t = (it.str || '').trim(); if (!t) continue; const y = it.transform[5], x = it.transform[4]; let r = rows.find(q => Math.abs(q.y - y) < 2.5); if (!r) rows.push(r = { y, it: [] }); r.it.push({ x, t }); }
+    rows.sort((a, c) => c.y - a.y).forEach(r => lines.push(r.it.sort((a, c) => a.x - c.x).map(q => q.t).join(' ').replace(/\s+/g, ' ').trim()));
+    lines.push('\f');
+  }
+  return labRowsFromText(lines);
+}
+function labRowsFromText(lines) {
+  const all = lines.join('\n'), out = [['Sample ID', 'Analyte', 'Result', 'Units', 'Sample date', 'Report No', 'Depth']];
+  const rep = (/SRC Group\s*#\s*([\w-]+)/i.exec(all) || /(?:work order|report (?:no\.?|number)|job (?:no\.?|number))\s*[:#]?\s*([\w-]+)/i.exec(all) || [])[1] || '';
+  const lab = /saskatchewan research council|src\.sk\.ca/i.test(all) ? 'SRC (Saskatchewan Research Council)' : /\bALS\b/.test(all) ? 'ALS' : /bureau veritas/i.test(all) ? 'Bureau Veritas' : /element materials|element labs/i.test(all) ? 'Element' : '';
+  const UNIT = /\s(ug\/g|µg\/g|mg\/kg|ug\/kg|µg\/kg|ug\/L|µg\/L|mg\/L|ng\/L|dS\/m|uS\/cm|µS\/cm|mS\/cm|vol ?%|wt ?%|%|pH units)(?=\s|$)/i;
+  let smp = new Map(), cols = null, n = 0;
+  for (const ln of lines) {
+    if (ln === '\f') { smp = new Map(); cols = null; continue; }   // each page names its own samples
+    const m = /^(\d{4,7})\s+(?:(\d{1,2}\/\d{1,2}\/\d{4})\s+)?(.+?)\s*\*(soil|water|sediment|solid|liquid)\*/i.exec(ln);
+    if (m) { smp.set(m[1], { id: m[3].trim(), date: m[2] || '' }); continue; }
+    if (/^analyte\b.*\bunits?\b/i.test(ln)) { cols = (ln.match(/\b\d{4,7}\b/g) || []).filter(k => smp.has(k)); continue; }
+    if (!cols?.length) continue;
+    const L = ' ' + ln, u = UNIT.exec(L); if (!u) continue;
+    const name = L.slice(0, u.index).trim().replace(/\*+$/, '').trim(); if (!name || /^lab section/i.test(name)) continue;
+    const vals = L.slice(u.index + u[0].length).match(/[<>]\s*\d+(?:\.\d+)?|-?\d+(?:\.\d+)?|see attached|not analy[sz]ed|n\/a|\bnd\b/gi) || [];
+    if (vals.length !== cols.length) continue;
+    vals.forEach((v, j) => { const sm = smp.get(cols[j]), d = /@\s*(\d+(?:\.\d+)?)/.exec(sm.id); out.push([sm.id, name, v.replace(/\s+/g, ''), u[1], sm.date, rep, d ? d[1] : '']); n++; });
+  }
+  return { rows: out, lab, rep, n };
+}
 function importLab() {
-  const f = document.createElement('input'); f.type = 'file'; f.accept = '.csv,.txt,.xlsx,.xls';
+  const f = document.createElement('input'); f.type = 'file'; f.accept = '.csv,.txt,.xlsx,.xls,.pdf';
   f.onchange = async () => { const file = f.files[0]; if (file) importLabFile(file); }; f.click();
 }
 async function importLabFile(file) {
-  let res; try { res = parseLabTable(await readTable(file)); } catch { res = { samples: [] }; }
-  if (!res.samples.length) { toast(`No lab results found in ${file.name}. The file needs a sample ID column and results for BTEX, PHC F1–F4, salinity or metals.`); return; }
-  S._labImp = res.samples.map(x => ({ ...x, m: matchLabId(x) }));
+  let res, meta = {}; const pdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+  try { if (pdf) { meta = await pdfLabRows(file); res = parseLabTable(meta.rows); res.form = 'read from the PDF report'; } else res = parseLabTable(await readTable(file)); }
+  catch (e) { if (e?.message === 'pdfjs') { toast('The PDF reader did not load (it needs an internet connection the first time). Try again, or import the lab\'s Excel or CSV file.'); return; } res = { samples: [] }; }
+  if (!res.samples.length) { toast(pdf ? `No lab results could be read from ${file.name}. Its text needs sample lines (e.g. "26785 07/21/2026 BH26-1 @1.20 *SOIL*") and a table of analytes with units; a scanned report has no text to read. Import the lab's Excel or CSV file instead.` : `No lab results found in ${file.name}. The file needs a sample ID column and results for BTEX, PHC F1–F4, salinity or metals.`); return; }
+  S._labMeta = meta;
+  S._labImp = res.samples.map(x => { const m = matchLabId(x); return { ...x, dup: /\bdup(licate)?\b|\bfd\b/i.test(x.id), m: /\bdup(licate)?\b|\bfd\b/i.test(x.id) ? { b: m.b, sm: null, depth: null } : m }; });
   const list = projList(), opts = (x, i) => {
     if (x.water) return `<select data-labmap="${i}" style="width:100%">${list.filter(b => b.well?.installed).map(b => `<option value="${esc(b.id)}|gw" ${x.m.b === b ? 'selected' : ''} ${editable(b) ? '' : 'disabled'}>Groundwater sample, ${esc(b.name)}${x.date ? ' · ' + esc(x.date) : ''}</option>`).join('')}<option value="" ${x.m.b?.well?.installed ? '' : 'selected'}>Skip this sample</option></select>`;
     const cur0 = x.m.sm ? `${x.m.b.id}|${x.m.sm.id}` : x.m.b && x.m.depth != null ? `${x.m.b.id}|new` : '';
@@ -14685,8 +14723,8 @@ async function importLabFile(file) {
   };
   const params = [...new Set(S._labImp.flatMap(x => Object.keys(x.res)))];
   dialog(`Import lab results from ${esc(file.name)}`, `<p class="note" style="margin:0">${S._labImp.length} sample${S._labImp.length === 1 ? '' : 's'}, ${res.form}. Parameters found: ${params.map(p => esc(LAB_PARAMS[p].label)).join(', ')}. Check each match; results replace any already entered for the same parameter.</p>
-    <div class="scroll-x" style="max-height:340px;overflow:auto"><table class="sum"><thead><tr><th>Lab sample ID</th><th style="min-width:260px">Goes to</th><th class="r">Results</th></tr></thead><tbody>${S._labImp.map((x, i) => `<tr><td>${esc(x.id)}</td><td>${opts(x, i)}</td><td class="r">${Object.keys(x.res).length}</td></tr>`).join('')}</tbody></table></div>
-    <div class="fields" style="grid-template-columns:1fr 1fr"><div class="fld"><label for="li-lab">Laboratory</label><input id="li-lab" value="${esc((/als|bureau|veritas|element|maxxam|exova|agat|caro|saskatchewan research|src/i.exec(file.name) || [''])[0])}"></div><div class="fld"><label for="li-rep">Report or work order</label><input id="li-rep" value="${esc(S._labImp.find(x => x.rep)?.rep || '')}"></div></div>
+    <div class="scroll-x" style="max-height:340px;overflow:auto"><table class="sum"><thead><tr><th>Lab sample ID</th><th style="min-width:260px">Goes to</th><th class="r">Results</th></tr></thead><tbody>${S._labImp.map((x, i) => `<tr><td>${esc(x.id)}${x.dup ? ' <small class="note">field duplicate: skipped unless you choose a sample</small>' : ''}${x.water ? ' <small class="note">water</small>' : ''}</td><td>${opts(x, i)}</td><td class="r">${Object.keys(x.res).length}</td></tr>`).join('')}</tbody></table></div>
+    <div class="fields" style="grid-template-columns:1fr 1fr"><div class="fld"><label for="li-lab">Laboratory</label><input id="li-lab" value="${esc(S._labMeta?.lab || (/als|bureau|veritas|element|maxxam|exova|agat|caro|saskatchewan research|src/i.exec(file.name) || [''])[0])}"></div><div class="fld"><label for="li-rep">Report or work order</label><input id="li-rep" value="${esc(S._labImp.find(x => x.rep)?.rep || '')}"></div></div>
     ${res.unknown?.length ? `<p class="note">Not imported (not in this app’s parameter list): ${esc(res.unknown.slice(0, 12).join(', '))}${res.unknown.length > 12 ? ` and ${res.unknown.length - 12} more` : ''}.</p>` : ''}`,
     `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="lab-imp-go">Import results</button>`);
 }
@@ -14695,7 +14733,7 @@ function importLabGo() {
   (S._labImp || []).forEach((x, i) => {
     const v = $(`[data-labmap="${i}"]`)?.value || ''; if (!v) return;
     const [bid, sid] = v.split('|'), b = S.bh.get(bid); if (!b || !editable(b)) return;
-    if (sid === 'gw') { b.gwSamples.push({ id: uid('gs'), date: x.date || '', sid: x.id, lab, report: rep || x.rep || '', res: x.res, unit0: x.unit0 || 'mg/L' }); n += Object.keys(x.res).length; ns++; touched.add(b); return; }
+    if (sid === 'gw') { (b.gwSamples ||= []).push({ id: uid('gs'), date: x.date || '', sid: x.id, lab, report: rep || x.rep || '', res: x.res, unit0: x.unit0 || 'mg/L' }); n += Object.keys(x.res).length; ns++; touched.add(b); return; }
     let sm = sid === 'new' ? null : b.samples.find(s => s.id === sid);
     if (!sm) { const prev = [...b.samples].sort((a, c) => (a.no || 0) - (c.no || 0)).pop(); sm = { ...SHEETS.samples.blank(b, prev), type: 'G', depth: x.m.depth }; b.samples.push(sm); }
     sm.lab = { ...(sm.lab || {}), ...x.res }; sm.labMeta = { lab: lab || sm.labMeta?.lab || '', report: rep || x.rep || sm.labMeta?.report || '', date: x.date || sm.labMeta?.date || '' };
