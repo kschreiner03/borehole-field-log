@@ -9332,7 +9332,7 @@ document.addEventListener('keydown', e => {
 }, true);
 function mapAct(act) {
   if (act === 'map-edit') { S.mapEdit = !S.mapEdit; S.draft = null; S.mapSel = null; renderView(true); return; }
-  if (act === 'imp-img') { const f = $('#img-file'); f.click(); return; }
+  if (act === 'imp-img') { if (window.desktop?.gis && gisOn()) { addImageryGis(); return; } const f = $('#img-file'); f.click(); return; }
   if (act === 'img-add-go') { addImageryGo(); return; }
   if (act === 'imp-loc' || act === 'imp-shp') { const f = $('#map-file'); f.dataset.mode = act; f.accept = act === 'imp-loc' ? '.csv,.txt,.xlsx,.xls' : '.geojson,.json,.kml,.kmz,.dxf,.csv,.txt,.xlsx'; f.click(); return; }
   if (act === 'loc-imp-go') { importLocationsGo(); return; }
@@ -9548,7 +9548,10 @@ async function readGeoTiff(file, wf) {
   try {
     const [x0, y0, x1, y1] = im.getBoundingBox(), proj = gk.ProjectedCSTypeGeoKey, geo = !proj && gk.GeographicTypeGeoKey;
     if (geo) { const z = projZone((x0 + x1) / 2), a = llToUtm(y0, x0, z), b2 = llToUtm(y1, x1, z); bounds = [a[0], a[1], b2[0], b2[1]]; notes.push('The image is in latitude/longitude; its corners were converted to UTM, so it may be slightly out of square.'); }
-    else { bounds = [x0, y0, x1, y1]; const z = EPSG_ZONE(proj), pz = projZone(-110); if (proj && !z) notes.push(`The image uses EPSG:${proj}, which is not a UTM zone. It may not line up.`); else if (z && /zone\s*\d/i.test(projList().find(b => b.crs)?.crs || '') && z !== pz) notes.push(`The image is in UTM zone ${z}; the project is in zone ${pz}.`); }
+    else { bounds = [x0, y0, x1, y1]; const z = EPSG_ZONE(proj), PE = projEpsg(), pz = EPSG_ZONE(PE), wgs = proj >= 32601 && proj <= 32660, nad = PE >= 2955 && PE <= 2962 || PE >= 26901 && PE <= 26923 || PE >= 3154 && PE <= 3160;
+      if (proj && !z) notes.push(`The image uses EPSG:${proj}, which is not a UTM zone, and is placed by its numbers as they are: it will not line up. Install the GIS engines (Settings › GIS engines) to have it reprojected.`);
+      else if (z && pz && z !== pz) { bounds = null; notes.push(`The image is in UTM zone ${z} and the project in zone ${pz}: it cannot be placed by its numbers. Install the GIS engines (Settings › GIS engines) to have it reprojected, or export it in EPSG:${PE}.`); }
+      else if (wgs && nad) notes.push(`The image is in WGS 84 and the project in NAD83 (EPSG:${PE}): placed without the datum shift, it sits about 1 to 1.5 m off layers that were reprojected. Install the GIS engines (Settings › GIS engines) to have it placed exactly.`); }
   } catch { if (wf) bounds = worldBounds(await wf.text(), W, H); }
   return { name: file.name.replace(/\.[^.]+$/, ''), data, bounds, notes };
 }
@@ -9571,6 +9574,9 @@ async function addImagery(files) {
   toast('Reading the imagery…');
   let r = null; try { r = /\.tiff?$/i.test(img.name) ? await readGeoTiff(img, wf) : await readWorldImage(img, wf); } catch (e) { console.error(e); toast('That image could not be read. Very large GeoTIFFs may need to be exported smaller.'); return; }
   if (!r) return;
+  imgDialog(r);
+}
+function imgDialog(r) {
   S._imgPend = r;
   const v = S._plan, ext = v ? [v.cx - v.W / 2 / v.sc, v.cy - v.H / 2 / v.sc, v.cx + v.W / 2 / v.sc, v.cy + v.H / 2 / v.sc] : [0, 0, 0, 0], bd = r.bounds || ext;
   const fld = (id, l, v2) => `<div class="fld"><label for="${id}">${l}</label><input id="${id}" type="number" step="any" value="${(+v2).toFixed(2)}"></div>`;
@@ -9579,6 +9585,23 @@ async function addImagery(files) {
     <div class="fields" style="grid-template-columns:1fr 1fr">${fld('im-e0', 'Left (west) easting', bd[0])}${fld('im-n1', 'Top (north) northing', bd[3])}${fld('im-e1', 'Right (east) easting', bd[2])}${fld('im-n0', 'Bottom (south) northing', bd[1])}</div>
     <div class="fld"><label for="im-name">Name</label><input id="im-name" value="${esc(r.name)}"></div>`,
     `<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="img-add-go">Add imagery</button>`);
+}
+/* a GeoTIFF (or a picture with a world file and a known system) read by GDAL and reprojected to the project's coordinate system,
+   the same as Toolbox › Add a raster layer: a drone orthophoto lines up with its DSM. A picture with no location goes to the corners dialog */
+async function addImageryGis() {
+  const f = await window.desktop.gis.pick('raster'); if (!f) return;
+  const P = projEpsg(), key = 'img|' + Date.now();
+  toast('Reading ' + f.name + ' and placing it in EPSG:' + P + '…');
+  const pr = gisStart(key, { nocache: true, kind: 'importrast', file: f.token, epsg: P, params: { as: 'image', maxpx: 4000 } }, 'Add imagery (GDAL gdalwarp)', f.name);
+  const j = [...GIS.jobs.values()].find(x => x.key === key); if (j) { j.tool = 'rast_import'; j.kind = 'hydro'; }
+  const r = await pr;
+  if (!r?.ok || !r.image) {
+    if (/no position|not georeferenced/i.test(r?.error || '')) { toast('This picture has no location in it: choose it again here and enter its corners.'); const fi = $('#img-file'); fi.click(); }
+    else if (r?.error) toast(r.error);
+    return;
+  }
+  if (j) j.sum = f.name + ': placed by GDAL in EPSG:' + P + ', ' + r.w + ' × ' + r.h + ' px (' + r.detail + ').';
+  imgDialog({ name: f.name.replace(/\.[^.]+$/, ''), data: 'data:' + (r.mime || 'image/png') + ';base64,' + r.image, bounds: r.box, notes: ['Reprojected by GDAL into the project\'s coordinate system (EPSG:' + P + '), from ' + String(r.detail || '').replace(/^.*from /, '') + ': it lines up with elevation models and layers brought in the same way.'] });
 }
 async function addImageryGo() {
   const r = S._imgPend; if (!r) return;

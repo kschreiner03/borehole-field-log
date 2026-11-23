@@ -309,6 +309,37 @@ def in_grass_hydro(job, gs, tmp):
         return {'values': read('d'), 'head': read('h_r'), 'tool': 'GRASS GIS %s r.mapcalc' % ver, 'detail': 'ground surface and water table each from ' + base}
     raise RuntimeError('Unknown groundwater tool ' + m)
 
+def inpaint(a, relax=30):
+    """missing cells (NaN) filled smoothly from all round them, with no direction favoured (GDAL FillNodata searches along 8 rays
+    and leaves straight streaks across big gaps): a pyramid push-pull (the known cells averaged into coarser and coarser grids until
+    none is missing, then each level's gaps taken from the smooth surface above it), then Laplace relaxation of the filled cells only"""
+    import numpy as np
+    from scipy import ndimage
+    a = np.asarray(a, float); hole = ~np.isfinite(a)
+    if not hole.any() or hole.all(): return a.copy()
+    S = [np.where(hole, 0.0, a)]; Wt = [(~hole).astype(float)]
+    while min(S[-1].shape) > 1 and (Wt[-1] <= 0).any():
+        s_, w_ = S[-1], Wt[-1]; H, W = s_.shape; H2, W2 = -(-H // 2), -(-W // 2)
+        sp = np.zeros((H2 * 2, W2 * 2)); wp = np.zeros_like(sp); sp[:H, :W] = s_; wp[:H, :W] = w_
+        S.append(sp.reshape(H2, 2, W2, 2).sum(axis=(1, 3))); Wt.append(wp.reshape(H2, 2, W2, 2).sum(axis=(1, 3)))
+    def up(m, shape):
+        z = ndimage.zoom(m, (shape[0] / m.shape[0], shape[1] / m.shape[1]), order=1, mode='nearest', grid_mode=True)
+        z = z[:shape[0], :shape[1]]
+        if z.shape != shape: z = np.pad(z, ((0, shape[0] - z.shape[0]), (0, shape[1] - z.shape[1])), mode='edge')
+        return z
+    w_ = Wt[-1]; m = np.where(w_ > 0, S[-1] / np.maximum(w_, 1e-12), np.nan)
+    if np.isnan(m).any(): m = np.where(np.isnan(m), np.nanmean(m), m)
+    def ease(m, known, it):   # the unknown cells relaxed to the mean of their four neighbours (a harmonic surface through the known)
+        for _ in range(it):
+            p = np.pad(m, 1, mode="edge"); m = np.where(known, m, (p[:-2, 1:-1] + p[2:, 1:-1] + p[1:-1, :-2] + p[1:-1, 2:]) / 4)
+        return m
+    for l in range(len(S) - 2, -1, -1):   # each level from the one above, then eased at its own scale (multigrid: fast across wide gaps)
+        est = up(m, S[l].shape); w_ = Wt[l]; kn = w_ > 0; m = ease(np.where(kn, S[l] / np.maximum(w_, 1e-12), est), kn, 12)
+    out = np.where(hole, m, a)
+    for _ in range(relax):   # the filled cells eased into each other and their rim (the known cells do not move)
+        p = np.pad(out, 1, mode='edge'); out = np.where(hole, (p[:-2, 1:-1] + p[2:, 1:-1] + p[1:-1, :-2] + p[1:-1, 2:]) / 4, a)
+    return out
+
 def in_grass_demfix(job, gs, tmp):
     """fix bad spots in an elevation grid: spikes and pits against the local median (GRASS r.neighbors, a robust MAD test),
     spots the user marked, holes in the data; refilled from the good ground around them (GDAL FillNodata); optionally false
@@ -426,12 +457,12 @@ def in_grass_demfix(job, gs, tmp):
     if far: notes.append('%d large gap%s reaching the edge of the data left empty (ground not in the file)' % (len(far), '' if len(far) == 1 else 's'))
     holes0 = holes0 & ~outside
     fill = str(prm.get('holes', 'yes')) != 'no'
-    prog(0.5, 'GDAL FillNodata: refilling %d cells from the ground around them' % int(np.isnan(b).sum() - (0 if fill else holes0.sum())))
-    ds = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); bd = ds.GetRasterBand(1); bd.SetNoDataValue(-99999)
-    bd.WriteArray(np.where(np.isfinite(b), b, -99999))
-    maxd = float(prm.get('maxfill') or 0) or max(nx, ny)   # every hole, however big
-    gdal.FillNodata(targetBand=bd, maskBand=None, maxSearchDist=maxd, smoothingIterations=int(prm.get('smoothit', 1)))
-    c = bd.ReadAsArray().astype(float); c[c <= -99998] = np.nan
+    prog(0.5, 'Refilling %d cells smoothly from the ground all round them' % int(np.isnan(b).sum() - (0 if fill else holes0.sum())))
+    bb = b.copy(); bb[outside] = np.nan
+    c = inpaint(np.where(outside, np.nan, b)) if np.isfinite(bb).any() else b.copy()
+    maxd = float(prm.get('maxfill') or 0)
+    if maxd > 0:   # only as far as asked from good ground
+        far_ = ndimage.distance_transform_edt(~np.isfinite(b)) > maxd; c[far_ & ~np.isfinite(b)] = np.nan
     if not fill: c[holes0] = np.nan
     c[outside] = np.nan   # beyond the file stays empty
     code[holes0 & np.isfinite(c)] = 3
@@ -442,9 +473,7 @@ def in_grass_demfix(job, gs, tmp):
         # each noise hollow and its sloping sides taken out and rebuilt from the ground at its rim
         prog(0.66, 'Levelling %d holes' % len(noise_ids))
         m = ndimage.binary_dilation(np.isin(hl, noise_ids), iterations=1) & np.isfinite(c) & ~keep
-        ds3 = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds3.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); b3 = ds3.GetRasterBand(1); b3.SetNoDataValue(-99999); b3.WriteArray(np.where(m | ~np.isfinite(c), -99999, c))
-        gdal.FillNodata(targetBand=b3, maskBand=None, maxSearchDist=max(nx, ny), smoothingIterations=2)
-        c3 = b3.ReadAsArray().astype(float); c3[c3 <= -99998] = np.nan
+        c3 = inpaint(np.where(m, np.nan, c))
         c = np.where(m & np.isfinite(c3), c3, c); code[m] = 7; levelled = len(noise_ids)
         notes.append('%d holes levelled: closed hollows under %g m², deeper than %g × their width and at least %g m below the ground round them (%s); wider hollows (excavations, ponds) were kept' % (levelled, amax, steep, mind, how))
     if str(prm.get('sinks', 'no')) == 'yes':
@@ -500,7 +529,7 @@ def in_grass_demfix(job, gs, tmp):
     cnt = {k: int((code == v).sum()) for k, v in (('spikes', 1), ('pits', 2), ('holes', 3), ('sinks', 4), ('marked', 5), ('outliers', 6), ('levelled', 7))}
     cnt['holes_levelled'] = levelled; cnt['trimmed'] = trimmed
     return {**out, 'code_b64': b64u8(code), 'counts': cnt, 'cell_area': ca, 'maxchange': float(chg.max()) if chg.size else 0.0, 'notes': notes,
-            'tool': 'GRASS GIS %s r.neighbors%s; GDAL %s FillNodata, gdaldem' % (ver, ', r.fill.dir' if str(prm.get('sinks', 'no')) == 'yes' else '', gdal.__version__), 'detail': '; '.join(notes)}
+            'tool': 'GRASS GIS %s r.neighbors%s; push-pull fill; GDAL %s gdaldem' % (ver, ', r.fill.dir' if str(prm.get('sinks', 'no')) == 'yes' else '', gdal.__version__), 'detail': '; '.join(notes)}
 
 # ---------- trees in a surface model ----------
 def units_of(job, cx, cy):
@@ -589,11 +618,8 @@ def find_trees_grid(job):
     del f
     thr = max(0.3, min(1.0, hmin * 0.4))
     veg = fin & (a - op > thr)
-    prog(0.35, 'GDAL FillNodata: refilling %d vegetation cells from the ground around them' % int(veg.sum()))
-    ds = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); bd = ds.GetRasterBand(1); bd.SetNoDataValue(-99999)
-    bd.WriteArray(np.where(fin & ~veg, a, -99999))
-    gdal.FillNodata(targetBand=bd, maskBand=None, maxSearchDist=max(nx, ny), smoothingIterations=2)   # the trees and every hole
-    g = bd.ReadAsArray().astype(float); g[g <= -99998] = np.nan; g = np.where(np.isfinite(g), g, op)
+    prog(0.35, 'The ground under %d vegetation cells, filled smoothly from the ground all round them' % int(veg.sum()))
+    g = inpaint(np.where(fin & ~veg, a, np.nan)); g = np.where(np.isfinite(g), g, op)
     gsm = ndimage.gaussian_filter(g, sigma=sig(1.0, 1))
     g = np.where(veg, np.minimum(gsm, a), np.where(fin, np.minimum(g, a), gsm)); g[beyond] = np.nan
     # 2. the canopy height model
