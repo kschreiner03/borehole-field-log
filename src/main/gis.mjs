@@ -192,6 +192,8 @@ export function checkJob(job) {
     if (!(Number.isInteger(job.nx) && Number.isInteger(job.ny) && job.nx >= 3 && job.ny >= 3 && job.nx * job.ny <= 4.5e6) || Math.ceil(job.nx * job.ny * 4 / 3) * 4 !== job.values_b64.length) return 'The grid does not match its size.';
     if (!nums([job.box], 4)) return 'No area.';
     if (job.spots != null && (!nums(job.spots, 3) || job.spots.length > 300)) return 'Spots must be [x, y, radius].';
+    if (job.keep != null && (!nums(job.keep, 3) || job.keep.length > 300)) return 'Kept areas must be [x, y, radius].';
+    if (job.keep_polys != null && !(Array.isArray(job.keep_polys) && job.keep_polys.length <= 200 && job.keep_polys.every(p => Array.isArray(p) && p.length >= 1 && p.length <= 50 && p.every(r => nums(r, 2) && r.length >= 3 && r.length <= 20000)))) return 'Kept areas must be polygons.';
     if (job.foot_b64 != null && (typeof job.foot_b64 !== 'string' || Math.ceil(job.nx * job.ny / 3) * 4 !== job.foot_b64.length || !/^[A-Za-z0-9+/=]+$/.test(job.foot_b64.slice(0, 200)))) return 'The outline does not match the grid.';
   } else if (kind === 'wbt') {
     if (job.method === 'catalog') return '';

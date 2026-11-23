@@ -332,8 +332,16 @@ def in_grass_demfix(job, gs, tmp):
     win = int(prm.get('window', 5)); win += (win + 1) % 2
     from scipy import ndimage
     fin0 = np.isfinite(a); fv = a[fin0]
-    if fv.size:   # values far outside the model's own range (a no-data value read as ground, a bird, a blunder): code 6
-        p1, p99 = np.percentile(fv, [1, 99]); Rr = max(20.0, float(p99 - p1)); outl = fin0 & ((a < p1 - Rr) | (a > p99 + Rr))
+    strict = str(prm.get('spikes', 'auto')) == 'no'   # only the spots marked and the holes: nothing else is changed
+    # areas the user keeps (an excavation, a pond, a stockpile that is real): nothing automatic changes them
+    keep = np.zeros((ny, nx), bool)
+    if job.get('keep') or job.get('keep_polys'):
+        XK, YK = np.meshgrid(x0 + dx * (np.arange(nx) + .5), y1 - dy * (np.arange(ny) + .5))
+        for kx, ky, kr in job.get('keep') or []: keep |= np.hypot(XK - kx, YK - ky) <= kr
+        if job.get('keep_polys'): keep |= rasterize_polys(job['keep_polys'], [x0, dx, 0, y1, 0, -dy], nx, ny).astype(bool)
+        notes.append('%d cells in the areas you keep left as they are' % int(keep.sum()))
+    if fv.size and not strict:   # values far outside the model's own range (a no-data value read as ground, a blunder): code 6; wide enough that a deep excavation is not one
+        p1, p99 = np.percentile(fv, [1, 99]); Rr = max(50.0, 2 * float(p99 - p1)); outl = fin0 & ~keep & ((a < p1 - Rr) | (a > p99 + Rr))
         if outl.any(): code[outl] = 6; notes.append('values more than %.0f m outside the model\'s range (%.1f to %.1f m)' % (Rr, p1, p99))
     ux, uy, _, _ = units_of(job, (x0 + x1) / 2, (y0 + y1) / 2); cellm = ((dx * ux) * (dy * uy)) ** .5
     smode = str(prm.get('spikes', 'auto'))
@@ -369,6 +377,42 @@ def in_grass_demfix(job, gs, tmp):
     for sx, sy, sr in job.get('spots') or []:   # spots marked on the map
         X, Y = np.meshgrid(x0 + dx * (np.arange(nx) + .5), y1 - dy * (np.arange(ny) + .5))
         code[(np.hypot(X - sx, Y - sy) <= sr) & np.isfinite(a)] = 5
+    # the closed hollows, sorted once from the surface as it came: noise (small, deep for its width, its bottom below the ground round it)
+    # or real (an excavation, a pond, a ditch, the ground between trees). Real ones are kept from the pit test as well as from levelling.
+    ux, uy, _, _ = units_of(job, (x0 + x1) / 2, (y0 + y1) / 2); dxm, dym = dx * ux, dy * uy; ca = dxm * dym
+    mind = float(prm.get('pitdepth') or .3); amax = float(prm.get('pitarea') or 400); steep = float(prm.get('pitsteep') or .5)
+    hl = None; noise_ids = []; how = ''
+    if not strict and (str(prm.get('level', 'yes')) == 'yes' or code[code == 2].size):
+        prog(0.4, 'Filling depressions to sort the hollows: noise or real')
+        how = 'WhiteboxTools FillDepressions'
+        try:
+            fi, fo = os.path.join(tmp, 'lv_in.tif'), os.path.join(tmp, 'lv_out.tif')
+            dsx = gdal.GetDriverByName('GTiff').Create(fi, nx, ny, 1, gdal.GDT_Float32); dsx.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); dsx.SetProjection(srs_of(job.get('epsg') or 3857).ExportToWkt())
+            bx = dsx.GetRasterBand(1); bx.SetNoDataValue(-32768.0); bx.WriteArray(np.where(np.isfinite(a), a, -32768.0)); dsx = None
+            subprocess.run([wbt_exe(), '--run=FillDepressions', '--wd=' + tmp, '--dem=' + fi, '--output=' + fo, '--fix_flats=false'], capture_output=True, timeout=3600)
+            fd = gdal.Open(fo); fb = fd.GetRasterBand(1); filled = fb.ReadAsArray().astype(float); nd_ = fb.GetNoDataValue(); fd = None
+            if nd_ is not None: filled[filled == nd_] = np.nan
+        except Exception:
+            how = 'GRASS GIS r.fill.dir'; to_grass(a, 'lv1'); gs.run_command('r.fill.dir', input='lv1', output='lv2', direction='lvdir', overwrite=True, quiet=True); filled = read('lv2')
+        dpt = np.where(np.isfinite(filled) & np.isfinite(a), filled - a, 0)
+        hl, nh = ndimage.label(dpt > 1e-3, structure=np.ones((3, 3)))
+        if nh:
+            idx = np.arange(1, nh + 1); area = np.asarray(ndimage.sum(np.ones(dpt.shape), hl, idx)) * ca; deep = np.asarray(ndimage.maximum(dpt, hl, idx))
+            touch = np.asarray(ndimage.maximum(keep.astype(np.uint8), hl, idx)) > 0 if keep.any() else np.zeros(idx.size, bool)
+            cand = idx[(area <= amax) & (deep >= mind) & (deep >= steep * 2 * np.sqrt(area / np.pi)) & ~touch]
+            if cand.size:
+                inc = np.isin(hl, cand); big = float(np.nanmax(a)) + 1000.0
+                zf = np.where(np.isfinite(a) & ~inc, a, big); st = max(1, int(round(1.0 / max(1e-9, ca ** .5))))   # about 1 m cells for this step
+                wcells = max(5, int(round(max(15.0, 3 * (amax / np.pi) ** .5) / ((ca ** .5) * st))) | 1)
+                lowc = ndimage.percentile_filter(zf[::st, ::st], 10, size=wcells); low = ndimage.zoom(lowc, (ny / lowc.shape[0], nx / lowc.shape[1]), order=1)[:ny, :nx]
+                av = np.where(np.isfinite(a), a, big); bot = np.asarray(ndimage.minimum(av, hl, cand)); pos = ndimage.minimum_position(av, hl, cand)
+                noise_ids = [k for k, b_, (pi, pj) in zip(cand, bot, pos) if low[pi, pj] < big - 1 and b_ < low[pi, pj] - mind]
+            real = (hl > 0) & ~np.isin(hl, noise_ids) & (dpt >= .1)
+            if real.any():
+                prot = ndimage.binary_dilation(real, iterations=max(1, int(round(1.0 / max(1e-9, ca ** .5))))) & ~np.isin(hl, noise_ids)
+                cleared = int((prot & (code == 2)).sum()); code[prot & (code == 2)] = 0
+                if cleared: notes.append('%d cells in real hollows (wide for their depth, or at ground level between trees) not taken for pits' % cleared)
+    code[keep & np.isin(code, [1, 2, 6])] = 0
     b = a.copy(); b[(code == 1) | (code == 2) | (code == 5) | (code == 6)] = np.nan
     holes0 = ~np.isfinite(a)
     # which missing ground is a hole: everything inside the file's outline, except a large gap reaching the outline or the grid's edge
@@ -393,53 +437,26 @@ def in_grass_demfix(job, gs, tmp):
     code[holes0 & np.isfinite(c)] = 3
     still = (np.isnan(c) & ((code == 1) | (code == 2) | (code == 5) | (code == 6)))
     if still.any(): c[still] = a[still]; code[still] = 0; notes.append('%d flagged cells were too far from good ground to refill and were left' % int(still.sum()))
-    ux, uy, _, _ = units_of(job, (x0 + x1) / 2, (y0 + y1) / 2); dxm, dym = dx * ux, dy * uy; ca = dxm * dym
     levelled = 0
-    if str(prm.get('level', 'yes')) == 'yes':
-        # closed hollows from filling the surface's depressions; one is a hole when it is small, deep enough, and its bottom lies below
-        # the low ground round it (so the ground between trees in a surface model, at ground level, is not a hole); the hollow and its
-        # sloping sides are taken out and rebuilt from the ground at its rim
-        prog(0.6, 'Filling depressions to find the closed hollows')
-        how = 'WhiteboxTools FillDepressions'
-        try:
-            fi, fo = os.path.join(tmp, 'lv_in.tif'), os.path.join(tmp, 'lv_out.tif')
-            dsx = gdal.GetDriverByName('GTiff').Create(fi, nx, ny, 1, gdal.GDT_Float32); dsx.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); dsx.SetProjection(srs_of(job.get('epsg') or 3857).ExportToWkt()); bx = dsx.GetRasterBand(1); bx.SetNoDataValue(-32768.0); bx.WriteArray(np.where(np.isfinite(c), c, -32768.0)); dsx = None
-            subprocess.run([wbt_exe(), '--run=FillDepressions', '--wd=' + tmp, '--dem=' + fi, '--output=' + fo, '--fix_flats=false'], capture_output=True, timeout=3600)
-            fd = gdal.Open(fo); fb = fd.GetRasterBand(1); filled = fb.ReadAsArray().astype(float); nd_ = fb.GetNoDataValue(); fd = None
-            if nd_ is not None: filled[filled == nd_] = np.nan
-        except Exception:
-            how = 'GRASS GIS r.fill.dir'; to_grass(c, 'lv1'); gs.run_command('r.fill.dir', input='lv1', output='lv2', direction='lvdir', overwrite=True, quiet=True); filled = read('lv2')
-        dpt = np.where(np.isfinite(filled) & np.isfinite(c), filled - c, 0)
-        mind = float(prm.get('pitdepth') or .3); amax = float(prm.get('pitarea') or 400)
-        lab, nl2 = ndimage.label(dpt > 1e-3, structure=np.ones((3, 3)))
-        if nl2:
-            idx = np.arange(1, nl2 + 1); area = np.asarray(ndimage.sum(np.ones(dpt.shape), lab, idx)) * ca; deep = np.asarray(ndimage.maximum(dpt, lab, idx))
-            cand = idx[(area <= amax) & (deep >= mind)]
-            if cand.size:
-                prog(0.66, 'Checking %d hollows against the ground round them' % cand.size)
-                inc = np.isin(lab, cand); big = float(np.nanmax(c)) + 1000.0
-                zf = np.where(np.isfinite(c) & ~inc, c, big); st = max(1, int(round(1.0 / max(1e-9, (ca ** .5)))))   # about 1 m cells for this step
-                wcells = max(5, int(round(max(15.0, 3 * (amax / np.pi) ** .5) / ((ca ** .5) * st))) | 1)
-                lowc = ndimage.percentile_filter(zf[::st, ::st], 10, size=wcells); low = ndimage.zoom(lowc, (ny / lowc.shape[0], nx / lowc.shape[1]), order=1)[:ny, :nx]
-                bot = np.asarray(ndimage.minimum(np.where(np.isfinite(c), c, big), lab, cand)); pos = ndimage.minimum_position(np.where(np.isfinite(c), c, big), lab, cand)
-                keep = [k for k, b_, (pi, pj) in zip(cand, bot, pos) if low[pi, pj] < big - 1 and b_ < low[pi, pj] - mind]
-                if keep:
-                    m = ndimage.binary_dilation(np.isin(lab, keep), iterations=1) & np.isfinite(c)
-                    ds3 = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds3.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); b3 = ds3.GetRasterBand(1); b3.SetNoDataValue(-99999); b3.WriteArray(np.where(m | ~np.isfinite(c), -99999, c))
-                    gdal.FillNodata(targetBand=b3, maskBand=None, maxSearchDist=max(nx, ny), smoothingIterations=2)
-                    c3 = b3.ReadAsArray().astype(float); c3[c3 <= -99998] = np.nan
-                    c = np.where(m & np.isfinite(c3), c3, c); code[m] = 7; levelled = len(keep)
-                    notes.append('%d holes levelled: closed hollows under %g m² whose bottom was at least %g m below the ground round them (%s)' % (levelled, amax, mind, how))
+    if str(prm.get('level', 'yes')) == 'yes' and not strict and noise_ids:
+        # each noise hollow and its sloping sides taken out and rebuilt from the ground at its rim
+        prog(0.66, 'Levelling %d holes' % len(noise_ids))
+        m = ndimage.binary_dilation(np.isin(hl, noise_ids), iterations=1) & np.isfinite(c) & ~keep
+        ds3 = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds3.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); b3 = ds3.GetRasterBand(1); b3.SetNoDataValue(-99999); b3.WriteArray(np.where(m | ~np.isfinite(c), -99999, c))
+        gdal.FillNodata(targetBand=b3, maskBand=None, maxSearchDist=max(nx, ny), smoothingIterations=2)
+        c3 = b3.ReadAsArray().astype(float); c3[c3 <= -99998] = np.nan
+        c = np.where(m & np.isfinite(c3), c3, c); code[m] = 7; levelled = len(noise_ids)
+        notes.append('%d holes levelled: closed hollows under %g m², deeper than %g × their width and at least %g m below the ground round them (%s); wider hollows (excavations, ponds) were kept' % (levelled, amax, steep, mind, how))
     if str(prm.get('sinks', 'no')) == 'yes':
         prog(0.7, 'r.fill.dir: filling false depressions')
         to_grass(c, 'c1'); gs.run_command('r.fill.dir', input='c1', output='c2', direction='cdir', overwrite=True, quiet=True)
-        c2 = read('c2'); ch = np.isfinite(c2) & np.isfinite(c) & (c2 - c > 1e-4); code[ch & (code == 0)] = 4; c = np.where(np.isfinite(c2), c2, c)
+        c2 = read('c2'); ch = np.isfinite(c2) & np.isfinite(c) & (c2 - c > 1e-4) & ~keep; code[ch & (code == 0)] = 4; c = np.where(ch, c2, c)
     sm = int(prm.get('smooth', 0) or 0)
     if sm in (3, 5, 7):
         prog(0.78, 'r.neighbors: light smoothing (average of %d × %d)' % (sm, sm))
         to_grass(c, 'c3'); gs.run_command('r.neighbors', input='c3', output='c4', method='average', size=sm, overwrite=True, quiet=True)
-        c4 = read('c4'); c = np.where(np.isfinite(c4) & np.isfinite(c), c4, c); notes.append('smoothed with a %d × %d average' % (sm, sm))
-    rebuilt = np.isin(code, [1, 2, 3, 5, 6, 7]) & np.isfinite(c)
+        c4 = read('c4'); c = np.where(np.isfinite(c4) & np.isfinite(c) & ~keep, c4, c); notes.append('smoothed with a %d × %d average' % (sm, sm))
+    rebuilt = np.isin(code, [1, 2, 3, 5, 6, 7]) & np.isfinite(c) & ~keep
     if rebuilt.any() and str(prm.get('texture', 'yes')) == 'yes':
         valid = np.isfinite(c); near = ndimage.distance_transform_edt(~valid, return_distances=False, return_indices=True); cf = c[tuple(near)]
         hf = cf - ndimage.gaussian_filter(cf, max(.7, 1.0 / max(cellm, 1e-9)))
@@ -449,7 +466,7 @@ def in_grass_demfix(job, gs, tmp):
             nz = ndimage.gaussian_filter(np.random.default_rng(7).normal(0, 1, c.shape), .8); nz /= (nz.std() or 1)
             c = np.where(rebuilt, c + nz * sd, c); notes.append('rebuilt places given the grain of the ground round them (%.2f m)' % sd)
     trimmed = 0; trs = str(prm.get('trim', 'auto')).strip(); tr = 0.0
-    if trs == 'auto' and np.isfinite(c).any() and (~np.isfinite(c)).any():
+    if trs == 'auto' and not strict and np.isfinite(c).any() and (~np.isfinite(c)).any():
         # how far in the edge is bad: the roughness (against a 3 m median) of each 1 m ring in from where the data stops, against the inside
         valid = np.isfinite(c); dist = ndimage.distance_transform_edt(np.pad(valid, 1, constant_values=True), sampling=(dy * uy, dx * ux))[1:-1, 1:-1]
         # the terrain carried out from inside: each cell against the nearest cell at least 8 m in, plus the slope there times the offset
@@ -475,7 +492,7 @@ def in_grass_demfix(job, gs, tmp):
         except ValueError: tr = 0.0
     if tr > 0:   # the last metres before the data stops (not the edge of the area, where the data goes on)
         valid = np.isfinite(c); dist = ndimage.distance_transform_edt(np.pad(valid, 1, constant_values=True), sampling=(dym, dxm))[1:-1, 1:-1]
-        cut = valid & (dist <= tr)
+        cut = valid & (dist <= tr) & ~keep
         if cut.any(): c[cut] = np.nan; code[cut] = 0; trimmed = int(cut.sum()); notes.append('%d cells within %g m of where the data stops trimmed' % (trimmed, tr))
     ds2 = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Float32); ds2.SetGeoTransform([x0, dx, 0, y1, 0, -dy]); b2 = ds2.GetRasterBand(1); b2.SetNoDataValue(-99999); b2.WriteArray(np.where(np.isfinite(c), c, -99999))
     out = terrain_products(ds2, b2, prm)
