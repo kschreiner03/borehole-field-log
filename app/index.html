@@ -12174,7 +12174,7 @@ function gisStart(key, job, label, input = '') {
   const pr = window.desktop.gis.run({ ...job, id, ...(lsGet('bhlog.projnet') === '1' ? { network: true } : {}) }).then(r => r, e => ({ ok: false, error: String(e?.message || e) })).then(r => {
     GIS.prom.delete(key); j.t1 = Date.now(); j.res = r;
     if (r?.ok) { j.status = 'done'; j.p = 1; j.msg = 'Completed'; if (GIS.cache.size > 60) GIS.cache.delete(GIS.cache.keys().next().value); if (!job.nocache) GIS.cache.set(key, r); }
-    else { j.status = r?.cancelled ? 'cancelled' : 'failed'; j.msg = r?.cancelled ? 'Cancelled' : r?.error || 'The tool stopped.'; if (!r?.cancelled) GIS.err.set(key, j.msg); }
+    else { j.status = r?.cancelled ? 'cancelled' : 'failed'; j.msg = r?.cancelled ? 'Cancelled' : /^Unknown (method|job).$/.test(r?.error || '') ? 'This tool is newer than the running app. Close the app completely and start it again.' : r?.error || 'The tool stopped.'; if (!r?.cancelled) GIS.err.set(key, j.msg); }
     if (GIS.jobs.size > 80) GIS.jobs.delete(GIS.jobs.keys().next().value);
     gisJobsUI(); gisRedraw(); return r;
   });
