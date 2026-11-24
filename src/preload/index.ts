@@ -21,10 +21,15 @@ const desktop = {
   // GIS engines (GRASS GIS, GDAL, PyKrige, GSTools), optional and installed per user: one job from a fixed list of methods at a time
   gis: {
     status: (): Promise<{ installed: boolean; supported?: boolean; home?: string; versions?: Record<string, string>; broken?: string } | null> => ipcRenderer.invoke('gis:status'),
-    install: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('gis:install'),
-    remove: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('gis:remove'),
+    install: (pack?: string): Promise<{ ok: boolean; error?: string; paused?: boolean; cancelled?: boolean; space?: { free: number; need: number } }> => ipcRenderer.invoke('gis:install', pack),
+    packs: (): Promise<Record<string, unknown> | null> => ipcRenderer.invoke('gis:packs'),
+    plan: (pack: string): Promise<Record<string, unknown> & { ok: boolean; error?: string }> => ipcRenderer.invoke('gis:plan', pack),
+    stop: (how: 'pause' | 'cancel'): Promise<boolean> => ipcRenderer.invoke('gis:stop', how),
+    size: (): Promise<{ engines: number } | null> => ipcRenderer.invoke('gis:size'),
+    chooseFolder: (): Promise<{ ok: boolean; home?: string; error?: string; cancelled?: boolean }> => ipcRenderer.invoke('gis:folder'),
+    remove: (pack?: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('gis:remove', pack),
     run: (job: unknown): Promise<Record<string, unknown> & { ok: boolean; error?: string }> => ipcRenderer.invoke('gis:run', job),
-    onProgress: (cb: (p: { step?: string; line?: string }) => void) => { ipcRenderer.on('gis:progress', (_e, p) => cb(p)); },
+    onProgress: (cb: (p: Record<string, unknown>) => void) => { ipcRenderer.on('gis:progress', (_e, p) => cb(p)); },
     // a running job's progress (the share done and what it is doing), and stopping it
     onJobProgress: (cb: (p: { id: string; p?: number; msg?: string }) => void) => { ipcRenderer.on('gis:jobprogress', (_e, p) => cb(p)); },
     cancel: (id: string): Promise<boolean> => ipcRenderer.invoke('gis:cancel', id),

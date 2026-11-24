@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { mf6Binary, runMf6 } from './mf6run.mjs';
-import { gisStatus, gisInstall, gisRemove, gisRun, gisCancel, gisRegisterFile, gisFilePath } from './gis.mjs';
+import { gisStatus, gisInstall, gisRemove, gisPacks, gisPlan, gisStop, gisSize, gisSetHome, gisInstalling, gisRun, gisCancel, gisRegisterFile, gisFilePath } from './gis.mjs';
 import { stat, copyFile } from 'node:fs/promises';
 import { clearCreds, fetchSnapshot, loadCreds, saveCreds } from './applemaps.mjs';
 import { checkForUpdate, HUB } from './updates.mjs';
@@ -141,8 +141,19 @@ ipcMain.handle('mf6:run', async (e, o: { files: Record<string, string>; outputs?
 /* GIS engines (optional, per user): status, install with progress, remove, and one job at a time from a fixed list of methods */
 const gisCtx = () => ({ userData: app.getPath('userData'), root: app.getAppPath() });
 ipcMain.handle('gis:status', async e => !mine(e) ? null : gisStatus(gisCtx()));
-ipcMain.handle('gis:install', async e => { if (!mine(e)) return { ok: false, error: 'Not allowed.' }; const wc = e.sender; return gisInstall({ ...gisCtx(), onProgress: p => { if (!wc.isDestroyed()) wc.send('gis:progress', p); } }); });
-ipcMain.handle('gis:remove', async e => !mine(e) ? { ok: false, error: 'Not allowed.' } : gisRemove(gisCtx()));
+ipcMain.handle('gis:install', async (e, pack: unknown) => !mine(e) ? { ok: false, error: 'Not allowed.' } : gisInstall({ ...gisCtx(), pack: pack === 'wbt' ? 'wbt' : 'engines', onProgress: p => toAll('gis:progress', p) }));
+ipcMain.handle('gis:remove', async (e, pack: unknown) => !mine(e) ? { ok: false, error: 'Not allowed.' } : gisRemove({ ...gisCtx(), pack: pack === 'wbt' ? 'wbt' : 'engines' }));
+// Add-ons: what is installed and the space there is, what an install would take, pausing or cancelling it, and the folder it goes in
+const toAll = (ch: string, p: unknown) => { for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed() && ours.has(w.webContents.id)) w.webContents.send(ch, p); };
+ipcMain.handle('gis:packs', async e => mine(e) ? gisPacks(gisCtx()) : null);
+ipcMain.handle('gis:plan', async (e, pack: unknown) => mine(e) && typeof pack === 'string' ? gisPlan({ ...gisCtx(), pack, onProgress: p => toAll('gis:progress', p) }) : { ok: false, error: 'Not allowed.' });
+ipcMain.handle('gis:stop', async (e, how: unknown) => mine(e) ? gisStop(how === 'cancel' ? 'cancel' : 'pause') : false);
+ipcMain.handle('gis:size', async e => mine(e) ? gisSize(gisCtx()) : null);
+ipcMain.handle('gis:folder', async e => {
+  if (!mine(e)) return { ok: false, error: 'Not allowed.' };
+  const r = await dialog.showOpenDialog(owner(e), { title: 'Where to put the GIS engines', properties: ['openDirectory', 'createDirectory'] });
+  return r.canceled || !r.filePaths[0] ? { ok: false, cancelled: true } : gisSetHome({ ...gisCtx(), dir: r.filePaths[0] });
+});
 ipcMain.handle('gis:run', async (e, job: unknown) => { if (!mine(e)) return { ok: false, error: 'Not allowed.' }; const wc = e.sender; return gisRun({ ...gisCtx(), job, onProgress: p => { if (!wc.isDestroyed()) wc.send('gis:jobprogress', p); } }); });
 ipcMain.handle('gis:cancel', async (e, id: unknown) => mine(e) && typeof id === 'string' ? gisCancel(id) : false);
 // an elevation model chosen here, in the shell's own Open dialog: the window gets a token for it, not its path
@@ -269,6 +280,6 @@ else {
     const f = process.argv.slice(1).find(a => PROJECT_EXT.some(x => a.toLowerCase().endsWith('.' + x))); if (f) sendFile(f);
     app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
   });
-  app.on('before-quit', () => { quitting = true; });
+  app.on('before-quit', () => { quitting = true; if (gisInstalling()) gisStop('pause'); });
   app.on('window-all-closed', () => { if (!isMac) app.quit(); });
 }

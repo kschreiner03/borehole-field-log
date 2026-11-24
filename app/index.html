@@ -1561,6 +1561,40 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 @media (max-width: 1100px) { .gp { grid-template-columns: minmax(0, 1fr); } }
 /* the Map page: the map is the page */
 .ctl-gb #gwm-setup .fld { display: grid; grid-template-columns: minmax(0, 1fr) 128px; align-items: center; gap: 8px; } .ctl-gb #gwm-setup .fld label { font: 400 12.5px var(--f-body); color: var(--muted); } .ctl-gb #gwm-setup .fld select, .ctl-gb #gwm-setup .fld input { width: 100%; }
+/* Add-ons */
+body.addons-on .side { display: none; } body.addons-on .shell { --sidebar-width: 0px !important; --ctl-w: 0px !important; }
+body.addons-on .main { padding: 0; gap: 0; }
+svg { --accent: #245b78; --accent-2: #1b4760; --primary: #245b78; }   /* a theme colours the screen, never a drawing or report */
+.ad { max-width: 1320px; width: 100%; margin: 0 auto; padding: 26px 28px 70px; box-sizing: border-box; display: grid; gap: 20px; }
+.ad-hero { display: flex; flex-wrap: wrap; align-items: end; gap: 14px 24px; } .ad-hero h2 { margin: 0; font: 600 26px/1.15 var(--f-body); letter-spacing: -.01em; } .ad-hero p { margin: 5px 0 0; color: var(--muted); max-width: 58ch; } .ad-hero .sp { flex: 1; }
+.ad-hero input[type="search"] { width: 250px; min-height: 36px; padding: 0 12px; border-radius: 18px; }
+.ad-cats { position: sticky; top: var(--appbar-h, 48px); z-index: 4; display: flex; gap: 2px; padding: 8px 0; background: var(--ground); overflow-x: auto; scrollbar-width: none; }
+.ad-cats button { position: relative; border: 0; background: none; padding: 8px 14px; border-radius: 18px; font: 500 13.5px var(--f-body); color: var(--muted); cursor: pointer; white-space: nowrap; transition: color .18s, background .18s; } .ad-cats button:hover { color: var(--ink); background: var(--hover); } .ad-cats button[aria-selected="true"] { color: #fff; background: var(--primary); } .ad-cats small { margin-left: 6px; opacity: .75; font-size: 11.5px; }
+.ad-sec > h3 { margin: 4px 0 10px; font: 600 15px var(--f-body); } .ad-sec > h3 small { margin-left: 8px; font: 400 12.5px var(--f-body); color: var(--muted); }
+.ad-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.ad-c { position: relative; display: flex; flex-direction: column; gap: 9px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; transition: transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s, border-color .22s; animation: adIn .34s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 26ms); }
+.ad-c:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(20, 40, 60, .12); border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); } .ad-c:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.ad-c.on { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); } .ad-c.on::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: var(--primary); }
+@keyframes adIn { from { opacity: .35; transform: translateY(10px); } }
+.ad-t { display: flex; align-items: center; gap: 12px; } .ad-i { width: 42px; height: 42px; flex: none; display: grid; place-items: center; border-radius: 10px; background: color-mix(in srgb, var(--h, var(--primary)) 13%, #fff); color: var(--h, var(--primary)); } .ad-i svg { width: 23px; height: 23px; }
+.ad-t b { display: block; font: 600 14.5px/1.25 var(--f-body); } .ad-t small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; } .ad-c > p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); flex: 1; }
+.ad-f { display: flex; align-items: center; gap: 8px; min-height: 32px; } .ad-f .sp { flex: 1; } .ad-f .meta { font-size: 12px; color: var(--muted); }
+.ad-ok { display: inline-flex; align-items: center; gap: 5px; font: 600 12.5px var(--f-body); color: var(--positive); } .ad-ok svg { width: 16px; height: 16px; } .ad-ok path { stroke-dasharray: 24; animation: adTick .5s .1s ease-out both; } @keyframes adTick { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+.ad-sw { position: relative; width: 40px; height: 23px; flex: none; border: 0; border-radius: 12px; background: var(--control); cursor: pointer; transition: background .2s; } .ad-sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .24s cubic-bezier(.3,1.5,.5,1); } .ad-sw[aria-checked="true"] { background: var(--primary); } .ad-sw[aria-checked="true"]::after { transform: translateX(17px); } .ad-sw:disabled { opacity: .5; cursor: default; }
+.ad-sws { display: flex; gap: 5px; } .ad-sws i { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--border); margin-left: -8px; } .ad-sws i:first-child { margin-left: 0; }
+/* progress: the bar eases to each new value; a light runs along it while there is nothing to measure */
+.ad-p { display: grid; gap: 7px; } .ad-bar { position: relative; height: 8px; border-radius: 5px; background: var(--rule); overflow: hidden; } .ad-bar > i { position: absolute; inset: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 78%, #fff), var(--primary)); border-radius: 5px; transform-origin: 0 50%; transform: scaleX(var(--p, 0)); transition: transform .5s cubic-bezier(.2,.7,.3,1); }
+.ad-bar::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.6) 50%, transparent 80%); transform: translateX(-100%); animation: adRun 1.5s linear infinite; } .ad-bar.wait > i { transform: scaleX(1); opacity: .28; } .ad-bar.still::after { display: none; } @keyframes adRun { to { transform: translateX(100%); } }
+.ad-pl { display: flex; gap: 8px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; } .ad-pl b { color: var(--ink); font-weight: 600; } .ad-pl .ad-a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ad-pl .ad-b { flex: none; white-space: nowrap; } .ad-pl .sp { flex: 1; } .ad-steps { display: flex; gap: 14px; font-size: 12px; color: var(--muted); } .ad-steps span { display: flex; align-items: center; gap: 5px; } .ad-steps span::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rule); transition: background .3s, box-shadow .3s; } .ad-steps .d::before { background: var(--positive); } .ad-steps .n { color: var(--ink); font-weight: 600; } .ad-steps .n::before { background: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 22%, transparent); }
+.ad-btns { display: flex; gap: 8px; } .ad .btn { border-radius: 8px; }
+.ad-space { display: grid; gap: 5px; font-size: 12.5px; } .ad-space .b { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--rule); } .ad-space .b i { transition: width .5s cubic-bezier(.2,.7,.3,1); } .ad-space .dl { background: var(--primary); } .ad-space .in { background: color-mix(in srgb, var(--primary) 55%, #fff); } .ad-space .mg { background: repeating-linear-gradient(45deg, var(--rule) 0 4px, #cfd5dc 4px 8px); } .ad-space.bad .dl, .ad-space.bad .in { background: var(--negative); } .ad-space.bad b { color: var(--negative); }
+.ad-dlg ul { margin: 4px 0; padding-left: 18px; } .ad-dlg li { margin: 3px 0; } .ad-dlg dl { display: grid; grid-template-columns: 110px 1fr; gap: 4px 12px; margin: 0; font-size: 13px; } .ad-dlg dt { color: var(--muted); } .ad-dlg dd { margin: 0; overflow-wrap: anywhere; } .ad-tools { columns: 2; column-gap: 22px; font-size: 13px; padding: 0; list-style: none; max-height: 260px; overflow: auto; } .ad-tools li { break-inside: avoid; padding: 2px 0; }
+/* the same install, wherever you are in the app */
+#ad-dock { position: fixed; right: 16px; bottom: calc(var(--status-h) + 14px); z-index: 13; display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 10px 30px rgba(16, 24, 40, .18); font-size: 13px; animation: adUp .35s cubic-bezier(.2,.9,.2,1) both; cursor: pointer; } #ad-dock[hidden] { display: none; } @keyframes adUp { from { opacity: 0; transform: translateY(20px) scale(.97); } }
+#ad-dock .rg { position: relative; width: 40px; height: 40px; flex: none; border-radius: 50%; background: conic-gradient(var(--primary) calc(var(--p, 0) * 360deg), var(--rule) 0); display: grid; place-items: center; transition: --p .5s; } @property --p { syntax: "<number>"; inherits: true; initial-value: 0; } #ad-dock .rg::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--surface); } #ad-dock .rg b { position: relative; font: 600 11px var(--f-body); } #ad-dock .rg.wait { animation: adSpin 1s linear infinite; background: conic-gradient(var(--primary) 90deg, var(--rule) 0); } #ad-dock .rg.wait b { visibility: hidden; } @keyframes adSpin { to { transform: rotate(1turn); } } #ad-dock small { display: block; color: var(--muted); } #ad-dock .tb { min-height: 30px; }
+body.ad-dock-on #toast { bottom: calc(var(--status-h) + 88px); }
+@media (prefers-reduced-motion: reduce) { .ad-c, .ad-ok path, #ad-dock { animation: none; } .ad-bar::after, #ad-dock .rg.wait { animation-duration: 4s; } .ad-c:hover { transform: none; } }
+@media (max-width: 860px) { .ad { padding: 16px 16px 60px; } .ad-tools { columns: 1; } }
 /* the map workspace: tools across the top, Contents on the left, the map filling the middle, panes on the right when asked for */
 .mws-bar[hidden], .mws-tabs[hidden], .mws-contents[hidden] { display: none; }
 body.mws-map .shell { grid-template-rows: auto minmax(0, 1fr); --mws-h: 44px; min-height: 0; }
@@ -1728,6 +1762,7 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
 <div class="ql" id="qlog" hidden></div>
 <div class="overlay" id="overlay" hidden></div>
 <div id="toast" hidden></div>
+<div id="ad-dock" role="status" aria-live="off" hidden></div>
 <footer id="statusbar" aria-label="Status">
   <span class="sync" id="sync" role="status">Loading…</span>
   <span id="sb-proj" class="sb-opt"></span>
@@ -2586,8 +2621,8 @@ function treeGroup(key, label, count, kids, extra = '') {
   return `<li class="tg${open ? ' open' : ''}"><div class="tr">${extra}<button class="tw" data-fold="${key}" aria-expanded="${open}" title="${open ? 'Collapse' : 'Expand'} ${esc(label)}">${TW}<span>${esc(label)}</span></button>${count != null ? `<span class="tc">${count}</span>` : ''}</div>${open ? `<ul class="tk">${kids}</ul>` : ''}</li>`;
 }
 const BH_TABS = ['log', 'edit', 'report'];
-const NAV_LABEL = { gp: 'GIS Toolbox', v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Outputs', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
-const NAV_ICON = { gp: '<path d="M4 8h16v11H4z"/><path d="M9 8V5h6v3M4 12h16M11 12v2h2v-2"/>', soil: '<path d="M3 9l9-5 9 5-9 5z"/><path d="M3 14l9 5 9-5"/>', v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
+const NAV_LABEL = { addons: 'Add-ons', gp: 'GIS Toolbox', v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Outputs', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
+const NAV_ICON = { addons: '<path d="M4 4h7v7H4zM13 13h7v7h-7zM4 13h7v7H4z"/><path d="M16.5 3.5v7M13 7h7"/>', gp: '<path d="M4 8h16v11H4z"/><path d="M9 8V5h6v3M4 12h16M11 12v2h2v-2"/>', soil: '<path d="M3 9l9-5 9 5-9 5z"/><path d="M3 14l9 5 9-5"/>', v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
 /* a row in the settings panel: its label, then the control (and its unit) on the same line; the same on every page */
 const crow = (l, c, id) => `<div class="cr">${id ? `<label class="cr-l" for="${id}">${l}</label>` : `<span class="cr-l">${l}</span>`}<span class="cr-c">${c}</span></div>`;
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -2598,7 +2633,7 @@ S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {}, ...jsonLS('bhlog.ui
 const uiSave = () => lsSet('bhlog.ui', JSON.stringify(S.ui));
 if (S.ui.openLast === false && !WIN) S.tab = 'projects';
 const ctlClamp = w => Math.round(Math.min(480, Math.max(240, +w || 300)));
-function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); document.body.classList.toggle('side-off', S.tab === 'compose'); document.body.classList.toggle('proj-home', S.tab === 'projects'); mwsApply(); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
+function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); document.body.classList.toggle('side-off', S.tab === 'compose'); document.body.classList.toggle('proj-home', S.tab === 'projects'); document.body.classList.toggle('addons-on', S.tab === 'addons'); mwsApply(); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
 /* the panel's column is set before a page draws, so drawings measure the work area they will really have */
 function ctlLayout() {
   const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
@@ -2655,7 +2690,7 @@ document.addEventListener('pointerdown', e => {
 const bhGlyph = well => `<svg class="bhg" viewBox="0 0 16 16" aria-hidden="true">${well ? '<circle cx="8" cy="8" r="4.6" fill="#fff" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/>' : '<circle cx="8" cy="8" r="4.6" fill="currentColor"/>'}</svg>`;
 /* the sidebar is the project as a tree: project pages, and each borehole with its own pages nested under it when chosen */
 /* the left side: a rail of project pages, then the project's boreholes as a list with a filter, status chips and a sort */
-const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['soil', 'Soil'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['compose', 'Outputs']];
+const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['soil', 'Soil'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['compose', 'Outputs'], ['addons', 'Add-ons']];
 const BH_ICON = '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M8 9h8M8 14h8"/>';
 S.bl = { q: '', st: lsGet('bhlog.blSt') || 'all', sort: lsGet('bhlog.blSort') || 'name' };
 const blMeta = b => { const w = latestWater(b), v = vapourMax(b, null, null); return { d: depthOf(b), w: w ? w.depth : null, v: v ? v.cvc : null }; };
@@ -3246,7 +3281,7 @@ function gpMenuList() {
   const q = (S.gpMenuQ || '').trim().toLowerCase(), cat = S.gpMenuCat || 'recent', tools = gpTools();
   const hit = ([id, t]) => (t.name + ' ' + t.by + ' ' + t.group + ' ' + t.desc).toLowerCase().includes(q);
   const row = ([id, t]) => `<button class="mi gp-mi" role="menuitem" data-act="gp-open" data-tool="${id}"><span class="gp-mi-i">${svgI(GP_CATS.find(c => c[0] === gpCatOf(id))[2])}</span><span><b>${esc(t.name)}</b><small>${esc(t.by)}</small></span></button>`;
-  if (q) { const hits = tools.filter(hit); return hits.length ? `<p class="gp-mh">${hits.length} tool${hits.length === 1 ? '' : 's'} matching “${esc(S.gpMenuQ.trim())}”</p>` + hits.map(row).join('') : '<p class="gp-mh">No tool matches. Try “volume”, “water”, “export”.</p>'; }
+  if (q) { const hits = tools.filter(hit); return hits.length ? `<p class="gp-mh">${hits.length} tool${hits.length === 1 ? '' : 's'} matching “${esc(S.gpMenuQ.trim())}”</p>` + hits.map(row).join('') : (() => { const off = gpAll().filter(e => !toolOn(e[0]) && hit(e)); return off.length ? '<p class="gp-mh">' + off.length + ' matching tool' + (off.length === 1 ? ' is' : 's are') + ' switched off. <button class="btn link" data-act="addons">Add-ons…</button></p>' : '<p class="gp-mh">No tool matches. Try “volume”, “water”, “export”.</p>'; })(); }
   if (cat === 'recent') { const rec = (S.gp.recent || []).filter(id => GP_TOOLS[id] && tools.some(([x]) => x === id)); return rec.length ? '<p class="gp-mh">Used lately</p>' + rec.map(id => row([id, GP_TOOLS[id]])).join('') : '<p class="gp-mh">Tools you run appear here. Pick a category on the left, or type to search.</p>'; }
   const C = GP_CATS.find(c => c[0] === cat);
   const shown = C[3].filter(g => tools.some(([, t]) => t.group === g));
@@ -3254,13 +3289,14 @@ function gpMenuList() {
 }
 function openGpMenu(anchor) {
   if ($('#menu')) { closeMenu(); return; }
+  if (S.gpMenuCat && S.gpMenuCat !== 'recent' && !gpTools().some(([, t]) => GP_CATS.find(c => c[0] === S.gpMenuCat)?.[3].includes(t.group))) S.gpMenuCat = null;
   if (!S.gpMenuCat) S.gpMenuCat = (S.gp.recent || []).length ? 'recent' : 'interp'; S.gpMenuQ = ''; wbLoad();
   const m = document.createElement('div'); m.id = 'menu'; m.className = 'menu fmenu gp-menu'; m.setAttribute('role', 'menu');
   const counts = Object.fromEntries(GP_CATS.map(c => [c[0], c[0] === 'recent' ? (S.gp.recent || []).length : gpTools().filter(([, t]) => c[3].includes(t.group)).length]));
   m.innerHTML = (gisOn() ? '' : `<p class="gp-menu-warn">${window.desktop?.gis ? 'The tools need the GIS engines. <button class="btn link" data-act="gis-install">Install…</button>' : 'The GIS tools run on the desktop app.'}</p>`)
     + `<div class="gp-mq"><input id="gp-menu-q" type="search" placeholder="Search ${gpTools().length} tools" aria-label="Search the tools" autocomplete="off"></div>
-    <div class="gp-mb"><nav class="gp-cats" role="tablist" aria-label="Tool categories">${GP_CATS.map(([id, label, icon]) => `<button type="button" role="tab" class="gp-cat" data-gpcat="${id}" aria-selected="${S.gpMenuCat === id}">${svgI(icon)}<span>${label}</span><small>${counts[id] || ''}</small></button>`).join('')}</nav>
-    <div class="gp-tl" id="gp-menu-list">${gpMenuList()}</div></div>`;
+    <div class="gp-mb"><nav class="gp-cats" role="tablist" aria-label="Tool categories">${GP_CATS.filter(c => c[0] === 'recent' || counts[c[0]]).map(([id, label, icon]) => `<button type="button" role="tab" class="gp-cat" data-gpcat="${id}" aria-selected="${S.gpMenuCat === id}">${svgI(icon)}<span>${label}</span><small>${counts[id] || ''}</small></button>`).join('')}</nav>
+    <div class="gp-tl" id="gp-menu-list">${gpMenuList()}</div></div>` + (() => { const n = gpAll().filter(([k]) => !toolOn(k)).length; return n ? `<button type="button" class="btn link" data-act="addons" style="margin:0;padding:8px 12px;text-align:left;border-top:1px solid var(--rule)">${n} more tools in Add-ons…</button>` : ''; })();
   const r = anchor.getBoundingClientRect(); m.style.top = r.bottom + 6 + 'px'; m.style.left = Math.max(12, Math.min(r.left, innerWidth - 620)) + 'px'; m.style.right = 'auto';
   document.body.append(m); setTimeout(() => $('#gp-menu-q')?.focus(), 0);
 }
@@ -3276,7 +3312,7 @@ function openActMenu(anchor, items) {
   document.body.append(m);
 }
 /* Find anything: pages, boreholes and every tool, in one search box */
-function goTab(k) { S.tab = k; lsSet('bhlog.tab', k); S.formStale = true; S.drawer = null; renderDrawer(); render(); }
+function goTab(k) { S.tab = k; queueMicrotask(adDock); lsSet('bhlog.tab', k); S.formStale = true; S.drawer = null; renderDrawer(); render(); }
 function findItems() {
   const items = [], b = cur(), seen = new Set(), seenT = new Set(), home = {};
   for (const k of ['home', 'site', 'table', 'gw', 'contam', 'soil', 'compose']) items.push({ t: NAV_LABEL[k], where: 'Project page', kind: 'Page', run: () => goTab(k) });
@@ -3800,6 +3836,7 @@ function renderMain() {
   const main = $('#main');
   if (!S.loaded) return;
   const b = cur();
+  if (S.tab === 'addons') { renderRail(); ctlLayout(); main.dataset.bh = ''; addonsDraw(main); return; }
   if (S.tab === 'projects' || (!b && !projNames().length && S.tab !== 'soil')) { S.tab = 'projects'; uiApply(); renderRail(); ctlLayout(); main.dataset.bh = ''; main.innerHTML = projectsHomeHTML(); return; }
   if (!b && S.tab !== 'soil') { renderRail(); ctlLayout(); main.dataset.bh = ''; main.innerHTML = emptyProjectHTML(curProj()); return; }
   if (!b && S.tab === 'soil') { renderRail(); ctlLayout(); main.dataset.bh = ''; main.innerHTML = '<div id="view"></div>'; renderView(true); return; }   // a soil survey needs no borehole
@@ -3850,6 +3887,7 @@ function renderFacts(b) {
 }
 function formFocused() { const a = document.activeElement; return !!(a && a.closest && a.closest('.edit')); }
 function renderView(full) {
+  if (S.tab === 'addons') { ctlLayout(); return; }
   const v = $('#view'); if (!v || S.tab === 'projects') return; ctlLayout();
   if (S.tab === 'reports') S.tab = 'compose';   // the Reports page and the report editor are one page
   const b = cur();
@@ -12117,7 +12155,7 @@ const gisVer = () => GIS.st?.versions || {};
 function gisInit() {
   if (!window.desktop?.gis) return;
   window.desktop.gis.onJobProgress?.(p => { const j = [...GIS.jobs.values()].find(x => x.id === p.id); if (!j || j.status !== 'running') return; if (p.p != null) j.p = p.p; if (p.msg) { j.msg = p.msg; j.msgs = [...(j.msgs || []), [Date.now(), p.msg]].slice(-200); } gisJobsUI(); });
-  window.desktop.gis.onProgress(p => { if (p.step) GIS.prog = p.step; if (p.line) GIS.log = [...GIS.log, p.line].slice(-4); const el = $('#gis-prog'); if (el) el.innerHTML = gisProgHTML(); });
+  window.desktop.gis.onProgress(adProgress); adRefresh();
   window.desktop.gis.status().then(st => { GIS.st = st; gisMethods(); if (gisOn() && MAP_TABS.includes(S.tab)) renderView(true); });
 }
 // the 3D engine methods join the cross-section's list once the engines are installed
@@ -12275,28 +12313,168 @@ async function gisExport(p, d0 = S.mres.d0, d1 = S.mres.d1) {
 }
 const saveBytes = async (name, data, type) => { if (window.desktop?.save) return window.desktop.save({ name, data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) }); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type })); a.download = name; a.click(); };
 /* Settings › GIS engines */
-const gisProgHTML = () => GIS.installing ? `<b>${esc(GIS.prog || 'Starting…')}</b>${GIS.log.length ? '<br><span class="mono">' + GIS.log.map(esc).join('<br>') + '</span>' : ''}` : '';
 function gisPrefsHTML() {
   if (!window.desktop?.gis) return '<p class="note">The GIS engines run on the desktop app (Windows or Mac).</p>';
-  const st = GIS.st, v = gisVer(), ro = GIS.installing ? 'disabled' : '';
+  const st = GIS.st, v = gisVer();
   const have = st?.installed && !st.broken ? `<p class="note">Installed in ${esc(st.home)}: GRASS GIS ${esc(v.grass || '?')}, GDAL ${esc(v.gdal || '?')}, PyKrige ${esc(v.pykrige || '?')}, GSTools ${esc(v.gstools || '?')} (Python ${esc(v.python || '?')}). Their methods are listed under "GIS software" wherever a map or section asks how to interpolate.</p>`
     : st?.broken ? `<p class="note">Installed in ${esc(st.home)}, but they did not start: ${esc(st.broken)} Remove and install again.</p>`
     : st && st.supported === false ? '<p class="note">Not available for this computer.</p>' : '<p class="note">Not installed. The app works fully without them, with its own methods.</p>';
   return `<section class="gis-prefs"><h4>GIS engines</h4><p class="note">Real GIS software, run on this computer as separate programs: GRASS GIS (v.surf.rst, v.surf.idw), GDAL (gdal_grid, gdal_contour, GeoTIFF and GeoPackage), PyKrige and GSTools (kriging in 2D and 3D). Installed for you only, from conda-forge, about 1.6 GB.</p>${have}
     <label class="check" style="margin:6px 0"><input type="checkbox" data-act="gis-net" ${lsGet('bhlog.projnet') === '1' ? 'checked' : ''}> Let PROJ download datum grids (cdn.proj.org) when a transformation needs one: NAD27 and older NAD83 to NAD83(CSRS), CGVD28 heights. They are kept on this computer.</label>
-    <p class="note" id="gis-prog">${gisProgHTML()}</p>
-    <div class="actions">${st?.installed ? `${st.versions && !st.versions.whitebox ? `<button class="btn primary" data-act="gis-install-go" ${ro} title="WhiteboxTools 2.4 (MIT), about 6 MB from conda-forge">Add WhiteboxTools</button>` : ''}<button class="btn" data-act="gis-check" ${ro}>Check</button><button class="btn" data-act="gis-remove" ${ro}>Remove</button>` : `<button class="btn primary" data-act="gis-install" ${ro}>Install GIS engines…</button>`}</div></section>`;
+    <div class="actions"><button class="btn primary" data-act="addons">Manage in Add-ons</button>${st?.installed ? '<button class="btn" data-act="gis-check">Check</button>' : ''}</div></section>`;
 }
-const GIS_LICENCE = `<p>This downloads and installs, for your user account only, from conda-forge (https://conda-forge.org), using micromamba (BSD-3-Clause):</p>
-  <ul><li><b>GRASS GIS 8.5</b>, GNU General Public License v2 or later. Source: https://github.com/OSGeo/grass</li><li><b>GDAL 3.12</b>, MIT license. Source: https://github.com/OSGeo/gdal</li><li><b>WhiteboxTools 2.4</b> (Dr John Lindsay, University of Guelph), MIT license. Source: https://github.com/jblindsay/whitebox-tools</li><li><b>PyKrige 1.7</b>, BSD-3-Clause. <b>GSTools 1.7</b>, LGPL-3.0. Python and NumPy, SciPy (BSD-style), and the libraries they need.</li></ul>
-  <p>They are separate programs: Borehole Field Log runs them and exchanges files with them, and does not include or change their code. Each keeps its own licence, which is installed with it. Nothing updates without you: Remove deletes them all.</p><p>About 360 MB is downloaded and about 1.6 GB used.</p>`;
-async function gisInstall() {
-  if (GIS.installing) return;
-  GIS.installing = true; GIS.prog = 'Starting…'; GIS.log = []; const re = () => { const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); }; re();
-  const r = await window.desktop.gis.install(); GIS.installing = false;
-  if (!r.ok) { GIS.prog = ''; toast('The GIS engines did not install: ' + r.error); re(); return; }
-  GIS.prog = ''; GIS.st = await window.desktop.gis.status(); gisMethods(); re(); toast(gisOn() ? 'GIS engines installed: GRASS GIS ' + (gisVer().grass || '') + ', GDAL ' + (gisVer().gdal || '') + '.' : 'Installed, but they did not start: ' + (GIS.st?.broken || ''));
+/* ---------- Add-ons: what can be switched on, added or removed. Engines are real downloads (conda-forge, fixed versions, checked
+   space first, paused, cancelled or removed here); tool sets, themes, symbols and guideline packs hold no code. ---------- */
+const AD_CATS = [['all', 'All'], ['tools', 'Tools'], ['themes', 'Themes'], ['symbols', 'Map symbols'], ['standards', 'Standards']];
+const AD_I = { engine: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', box: '<path d="M4 18l5-8 4 5 3-4 4 7z"/><circle cx="17" cy="6" r="2"/>', set: '<path d="M4 8h16v11H4z"/><path d="M9 8V5h6v3M4 13h16"/>', theme: '<path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 1.6-2-.6-1.4.2-2.5 1.7-2.5H17a4 4 0 0 0 4-4C21 7 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="11" cy="7.5" r="1"/><circle cx="16" cy="8.5" r="1"/>', sym: '<circle cx="7" cy="8" r="3"/><path d="M14 5h6v6h-6zM7 14l4 6H3z"/><path d="M14 17h6M17 14v6"/>', std: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 13l2 2 4-4"/>', water: NAV_ICON.gwm };
+const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)), mixW = (c, k) => '#' + hex(c).map(v => Math.round(v + (255 - v) * k).toString(16).padStart(2, '0')).join(''), mixK = (c, k) => '#' + hex(c).map(v => Math.round(v * (1 - k)).toString(16).padStart(2, '0')).join('');
+const lumOf = c => { const [r, g, b] = hex(c).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * b; }, onWhite = c => 1.05 / (lumOf(c) + .05);
+const AD_THEMES = [['standard', 'Standard', 'The app’s own slate teal.', '#245b78'], ['ocean', 'Ocean', 'A clear blue.', '#1f5fae'], ['forest', 'Forest', 'Deep green.', '#2f6b3f'], ['plum', 'Plum', 'A quiet purple.', '#6b3f7a'], ['clay', 'Clay', 'Warm brown, like till.', '#8a4b2a'], ['graphite', 'Graphite', 'Neutral grey, no colour to compete with your data.', '#3d4654'], ['contrast', 'High contrast', 'Black text, strong lines: for bright sun or tired eyes.', '#003b73']];
+const AD_SYMS = [['standard', 'Standard', 'A dot for boreholes, a target for wells.', { bh: { shape: 'standard', fill: '#1f2937', line: '#ffffff', size: 6 }, mw: { shape: 'standard', fill: '#ffffff', line: '#1f2937', size: 6.5 } }], ['print', 'Print, black and white', 'Open circles and squares that photocopy cleanly.', { bh: { shape: 'circle', fill: '#ffffff', line: '#000000', size: 6 }, mw: { shape: 'square', fill: '#000000', line: '#000000', size: 5.5 } }], ['bright', 'Over imagery', 'Bright orange and cyan, easy to see on air photos.', { bh: { shape: 'circle', fill: '#ff8a00', line: '#ffffff', size: 7 }, mw: { shape: 'target', fill: '#00d5ff', line: '#06222b', size: 8 } }], ['triangle', 'Triangles and diamonds', 'Boreholes as triangles, wells as diamonds.', { bh: { shape: 'triangle', fill: '#245b78', line: '#ffffff', size: 7 }, mw: { shape: 'diamond', fill: '#ffffff', line: '#245b78', size: 7.5 } }]];
+S.ad = { cat: 'all', q: '', st: null, size: null, pg: null, err: {}, busy: '', plan: null };
+const userPacks = () => { const l = jsonLS('bhlog.userPacks', []); return Array.isArray(l) ? l.filter(p => !packBad(p)) : []; };
+const themesAll = () => [...AD_THEMES.map(([id, name, desc, c]) => ({ id, name, desc, c })), ...userPacks().filter(p => p.type === 'theme').map(p => ({ id: p.id, name: p.name, desc: p.desc || 'Added from a file.', c: p.data.primary, user: p }))];
+const symsAll = () => [...AD_SYMS.map(([id, name, desc, d]) => ({ id, name, desc, d })), ...userPacks().filter(p => p.type === 'symbols').map(p => ({ id: p.id, name: p.name, desc: p.desc || 'Added from a file.', d: p.data, user: p }))];
+function themeApply() {
+  const id = lsGet('bhlog.theme') || 'standard', t = themesAll().find(x => x.id === id) || themesAll()[0], b = document.body.style, V = ['--accent', '--accent-2', '--primary', '--active', '--hover', '--accent-soft', '--sel', '--ink', '--muted', '--border', '--rule', '--control', '--btn-line', '--line', '--grid'];
+  for (const v of V) b.removeProperty(v); if (t.id === 'standard') return; const c = t.c;
+  const set = { '--accent': c, '--primary': c, '--accent-2': mixK(c, .25), '--active': mixW(c, .84), '--sel': mixW(c, .84), '--hover': mixW(c, .91), '--accent-soft': mixW(c, .88), ...(t.id === 'contrast' ? { '--ink': '#000000', '--muted': '#2b2f36', '--border': '#5b6470', '--line': '#5b6470', '--rule': '#8a929c', '--grid': '#8a929c', '--control': '#1f2937', '--btn-line': '#3a424d' } : {}) };
+  for (const [k, v] of Object.entries(set)) b.setProperty(k, v);
 }
+themeApply(); addEventListener('storage', e => { if (e.key === 'bhlog.theme' || e.key === 'bhlog.userPacks') { themeApply(); if (S.tab === 'addons') adDraw(); } if (e.key === 'bhlog.packs') { S.packs = jsonLS('bhlog.packs', {}); if (S.tab === 'addons') adDraw(); } });
+/* a pack from a file: only plain values of known kinds, nothing that runs */
+const HEX = /^#[0-9a-fA-F]{6}$/, txt = (v, n) => typeof v === 'string' && v.trim().length > 0 && v.length <= n;
+function packBad(p) {
+  if (!p || typeof p !== 'object' || p.app !== 'borehole-field-log' || p.kind !== 'pack') return 'This is not a Borehole Field Log pack.';
+  if (p.version !== 1) return 'This pack needs a newer version of the app.'; if (!txt(p.name, 80)) return 'The pack has no name.'; if (p.desc != null && !(typeof p.desc === 'string' && p.desc.length <= 400)) return 'The description is too long.';
+  const d = p.data; if (!d || typeof d !== 'object') return 'The pack is empty.';
+  if (p.type === 'theme') return !HEX.test(d.primary) ? 'The theme needs a colour such as #245b78.' : onWhite(d.primary) < 4.5 ? 'White text would be hard to read on this theme’s colour. Choose a darker one.' : '';
+  if (p.type === 'symbols') { for (const k of ['bh', 'mw']) { const q = d[k]; if (!q || !SYM_SHAPES[q.shape] || !HEX.test(q.fill) || !HEX.test(q.line) || !(q.size >= 2 && q.size <= 20)) return 'The symbols are not complete.'; } return ''; }
+  if (p.type === 'guidelines') { if (!txt(p.source, 300)) return 'A guideline pack must name its source (the document it was taken from).'; if (!/^\d{4}(-\d{2}(-\d{2})?)?$/.test(String(p.date || ''))) return 'A guideline pack must give the date of its source, such as 2024 or 2024-06.'; const e = Object.entries(d.values || {}); if (!e.length || e.length > 400) return 'The pack has no guideline values.'; const un = e.filter(([k]) => !LAB_PARAMS[k]).map(([k]) => k); if (un.length) return 'The app does not know these parameters: ' + un.slice(0, 6).join(', ') + '.'; const bad = e.filter(([, v]) => typeof v !== 'number' || !isFinite(v) || v < 0).map(([k]) => k); return bad.length ? 'These values are not numbers: ' + bad.slice(0, 6).join(', ') + '.' : ''; }
+  return 'This kind of pack is not known.';
+}
+const adBytes = n => n == null ? '' : n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(n < 1e7 ? 1 : 0) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB';
+const adEta = t => t == null || !isFinite(t) ? '' : t < 60 ? Math.max(1, Math.round(t)) + ' s left' : t < 5400 ? Math.round(t / 60) + ' min left' : (t / 3600).toFixed(1) + ' h left';
+const ENG = {
+  engines: { name: 'GIS engines', by: 'GRASS GIS, GDAL, PyKrige, GSTools', desc: 'Real GIS software behind the Toolbox: surfaces, kriging, GeoTIFF and GeoPackage, coordinate systems. Runs only while a tool is working.', dl: 360e6, use: 1.6e9, icon: AD_I.engine, h: '#1f5fae', lic: [['GRASS GIS 8.5', 'GNU GPL v2 or later', 'https://github.com/OSGeo/grass'], ['GDAL 3.12', 'MIT', 'https://github.com/OSGeo/gdal'], ['PyKrige 1.7', 'BSD-3-Clause', 'https://github.com/GeoStat-Framework/PyKrige'], ['GSTools 1.7', 'LGPL-3.0', 'https://github.com/GeoStat-Framework/GSTools'], ['Python, NumPy, SciPy and their libraries', 'PSF, BSD-style and others', 'https://conda-forge.org']] },
+  wbt: { name: 'WhiteboxTools', by: 'Dr John Lindsay, University of Guelph', desc: 'More than 450 terrain, water, lidar and image tools. For specialist work: most projects never need it.', dl: 6e6, use: 30e6, icon: AD_I.box, h: '#8a4b2a', needs: 'engines', lic: [['WhiteboxTools 2.4', 'MIT', 'https://github.com/jblindsay/whitebox-tools']] },
+};
+async function adRefresh() { if (!window.desktop?.gis?.packs) return; try { S.ad.st = await window.desktop.gis.packs(); if (S.ad.st?.running && S.ad.st.running.stage !== 'remove') adProgress(S.ad.st.running); } catch { S.ad.st = null; } if (S.tab === 'addons') { adDraw(); adSize(); } }
+/* an install's progress: nodes are updated in place, so the bars ease instead of being redrawn */
+function adProgress(p) {
+  if (!p?.pack) return; const was = S.ad.pg, done = ['done', 'failed', 'cancelled', 'paused'].includes(p.stage); if (S.ad.plan && p.stage === 'prepare') { const l = $('#ad-plan-l'); if (l && p.label) l.textContent = p.label + '…'; return; }
+  S.ad.pg = done ? null : p; adDock();
+  if (done || !was || was.pack !== p.pack) { if (done) adRefresh(); else if (S.tab === 'addons') adDraw(); return; }
+  adTick();
+}
+const AD_STEP = [['prepare', 'Prepare'], ['download', 'Download'], ['install', 'Install'], ['finish', 'Finish']];
+function adTick() {
+  const p = S.ad.pg, el = p && $('[data-adp="' + p.pack + '"]'); if (!el) return; const wait = p.stage === 'prepare' || p.stage === 'finish', bar = el.querySelector('.ad-bar');
+  bar.classList.toggle('wait', p.stage === 'prepare'); bar.classList.toggle('still', !wait && p.stage !== 'install' && !p.speed); bar.style.setProperty('--p', (p.p || 0).toFixed(4)); bar.setAttribute('aria-valuenow', Math.round((p.p || 0) * 100));
+  el.querySelector('.ad-a').innerHTML = p.stage === 'prepare' ? esc(p.label || 'Getting ready') + '…' : p.stage === 'download' ? '<b>' + adBytes(p.done) + '</b> of ' + adBytes(p.total) + (p.label ? ' · ' + esc(p.label) : '') : p.stage === 'install' ? '<b>' + (p.linked || 0) + '</b> of ' + (p.packages || 0) + ' packages in place' : 'Finishing up…';
+  el.querySelector('.ad-b').textContent = p.stage === 'download' ? [p.speed ? adBytes(p.speed) + '/s' : '', adEta(p.eta)].filter(Boolean).join(' · ') : p.p ? Math.round(p.p * 100) + ' %' : '';
+  const at = AD_STEP.findIndex(x => x[0] === p.stage); el.querySelectorAll('.ad-steps span').forEach((x, i) => { x.className = i < at ? 'd' : i === at ? 'n' : ''; });
+}
+function adDock() {
+  const el = $('#ad-dock'), p = S.ad.pg; if (!el) return; const show = !!p && !(S.tab === 'addons' && ['all', 'tools'].includes(S.ad.cat)) && !S.ad.plan; document.body.classList.toggle('ad-dock-on', show);
+  if (!show) { el.hidden = true; el.innerHTML = ''; return; }
+  if (el.hidden || !el.firstChild) { el.hidden = false; el.innerHTML = '<span class="rg"><b></b></span><span><b class="n"></b><small></small></span><button type="button" class="tb" data-adstop="pause" title="Pause: what was downloaded is kept">Pause</button>'; }
+  el.querySelector('.rg').style.setProperty('--p', (p.p || 0).toFixed(4)); el.querySelector('.rg').classList.toggle('wait', p.stage === 'prepare'); el.querySelector('.rg b').textContent = Math.round((p.p || 0) * 100) + '%'; el.querySelector('.n').textContent = ENG[p.pack]?.name || ''; el.querySelector('small').textContent = p.stage === 'download' ? [adBytes(p.done) + ' of ' + adBytes(p.total), adEta(p.eta)].filter(Boolean).join(' · ') : p.stage === 'install' ? 'Installing' : p.stage === 'finish' ? 'Finishing up' : 'Getting ready';
+}
+const adOk = t => '<span class="ad-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4.5 4.5L19 7"/></svg>' + t + '</span>';
+function adCards() {
+  const st = S.ad.st, out = [], desk = !!window.desktop?.gis?.packs, card = o => out.push(o);
+  for (const [k, E] of Object.entries(ENG)) {
+    const on = !!st?.[k], pg = S.ad.pg?.pack === k ? S.ad.pg : null, need = E.needs && !st?.[E.needs], paused = st?.paused === k, err = S.ad.err[k];
+    const foot = pg ? '<div class="ad-p" data-adp="' + k + '"><div class="ad-bar' + (pg.stage === 'prepare' ? ' wait' : '') + '" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="' + esc(E.name) + '" style="--p:' + (pg.p || 0) + '"><i></i></div><div class="ad-pl"><span class="ad-a"></span><span class="sp"></span><span class="ad-b"></span></div><div class="ad-steps">' + AD_STEP.map(x => '<span>' + x[1] + '</span>').join('') + '</div><div class="ad-btns"><button type="button" class="btn" data-adstop="pause">Pause</button><button type="button" class="btn link" data-adstop="cancel">Cancel</button></div></div>'
+      : !desk ? '<div class="ad-f"><span class="meta">Needs the desktop app</span></div>'
+      : st && st.supported === false ? '<div class="ad-f"><span class="meta">Not available for this computer</span></div>'
+      : S.ad.busy === k ? '<div class="ad-f"><span class="meta">Removing…</span></div>'
+      : on ? '<div class="ad-f">' + adOk('Added') + '<span class="sp"></span>' + (k === 'wbt' ? '<span class="meta">In the Toolbox</span>' + adSw('wbt') : S.ad.size ? '<span class="meta">' + adBytes(S.ad.size.engines) + ' used</span>' : '') + '<button type="button" class="btn" data-adrm="' + k + '">Remove</button></div>'
+      : (err ? '<p class="note" style="color:var(--negative);margin:0">' + esc(err) + '</p>' : '') + '<div class="ad-f"><span class="meta">' + (need ? 'Needs the GIS engines' : paused ? 'Paused: the download is kept' : adBytes(E.dl) + ' to download') + '</span><span class="sp"></span><button type="button" class="btn primary" data-adadd="' + k + '"' + (need || !st || S.ad.pg ? ' disabled' : '') + '>' + (paused ? 'Resume' : 'Add') + '</button>' + (paused ? '<button type="button" class="btn link" data-adclear="' + k + '">Discard</button>' : '') + '</div>';
+    card({ cat: 'tools', sec: 'Engines', id: 'e:' + k, name: E.name, by: E.by, desc: E.desc, icon: E.icon, h: E.h, on, foot });
+  }
+  for (const [k, [name, ids]] of Object.entries(TOOL_SETS)) { const h = { interp: '#6b3f7a', terrain: '#2f6b3f', raster: '#1f5fae', site: '#b0611a' }[k], n = ids.filter(i => GP_TOOLS[i] && !(desktopWin() && GIS_NO_WIN.has(i))).length; card({ cat: 'tools', sec: 'Toolbox sets', id: 's:' + k, name, by: n + ' tools', desc: { interp: 'Choose the method and variogram yourself. Without it, maps pick a method for you.', terrain: 'Clean up elevation maps, find trees, 3D meshes.', raster: 'Calculator, reclassify, clip, warp, statistics in areas.', site: 'Upgradient paths, unit maps, distances and areas, coordinate conversion.' }[k], icon: AD_I.set, h, on: !!S.packs[k], foot: '<div class="ad-f"><span class="meta">' + (S.packs[k] ? 'In the Toolbox' : 'No download') + '</span><span class="sp"></span>' + adSw(k) + '</div>' }); }
+  const th = lsGet('bhlog.theme') || 'standard';
+  for (const t of themesAll()) card({ cat: 'themes', sec: 'Themes', id: 't:' + t.id, name: t.name, by: t.user ? 'From a file' : 'Screen colours only', desc: t.desc, icon: AD_I.theme, h: t.c, on: th === t.id, foot: '<div class="ad-f"><span class="ad-sws">' + [t.c, mixK(t.c, .25), mixW(t.c, .6), mixW(t.c, .84)].map(c => '<i style="background:' + c + '"></i>').join('') + '</span><span class="sp"></span>' + (th === t.id ? adOk('In use') : '<button type="button" class="btn" data-adtheme="' + esc(t.id) + '">Use</button>') + (t.user ? '<button type="button" class="btn link" data-adpk="' + esc(t.id) + '">Remove</button>' : '') + '</div>' });
+  const cs = JSON.stringify(['bh', 'mw'].map(k => { const q = symStyle(k); return [q.shape, q.fill, q.line, +q.size]; })), has = projNames().length && cur();
+  for (const y of symsAll()) { const on = has && cs === JSON.stringify(['bh', 'mw'].map(k => [y.d[k].shape, y.d[k].fill, y.d[k].line, +y.d[k].size])), draw = (k, x) => symShape(x, 15, { ...y.d[k] }, k);
+    card({ cat: 'symbols', sec: 'Map symbols', id: 'y:' + y.id, name: y.name, by: 'For this project’s maps', desc: y.desc, icon: AD_I.sym, h: '#8a4b2a', on, foot: '<div class="ad-f"><svg width="92" height="30" style="background:#e3e8dc;border-radius:6px" role="img" aria-label="Borehole and well symbols">' + draw('bh', 24) + draw('mw', 66) + '</svg><span class="sp"></span>' + (on ? adOk('In use') : '<button type="button" class="btn" data-adsym="' + esc(y.id) + '"' + (has && !S.readOnly ? '' : ' disabled') + '>Use</button>') + (y.user ? '<button type="button" class="btn link" data-adpk="' + esc(y.id) + '">Remove</button>' : '') + '</div>' }); }
+  for (const [i, g] of (S.co.guideSets || []).entries()) card({ cat: 'standards', sec: 'Guidelines', id: 'g:' + i, name: g.name, by: g.source ? g.source + ' (' + g.date + ')' : 'Saved in this app', desc: Object.keys(g.values || {}).length + ' values. Choose it on the Lab page to flag exceedances.' + (g.source ? '' : ' No source recorded.'), icon: AD_I.std, h: '#b0611a', on: false, foot: '<div class="ad-f"><span class="sp"></span><button type="button" class="btn" data-adex="' + i + '">Share as a file</button></div>' });
+  for (const [k, v] of Object.entries(SYMBOL_SETS)) card({ cat: 'standards', sec: 'Soil symbols (included)', id: 'ss:' + k, name: v.name.split(' (')[0], by: 'Included', desc: v.name.includes('(') ? 'For logs and sections: ' + v.name.replace(/^[^(]*\(/, '').replace(/\)$/, '') + '.' : 'For logs and sections.', icon: AD_I.std, h: '#2f6b3f', on: symbolSet() === v, foot: '<div class="ad-f"><span class="sp"></span>' + (symbolSet() === v ? adOk('In use') : '<button type="button" class="btn" data-act="prefs">Settings…</button>') + '</div>' });
+  return out;
+}
+const adSw = k => '<button type="button" class="ad-sw" role="switch" aria-checked="' + !!S.packs[k] + '" data-adsw="' + k + '" aria-label="Show in the Toolbox"></button>';
+function addonsDraw(main) { main.innerHTML = '<div class="ad" id="ad"></div>'; adDraw(true); adDock(); adRefresh(); }
+function adSize() { if (window.desktop?.gis?.size && !S.ad.size && !S.ad.sizing && S.ad.st?.engines) { S.ad.sizing = true; window.desktop.gis.size().then(r => { S.ad.sizing = false; if (r?.engines) { S.ad.size = r; if (S.tab === 'addons') adDraw(); } }, () => { S.ad.sizing = false; }); } }
+function adDraw(first) {
+  const el = $('#ad'); if (!el) return; const q = S.ad.q.trim().toLowerCase(), C = adCards(), hit = C.filter(c => (S.ad.cat === 'all' || c.cat === S.ad.cat) && (!q || (c.name + ' ' + c.by + ' ' + c.desc).toLowerCase().includes(q))), st = S.ad.st;
+  if (first || !el.querySelector('.ad-hero')) el.innerHTML = '<div class="ad-hero"><div><h2>Add-ons</h2><p>Start light and add what a job needs. Everything here can be switched off or removed, and your projects still open without it.</p></div><span class="sp"></span><input type="search" id="ad-q" placeholder="Search add-ons" aria-label="Search add-ons" autocomplete="off" value="' + esc(S.ad.q) + '"><button type="button" class="btn" data-adfile="1">Add from a file…</button></div><div class="ad-cats" role="tablist" aria-label="Kinds of add-on"></div><div id="ad-list"></div><div id="ad-foot"></div>';
+  el.querySelector('.ad-cats').innerHTML = AD_CATS.map(([k, t]) => '<button type="button" role="tab" data-adcat="' + k + '" aria-selected="' + (S.ad.cat === k) + '">' + t + '<small>' + (k === 'all' ? C.length : C.filter(c => c.cat === k).length) + '</small></button>').join('');
+  const secs = [...new Set(hit.map(c => c.sec))]; let n = 0; const list = $('#ad-list'), still = !first && (list.dataset.k === S.ad.cat || !!q); list.dataset.k = S.ad.cat;
+  list.innerHTML = secs.map(x => '<section class="ad-sec" style="margin-bottom:22px"><h3>' + esc(x) + '</h3><div class="ad-grid">' + hit.filter(c => c.sec === x).map(c => '<article class="ad-c' + (c.on ? ' on' : '') + '" tabindex="0" data-adc="' + esc(c.id) + '" style="--h:' + c.h + ';--i:' + Math.min(n++, 14) + (still ? ';animation:none' : '') + '"><div class="ad-t"><span class="ad-i">' + svgI(c.icon) + '</span><span><b>' + esc(c.name) + '</b><small>' + esc(c.by) + '</small></span></div><p>' + esc(c.desc) + '</p>' + c.foot + '</article>').join('') + '</div></section>').join('') || '<p class="note">Nothing matches “' + esc(S.ad.q) + '”.</p>';
+  $('#ad-foot').innerHTML = st && ['all', 'tools'].includes(S.ad.cat) ? '<p class="note">Engines go in ' + esc(st.home) + (st.free != null ? ' · ' + adBytes(st.free) + ' free on that drive' : '') + (st.engines || S.ad.pg ? '' : ' · <button type="button" class="btn link" data-adfolder="1">Choose another folder…</button>') + '. Downloads come from conda-forge; nothing about you or your projects is sent.</p>' : '';
+  adTick();
+}
+/* before an engine is added: what it is, what it takes, and whether it fits */
+async function adPlan(k) {
+  const E = ENG[k]; if (!E || !window.desktop?.gis?.plan) { toast('This needs the desktop app.'); return; } if (S.ad.pg) { toast('Another install is running.'); return; }
+  const lic = '<details><summary>Licences</summary><ul>' + E.lic.map(l => '<li><b>' + esc(l[0]) + '</b>, ' + esc(l[1]) + '. ' + esc(l[2]) + '</li>').join('') + '</ul><p class="note">Separate programs, installed for you only and run as published. Each keeps its own licence.</p></details>';
+  const show = (mid, foot) => dialog('Add ' + esc(E.name), '<div class="ad-dlg mws-dlg"><p style="margin:0">' + esc(E.desc) + '</p>' + mid + lic + '</div>', foot);
+  S.ad.plan = k; S.ad.err[k] = ''; show('<div class="ad-p"><div class="ad-bar wait" role="progressbar"><i></i></div><div class="ad-pl" id="ad-plan-l">Checking the download and the space on the drive…</div></div>', '<button class="btn" data-adplanx="1">Cancel</button>');
+  let p; try { p = await window.desktop.gis.plan(k); } catch (e) { p = { ok: false, error: e.message }; } if (S.ad.plan !== k) return;
+  const again = '<button class="btn" data-adplanx="1">Cancel</button><button class="btn" data-adfolder="' + k + '">Choose another folder…</button>';
+  if (!p.ok) { S.ad.planDone = true; show('<p style="color:var(--negative);margin:0">' + esc(p.error === 'stopped' ? 'Stopped.' : p.error) + (p.space ? ' ' + adBytes(p.space.free) + ' free.' : '') + '</p>', p.space && k === 'engines' ? again : '<button class="btn" data-adplanx="1">Close</button>'); return; }
+  const tot = Math.max(p.need, p.free || 0) || 1, w = n => (n / tot * 100).toFixed(1) + '%';
+  show('<dl><dt>Download</dt><dd>' + adBytes(p.download) + ' in ' + p.files.length + ' packages' + (p.download < 1e5 ? ' (already downloaded)' : '') + '</dd><dt>Installed</dt><dd>about ' + adBytes(p.installed) + '</dd><dt>Folder</dt><dd>' + esc(p.home) + '</dd></dl><div class="ad-space' + (p.fits ? '' : ' bad') + '"><span>' + (p.fits ? 'Fits: <b>' + adBytes(p.need) + '</b> needed, <b>' + adBytes(p.free) + '</b> free' : '<b>Not enough space:</b> ' + adBytes(p.need) + ' needed, ' + adBytes(p.free) + ' free') + '</span><span class="b"><i class="dl" style="width:' + w(p.download) + '"></i><i class="in" style="width:' + w(p.installed) + '"></i><i class="mg" style="width:' + w(p.margin) + '"></i></span><span class="note" style="margin:0">Download, installed, and ' + adBytes(p.margin) + ' always left free for Windows and your projects.</span></div>',
+    p.fits ? '<button class="btn" data-adplanx="1">Cancel</button><button class="btn primary" data-adgo="' + k + '">Agree and add</button>' : k === 'engines' ? again : '<button class="btn" data-adplanx="1">Close</button>');
+}
+async function adGo(k) {
+  S.ad.plan = null; closeOverlay(); S.ad.err[k] = ''; adProgress({ pack: k, stage: 'prepare', label: 'Getting ready' }); if (S.tab === 'addons') adDraw();
+  let r; try { r = await window.desktop.gis.install(k); } catch (e) { r = { ok: false, error: e.message }; } S.ad.pg = null; adDock();
+  if (r.ok) { S.ad.size = null; if (k === 'wbt') { S.packs.wbt = true; lsSet('bhlog.packs', JSON.stringify(S.packs)); GIS.wbt = null; } GIS.st = await window.desktop.gis.status(); gisMethods(); toast(gisOn() ? ENG[k].name + ' added.' : 'Added, but it did not start: ' + (GIS.st?.broken || '')); }
+  else if (r.paused) toast('Paused. Resume it in Add-ons whenever you like.'); else if (r.cancelled) toast('Cancelled. Nothing was left behind.'); else { S.ad.err[k] = r.error; toast(ENG[k].name + ' was not added: ' + r.error); }
+  adRefresh();
+}
+async function adRemove(k) {
+  if (!confirm('Remove ' + ENG[k].name + '?' + (k === 'engines' ? '\n\nMaps set to one of its methods go back to the built-in ones. WhiteboxTools is removed with it. Layers already made stay.' : '\n\nLayers already made stay.'))) return;
+  S.ad.busy = k; adDraw(); const r = await window.desktop.gis.remove(k); S.ad.busy = ''; S.ad.size = null; if (r.ok) { GIS.cache.clear(); if (k === 'wbt') GIS.wbt = null; GIS.st = await window.desktop.gis.status(); if (k === 'engines') GIS.wbt = null; } toast(r.ok ? ENG[k].name + ' removed.' : 'Not removed: ' + r.error); adRefresh();
+}
+function adDetails(id) {
+  const [t, k] = [id.slice(0, id.indexOf(':')), id.slice(id.indexOf(':') + 1)], close = '<button class="btn" data-act="close">Close</button>';
+  if (t === 'e') { const E = ENG[k]; dialog(esc(E.name), '<div class="ad-dlg mws-dlg"><p style="margin:0">' + esc(E.desc) + '</p><dl>' + E.lic.map(l => '<dt>' + esc(l[1]) + '</dt><dd>' + esc(l[0]) + '<br><span class="note">' + esc(l[2]) + '</span></dd>').join('') + '</dl><p class="note">Separate programs from conda-forge, at fixed versions, installed for you only. The app runs them as published and sends nothing about you or your projects.</p></div>', close); }
+  else if (t === 's') dialog(esc(TOOL_SETS[k][0]), '<div class="ad-dlg mws-dlg"><ul class="ad-tools">' + TOOL_SETS[k][1].filter(i => GP_TOOLS[i] && !(desktopWin() && GIS_NO_WIN.has(i))).map(i => '<li><b>' + esc(GP_TOOLS[i].name) + '</b><br><span class="note">' + esc(GP_TOOLS[i].by) + '</span></li>').join('') + '</ul></div>', close);
+  else if (t === 'g') { const g = (S.co.guideSets || [])[+k]; if (g) dialog(esc(g.name), '<div class="ad-dlg"><p class="note">' + (g.source ? 'Source: ' + esc(g.source) + ', ' + esc(g.date) + '. ' : 'No source is recorded for these values. ') + 'Check them against the document before you rely on them.</p><div class="scroll-x" style="max-height:320px;overflow:auto"><table class="sum"><thead><tr><th>Parameter</th><th class="r">Value</th></tr></thead><tbody>' + Object.entries(g.values || {}).map(([p, v]) => '<tr><td>' + esc(resLabel(p)) + '</td><td class="r">' + esc(v) + '</td></tr>').join('') + '</tbody></table></div></div>', close); }
+}
+async function adFile(file) {
+  let p = null; try { if (file.size > 1e6) throw new Error('big'); p = JSON.parse(await file.text()); } catch { toast('That file could not be read as a pack.'); return; }
+  const bad = packBad(p); if (bad) { toast(bad); return; } const q = { app: p.app, kind: p.kind, version: 1, type: p.type, name: p.name.trim(), desc: p.desc || '', by: typeof p.by === 'string' ? p.by.slice(0, 80) : '', source: p.source, date: p.date, data: p.type === 'theme' ? { primary: p.data.primary } : p.type === 'symbols' ? Object.fromEntries(['bh', 'mw'].map(k => [k, { shape: p.data[k].shape, fill: p.data[k].fill, line: p.data[k].line, size: p.data[k].size }])) : { values: { ...p.data.values } } };
+  if (q.type === 'guidelines') { S.ad.gp = q; dialog('Add guidelines: ' + esc(q.name), '<div class="ad-dlg mws-dlg"><p style="margin:0">Source: <b>' + esc(q.source) + '</b>, ' + esc(q.date) + '</p><div class="scroll-x" style="max-height:300px;overflow:auto"><table class="sum"><thead><tr><th>Parameter</th><th class="r">Value</th></tr></thead><tbody>' + Object.entries(q.data.values).map(([k, v]) => '<tr><td>' + esc(resLabel(k)) + '</td><td class="r">' + esc(v) + '</td></tr>').join('') + '</tbody></table></div><label class="check"><input type="checkbox" id="ad-gok"> I have checked these values against the source</label></div>', '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-adgok="1">Add</button>'); return; }
+  q.id = 'u' + uid(); lsSet('bhlog.userPacks', JSON.stringify([...userPacks().filter(x => !(x.type === q.type && x.name === q.name)), q])); S.ad.cat = q.type === 'theme' ? 'themes' : 'symbols'; adDraw(); toast(q.name + ' added.');
+}
+document.addEventListener('click', e => {
+  const q = x => e.target.closest?.(x); let t;
+  if ((t = q('[data-adcat]'))) { S.ad.cat = t.dataset.adcat; adDraw(); adDock(); return; }
+  if ((t = q('[data-adsw]'))) { const k = t.dataset.adsw; S.packs[k] = !S.packs[k]; lsSet('bhlog.packs', JSON.stringify(S.packs)); t.setAttribute('aria-checked', String(!!S.packs[k])); const c = t.closest('.ad-c'), m = t.parentElement.querySelector('.meta'); if (k !== 'wbt') { c?.classList.toggle('on', !!S.packs[k]); if (m) m.textContent = S.packs[k] ? 'In the Toolbox' : 'No download'; } return; }
+  if ((t = q('[data-adadd]'))) { adPlan(t.dataset.adadd); return; }
+  if ((t = q('[data-adgo]'))) { adGo(t.dataset.adgo); return; }
+  if ((t = q('[data-adplanx]'))) { if (S.ad.plan) window.desktop?.gis?.stop?.('cancel'); S.ad.plan = null; closeOverlay(); return; }
+  if ((t = q('[data-adstop]'))) { t.disabled = true; t.textContent = t.dataset.adstop === 'pause' ? 'Pausing…' : 'Cancelling…'; window.desktop.gis.stop(t.dataset.adstop); return; }
+  if ((t = q('[data-adrm]'))) { adRemove(t.dataset.adrm); return; }
+  if ((t = q('[data-adclear]'))) { const k = t.dataset.adclear; t.disabled = true; window.desktop.gis.remove(k).then(() => adRefresh()); return; }
+  if ((t = q('[data-adfolder]'))) { const k = t.dataset.adfolder; S.ad.plan = null; closeOverlay(); window.desktop.gis.chooseFolder().then(r => { if (r.cancelled) return; if (!r.ok) { toast(r.error); return; } toast('The GIS engines will go in ' + r.home + '.'); adRefresh(); if (ENG[k]) adPlan(k); }); return; }
+  if ((t = q('[data-adtheme]'))) { const go = () => { lsSet('bhlog.theme', t.dataset.adtheme); themeApply(); adDraw(); }; if (document.startViewTransition && !document.hidden && document.hasFocus() && !matchMedia('(prefers-reduced-motion: reduce)').matches) document.startViewTransition(go); else go(); return; }
+  if ((t = q('[data-adsym]'))) { const y = symsAll().find(x => x.id === t.dataset.adsym); if (!y || S.readOnly || !cur()) return; setSite({ ...(siteOf() || {}), symStyle: { ...(siteOf()?.symStyle || {}), bh: { ...y.d.bh }, mw: { ...y.d.mw } } }); adDraw(); toast('This project’s maps now use ' + y.name + '. Undo takes it back.'); return; }
+  if ((t = q('[data-adpk]'))) { const id = t.dataset.adpk; lsSet('bhlog.userPacks', JSON.stringify(userPacks().filter(x => x.id !== id))); if (lsGet('bhlog.theme') === id) { lsSet('bhlog.theme', 'standard'); themeApply(); } adDraw(); return; }
+  if ((t = q('[data-adex]'))) { const g = (S.co.guideSets || [])[+t.dataset.adex]; if (!g) return; S.ad.ex = +t.dataset.adex; dialog('Share ' + esc(g.name), '<div class="mws-dlg"><label class="fld">Source (the document these values come from)<input id="ad-src" value="' + esc(g.source || '') + '"></label><label class="fld">Date of the source<input id="ad-date" placeholder="2024 or 2024-06" value="' + esc(g.date || '') + '"></label><p class="note">Others see where the values came from and are asked to check them.</p></div>', '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-adexgo="1">Save the file</button>'); return; }
+  if (q('[data-adexgo]')) { const g = (S.co.guideSets || [])[S.ad.ex], p = { app: 'borehole-field-log', kind: 'pack', version: 1, type: 'guidelines', name: g.name, source: $('#ad-src').value.trim(), date: $('#ad-date').value.trim(), data: { values: Object.fromEntries(Object.entries(g.values).map(([k, v]) => [k, +v]).filter(x => isFinite(x[1]))) } }, bad = packBad(p); if (bad) { toast(bad); return; } g.source = p.source; g.date = p.date; store.saveCompany(); closeOverlay(); adDraw(); saveFile(g.name.replace(/[^\w .-]+/g, ' ').trim() + '.bfpack.json', new Blob([JSON.stringify(p, null, 1)], { type: 'application/json' })); return; }
+  if (q('[data-adgok]')) { const g = S.ad.gp; if (!g) return; if (!$('#ad-gok').checked) { toast('Tick the box once you have checked the values.'); return; } S.co.guideSets = [...(S.co.guideSets || []).filter(x => x.name !== g.name), { name: g.name, values: g.data.values, source: g.source, date: g.date }]; store.saveCompany(); S.ad.gp = null; closeOverlay(); S.ad.cat = 'standards'; adDraw(); toast(g.name + ' added. Choose it on the Lab page.'); return; }
+  if (q('[data-adfile]')) { const i = document.createElement('input'); i.type = 'file'; i.accept = '.json'; i.onchange = () => { if (i.files[0]) adFile(i.files[0]); }; i.click(); return; }
+  if (q('#ad-dock') && !q('button')) { S.ad.cat = 'tools'; goTab('addons'); return; }
+  if ((t = q('.ad-c')) && !q('button, a, input')) adDetails(t.dataset.adc);
+});
+document.addEventListener('input', e => { if (e.target.id === 'ad-q') { S.ad.q = e.target.value; adDraw(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches?.('.ad-c')) adDetails(e.target.dataset.adc); });
 /* ---------- GIS Toolbox: pick a tool, set its input and parameters, Run; progress, messages and the history of runs, as in a
    desktop GIS. Every run is the real tool (GRASS GIS, GDAL, PyKrige, GSTools) through the GIS engines. ---------- */
 const GP_TOOLS = {
@@ -12355,7 +12533,18 @@ const GP_TOOLS = {
 };
 S.gp = { tool: 'grass_rst', p: '', d0: null, d1: null, prm: {}, cell: '', use: true, save: false, q: '', ...jsonLS('bhlog.gp', {}) };
 const gpSave = () => lsSet('bhlog.gp', JSON.stringify({ ...S.gp, run: undefined }));
-const gpTools = () => Object.entries(GP_TOOLS).filter(([k]) => !(desktopWin() && GIS_NO_WIN.has(k)));
+const gpAll = () => Object.entries(GP_TOOLS).filter(([k]) => !(desktopWin() && GIS_NO_WIN.has(k)));
+/* the everyday tools are always there; the rest come in sets, switched on in Add-ons (off to begin with) */
+const TOOL_SETS = {
+  interp: ['Interpolation methods', ['grass_rst', 'grass_idw', 'pykrige_uk', 'gstools_ok', 'gdal_invdist', 'gdal_invdistnn', 'gdal_linear', 'gdal_nearest', 'pykrige_ok3d', 'gstools_ok3d', 'compare']],
+  terrain: ['Terrain and elevation', ['elev_fix', 'elev_trees', 'trees_ortho', 'terr_3d', 'terr_model', 'elev_points', 'rast_terrain']],
+  raster: ['Raster tools', ['rast_import', 'rast_warp', 'rast_calc', 'rast_reclass', 'rast_zonal', 'rast_filter', 'an_diff']],
+  site: ['Site and sampling', ['gw_upgrad', 'unit_map', 'smp_dist', 'smp_thiessen', 'crs_convert']],
+};
+S.packs = { ...jsonLS('bhlog.packs', {}) };
+const setOf = k => k.startsWith('wb_') ? 'wbt' : Object.keys(TOOL_SETS).find(q => TOOL_SETS[q][1].includes(k)) || null;
+const toolOn = k => { const q = setOf(k); return !q || !!S.packs[q]; };
+const gpTools = () => gpAll().filter(([k]) => toolOn(k) || k === S.gpPanel);
 function gpHTML() {
   const T = GP_TOOLS[S.gp.tool] || GP_TOOLS.grass_rst, k = GP_TOOLS[S.gp.tool] ? S.gp.tool : 'grass_rst', q = (S.gp.q || '').toLowerCase();
   const groups = [...new Set(gpTools().map(([, t]) => t.group))];
@@ -13013,7 +13202,7 @@ function wbFields(v) {
 }
 function wbFormHTML(k, T) {
   const vals = ((S.gp.wb ||= {})[k] ||= {}), ins = [], prm = [], outs = [], W = T.wb;
-  if (GIS.wbt && !GIS.wbt.installed) ins.push('<p class="gp-warn">WhiteboxTools is not in your GIS engines yet: Settings › GIS engines › Add WhiteboxTools (about 6 MB).</p>');
+  if (GIS.wbt && !GIS.wbt.installed) ins.push('<p class="gp-warn">WhiteboxTools is not in your GIS engines yet: <button class="btn link" data-act="addons">Add-ons</button> › WhiteboxTools (about 6 MB).</p>');
   for (const p of W.params) {
     const fl = p.flags.at(-1), t = wbType(p), tip = esc(p.description || ''), lab = `<span title="${tip}">${esc(p.name)}${p.optional ? '' : ' *'}</span>`;
     let v = vals[fl];
@@ -16661,6 +16850,7 @@ document.addEventListener('click', e => {
   switch (act) {
     case 'menu': openMenu(); break;
     case 'find': openFind(); break;
+    case 'addons': goTab('addons'); break;
     case 'win-page': openWin(S.tab === 'projects' ? 'home' : S.tab); break;
     case 'win-table': openWin('site', 'table'); break;
     case 'graphs': dialog('Graphs on the logs', graphsRowHTML() + '<p class="note" style="margin:0">Every borehole log in the project uses these graphs, on screen and in PDFs. Chart colours: lab results above their guideline are red.</p>', '<button class="btn primary" data-act="close">Done</button>'); break;
@@ -16703,10 +16893,8 @@ document.addEventListener('click', e => {
     case 'drawer-layer-below': if (editable(b) && S.drawer?.kind === 'layer') { const l0 = b.layers[S.drawer.i], top = l0.bottom ?? l0.top ?? 0, nl = newLayer(top); nl.bottom = top + fromD(S.units === 'ft' ? 2 : .5); const nx = b.layers[S.drawer.i + 1]; if (nx && nx.top != null && nx.top < nl.bottom) nl.bottom = nx.top; b.layers.splice(S.drawer.i + 1, 0, nl); logChange(b, 'Soil layers'); store.save(b); redrawLog(); openDrawer('layer', S.drawer.i + 1); } break;
     case 'drawer-edit-full': S.drawer = null; renderDrawer(); S.tab = 'edit'; S.formStale = true; renderMain(); setTimeout(() => $('#sec-well')?.scrollIntoView({ block: 'start' }), 50); break;
     case 'prefs': openPrefs(); break;
-    case 'gis-install': dialog('Install the GIS engines', GIS_LICENCE, '<button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="gis-install-go">Agree and install</button>'); break;
-    case 'gis-install-go': openPrefs(); gisInstall(); break;
+    case 'gis-install': closeMenu(); adPlan('engines'); break;
     case 'gis-check': GIS.st = null; window.desktop?.gis?.status().then(st => { GIS.st = st; gisMethods(); const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); toast(gisOn() ? 'The GIS engines start and answer.' : 'They did not start: ' + (st?.broken || 'not installed')); }); break;
-    case 'gis-remove': if (confirm('Remove the GIS engines (about 1.6 GB)? Maps set to a GIS method go back to the built-in ones until they are installed again.')) window.desktop.gis.remove().then(r => { GIS.st = { installed: false }; GIS.cache.clear(); const el = $('.gis-prefs'); if (el) el.outerHTML = gisPrefsHTML(); toast(r.ok ? 'The GIS engines were removed.' : r.error); }); break;
     case 'gis-export': gisExport(t.dataset.p || 'cvc'); break;
     case 'gp-run': gpRun(); break;
     case 'crs-project': crsPick('Project coordinate system', 'EPSG:' + projEpsg(), c => { if (!/^EPSG:\d+$/.test(c)) { toast('The project system must be an EPSG code.'); return; } setSite({ ...(siteOf() || {}), epsg: c }); toast('The project now uses ' + c + ' ' + crsName(c) + '. Boreholes keep their coordinates; convert any recorded in another system with Toolbox › Coordinates.'); renderView(true); }); break;
@@ -17015,7 +17203,7 @@ const MENUS = [
   ['Project', [['New borehole', 'new'], ['Monitoring round…', 'round'], ['Copy details to all boreholes…', 'apply-project'], '-', ['Site drawing…', 'site-img'], ['Import locations…', 'imp-loc'], ['Import shapes…', 'imp-shp'], ['Add imagery…', 'imp-img'], '-', ['Remove example boreholes', 'clear-examples']]],
   ['Boreholes', [['Export this borehole (.bh)…', 'save-bh'], ['Import a borehole into this project (.bh)…', 'imp-bh'], '-', ['Log step by step', 'qlog', 'Mod+L'], ['Add sample', 'quick'], ['Drilling note', 'quick-note'], '-', ['Check log', 'check-log'], ['Mark ready for review', 'to-review'], ['Issue…', 'issue'], ['Revise', 'revise'], ['Comments', 'comments'], ['History', 'history'], '-',
     ['Duplicate', 'duplicate'], ['Save as template', 'bh-tpl'], ['Delete…', 'delete']]],
-  ['Tools', [['Find anything…', 'find', 'Mod+K'], ['Log columns…', 'log-cols'], ['Graphs…', 'graphs'], ['Company, logo and initials…', 'settings'], '-', ['Load example: oil lease delineation', 'load-lloyd'], ['Load example: service-station plume', 'load-sk'], ['Load example: Dawn Lake excavation', 'load-dl'], ['Load example: cross-section and plume', 'load-xs']]],
+  ['Tools', [['Find anything…', 'find', 'Mod+K'], ['Add-ons…', 'addons'], ['Log columns…', 'log-cols'], ['Graphs…', 'graphs'], ['Company, logo and initials…', 'settings'], '-', ['Load example: oil lease delineation', 'load-lloyd'], ['Load example: service-station plume', 'load-sk'], ['Load example: Dawn Lake excavation', 'load-dl'], ['Load example: cross-section and plume', 'load-xs']]],
   ['Reports', [['This log (PDF)', 'pdf-one', 'Mod+P'], ['All logs in the project (PDF)', 'pdf-all'], ['Report appendix (PDF)…', 'appendix'], ['Location plan (PDF)', 'plan-pdf'], '-', ['Report editor', 'tab:compose'], ['Excel workbook…', 'export']]],
   ['Help', [['Tutorial: cross-section', 'tut-xsec'], ['Tutorial: groundwater model', 'tut-gwm'], '-', ['Keyboard shortcuts', 'shortcuts', 'F1'], ['Check for updates…', 'upd-check'], ['About Borehole Field Log', 'about']]],
 ];
