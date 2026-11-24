@@ -1604,12 +1604,15 @@ body.mws-map #sb-proj, body.mws-map #sb-bh, body.mws-map #sb-iss, body.mws-map #
 .mws-dock { flex: none; display: flex; flex-direction: column; min-height: 0; position: relative; background: var(--surface); border-top: 1px solid var(--border); } .mws-dock[hidden] { display: none; }
 .mws-drz { position: absolute; left: 0; right: 0; top: -3px; height: 6px; cursor: row-resize; z-index: 3; } .mws-drz:hover { background: var(--accent); opacity: .35; }
 .mws-dt { position: static; flex: none; min-height: 33px; } .mws-dt button { padding-top: 6px; padding-bottom: 6px; }
-.mws-db { display: flex; align-items: center; gap: 4px 10px; padding: 4px 10px; border-bottom: 1px solid var(--rule); font-size: 12.5px; flex: none; overflow-x: auto; scrollbar-width: none; white-space: nowrap; } .mws-db input[type="search"] { width: 170px; min-height: 27px; font-size: 12.5px; padding: 0 8px; } .mws-db .btn.link { font-size: 12.5px; } .mws-db .sp { flex: 1; } .mws-db .check { font-size: 12.5px; gap: 5px; }
+.mws-db { display: flex; align-items: center; gap: 4px 10px; padding: 4px 10px; border-bottom: 1px solid var(--rule); font-size: 12.5px; flex: none; overflow-x: auto; scrollbar-width: none; white-space: nowrap; } .mws-db > * { flex: none; } .mws-db input[type="search"] { width: 150px; min-height: 27px; font-size: 12.5px; padding: 0 8px; } .mws-db .btn.link { font-size: 12.5px; } .mws-db .sp { flex: 1 0 0; } .mws-db .check { font-size: 12.5px; gap: 5px; }
 .mws-dg { flex: 1 1 auto; min-height: 0; overflow: auto; } .mws-dg table { border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 12.5px; width: max-content; }
 .mws-dg th, .mws-dg td { height: 26px; padding: 0 8px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; box-sizing: border-box; } .mws-dg td.r, .mws-dg th.r { text-align: right; font-variant-numeric: tabular-nums; }
 .mws-dg th { position: sticky; top: 0; z-index: 2; background: var(--panel-2, var(--ground)); padding: 0; } .mws-dg th button { width: 100%; height: 25px; padding: 0 8px; border: 0; background: none; font: 600 12px var(--f-body); color: var(--ink); text-align: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mws-dg tr.on td { background: #d4f1f7; } .mws-dg tbody tr { cursor: default; } .mws-dg tbody tr:hover td:not([colspan]) { box-shadow: inset 0 0 0 100px rgba(27,108,128,.06); } .mws-dg td.ed { color: var(--ink); } .mws-dg td.ro { color: var(--muted); }
 .mws-dg td input, .mws-dg td select { width: 100%; height: 22px; min-height: 0; padding: 0 4px; font: 12.5px var(--f-body); border: 1px solid var(--accent); } .mws-dg td:has(input) { padding: 0 2px; }
+.sy-rows { display: grid; gap: 2px; } .sy-row { display: grid; grid-template-columns: 18px 30px minmax(0, 1fr) auto 20px; gap: 6px; align-items: center; font-size: 12.5px; min-height: 28px; } .sy-row input[type="color"] { width: 30px; height: 22px; min-height: 0; padding: 1px; } .sy-row input[type="text"], .sy-row input[type="number"] { width: 100%; min-height: 26px !important; padding: 0 6px; } .sy-row .n { color: var(--muted); font-variant-numeric: tabular-nums; } .sy-row .x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0; } .sy-row input[type="checkbox"] { width: 15px; height: 15px; margin: 0; accent-color: var(--primary); }
+.sy-ramp { display: inline-block; width: 70px; height: 12px; border: 1px solid var(--rule); } .sy-f { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 20px; gap: 6px; align-items: center; } .sy-f input { grid-column: 1 / 3; } .sy-f select, .sy-f input { width: 100%; }
+.sy-ins { display: flex; flex-wrap: wrap; gap: 4px; } .sy-ins button { border: 1px solid var(--control, var(--line)); background: var(--surface); border-radius: 10px; font: 11.5px var(--f-body); padding: 1px 8px; cursor: pointer; } .sy-ins button:hover { background: var(--hover); }
 .mws-dlg { display: grid; gap: 10px; } .mws-dlg .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .mws-dlg select, .mws-dlg input { min-height: 34px; }
 .menu.mws-menu { width: auto; min-width: 210px; max-width: 340px; padding: 4px; right: auto; } .mws-menu .mi { padding: 6px 10px; align-items: center; } .mws-menu .mi b { font-weight: 500; font-size: 13px; } .mws-menu hr { border: 0; border-top: 1px solid var(--rule); margin: 4px 0; } .mws-menu .mi.danger-text b { color: var(--negative, #b42318); } .mws-menu .mh { margin: 2px 10px 4px; font: 600 11.5px var(--f-body); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .site-only { display: block; } .site-map > .body { padding: 8px; } .site-map .map-tip { margin: 6px 2px 0; font-size: 11.5px; }
@@ -2770,6 +2773,9 @@ const dotSym = (col, r = 4) => (x, y) => '<circle cx="' + x + '" cy="' + y + '" 
 const FIX_KEY = [[1, 'Spike removed', '#dc2828'], [2, 'Pit filled', '#1e5adc'], [3, 'Hole filled', '#eba000'], [4, 'Hollow', '#009696'], [5, 'Marked spot', '#8c3caa'], [6, 'Outlier', '#d700a0'], [7, 'Levelled', '#f57800']];
 const RAMP_NAME = { terrain: 'Terrain', spectral: 'Spectral', viridis: 'Viridis', grey: 'Grey', water: 'Blues', depth: 'Yellow to blue', impact: 'Oranges', prob: 'Chance', uncert: 'Purples', slope: 'Slope', cutfill: 'Blue to red', drain: 'Drainage', distance: 'Distance', soil: 'Browns', change: 'Red to blue', aspect: 'Aspect' };
 /* a Toolbox layer's symbols: a ramp with its range, classes, what was fixed, contours, trees, or its one symbol */
+const featTC = new WeakMap();
+function featTypes(L) { let t = featTC.get(L.features || L); if (!t) { t = new Set(); for (const f of L.features || []) t.add(f.type); featTC.set(L.features || L, t); } return t; }
+const featType = L => ['polygon', 'line', 'point'].find(t => featTypes(L).has(t)) || 'polygon';
 function gisLegendRows(L) {
   const k = 'g' + L.id + ':', lb = gisLab(L), R = [], u = L.unit ? ' ' + L.unit : '';
   if (L.kind === 'raster') {
@@ -2783,8 +2789,10 @@ function gisLegendRows(L) {
     if (L.marks?.length) R.push({ k: k + 'mk', t: 'Suggested borehole', sym: (x, y) => '<circle cx="' + x + '" cy="' + y + '" r="5" fill="#fff" stroke="#6a1b9a" stroke-width="2"/>' });
   } else if (L.kind === 'arrows') R.push({ k: k + 'a', t: lb.text || L.name, sym: (x, y) => LG_SYM.arrow(x, y, '#1565c0') });
   else if (L.kind === 'path') R.push({ k: k + 'p', t: L.name, sym: (x, y) => LG_SYM.dash(x, y, L.color || '#0b62c4') });
-  else if (L.kind === 'feats') { const col = lb.color || L.color || '#5b2c83', ts = new Set((L.features || []).map(f => f.type)), nm = { polygon: 'areas', line: 'lines', point: 'points' };
-    for (const t of ['polygon', 'line', 'point']) if (ts.has(t)) R.push({ k: k + t, t: L.name + (ts.size > 1 ? ': ' + nm[t] : ''), sym: t === 'polygon' ? boxSym(col, col, '', .15) : t === 'line' ? lineSym(col) : dotSym(col) }); }
+  else if (L.kind === 'feats' && symClasses(L)) { const I = symIndex(L), ty = featType(L), sh = L.flt?.rules?.length ? new Set(mwsShapesOf(L).map(f => I.ix[f.id])) : null;
+    I.C.list.forEach((c, i) => { if (c.off || !I.n[i] || sh && !sh.has(i)) return; R.push({ k: k + 's' + i, t: c.t, sym: ty === 'polygon' ? boxSym(c.color, '#3d4654', L.sym.dash ? '4 3' : '', L.sym.op ?? .55) : ty === 'line' ? lineSym(c.color, L.sym.w ?? 1.8, L.sym.dash ? '4 3' : '') : dotSym(c.color, Math.min(5, L.sym.r ?? 4)) }); }); }
+  else if (L.kind === 'feats') { const col = lb.color || L.color || '#5b2c83', ts = featTypes(L), nm = { polygon: 'areas', line: 'lines', point: 'points' };
+    for (const t of ['polygon', 'line', 'point']) if (ts.has(t)) R.push({ k: k + t, t: L.name + (ts.size > 1 ? ': ' + nm[t] : ''), sym: t === 'polygon' ? boxSym(col, col, L.sym?.dash ? '4 3' : '', L.sym?.op ?? .15) : t === 'line' ? lineSym(col, L.sym?.w ?? 1.8, L.sym?.dash ? '4 3' : '') : dotSym(col, Math.min(5, L.sym?.r ?? 4)) }); }
   else if (L.kind === 'polys') { const ps = L.style === 'cells' ? ['rgba(90,110,140,.06)', '#4a5a78', ''] : L.style === 'buffer' ? ['rgba(255,170,0,.12)', '#c77700', '5 3'] : ['rgba(196,36,42,.16)', '#c4242a', '6 3']; R.push({ k: k + 'poly', t: L.name, sym: boxSym(ps[0], ps[1], ps[2]) }); }
   return R;
 }
@@ -2797,7 +2805,7 @@ function shapeLegendRows() {
 function overlayLegendRows() {
   const R = [];
   for (const L of GIS.layers.filter(x => x.on)) { const rows = gisLegendRows(L); if (!rows.length) continue;
-    if (L.kind === 'raster') R.push({ k: 'g' + L.id + ':h', t: L.name, head: true }, ...rows); else R.push(...rows); }
+    if (L.kind === 'raster' || rows.length > 1 && L.kind === 'feats' && symClasses(L)) R.push({ k: 'g' + L.id + ':h', t: L.name, head: true }, ...rows); else R.push(...rows); }
   if (lyrOn('feat')) R.push(...shapeLegendRows().filter(r => lyrOn(r.k)));
   return R;
 }
@@ -2854,8 +2862,8 @@ function contentsHTML() {
   o.push(simple('contours', 'Water-table contours', gwHeads(mapList()).wells.length < 3, tocActs(tocGo('map-wl', 'Water levels used…'))));
   // Toolbox layers: each its own row, in the order they draw; drag to reorder
   if (GIS.layers.length) o.push(tocRow({ id: 'gis', name: 'Toolbox layers', note: GIS.layers.filter(L => L.on).length + ' of ' + GIS.layers.length + ' on', cls: 'toc-grp',
-    kids: '<ul class="toc-kids">' + GIS.layers.map(L => { const rows = gisLegendRows(L), one = L.kind !== 'raster' && rows.length === 1;
-      return tocRow({ id: 'g:' + L.id, name: L.name, note: L.note || '', check: '<input type="checkbox" class="toc-chk" data-gislay="' + L.id + '"' + (L.on ? ' checked' : '') + ' aria-label="Show ' + esc(L.name) + '" title="Show on the map">', sw: one ? rows[0].sym : null,
+    kids: '<ul class="toc-kids">' + GIS.layers.map(L => { const rows = gisLegendRows(L), one = L.kind !== 'raster' && rows.length === 1 && !(L.kind === 'feats' && symClasses(L));
+      return tocRow({ id: 'g:' + L.id, name: L.name, note: (L.note || '') + (L.flt?.rules?.length ? (L.note ? ' · ' : '') + 'filtered' : ''), check: '<input type="checkbox" class="toc-chk" data-gislay="' + L.id + '"' + (L.on ? ' checked' : '') + ' aria-label="Show ' + esc(L.name) + '" title="Show on the map">', sw: one ? rows[0].sym : null,
         sw16: L.kind === 'image' ? '<rect x="2" y="3" width="12" height="10" fill="#cfd8dc" stroke="#546e7a"/><path d="M3 12l4-4 3 3 2-2 2 3" fill="none" stroke="#546e7a"/>' : '', kids: one ? '' : tocLegend(rows), props: gisPropsHTML(L), drag: L.id, cls: L.on ? '' : 'off' }); }).join('') + '</ul>' }));
   // shapes drawn or imported on the plan, one row per kind
   const sk = shapeLegendRows();
@@ -10014,7 +10022,7 @@ function mwsRender() {
   if (S.ui.mwsPane && !mwsTabs().includes(S.ui.mwsPane)) S.ui.mwsPane = mwsTabs().at(-1) || null;
   const G = (CTL.site() || []).filter(g => g.id !== 'map-contents'), gp = mwsGpOn(), id = gp ? 'gp' : S.ui.mwsPane, w = mwsPaneW();
   el.hidden = !w; el.classList.remove('min'); sh.style.setProperty('--ctl-w', w + 'px'); if (!w) { el.innerHTML = ''; delete el.dataset.gp; return; }
-  const name = k => ({ gp: 'Toolbox', edit: 'Edit', layer: 'Layer', info: 'Identify' })[k] || G.find(g => g.id === k)?.title || '';
+  const name = k => ({ gp: 'Toolbox', edit: 'Edit', layer: 'Layer', info: 'Identify', sym: 'Symbology', lab: 'Labels', flt: 'Filter' })[k] || G.find(g => g.id === k)?.title || '';
   const ids = [...mwsTabs().filter(name), ...(S.mwsGp && GP_TOOLS[S.mwsGp] ? ['gp'] : [])];
   const tabs = '<div class="mws-pt" role="tablist" aria-label="Open panes">' + ids.map(k => '<span class="' + (k === id ? 'on' : '') + '"><button type="button" role="tab" aria-selected="' + (k === id) + '" data-mwspane="' + k + '">' + esc(name(k)) + '</button><button type="button" class="x" data-mwsshut="' + k + '" title="Close" aria-label="Close ' + esc(name(k)) + '">×</button></span>').join('') + '</div>';
   const same = el.dataset.gp === (gp ? S.gpPanel : 'mws:' + id), top = same ? el.scrollTop : 0; el.dataset.gp = gp ? S.gpPanel : 'mws:' + id;
@@ -10022,6 +10030,7 @@ function mwsRender() {
   if (gp) el.innerHTML = tabs + gpPaneHTML(S.gpPanel);
   else if (id === 'edit') el.innerHTML = body('<div class="map-side">' + mapEdSideHTML() + '</div>');
   else if (id === 'info') el.innerHTML = body(mwsInfoHTML());
+  else if (['sym', 'lab', 'flt'].includes(id)) el.innerHTML = body(symPaneHTML(id));
   else if (id === 'layer') { const P = TOC_PROPS.get(S.tocSel); el.innerHTML = body(P?.props ? '<div class="mws-hit"><h5>' + esc(P.name) + '</h5></div>' + P.props : '<p class="note">Choose a layer in Contents.</p>'); }
   else el.innerHTML = body(G.find(g => g.id === id)?.html || '');
   el.scrollTop = top;
@@ -10119,7 +10128,7 @@ function mwsLayerMenu(id, x, y) {
   const P = TOC_PROPS.get(id); if (!P) return; const d = document.createElement('div'); d.innerHTML = P.props || '';
   const acts = [...d.querySelectorAll('.toc-acts button')].map(b => { const at = [...b.attributes].filter(a => a.name.startsWith('data-') || a.name === 'disabled').map(a => a.name + '="' + esc(a.value) + '"').join(' '); return [mwsMi(at, esc(b.textContent), b.classList.contains('danger-text') ? 'danger-text' : ''), b.classList.contains('danger-text')]; });
   const more = d.querySelector('input, select, details'), L = id.startsWith('g:') && GIS.layers.find(q => q.id === id.slice(2));
-  mwsMenu(x, y, '<p class="mh">' + esc(P.name) + '</p>' + (mwsSrcOf(id) ? mwsMi('data-mwstbl="' + esc(mwsSrcOf(id)) + '"', 'Attribute table') : '') + (P.check ? mwsMi('data-mwstick="' + esc(id) + '"', 'Show or hide') : '') + acts.filter(a => !a[1]).map(a => a[0]).join('') + (more ? '<hr>' + mwsMi('data-mwsprops="' + esc(id) + '"', 'Properties…') : '') + (L && L.kind !== 'image' && layerFeatures(L).length ? mwsMi('data-mwsexport="' + esc(L.id) + '"', 'Export shapes (GeoJSON)…') : '') + (acts.some(a => a[1]) ? '<hr>' + acts.filter(a => a[1]).map(a => a[0]).join('') : ''));
+  mwsMenu(x, y, '<p class="mh">' + esc(P.name) + '</p>' + (mwsSrcOf(id) ? mwsMi('data-mwstbl="' + esc(mwsSrcOf(id)) + '"', 'Attribute table') : '') + (P.check ? mwsMi('data-mwstick="' + esc(id) + '"', 'Show or hide') : '') + acts.filter(a => !a[1]).map(a => a[0]).join('') + (L?.kind === 'feats' ? '<hr>' + mwsMi('data-mwsgo="sym" data-id="' + esc(id) + '"', 'Symbology…') + mwsMi('data-mwsgo="lab" data-id="' + esc(id) + '"', 'Labels…') + mwsMi('data-mwsgo="flt" data-id="' + esc(id) + '"', 'Filter…') : '') + (more ? (L?.kind === 'feats' ? '' : '<hr>') + mwsMi('data-mwsprops="' + esc(id) + '"', 'Properties…') : '') + (L && L.kind !== 'image' && layerFeatures(L).length ? mwsMi('data-mwsexport="' + esc(L.id) + '"', 'Export shapes (GeoJSON)…') : '') + (acts.some(a => a[1]) ? '<hr>' + acts.filter(a => a[1]).map(a => a[0]).join('') : ''));
 }
 function mwsExport(id) {   // a vector layer (or a surface's contours) as GeoJSON in latitude and longitude
   const L = GIS.layers.find(x => x.id === id); if (!L) return; const z = crsZone(), ll = p => { const [la, lo] = utmToLL(p[0], p[1], z); return [+lo.toFixed(8), +la.toFixed(8)]; }, shut = r => r.length && (r[0][0] !== r.at(-1)[0] || r[0][1] !== r.at(-1)[1]) ? [...r, r[0]] : r;
@@ -10140,6 +10149,7 @@ document.addEventListener('click', e => {
   if ((t = q('[data-mwszoom]'))) { closeMenu(); const b = S.bh.get(t.dataset.mwszoom); if (b?.easting != null) { S.mv = { cx: b.easting, cy: b.northing, sc: Math.max(S._plan?.sc || 0, 8) }; S.mvProj = curProj(); drawPlan(); } else toast('No coordinates yet.'); return; }
   if ((t = q('[data-mwsfeat]'))) { const id = t.dataset.mwsfeat; if (!S.mapEdit) mapAct('map-edit'); S.mapSel = id; refreshMapEd(); return; }
   if ((t = q('[data-mwstick]'))) { closeMenu(); document.querySelector('#mws-contents [data-toc="' + CSS.escape(t.dataset.mwstick) + '"] > .toc-row .toc-chk')?.click(); return; }
+  if ((t = q('[data-mwsgo]'))) { closeMenu(); if (t.dataset.id) S.tocSel = t.dataset.id; mwsOpen(t.dataset.mwsgo); return; }
   if ((t = q('[data-mwsprops]'))) { closeMenu(); S.tocSel = t.dataset.mwsprops; mwsOpen('layer'); return; }
   if ((t = q('[data-mwsexport]'))) { closeMenu(); mwsExport(t.dataset.mwsexport); return; }
   if ((t = q('[data-mwsat]'))) { closeMenu(); const [x, y] = t.dataset.mwsat.split(',').map(Number), k = t.dataset.do;
@@ -10163,13 +10173,68 @@ document.addEventListener('pointerdown', e => {
   addEventListener('pointermove', mv); addEventListener('pointerup', up);
 });
 
+/* the Symbology, Labels and Filter panes: for the layer of shapes chosen in Contents */
+const symLayer = () => { const L = S.tocSel?.startsWith('g:') && GIS.layers.find(x => 'g:' + x.id === S.tocSel); return L?.kind === 'feats' ? L : null; };
+function symPaneHTML(id) {
+  const L = symLayer(); if (!L) return '<p class="note">Choose a layer of shapes in Contents.</p>' + GIS.layers.filter(x => x.kind === 'feats').map(x => '<button type="button" class="btn link" style="text-align:left" data-tocsel="g:' + x.id + '">' + esc(x.name) + '</button>').join('');
+  const F = featFields(L), head = '<div class="mws-hit"><h5>' + esc(L.name) + '</h5></div>', opt = (v, t, on) => '<option value="' + esc(v) + '"' + (on ? ' selected' : '') + '>' + esc(t) + '</option>', s = symOf(L), ty = featTypes(L), num = (k, v, a = '') => '<input type="number" data-sy="' + k + '" value="' + v + '" ' + a + '>';
+  if (id === 'flt') { const rs = L.flt?.rules || [], n = mwsShapesOf(L).length, N = L.features.length;
+    return head + '<p class="note">Only shapes that match are drawn, listed in the table, selected and used by the Toolbox. Nothing is deleted.</p>' + (rs.length > 1 ? crow('Match', '<select data-sy="any">' + opt('', 'Every rule', !L.flt.any) + opt('1', 'Any rule', L.flt.any) + '</select>') : '')
+      + rs.map((r, i) => '<div class="sy-f"><select data-sy="rf:' + i + '" aria-label="Field">' + F.map(f => opt(f[0], f[1], r.f === f[0])).join('') + '</select><select data-sy="ro:' + i + '" aria-label="Test">' + MWS_OPS.map(o => opt(o[0], o[1], r.o === o[0])).join('') + '</select><button type="button" class="x btn link" data-syx="' + i + '" aria-label="Remove this rule" title="Remove">×</button>' + (r.o === 'no' || r.o === 'yes' ? '' : '<input data-sy="rv:' + i + '" value="' + esc(r.v ?? '') + '" placeholder="Value" aria-label="Value" list="sy-l' + i + '"><datalist id="sy-l' + i + '">' + [...new Set(L.features.slice(0, 5000).map(f => featVal(f, r.f)).filter(v => v != null && v !== '' && (typeof v !== 'number' || r.f.startsWith('a:'))).map(String))].slice(0, 40).map(v => '<option value="' + esc(v) + '">').join('') + '</datalist>') + '</div>').join('')
+      + '<div class="actions"><button type="button" class="btn" data-sydo="rule"' + (F.length ? '' : ' disabled') + '>Add a rule</button>' + (rs.length ? '<button type="button" class="btn link" data-sydo="fclr">Remove the filter</button>' : '') + '</div><p class="note"><b>' + n.toLocaleString('en-CA') + '</b> of ' + N.toLocaleString('en-CA') + ' shapes shown.</p>'; }
+  if (id === 'lab') { const lb = gisLab(L);
+    return head + '<label class="check"><input type="checkbox" data-gisl="' + L.id + '.show"' + (lb.show ? ' checked' : '') + '> Show labels</label>' + '<label class="cr-l" for="sy-expr">Label text</label><input type="text" id="sy-expr" data-sy="expr" value="' + esc(labExpr(L)) + '" spellcheck="false" autocomplete="off"><div class="sy-ins">' + F.map(f => '<button type="button" data-syins="' + esc(f[1]) + '" title="Add this field">' + esc(f[1]) + '</button>').join('') + '</div><p class="note">Fields go in braces, with any text between: Lot {Name}, {OWNER}.</p>'
+      + crow('Size', '<input type="number" min="6" max="40" step="0.5" data-gisl="' + L.id + '.size" value="' + lb.size + '"><span class="note">px</span>') + crow('Colour', '<input type="color" data-sy="tcol" value="' + (lb.tcol || (symClasses(L) ? '#1f2937' : symCol(L))) + '">') + '<label class="check"><input type="checkbox" data-sy="thin"' + (lb.thin ?? L.features.length > 400 ? ' checked' : '') + '> Leave out labels that would overlap</label>'; }
+  const I = symIndex(L), look = '<h4>Look</h4>' + (ty.has('polygon') ? crow('Fill', '<input type="range" data-sy="op" min="0" max="1" step="0.05" value="' + (s.op ?? (I ? .55 : .12)) + '"><span class="note">' + Math.round((s.op ?? (I ? .55 : .12)) * 100) + ' %</span>') : '') + (ty.has('polygon') || ty.has('line') ? crow('Line', num('w', s.w ?? (ty.has('polygon') && !ty.has('line') ? I ? .8 : 1.4 : 1.8), 'min="0.2" max="12" step="0.2"') + '<select data-sy="dash" style="min-width:86px">' + opt('', 'Solid', !s.dash) + opt('1', 'Dashed', s.dash) + '</select>') : '') + (ty.has('point') ? crow('Point size', num('r', s.r ?? 4, 'min="1" max="20" step="0.5"')) : '') + '<button type="button" class="btn link" data-sydo="reset" style="align-self:flex-start">Back to the plain symbol</button>';
+  const nF = F.filter(f => f[2]); let h = head + crow('Draw', '<select data-sy="mode">' + opt('one', 'One symbol', s.mode === 'one') + opt('cat', 'A colour per value', s.mode === 'cat') + opt('num', 'Colours by value range', s.mode === 'num') + '</select>');
+  if (s.mode === 'one') return h + crow('Colour', '<input type="color" data-sy="color" value="' + symCol(L) + '">') + look;
+  const FL = s.mode === 'num' ? nF : F; if (!FL.length) return h + '<p class="note">This layer has no ' + (s.mode === 'num' ? 'number ' : '') + 'fields.</p>' + look;
+  h += crow('Field', '<select data-sy="field">' + (s.field ? '' : opt('', 'Choose…', true)) + FL.map(f => opt(f[0], f[1], s.field === f[0])).join('') + '</select>'); if (!s.field || !I) return h + look;
+  if (s.mode === 'num') h += crow('Classes', '<select data-sy="how">' + [['jenks', 'Natural breaks'], ['quant', 'Equal counts'], ['equal', 'Equal steps'], ['hand', 'By hand']].map(o => opt(o[0], o[1], (s.how || 'jenks') === o[0])).join('') + '</select>') + crow('How many', '<select data-sy="nc" aria-label="How many classes"' + (s.how === 'hand' ? ' disabled' : '') + '>' + [2, 3, 4, 5, 6, 7, 8, 9].map(n => opt(n, n, (s.nc || 5) === n)).join('') + '</select>') + crow('Colours', '<select data-sy="ramp">' + ['water', 'impact', 'uncert', 'viridis', 'depth', 'grey'].filter(r => GIS_RAMPS[r]).map(r => opt(r, RAMP_NAME[r] || r, (s.ramp || 'water') === r)).join('') + '</select><label class="check"><input type="checkbox" data-sy="rev"' + (s.rev ? ' checked' : '') + '> Reverse</label>');
+  h += '<div class="sy-rows">' + I.C.list.map((c, i) => c.other && !I.n[i] ? '' : '<div class="sy-row"><input type="checkbox" data-sy="con:' + i + '"' + (c.off ? '' : ' checked') + (s.mode === 'num' && !c.other ? ' style="visibility:hidden"' : '') + ' aria-label="Show ' + esc(c.t) + '"><input type="color" data-sy="cc:' + i + '" value="' + c.color + '" aria-label="Colour of ' + esc(c.t) + '">' + (c.other ? '<span>' + esc(c.t) + '</span>' : s.mode === 'num' ? (i < (s.breaks || []).length ? '<input type="number" step="any" data-sy="cb:' + i + '" value="' + +(+s.breaks[i]).toPrecision(6) + '" title="Upper limit of this class" aria-label="Upper limit">' : '<span>' + esc(c.t) + '</span>') : '<input type="text" data-sy="ct:' + i + '" value="' + esc(c.t) + '" aria-label="Legend text">') + '<span class="n">' + I.n[i].toLocaleString('en-CA') + '</span>' + (s.mode === 'cat' && !c.other ? '<button type="button" class="x" data-sycx="' + i + '" title="Put with all other values" aria-label="Remove ' + esc(c.t) + '">×</button>' : '<span></span>') + '</div>').join('') + '</div>';
+  if (s.mode === 'cat') { const left = symLeft(L); h += left.length ? crow('Add value', '<select data-sy="addv">' + opt('', left.length + ' more…', true) + left.slice(0, 200).map(([v, n]) => opt(v || '\u0000', (v || 'No value') + ' (' + n + ')')).join('') + '</select>') + '<p class="note">The eight most common values have their own colour; the rest share one. An added value starts grey: choose its colour.</p>' : ''; }
+  return h + look;
+}
+const symCount = (L, k) => { const m = new Map(); for (const f of L.features) { const v = featVal(f, k), t = v == null ? '' : String(v); m.set(t, (m.get(t) || 0) + 1); } return [...m].sort((a, b) => b[1] - a[1] || mwsColl.compare(a[0], b[0])); };
+const symLeft = L => { const on = new Set((L.sym.cats || []).map(c => c.v)); return symCount(L, L.sym.field).filter(([v]) => !on.has(v)); };
+function symAuto(L, s) {   // the classes of a field newly chosen
+  if (s.mode === 'cat') { const top = symCount(L, s.field).filter(([v]) => v !== '').slice(0, 8).map(([v]) => v).sort((a, b) => mwsColl.compare(a, b)); s.cats = top.map((v, i) => ({ v, color: SYM_CATS[i] })); delete s.breaks; }
+  else if (s.mode === 'num') { const v = L.features.map(f => featNum(featVal(f, s.field))).filter(isFinite); let lo = Infinity; for (const x of v) if (x < lo) lo = x; s.lo = v.length ? lo : null; if (s.how !== 'hand' || !s.breaks) s.breaks = symBreaks(v, s.how === 'hand' ? 'jenks' : s.how || 'jenks', s.nc || 5); s.cols = symRamp(s.ramp || 'water', s.breaks.length + 1); if (s.rev) s.cols.reverse(); delete s.cats; }
+  return s;
+}
+function symSet(k, t) {
+  const L = symLayer(); if (!L) return; const [a, i0] = k.split(':'), i = +i0, v = t.value, s = structuredClone(symOf(L)); let sym = true;
+  if (a === 'mode') { s.mode = v; if (v !== 'one') { const F = featFields(L).filter(f => v !== 'num' || f[2]); if (!F.some(f => f[0] === s.field)) s.field = (F.find(f => f[0].startsWith('a:')) || F[0])?.[0]; if (s.field) symAuto(L, s); } }
+  else if (a === 'field') { s.field = v; delete s.breaks; if (s.how === 'hand') delete s.how; symAuto(L, s); }
+  else if (a === 'how') { s.how = v; if (v !== 'hand') symAuto(L, s); } else if (a === 'nc') { s.nc = +v; symAuto(L, s); } else if (a === 'ramp') { s.ramp = v; symAuto(L, { ...s }); s.cols = symRamp(v, (s.breaks || []).length + 1); if (s.rev) s.cols.reverse(); } else if (a === 'rev') { s.rev = t.checked; s.cols = [...(s.cols || [])].reverse(); }
+  else if (a === 'op') s.op = +v; else if (a === 'w') { if (!(+v > 0)) return; s.w = +v; } else if (a === 'r') { if (!(+v > 0)) return; s.r = +v; } else if (a === 'dash') s.dash = !!v;
+  else if (a === 'con' || a === 'cc') { const n = s.mode === 'cat' ? (s.cats || []).length : (s.breaks || []).length + 1; if (i >= n) { if (a === 'cc') s.other = v; else s.otherOff = !t.checked; } else if (s.mode === 'cat') { if (a === 'cc') s.cats[i].color = v; else s.cats[i].off = !t.checked; } else if (a === 'cc') s.cols[i] = v; }
+  else if (a === 'ct') s.cats[i].t = v.trim() || undefined;
+  else if (a === 'cb') { const x = +v, b = s.breaks; if (v === '' || !isFinite(x) || i && x <= b[i - 1] || i < b.length - 1 && x >= b[i + 1]) { toast('Each limit must be between the ones beside it.'); ctlRender(); return; } b[i] = x; s.how = 'hand'; }
+  else if (a === 'addv') { if (!v) return; s.cats = [...(s.cats || []), { v: v === '\u0000' ? '' : v, color: '#b0b5bd' }]; }
+  else { sym = false;
+    if (a === 'color') { const lab = { ...(L.lab || {}) }; delete lab.color; L.lab = lab; L.color = v; }
+    else if (a === 'expr') L.lab = { ...(L.lab || {}), expr: v, show: true }; else if (a === 'tcol') L.lab = { ...(L.lab || {}), tcol: v }; else if (a === 'thin') L.lab = { ...(L.lab || {}), thin: t.checked };
+    else { const F = structuredClone(L.flt || { rules: [] }); if (a === 'any') F.any = !!v; else if (a === 'rf') { F.rules[i].f = v; F.rules[i].v = ''; } else if (a === 'ro') F.rules[i].o = v; else if (a === 'rv') F.rules[i].v = v; else return; L.flt = F; mwsFltSel(L); } }
+  if (sym) L.sym = s; gisHist(); renderView(true);
+}
+function mwsFltSel(L) { const src = 'g:' + L.id, sel = S.mwsSel.get(src); if (!sel) return; const ok = new Set(mwsShapesOf(L).map(f => f.id)), n = new Set([...sel].filter(i => ok.has(i))); if (n.size) S.mwsSel.set(src, n); else S.mwsSel.delete(src); }
+document.addEventListener('change', e => { const k = e.target.dataset?.sy; if (k) symSet(k, e.target); });
+document.addEventListener('click', e => {
+  const q = x => e.target.closest?.(x); let t; const L = symLayer(); if (!L) return;
+  if ((t = q('[data-syins]'))) { const i = $('#sy-expr'); if (!i) return; const a = i.selectionEnd || i.value.length, a0 = i.selectionEnd ? i.selectionStart : a; i.value = i.value.slice(0, a0) + '{' + t.dataset.syins + '}' + i.value.slice(a); symSet('expr', i); return; }
+  if ((t = q('[data-sycx]'))) { const s = structuredClone(symOf(L)); s.cats.splice(+t.dataset.sycx, 1); L.sym = s; gisHist(); renderView(true); return; }
+  if ((t = q('[data-syx]'))) { const F = structuredClone(L.flt); F.rules.splice(+t.dataset.syx, 1); L.flt = F.rules.length ? F : null; mwsFltSel(L); gisHist(); renderView(true); return; }
+  if ((t = q('[data-sydo]'))) { const k = t.dataset.sydo; if (k === 'rule') { const F = structuredClone(L.flt || { rules: [] }), f = featFields(L); F.rules.push({ f: (f.find(x => x[0].startsWith('a:')) || f[0])[0], o: 'eq', v: '' }); L.flt = F; } else if (k === 'fclr') L.flt = null; else if (k === 'reset') L.sym = null; mwsFltSel(L); gisHist(); renderView(true); }
+});
 /* ---------- attribute tables and selections. A source is 'bh' (boreholes), 'feat' (site shapes) or 'g:<id>' (a layer's shapes).
    One selection per source; the table, the map and the dialogs all read and write it. Only the rows in view are in the page. ---------- */
 S.mwsSel = new Map(); S.mwsT = { src: null, open: [], st: {} };
 /* a layer's shapes, kept until its data changes */
 const mwsShC = new WeakMap(), mwsKey = L => L.features || L.polys || L.path || L.arrows || L.contours || L.marks;
-function mwsShapesOf(L) { const key = mwsKey(L); if (!key || typeof key !== 'object') return []; const sg = L.kind + (L.kind === 'feats' ? '' : JSON.stringify([L.lab, L.note, L.name])), c = mwsShC.get(key); if (c?.sg === sg) return c.list; const list = layerFeatures(L).map((f, i) => ({ ...f, id: i })); mwsShC.set(key, { sg, list }); return list; }
-function mwsSrcOf(id) { if (id === 'bh' || id.startsWith('bh:')) return 'bh'; if (id === 'feat' || id.startsWith('fk:')) return 'feat'; if (id.startsWith('g:')) { const L = GIS.layers.find(x => x.id === id.slice(2)); if (L && L.kind !== 'image' && mwsShapesOf(L).length) return id; } return null; }
+function mwsShapesOf(L) { const key = mwsKey(L); if (!key || typeof key !== 'object') return []; const sg = L.kind + (L.kind === 'feats' ? JSON.stringify(L.flt?.rules?.length ? L.flt : 0) : JSON.stringify([L.lab, L.note, L.name])), c = mwsShC.get(key); if (c?.sg === sg) return c.list; let list;
+  if (L.kind === 'feats') { const ok = L.flt?.rules?.length ? fltOf(L) : null; list = []; L.features.forEach((f, i) => { if (!ok || ok(f)) list.push({ type: f.type, name: f.name || '', pts: f.pts, ...(f.attrs ? { attrs: f.attrs } : {}), id: i }); }); } else list = layerFeatures(L).map((f, i) => ({ ...f, id: i })); mwsShC.set(key, { sg, list }); return list; }
+function mwsSrcOf(id) { if (id === 'bh' || id.startsWith('bh:')) return 'bh'; if (id === 'feat' || id.startsWith('fk:')) return 'feat'; if (id.startsWith('g:')) { const L = GIS.layers.find(x => x.id === id.slice(2)); if (L && L.kind !== 'image' && (L.kind === 'feats' ? L.features.length : mwsShapesOf(L).length)) return id; } return null; }
 const mwsSrcName = src => src === 'bh' ? 'Boreholes' : src === 'feat' ? 'Site shapes' : GIS.layers.find(x => 'g:' + x.id === src)?.name || '';
 const mwsSources = () => [projList().length && 'bh', featsOf().length && 'feat', ...GIS.layers.map(L => 'g:' + L.id).filter(mwsSrcOf)].filter(Boolean);
 /* the shapes of a source: [{ id, type, pts, name, attrs }] */
@@ -10193,13 +10258,13 @@ function mwsTable(src) {
       for (const [p] of rp) { const r = resultAt(b, p); v['r:' + p] = r ? r.v : null; if (r?.lt) lt['r:' + p] = 1; } return { id: b.id, v, lt, ro: !editable(b) }; }) };
   }
   const L = src === 'feat' ? null : GIS.layers.find(x => 'g:' + x.id === src); if (src !== 'feat' && !L) return { F, rows: [] };
-  const key = L ? mwsKey(L) : siteOf()?.features, hit = key && mwsCache.get(key); if (hit && hit.src === src && hit.ro === S.readOnly) return hit;
+  const key = L ? mwsKey(L) : siteOf()?.features, fk = L ? JSON.stringify(L.flt || 0) : '', hit = key && mwsCache.get(key); if (hit && hit.src === src && hit.ro === S.readOnly && hit.fk === fk) return hit;
   const sh = mwsShapes(src), ed = !S.readOnly && (src === 'feat' || L.kind === 'feats') ? 1 : 0, ak = new Map(); for (const q of sh) for (const [k, v] of Object.entries(q.attrs || {})) { const o = ak.get(k) || { num: 1 }; if (v !== '' && v != null && typeof v !== 'number') o.num = 0; ak.set(k, o); }
   f('#', 'No.', { num: 1 }); f('name', 'Name', { edit: ed }); if (src === 'feat') f('kind', 'Type', { edit: ed, opts: Object.entries(FEAT_KINDS).map(([k, q]) => [k, q[0]]) }); f('geo', 'Geometry');
   if (sh.some(q => q.value != null)) f('value', 'Value', { num: 1 }); if (sh.some(q => q.type === 'polygon')) f('area', 'Area (m²)', { num: 1 }); if (sh.some(q => q.type !== 'point')) f('len', 'Length or perimeter (m)', { num: 1 });
   for (const [k, o] of ak) f('a:' + k, k, { num: o.num, edit: ed });
-  const rows = sh.map((q, i) => { const v = { '#': i + 1, name: q.name || '', kind: FEAT_KINDS[q.kind] ? q.kind : 'other', geo: q.type === 'polygon' ? 'Area' : q.type === 'line' ? 'Line' : 'Point', value: q.value ?? null, area: q.type === 'polygon' ? r2(mwsArea(q), 1) : null, len: q.type === 'point' ? null : r2(mwsLen(q) + (q.type === 'polygon' ? mwsRings(q).reduce((a, r) => a + (r.length ? Math.hypot(r[0][0] - r.at(-1)[0], r[0][1] - r.at(-1)[1]) : 0), 0) : 0), 1) }; for (const [k, x] of Object.entries(q.attrs || {})) v['a:' + k] = x; return { id: q.id, v }; });
-  const T = { src, ro: S.readOnly, F, rows }; if (key) mwsCache.set(key, T); return T;
+  const rows = sh.map((q, i) => { const v = { '#': src === 'feat' ? i + 1 : q.id + 1, name: q.name || '', kind: FEAT_KINDS[q.kind] ? q.kind : 'other', geo: q.type === 'polygon' ? 'Area' : q.type === 'line' ? 'Line' : 'Point', value: q.value ?? null, area: q.type === 'polygon' ? r2(mwsArea(q), 1) : null, len: q.type === 'point' ? null : r2(mwsLen(q) + (q.type === 'polygon' ? mwsRings(q).reduce((a, r) => a + (r.length ? Math.hypot(r[0][0] - r.at(-1)[0], r[0][1] - r.at(-1)[1]) : 0), 0) : 0), 1) }; for (const [k, x] of Object.entries(q.attrs || {})) v['a:' + k] = x; return { id: q.id, v }; });
+  const T = { src, ro: S.readOnly, fk, F, rows }; if (key) mwsCache.set(key, T); return T;
 }
 const mwsShow = (c, r) => { const x = r.v[c.k]; if (x == null || x === '') return ''; if (c.opts) return c.opts.find(o => o[0] === x)?.[1] ?? x; return (r.lt?.[c.k] ? '<' : '') + (c.lt ? (+x).toLocaleString('en-CA') : String(x)); };
 /* selections */
@@ -10216,7 +10281,7 @@ function mwsSelClear() { S.mwsSel.clear(); mwsSelDone(); }
 function mwsSelCount() { const el = $('#mws-seln'), n = mwsSelN(); if (el) { el.hidden = !n; el.textContent = n.toLocaleString('en-CA') + ' selected'; } }
 function mwsSelDraw() {
   const svg = $('#plan svg'), t = S._drawn; if (!svg || !t || !mwsOn()) return; svg.querySelector('#mws-sel')?.remove(); if (!mwsSelN()) return;
-  for (const [src, ids] of [...S.mwsSel]) { const L = src.startsWith('g:') && GIS.layers.find(x => 'g:' + x.id === src), ok = src === 'bh' ? new Set(projList().map(b => b.id)) : src === 'feat' ? new Set(featsOf().map(f => f.id)) : null, n = ok ? 0 : L ? mwsShapesOf(L).length : 0, keep = new Set([...ids].filter(i => ok ? ok.has(i) : i < n)); if (keep.size !== ids.size) { if (keep.size) S.mwsSel.set(src, keep); else S.mwsSel.delete(src); } }
+  for (const [src, ids] of [...S.mwsSel]) { const L = src.startsWith('g:') && GIS.layers.find(x => 'g:' + x.id === src), ok = src === 'bh' ? new Set(projList().map(b => b.id)) : src === 'feat' ? new Set(featsOf().map(f => f.id)) : null, n = ok ? 0 : L ? L.features?.length ?? mwsShapesOf(L).length : 0, keep = new Set([...ids].filter(i => ok ? ok.has(i) : i < n)); if (keep.size !== ids.size) { if (keep.size) S.mwsSel.set(src, keep); else S.mwsSel.delete(src); } }
   mwsSelCount();
   const X = e => (t.W / 2 + (e - t.cx) * t.sc).toFixed(1), Y = n => (t.H / 2 - (n - t.cy) * t.sc).toFixed(1); let d = '', a = '', c = '';
   for (const [src, ids] of S.mwsSel) for (const f of mwsShapes(src, true)) if (ids.has(f.id) && f.pts.length) { if (f.type === 'point') { const r = src === 'bh' ? 10 : 7; c += 'M' + X(f.pts[0][0]) + ' ' + Y(f.pts[0][1]) + 'm-' + r + ' 0a' + r + ' ' + r + ' 0 1 0 ' + 2 * r + ' 0a' + r + ' ' + r + ' 0 1 0 -' + 2 * r + ' 0'; } else { const p = mwsRings(f).map(r => 'M' + r.map(q => X(q[0]) + ' ' + Y(q[1])).join('L') + (f.type === 'polygon' ? 'Z' : '')).join(''); if (f.type === 'polygon') a += p; else d += p; } }
@@ -11086,7 +11151,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.i
 document.addEventListener('input', e => { if (e.target.id === 'xs-date') { const d = xsDates(sectionList())[+e.target.value]; if (d) xsSetDate(d); } });
 function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); const ms = $('#xs-model-sec'); if (ms) ms.outerHTML = xsModelHTML(); }   // the forecast panel reads the drawn section's geometry
 const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
-function drawPlan(el = $('#plan')) { if (!el) return; if (S.tab === 'soil') { drawSoil(); return; } const mws = mwsOn(); el.innerHTML = planSVG(Math.max(el.clientWidth, mws ? 200 : 420), mws ? Math.max(200, el.clientHeight) : S.mapEdit ? 620 : planH(el), true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); if (mws) { mwsMark(); mwsSelDraw(); mwsStatus(); } loadImagery(); }
+function drawPlan(el = $('#plan')) { if (!el) return; if (S.tab === 'soil') { drawSoil(); return; } const mws = mwsOn(); el.innerHTML = planSVG(Math.max(el.clientWidth, mws ? 200 : 420), mws ? Math.max(200, el.clientHeight) : S.mapEdit ? 620 : planH(el), { cv: true }) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); gisCanvasFill(el.querySelector('svg')); if (mws) { mwsMark(); mwsSelDraw(); mwsStatus(); } loadImagery(); }
 /* Delaunay triangulation (Bowyer–Watson) for contouring between boreholes */
 function delaunay(P) {
   const n = P.length; if (n < 3) return [];
@@ -11138,7 +11203,7 @@ function planSVG(W, H, interactive) {
   if (S.lyr.grid !== false) for (let e = Math.ceil((cx - W / 2 / sc) / gs) * gs; e < cx + W / 2 / sc; e += gs) o.push(`<line x1="${X(e)}" x2="${X(e)}" y1="0" y2="${H}" style="stroke:var(--grid)" opacity="${site?.img ? .5 : 1}"/>`);
   if (S.lyr.grid !== false) for (let n = Math.ceil((cy - H / 2 / sc) / gs) * gs; n < cy + H / 2 / sc; n += gs) o.push(`<line x1="0" x2="${W}" y1="${Y(n)}" y2="${Y(n)}" style="stroke:var(--grid)" opacity="${site?.img ? .5 : 1}"/>`);
   o.push(featuresSVG(X, Y, { edit: interactive && S.mapEdit, sel: S.mapSel }));
-  o.push(gisLayersSVG(X, Y));   // what the Toolbox made: water table, flow arrows and paths, depth to water, areas
+  o.push(gisLayersSVG(X, Y, interactive ? { W, H, cv: !!interactive.cv } : null));   // what the Toolbox made: water table, flow arrows and paths, depth to water, areas
   if (interactive && mapInk() && S.measure) o.push(measureSVG(X, Y));
   if (interactive && S.gpPanel === 'elev_fix' && (S.gp.keeps || []).length) { const kr = (S.gp.prm?.elev_fix?.keepr > 0 ? +S.gp.prm.elev_fix.keepr : 20) * sc; o.push(S.gp.keeps.map(([x, y], i) => `<g><circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="${Math.max(5, kr).toFixed(1)}" fill="rgba(22,140,80,.12)" stroke="#168c50" stroke-width="2" stroke-dasharray="6 3"/><text x="${X(x).toFixed(1)}" y="${(Y(y) + 4).toFixed(1)}" font-size="11" font-weight="700" text-anchor="middle" fill="#0f5f36">K${i + 1}</text></g>`).join('')); }
   if (interactive && S.gpPanel === 'elev_fix' && (S.gp.spots || []).length) { const rr = (S.gp.prm?.elev_fix?.spotr > 0 ? +S.gp.prm.elev_fix.spotr : 5) * sc; o.push(S.gp.spots.map(([x, y], i) => `<g><circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="${Math.max(4, rr).toFixed(1)}" fill="rgba(140,60,170,.18)" stroke="#8c3caa" stroke-width="2" stroke-dasharray="4 2"/><text x="${X(x).toFixed(1)}" y="${(Y(y) + 4).toFixed(1)}" font-size="11" font-weight="700" text-anchor="middle" fill="#6a1b9a">${i + 1}</text></g>`).join('')); }
@@ -12765,7 +12830,7 @@ function wbFeats(v, t) {
   if (v === 'B:bh') return projList().filter(b => b.easting != null && b.northing != null).map(b => ({ type: 'point', name: String(b.name || '').slice(0, 80), pts: [[b.easting, b.northing]], attrs: { ELEV: b.elevation ?? null, DEPTH: depthOf(b) ?? null } }));
   if (v.startsWith('T:')) { const L = GIS.layers.find(x => x.id === v.slice(2)); return (L?.trees || []).map((q, i) => ({ type: 'point', name: 'T' + (i + 1), pts: [[q[0], q[1]]], attrs: { HEIGHT: q[3], CROWN: +(2 * q[4]).toFixed(2), GROUND: q[2] } })); }
   const L = GIS.layers.find(x => x.id === v.slice(2)); if (!L) return null;
-  const F = layerFeatures(L).map((f, i) => ({ ...f, name: String(f.name || '').slice(0, 80), ...(L.features?.[i]?.attrs ? { attrs: Object.fromEntries(Object.entries(L.features[i].attrs).filter(([a, x]) => /^[A-Za-z_][A-Za-z0-9_]{0,9}$/.test(a) && (x == null || typeof x === 'number' || typeof x === 'string')).slice(0, 30).map(([a, x]) => [a, typeof x === 'string' ? x.slice(0, 80) : x])) } : {}) }));
+  const F = layerFeatures(L).map((f, i) => ({ ...f, name: String(f.name || '').slice(0, 80), ...(L.kind === 'feats' && f.attrs ? { attrs: Object.fromEntries(Object.entries(f.attrs).filter(([a, x]) => /^[A-Za-z_][A-Za-z0-9_]{0,9}$/.test(a) && (x == null || typeof x === 'number' || typeof x === 'string')).slice(0, 30).map(([a, x]) => [a, typeof x === 'string' ? x.slice(0, 80) : x])) } : {}) }));
   return F.filter(f => ok(f.type));
 }
 function wbSource(v, t) {
@@ -12873,7 +12938,7 @@ document.addEventListener('click', async e => {
 const gridOf = L => ({ b64: f32b64(L.values), nx: L.nx, ny: L.ny, box: L.box.map(v => +v) });
 /* a Toolbox layer's shapes as features (lines, areas, points) for export or buffers */
 function layerFeatures(L) {
-  if (L.kind === 'feats') return L.features.map(f => ({ type: f.type, name: f.name || '', pts: f.pts, ...(f.attrs ? { attrs: f.attrs } : {}) }));
+  if (L.kind === 'feats') return (L.flt?.rules?.length ? L.features.filter(fltOf(L)) : L.features).map(f => ({ type: f.type, name: f.name || '', pts: f.pts, ...(f.attrs ? { attrs: f.attrs } : {}) }));
   if (L.kind === 'path') return [{ type: 'line', name: L.lab?.text ?? L.note ?? L.name, pts: L.path }];
   if (L.kind === 'polys') return L.polys.map((rings, i) => ({ type: 'polygon', name: L.plabels?.[i]?.[2] ?? L.lab?.text ?? L.name, pts: rings }));
   if (L.kind === 'arrows') { const l = L.len || 5; return L.arrows.map(([x, y, az]) => { const a = az * Math.PI / 180; return { type: 'line', name: Math.round(az) + '°', pts: [[x - Math.sin(a) * l / 2, y - Math.cos(a) * l / 2], [x + Math.sin(a) * l / 2, y + Math.cos(a) * l / 2]] }; }); }
@@ -13508,7 +13573,95 @@ const gisLab = L => ({ show: true, size: 10, ...(L.kind === 'raster' && L.marks 
 const gisLabText = (x, y, t, sz, col, extra = '') => `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${sz}" fill="${col}" stroke="#fff" stroke-width="${Math.max(2.5, sz * .3).toFixed(1)}" paint-order="stroke" style="font-family:var(--f-label)" ${extra}>${esc(t)}</text>`;
 /* the centre of a polygon's outer ring (area-weighted), for its label */
 const ringCentre = r => { let a = 0, cx = 0, cy = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const f = r[j][0] * r[i][1] - r[i][0] * r[j][1]; a += f; cx += (r[j][0] + r[i][0]) * f; cy += (r[j][1] + r[i][1]) * f; } return Math.abs(a) > 1e-9 ? [cx / (3 * a), cy / (3 * a), Math.abs(a / 2)] : [r[0][0], r[0][1], 0]; };
-function gisLayersSVG(X, Y) {
+/* ---------- how a layer of shapes is drawn: one symbol, a colour per value of a field, or colours by value range. The style is
+   L.sym, the filter L.flt, the labels L.lab: all light, so changing them saves no shapes. Many shapes on the screen are drawn on a
+   canvas, only those in view; report pages are always drawn as vectors. ---------- */
+const SYM_CATS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'], SYM_OTHER = '#8a8f98';
+const symCol = L => gisLab(L).color || L.color || '#5b2c83';
+const symOf = L => ({ mode: 'one', ...(L.sym || {}) });
+/* a field of a shape: name, or a:<attribute>, or a measure */
+const featVal = (f, k) => k === 'name' ? f.name || '' : k === 'value' ? f.value ?? null : k === 'area' ? (f.type === 'polygon' ? mwsArea(f) : null) : k === 'len' ? (f.type === 'point' ? null : mwsLen(f)) : f.attrs?.[k.slice(2)] ?? null;
+const featNum = v => v == null || v === '' ? NaN : typeof v === 'number' ? v : +String(v).replace(/[\s,]/g, '');
+const featFC = new WeakMap();
+function featFields(L) {   // [key, label, every value a number]
+  const c = featFC.get(L.features); if (c) return c; const m = new Map(); let pl = 0, ln = 0, nm = 0;
+  for (const f of L.features) { if (f.name) nm = 1; if (f.type === 'polygon') pl = 1; if (f.type !== 'point') ln = 1; for (const k in f.attrs || {}) { const v = f.attrs[k]; if (v == null || v === '') continue; const n = !isNaN(featNum(v)); m.set(k, m.has(k) ? m.get(k) && n : n); } }
+  const o = [...(nm ? [['name', 'Name', false]] : []), ...[...m].map(([k, n]) => ['a:' + k, k, n]), ...(pl ? [['area', 'Area (m²)', true]] : []), ...(ln ? [['len', 'Length (m)', true]] : [])]; featFC.set(L.features, o); return o;
+}
+/* a rule's test, the same for filters and Select by values */
+function fltTest(x, o, raw) {
+  const t = x == null ? '' : String(x), e = t === '', r = String(raw ?? '').trim(); if (o === 'no') return e; if (o === 'yes') return !e; if (r === '') return true;
+  const a = featNum(x), b = featNum(r), num = !isNaN(a) && !isNaN(b), same = num ? a === b : t.toLowerCase() === r.toLowerCase();
+  if (o === 'ne') return !same; if (e) return false; if (o === 'has') return t.toLowerCase().includes(r.toLowerCase()); if (o === 'eq') return same; if (!num) return false; return o === 'gt' ? a > b : o === 'ge' ? a >= b : o === 'lt' ? a < b : a <= b;
+}
+const fltOf = L => { const F = L.flt, rs = F.rules.filter(r => r.f); return f => F.any ? rs.some(r => fltTest(featVal(f, r.f), r.o, r.v)) : rs.every(r => fltTest(featVal(f, r.f), r.o, r.v)); };
+/* class breaks: the upper limit of each class but the last */
+function symBreaks(vals, how, n) {
+  const v = vals.filter(isFinite).sort((a, b) => a - b); if (!v.length) return []; const lo = v[0], hi = v.at(-1), u = [...new Set(v)]; n = Math.max(2, Math.min(n, u.length)); if (u.length < 2) return [];
+  if (how === 'equal') return Array.from({ length: n - 1 }, (_, i) => lo + (hi - lo) * (i + 1) / n);
+  if (how === 'quant') return [...new Set(Array.from({ length: n - 1 }, (_, i) => v[Math.min(v.length - 1, Math.ceil(v.length * (i + 1) / n) - 1)]))].filter(x => x < hi);
+  // natural breaks (Fisher–Jenks): the least spread inside the classes; a long list is thinned to 600 values in order first
+  const q = v.length > 600 ? Array.from({ length: 600 }, (_, i) => v[Math.round(i * (v.length - 1) / 599)]) : v, N = q.length, p1 = [0], p2 = [0]; for (const x of q) { p1.push(p1.at(-1) + x - lo); p2.push(p2.at(-1) + (x - lo) ** 2); }
+  const sse = (i, j) => { const m = j - i, a = p1[j] - p1[i]; return p2[j] - p2[i] - a * a / m; }; let D = Array.from({ length: N + 1 }, (_, j) => j ? sse(0, j) : 0); const B = [];
+  for (let k = 2; k <= n; k++) { const E = new Array(N + 1).fill(Infinity), C = new Array(N + 1).fill(0); for (let j = k; j <= N; j++) for (let i = k - 1; i < j; i++) { const c = D[i] + sse(i, j); if (c < E[j] - 1e-12) { E[j] = c; C[j] = i; } } D = E; B[k] = C; }
+  const out = []; let j = N; for (let k = n; k >= 2; k--) { j = B[k][j]; out.unshift(q[j - 1]); } return [...new Set(out)].filter(x => x < hi);
+}
+const symRamp = (ramp, n) => { const R = GIS_RAMPS[ramp] || GIS_RAMPS.water; return Array.from({ length: n }, (_, i) => { const t = (n < 2 ? 1 : .12 + .88 * i / (n - 1)) * (R.length - 1), k = Math.min(R.length - 2, Math.floor(t)), u = t - k; return '#' + [0, 1, 2].map(q => Math.round(R[k][q] + (R[k + 1][q] - R[k][q]) * u).toString(16).padStart(2, '0')).join(''); }); };
+/* the classes as drawn: [{ t, color, off }], and which one a shape is in */
+function symClasses(L) {
+  const s = symOf(L);
+  if (s.mode === 'cat' && s.field) { const m = new Map((s.cats || []).map((c, i) => [c.v, i])), k = s.cats?.length || 0; return { list: [...(s.cats || []).map(c => ({ t: c.t ?? (c.v === '' ? 'No value' : c.v), color: c.color, off: c.off })), { t: 'All other values', color: s.other || SYM_OTHER, off: s.otherOff, other: true }], of: f => { const v = featVal(f, s.field); return m.get(v == null ? '' : String(v)) ?? k; } }; }
+  if (s.mode === 'num' && s.field) { const b = s.breaks || [], cols = s.cols || [], f0 = v => Math.abs(v) >= 1000 ? Math.round(v).toLocaleString('en-CA') : String(+v.toPrecision(4)), lo = s.lo; return { list: [...Array.from({ length: b.length + 1 }, (_, i) => ({ t: s.names?.[i] || (b.length ? i === 0 ? (lo != null && lo < b[0] ? f0(lo) + ' to ' : 'Up to ') + f0(b[0]) : i === b.length ? 'Over ' + f0(b[i - 1]) : 'Over ' + f0(b[i - 1]) + ' to ' + f0(b[i]) : 'All values'), color: cols[i] || '#888888' })), { t: 'No value', color: s.other || SYM_OTHER, off: s.otherOff, other: true }], of: f => { const v = featNum(featVal(f, s.field)); if (isNaN(v)) return b.length + 1; let i = 0; while (i < b.length && v > b[i]) i++; return i; } }; }
+  return null;
+}
+const symC = new WeakMap();
+function symIndex(L) {   // the class of every shape, kept until the shapes or the style change
+  const C = symClasses(L); if (!C) return null; const k = JSON.stringify([L.sym.mode, L.sym.field, L.sym.breaks, (L.sym.cats || []).map(c => c.v)]), h = symC.get(L.features); if (h?.k === k) return { C, ix: h.ix, n: h.n };
+  const ix = L.features.map(C.of), n = new Array(C.list.length).fill(0); for (const i of ix) n[i]++; symC.set(L.features, { k, ix, n }); return { C, ix, n };
+}
+/* labels: the text of a shape, from {field} places in the layer's label text */
+const labExpr = L => L.lab?.expr ?? '{Name}';
+const labText = (L, f, F) => labExpr(L).replace(/\{([^{}]+)\}/g, (_, n) => { const q = F.find(x => x[1].toLowerCase() === n.trim().toLowerCase()), v = q ? featVal(f, q[0]) : ''; return v == null ? '' : typeof v === 'number' ? (q[0].startsWith('a:') ? String(v) : v.toLocaleString('en-CA', { maximumFractionDigits: 1 })) : String(v); }).replace(/\s+/g, ' ').trim();
+let GIS_CV = [];   // canvases waiting to be put in the map just drawn
+function featsDraw(L, X, Y, vw) {
+  const s = symOf(L), I = symIndex(L), base = symCol(L), list = mwsShapesOf(L), W = vw?.W, H = vw?.H, sc = Math.abs(X(1) - X(0)), x0 = X(0), y0 = Y(0), w = s.w ?? null, op = s.op ?? .12, r = s.r ?? 4, dash = s.dash ? '6 4' : '';
+  const pad = vw ? 30 / sc : 0, e0 = vw ? -x0 / sc - pad : 0, e1 = vw ? (W - x0) / sc + pad : 0, n1 = vw ? y0 / sc + pad : 0, n0 = vw ? (y0 - H) / sc - pad : 0;
+  const seen = []; for (const f of list) { if (!f.pts?.length) continue; const c = I ? I.C.list[I.ix[f.id]] : null; if (c?.off) continue; if (vw) { const b = f._bb ||= mwsBox(f); if (b[0] > e1 || b[2] < e0 || b[1] > n1 || b[3] < n0) continue; } seen.push([f, c ? c.color : base]); }
+  let out = '';
+  if (vw?.cv && seen.length > 300) { const i = GIS_CV.length; GIS_CV.push({ seen, sc, x0, y0, W, H, op, w, r, dash: s.dash, cat: !!I }); out = '<foreignObject x="0" y="0" width="' + W + '" height="' + H + '" data-gcv="' + i + '" pointer-events="none"></foreignObject>'; }
+  else { const o = [], P = q => q.map(p => X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join('L'), da = dash ? ' stroke-dasharray="' + dash + '"' : '';
+    for (const [f, col] of seen) {
+      if (f.type === 'point') o.push('<circle cx="' + X(f.pts[0][0]).toFixed(1) + '" cy="' + Y(f.pts[0][1]).toFixed(1) + '" r="' + r + '" fill="' + col + '" stroke="#fff" stroke-width="1.5"/>');
+      else if (f.type === 'line') o.push('<path d="M' + P(f.pts) + '" fill="none" stroke="' + col + '" stroke-width="' + (w ?? 1.8) + '" stroke-linejoin="round"' + da + '/>');
+      else o.push('<path d="' + mwsRings(f).map(q => 'M' + P(q) + 'Z').join('') + '" fill="' + col + '" fill-opacity="' + (I && s.op == null ? .55 : op) + '" fill-rule="evenodd" stroke="' + (I ? '#3d4654' : col) + '" stroke-width="' + (w ?? (I ? .8 : 1.4)) + '"' + da + '/>'); }
+    out = o.join(''); }
+  const lb = gisLab(L); if (!lb.show) return out;
+  const F = featFields(L), many = seen.length > 400, put = [], tcol = lb.tcol || (I ? '#1f2937' : base), thin = lb.thin ?? many, cell = new Map(), lbOut = []; if (many && !vw && !lb.thin && L.lab?.expr == null) return out;
+  for (const [f] of seen) {
+    const t = labText(L, f, F); if (!t) continue; let x, y, an = 'middle';
+    if (f.type === 'point') { x = X(f.pts[0][0]) + r + 2; y = Y(f.pts[0][1]) + 4; an = 'start'; } else if (f.type === 'line') { if (f.pts.length < 2) continue; const m = f.pts[Math.floor(f.pts.length / 2)]; x = X(m[0]); y = Y(m[1]) - 5; } else { const c = ringCentre(mwsRings(f)[0]); x = X(c[0]); y = Y(c[1]); }
+    if (vw && (x < -50 || y < -20 || x > W + 50 || y > H + 20)) continue;
+    if (thin) { const wd = t.length * lb.size * .56, a = an === 'start' ? x : x - wd / 2, b = [a - 2, y - lb.size, a + wd + 2, y + 3], ks = []; let hit = false; for (let i = Math.floor(b[0] / 60); i <= Math.floor(b[2] / 60) && !hit; i++) for (let j = Math.floor(b[1] / 24); j <= Math.floor(b[3] / 24); j++) { const k = i + ':' + j; ks.push(k); if ((cell.get(k) || []).some(q => q[0] < b[2] && q[2] > b[0] && q[1] < b[3] && q[3] > b[1])) { hit = true; break; } } if (hit) continue; for (const k of ks) (cell.get(k) || cell.set(k, []).get(k)).push(b); }
+    put.push(1); lbOut.push(gisLabText(x, y, t, lb.size, tcol, 'text-anchor="' + an + '"')); if (put.length >= 600) break;
+  }
+  return out + lbOut.join('');
+}
+function gisCanvasFill(svg) {
+  for (const fo of svg?.querySelectorAll('[data-gcv]') || []) { const j = GIS_CV[+fo.dataset.gcv]; if (!j) continue; const k = Math.min(2, window.devicePixelRatio || 1), c = document.createElement('canvas'); c.width = Math.round(j.W * k); c.height = Math.round(j.H * k); c.style.cssText = 'display:block;width:' + j.W + 'px;height:' + j.H + 'px'; fo.append(c);
+    const g = c.getContext('2d'); g.scale(k, k); g.lineJoin = 'round'; if (j.dash) g.setLineDash([6, 4]); const X = x => j.x0 + x * j.sc, Y = y => j.y0 - y * j.sc;
+    // a run of shapes of one kind and colour is one path; a colour change starts another, so the drawing order is kept
+    let kind = '', col = '', n = 0; const end = () => { if (!n) return; if (kind === 'polygon') { g.globalAlpha = j.cat && j.op === .12 ? .55 : j.op; g.fillStyle = col; g.fill('evenodd'); g.globalAlpha = 1; g.strokeStyle = j.cat ? '#3d4654' : col; g.lineWidth = j.w ?? (j.cat ? .8 : 1.4); g.stroke(); } else if (kind === 'line') { g.strokeStyle = col; g.lineWidth = j.w ?? 1.8; g.stroke(); } else { g.fillStyle = col; g.fill(); g.setLineDash([]); g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.stroke(); if (j.dash) g.setLineDash([6, 4]); } n = 0; };
+    const trace = r => { let px = 1e9, py = 1e9; for (let i = 0; i < r.length; i++) { const x = X(r[i][0]), y = Y(r[i][1]); if (!i) g.moveTo(x, y); else if (i === r.length - 1 || Math.abs(x - px) + Math.abs(y - py) > .8) g.lineTo(x, y); else continue; px = x; py = y; } };
+    for (const [f, q] of j.seen) {
+      if (f.type !== kind || q !== col || n >= 400) { end(); kind = f.type; col = q; g.beginPath(); }
+      if (f.type === 'point') { const x = X(f.pts[0][0]), y = Y(f.pts[0][1]); g.moveTo(x + j.r, y); g.arc(x, y, j.r, 0, 6.2832); }
+      else if (f.type === 'line') trace(f.pts);
+      else { const b = f._bb; if ((b[2] - b[0]) * j.sc < 1.2 && (b[3] - b[1]) * j.sc < 1.2) g.rect(X(b[0]), Y(b[3]), 1, 1); else for (const r of mwsRings(f)) { trace(r); g.closePath(); } }
+      n++; }
+    end(); }
+  GIS_CV = [];
+}
+function gisLayersSVG(X, Y, vw) {
   return (GIS.layers || []).filter(L => L.on).slice().reverse().sort((a, b) => (b.under ? 1 : 0) - (a.under ? 1 : 0)).map(L => {
     const o = [], P = q => q.map(p => X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join('L'), lb = gisLab(L);
     if (L.kind === 'image') { const [x0, y0, x1, y1] = L.box; o.push(`<image href="${L.url}" x="${X(x0).toFixed(1)}" y="${Y(y1).toFixed(1)}" width="${(X(x1) - X(x0)).toFixed(1)}" height="${(Y(y0) - Y(y1)).toFixed(1)}" preserveAspectRatio="none" opacity="${L.op ?? .85}"/>`); }
@@ -13535,15 +13688,8 @@ function gisLayersSVG(X, Y) {
       for (let i = 6; i < q.length - 1; i += 10) { const a = q[i], b = q[i + 1], ax = X(a[0]), ay = Y(a[1]), d = Math.hypot(X(b[0]) - ax, Y(b[1]) - ay) || 1, ux = (X(b[0]) - ax) / d, uy = (Y(b[1]) - ay) / d; o.push(`<path d="M${(ax - ux * 7 - uy * 4).toFixed(1)} ${(ay - uy * 7 + ux * 4).toFixed(1)}L${ax.toFixed(1)} ${ay.toFixed(1)}L${(ax - ux * 7 + uy * 4).toFixed(1)} ${(ay - uy * 7 - ux * 4).toFixed(1)}" fill="none" stroke="${col}" stroke-width="2"/>`); }
       o.push(`<circle cx="${X(q[0][0]).toFixed(1)}" cy="${Y(q[0][1]).toFixed(1)}" r="5" fill="${col}" stroke="#fff" stroke-width="1.5"/>`);
       if (lb.show) o.push(gisLabText(X(e[0]) + 6, Y(e[1]) - 6, lb.text ?? L.note ?? '', lb.size, lb.color || '#0b3d91'));
-    } else if (L.kind === 'feats') {
-      const col = lb.color || L.color || '#5b2c83', lab2 = [];
-      for (const f of L.features) {
-        if (f.type === 'point') { const x = X(f.pts[0][0]), y = Y(f.pts[0][1]); o.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${col}" stroke="#fff" stroke-width="1.5"/>`); if (f.name) lab2.push([x + 6, y + 4, f.name, 'start']); }
-        else if (f.type === 'line') { o.push(`<path d="M${P(f.pts)}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round"/>`); if (f.name && f.pts.length > 1) { const m = f.pts[Math.floor(f.pts.length / 2)]; lab2.push([X(m[0]), Y(m[1]) - 5, f.name, 'middle']); } }
-        else { o.push(`<path d="${f.pts.map(r => 'M' + P(r) + 'Z').join('')}" fill="${col}" fill-opacity=".12" fill-rule="evenodd" stroke="${col}" stroke-width="1.4"/>`); if (f.name) { const c = ringCentre(f.pts[0]); lab2.push([X(c[0]), Y(c[1]), f.name, 'middle']); } }
-      }
-      if (lb.show && lab2.length <= 400) for (const [x, y, t, a] of lab2) o.push(gisLabText(x, y, t, lb.size, col, `text-anchor="${a}"`));
-    } else if (L.kind === 'polys') {
+    } else if (L.kind === 'feats') o.push(featsDraw(L, X, Y, vw));
+    else if (L.kind === 'polys') {
       const ps = L.style === 'cells' ? ['rgba(90,110,140,.06)', '#4a5a78', '1.3', ''] : L.style === 'buffer' ? ['rgba(255,170,0,.12)', '#c77700', '1.6', '5 3'] : ['rgba(196,36,42,.16)', '#c4242a', '1.6', '6 3'];
       for (const rings of L.polys) o.push(`<path d="${rings.map(r => 'M' + P(r) + 'Z').join('')}" fill="${ps[0]}" fill-rule="evenodd" stroke="${ps[1]}" stroke-width="${ps[2]}" ${ps[3] ? `stroke-dasharray="${ps[3]}"` : ''}/>`);
       if (lb.show) (L.plabels || []).forEach(([x, y, t], i) => o.push(gisLabText(X(x), Y(y) + 16, lb.texts?.[i] ?? t, lb.size, lb.color || ps[1], 'text-anchor="middle"')));
