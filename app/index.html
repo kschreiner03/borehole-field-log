@@ -1561,6 +1561,46 @@ body.ctl-drag { user-select: none; cursor: col-resize; }
 @media (max-width: 1100px) { .gp { grid-template-columns: minmax(0, 1fr); } }
 /* the Map page: the map is the page */
 .ctl-gb #gwm-setup .fld { display: grid; grid-template-columns: minmax(0, 1fr) 128px; align-items: center; gap: 8px; } .ctl-gb #gwm-setup .fld label { font: 400 12.5px var(--f-body); color: var(--muted); } .ctl-gb #gwm-setup .fld select, .ctl-gb #gwm-setup .fld input { width: 100%; }
+/* the map workspace: tools across the top, Contents on the left, the map filling the middle, panes on the right when asked for */
+.mws-bar[hidden], .mws-tabs[hidden], .mws-contents[hidden] { display: none; }
+body.mws-map .shell { grid-template-rows: auto minmax(0, 1fr); --mws-h: 44px; min-height: 0; }
+body.mws-map:not(.side-min) .shell { --sidebar-width: var(--mws-w, 290px); }
+body.mws-map .mws-bar { grid-column: 2 / -1; grid-row: 1; display: flex; align-items: center; gap: 2px; height: 44px; padding: 0 8px; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.mws-t { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--r-sm); background: none; font: 13px var(--f-body); color: var(--ink); white-space: nowrap; cursor: pointer; flex: none; }
+.mws-t svg { width: 17px; height: 17px; flex: none; } .mws-t .chev { width: 13px; height: 13px; color: var(--muted); }
+.mws-t:hover:not(:disabled) { background: var(--hover); } .mws-t[aria-pressed="true"] { background: var(--active); border-color: var(--accent); color: var(--accent-2); font-weight: 600; } .mws-t:disabled { opacity: .45; cursor: default; }
+.mws-sep { width: 1px; height: 22px; margin: 0 6px; background: var(--rule); flex: none; } .mws-bar .sp { flex: 1 1 auto; }
+.mws-bar .map-go { flex: 0 1 250px; min-width: 130px; } .mws-bar .map-go input { min-height: 30px; font-size: 12.5px; } .mws-bar .map-go .btn { min-height: 30px; }
+body.mws-map .side { grid-row: 2; position: relative; top: 0; height: calc(100vh - var(--appbar-h, 68px) - var(--status-h) - 44px); overflow: hidden; }
+body.mws-map .side > .bl-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+body.mws-map .prail { grid-row: 1 / -1; }
+body.mws-map .ctl { grid-row: 2; position: relative; top: 0; height: calc(100vh - var(--appbar-h, 68px) - var(--status-h) - 44px); }
+body.mws-map .main { grid-row: 2; padding: 0; gap: 0; min-height: 0; height: calc(100vh - var(--appbar-h, 68px) - var(--status-h) - 44px); overflow: hidden; }
+body.mws-map .main > :not(#view) { display: none !important; }
+body.mws-map #view { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; } body.mws-map #view > .hid-note { margin: 0; }
+.mws { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.mws .map-canvas { flex: 1 1 auto; min-height: 0; border: 0; border-radius: 0; }
+.mws-ed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 10px; background: var(--active); border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.mws-ed .seg button { padding: 4px 10px; min-height: 28px; font-size: 12.5px; } .mws-ed .seg { flex-wrap: wrap; background: var(--surface); } .mws-ed .note { flex: 1 1 260px; margin: 0; font-size: 12px; }
+.mws .map-canvas > svg { cursor: grab; } .mws .map-canvas[data-mws="info"] > svg { cursor: help; } .mws .map-canvas[data-mws="measure"] > svg, .mws .map-canvas[data-tool="area"] > svg, .mws .map-canvas[data-tool="line"] > svg, .mws .map-canvas[data-tool="rect"] > svg, .mws .map-canvas[data-tool="circle"] > svg, .mws .map-canvas[data-tool="label"] > svg, .mws .map-canvas[data-tool="place"] > svg { cursor: crosshair; } .mws .map-canvas[data-mws="section"] > svg { cursor: default; } .mws .map-canvas > svg:active { cursor: grabbing; }
+.mws .map-canvas[data-mws="measure"] > svg:active { cursor: crosshair; }
+.mws-tabs { display: flex; align-items: center; gap: 2px; padding: 0 6px; border-bottom: 1px solid var(--rule); flex: none; min-height: 37px; }
+.mws-tabs button[role="tab"] { border: 0; border-bottom: 2px solid transparent; background: none; padding: 9px 8px 7px; font: 600 12.5px var(--f-body); color: var(--muted); cursor: pointer; } .mws-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); } .mws-tabs .sp { flex: 1; } .mws-tabs .tb { min-height: 26px; padding: 0 5px; } .mws-tabs .tb svg { width: 14px; height: 14px; }
+.mws-contents { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 6px 8px 12px; align-content: start; }
+body.mws-toc .side > #bl-head, body.mws-toc .side > #list, body.mws-toc .side > #side-foot { display: none; }
+body.mws-map:not(.mws-toc) .bl-title b, body.mws-map .bl-min { display: none; }
+.mws-rz { position: absolute; right: 0; top: 0; bottom: 0; width: 5px; cursor: col-resize; z-index: 3; } .mws-rz:hover { background: var(--accent); opacity: .35; }
+.mws-pt { position: sticky; top: 0; z-index: 3; display: flex; align-items: stretch; gap: 0; background: var(--panel-2, var(--ground)); border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; min-height: 37px; }
+.mws-pt > span { display: flex; align-items: center; border-right: 1px solid var(--rule); flex: none; } .mws-pt > span.on { background: var(--surface); box-shadow: inset 0 2px 0 var(--accent); }
+.mws-pt button { border: 0; background: none; font: 12.5px var(--f-body); color: var(--muted); padding: 8px 2px 8px 10px; cursor: pointer; white-space: nowrap; } .mws-pt .on button:first-child { color: var(--ink); font-weight: 600; }
+.mws-pt button.x { padding: 4px 8px 4px 4px; font-size: 14px; line-height: 1; } .mws-pt button.x:hover { color: var(--negative, #b42318); }
+body.mws-map .ctl-gb { padding-top: 10px; } body.mws-map .gp-head { position: static; } body.mws-map .ctl .map-side { gap: 8px; } body.mws-map .ctl .map-side .cmp-lbl { font-size: 12px; }
+body.mws-map #sb-proj, body.mws-map #sb-bh, body.mws-map #sb-iss, body.mws-map #sb-units { display: none !important; }
+.sb-map[hidden] { display: none !important; } #statusbar > .sb-map { padding: 0; gap: 0; } .sb-map > * { display: flex; align-items: center; gap: 5px; height: 100%; padding: 0 10px; border: 0; border-right: 1px solid var(--border); font: 12px var(--f-body); color: var(--ink); background: none; white-space: nowrap; } .sb-map button { cursor: pointer; } .sb-map button:hover { background: var(--hover); }
+.sb-map input { width: 78px; height: 18px; padding: 0 4px; border: 1px solid var(--control, var(--line)); border-radius: 2px; font: 12px var(--f-body); background: #fff; } .sb-map .xy { min-width: 190px; font-variant-numeric: tabular-nums; }
+.mws-hit { border-bottom: 1px solid var(--rule); padding: 2px 0 12px; display: flex; flex-direction: column; gap: 6px; } .mws-hit:last-child { border-bottom: 0; } .mws-hit h5 { margin: 4px 0 0; font: 600 14px var(--f-body); color: var(--ink); } .mws-hit h5 small { display: block; font: 12px var(--f-body); color: var(--muted); }
+.mws-hit table { width: 100%; border-collapse: collapse; font-size: 12.5px; } .mws-hit td { padding: 3px 4px 3px 0; border-bottom: 1px solid var(--rule); vertical-align: top; overflow-wrap: anywhere; } .mws-hit td:first-child { color: var(--muted); width: 42%; } .mws-hit td.over { color: var(--negative, #b42318); font-weight: 600; }
+.menu.mws-menu { width: auto; min-width: 210px; max-width: 340px; padding: 4px; right: auto; } .mws-menu .mi { padding: 6px 10px; align-items: center; } .mws-menu .mi b { font-weight: 500; font-size: 13px; } .mws-menu hr { border: 0; border-top: 1px solid var(--rule); margin: 4px 0; } .mws-menu .mi.danger-text b { color: var(--negative, #b42318); } .mws-menu .mh { margin: 2px 10px 4px; font: 600 11.5px var(--f-body); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .site-only { display: block; } .site-map > .body { padding: 8px; } .site-map .map-tip { margin: 6px 2px 0; font-size: 11.5px; }
 /* report editor: the page gets the room; item and page settings live in the panel */
 body.side-off .shell { --sidebar-width: 0px; } body.side-off .side { display: none; }
@@ -1647,10 +1687,13 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
 </div>
 
 <div class="shell">
+  <div class="mws-bar" id="mws-bar" role="toolbar" aria-label="Map tools" hidden></div>
   <nav class="rail" id="rail" aria-label="Views"></nav>
   <nav class="prail" id="prail" aria-label="Project pages"></nav>
   <aside class="side" aria-label="Boreholes">
     <div class="side-strip"><button type="button" class="tb" data-act="side-toggle" title="Show the borehole list" aria-label="Show the borehole list"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button><span class="ct" id="side-ct"></span></div>
+    <div class="mws-tabs" id="mws-tabs" role="tablist" aria-label="Contents or boreholes" hidden></div>
+    <div class="mws-contents map-layers toc" id="mws-contents" hidden></div>
     <div class="bl-head" id="bl-head"></div>
     <ul class="bl-rows" id="list"></ul>
     <div class="side-foot" id="side-foot" hidden></div>
@@ -1675,6 +1718,7 @@ body.field .bl-row { padding: 10px 12px; font-size: 15px; } body.field .prail bu
   <span id="sb-proj" class="sb-opt"></span>
   <span id="sb-bh"></span>
   <button type="button" id="sb-iss" class="sb-iss" data-act="show-issues" hidden></button>
+  <span id="sb-map" class="sb-map" hidden></span>
   <span class="sb-grow"></span>
   <button type="button" id="sb-gp" class="sb-gp" data-act="gp-chip" hidden title="GIS tools running"></button>
   <span id="sb-units" class="sb-opt"></span>
@@ -2420,10 +2464,11 @@ S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {}, ...jsonLS('bhlog.ui
 const uiSave = () => lsSet('bhlog.ui', JSON.stringify(S.ui));
 if (S.ui.openLast === false) S.tab = 'projects';
 const ctlClamp = w => Math.round(Math.min(480, Math.max(240, +w || 300)));
-function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); document.body.classList.toggle('side-off', S.tab === 'compose'); document.body.classList.toggle('proj-home', S.tab === 'projects'); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
+function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); document.body.classList.toggle('side-off', S.tab === 'compose'); document.body.classList.toggle('proj-home', S.tab === 'projects'); mwsApply(); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
 /* the panel's column is set before a page draws, so drawings measure the work area they will really have */
 function ctlLayout() {
   const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
+  if (mwsOn()) { const w = mwsPaneW(); el.hidden = !w; el.classList.remove('min'); el.dataset.tab = S.tab; sh.style.setProperty('--ctl-w', w + 'px'); return; }
   if (S.gpPanel && GP_TOOLS[S.gpPanel] && GP_TABS.includes(S.tab) && cur()) { el.hidden = false; el.classList.remove('min'); sh.style.setProperty('--ctl-w', Math.max(340, ctlClamp(S.ui.ctlW)) + 'px'); return; }
   const has = !!CTL[S.tab] && (!!cur() || S.tab === 'soil') && (S.tab !== 'gwm' || !gwModel().error), open = S.ui.ctlOpen !== false;
   if (el.dataset.tab !== S.tab) { el.scrollTop = 0; el.dataset.tab = S.tab; }
@@ -2445,6 +2490,7 @@ function gpPaneHTML(k) {
 }
 function ctlRender() {
   const el = $('#ctl'), sh = $('.shell'); if (!el || !sh) return; uiApply();
+  if (mwsOn()) { mwsRender(); return; }
   if (S.gpPanel && GP_TOOLS[S.gpPanel] && GP_TABS.includes(S.tab) && (cur() || S.tab === 'soil')) {   // a tool open from the Toolbox
     const top = el.dataset.gp === S.gpPanel ? el.scrollTop : 0; el.hidden = false; el.classList.remove('min'); el.dataset.gp = S.gpPanel;
     sh.style.setProperty('--ctl-w', Math.max(340, ctlClamp(S.ui.ctlW)) + 'px'); el.innerHTML = gpPaneHTML(S.gpPanel); el.scrollTop = top; return;
@@ -2462,7 +2508,7 @@ function ctlRender() {
 /* the work area changed width: redraw what was sized to it (not the borehole workspace, which keeps its inputs) */
 const workResized = () => { if (S.tab !== 'edit') renderView(true); else ctlRender(); };
 document.addEventListener('click', e => {
-  const go = e.target.closest?.('[data-ctlgo]'); if (go) { S.ui.ctlOpen = true; S.ui.fold = { ...S.ui.fold, [go.dataset.ctlgo]: false }; uiSave(); workResized(); $(`[data-ctlg="${go.dataset.ctlgo}"]`)?.scrollIntoView({ block: 'start' }); return; }
+  const go = e.target.closest?.('[data-ctlgo]'); if (go && mwsOn()) { closeMenu(); mwsOpen(go.dataset.ctlgo); return; } if (go) { S.ui.ctlOpen = true; S.ui.fold = { ...S.ui.fold, [go.dataset.ctlgo]: false }; uiSave(); workResized(); $(`[data-ctlg="${go.dataset.ctlgo}"]`)?.scrollIntoView({ block: 'start' }); return; }
   const fo = e.target.closest?.('[data-ctlfold]'); if (fo) { const k = fo.dataset.ctlfold, f = fo.getAttribute('aria-expanded') === 'true'; S.ui.fold = { ...S.ui.fold, [k]: f }; uiSave(); fo.setAttribute('aria-expanded', String(!f)); fo.nextElementSibling.hidden = f; }
 });
 document.addEventListener('pointerdown', e => {
@@ -2644,7 +2690,7 @@ document.addEventListener('submit', e => { const f = e.target.closest?.('[data-m
 const CTL_I = { base: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 15l5-5 4 4 3-3 6 6"/>', lbl: '<path d="M5 7V5h14v2M12 5v14M9 19h6"/>', furn: '<path d="M12 3l3.5 8h-7z"/><path d="M4 20h16M4 17v3M12 17v3M20 17v3"/>', style: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/>', draw: '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M8 5v14M16 5v14"/>' };
 /* the map's own settings beside it: what is drawn first, then the look, then the less used */
 CTL.site = () => {
-  if (S.mapEdit) return [{ id: 'map-sec', title: 'Section line', icon: NAV_ICON.xsec, html: secToolsHTML() }];
+  if (S.mapEdit && !mwsOn()) return [{ id: 'map-sec', title: 'Section line', icon: NAV_ICON.xsec, html: secToolsHTML() }];
   const ps = projList(), on = LAYER_DEFS.filter(([k]) => lyrOn(k)).length, rp = resultParams(), M = S.mres;
   return [
     { id: 'map-contents', title: 'Contents', icon: NAV_ICON.site, sum: `${on + GIS.layers.filter(L => L.on).length} on`, html: `<div class="map-layers toc">${contentsHTML()}</div>` },
@@ -2745,14 +2791,14 @@ const tocChk = (attr, on, name) => '<input type="checkbox" class="toc-chk" ' + a
 const MORE_I = '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>';
 /* one row: twisty (when it has symbols or layers under it), tick, symbol, name, options */
 function tocRow({ id, name, note = '', check = '', sw = null, sw16 = '', kids = '', props = '', cls = '', drag = '' }) {
-  const open = !S.tocFold.has(id), sel = S.tocSel === id && props;
+  const mws = mwsOn(), open = !S.tocFold.has(id), sel = S.tocSel === id && props; if (mws) TOC_PROPS.set(id, { name, props, check });
   return '<li class="toc-li' + (sel ? ' sel' : '') + (cls ? ' ' + cls : '') + '" data-toc="' + esc(id) + '">'
     + '<div class="toc-row"' + (drag ? ' draggable="true" data-tocdrag="' + esc(drag) + '" title="Drag to change the drawing order"' : '') + '>'
     + (kids ? '<button type="button" class="toc-tw" data-tocfold="' + esc(id) + '" aria-expanded="' + open + '" aria-label="' + (open ? 'Collapse ' : 'Expand ') + esc(name) + '">' + TW + '</button>' : '<span class="toc-tw"></span>')
     + (check || '<span class="toc-nochk"></span>') + (sw ? tocSwatch(sw) : sw16 ? '<svg class="toc-sw16" viewBox="0 0 16 16" aria-hidden="true">' + sw16 + '</svg>' : '')
     + '<button type="button" class="toc-nm" ' + (props ? 'data-tocsel="' + esc(id) + '"' : 'tabindex="-1"') + ' title="' + esc(name + (note ? ': ' + note : '')) + '">' + esc(name) + (note ? '<small>' + esc(note) + '</small>' : '') + '</button>'
-    + (props ? '<button type="button" class="tb toc-more" data-tocsel="' + esc(id) + '" aria-label="Options for ' + esc(name) + '" title="Layer options">' + svgI(MORE_I) + '</button>' : '')
-    + '</div>' + (kids && open ? kids : '') + (sel ? '<div class="toc-props">' + props + '</div>' : '') + '</li>';
+    + (props ? '<button type="button" class="tb toc-more" data-tocsel="' + esc(id) + '" aria-label="Options for ' + esc(name) + '" title="Layer options"' + (mws ? ' data-tocmenu="1"' : '') + '>' + svgI(MORE_I) + '</button>' : '')
+    + '</div>' + (kids && open ? kids : '') + (sel && !mws ? '<div class="toc-props">' + props + '</div>' : '') + '</li>';
 }
 const tocGo = (g, t) => '<button type="button" class="btn link" data-ctlgo="' + g + '">' + t + '</button>';
 const tocActs = (...b) => '<div class="toc-acts">' + b.filter(Boolean).join('') + '</div>';
@@ -2813,8 +2859,8 @@ function contentsHTML() {
   o.push(tocRow({ id: 'base', name: 'Basemap: ' + (BASEMAPS[basemapKey()]?.[0] || 'none').replace(/\s*\(.*\)\s*$/, ''), sw16: def('ortho').replace('#9cb08a', '#c9d6c0'), props: tocActs(tocGo('map-base', 'Change the basemap…')) }));
   return '<div class="toc-bar"><span>Drawing order</span><span class="sp"></span><button type="button" class="btn link" data-tocall="open">Expand all</button><button type="button" class="btn link" data-tocall="close">Collapse all</button></div>'
     + '<ul class="toc-tree">' + o.join('') + '</ul>'
-    + '<div class="toc-add"><button type="button" class="btn" data-act="imp-img">Add imagery…</button><button type="button" class="btn" data-act="imp-shp">Import shapes…</button><button type="button" class="btn" data-act="gp-menu">Toolbox…</button></div>'
-    + '<p class="note">Choose a layer, or right-click it, for its options. Drag Toolbox layers to change which draws on top.</p>';
+    + (mwsOn() ? '<p class="note">Right-click a layer for its options; double-click for its properties. Drag Toolbox layers to change which draws on top.</p>' : '<div class="toc-add"><button type="button" class="btn" data-act="imp-img">Add imagery…</button><button type="button" class="btn" data-act="imp-shp">Import shapes…</button><button type="button" class="btn" data-act="gp-menu">Toolbox…</button></div>'
+    + '<p class="note">Choose a layer, or right-click it, for its options. Drag Toolbox layers to change which draws on top.</p>');
 }
 /* the area a layer covers, to zoom to it */
 function tocExtent(id) {
@@ -2836,11 +2882,11 @@ function tocZoom(id) {
 document.addEventListener('click', e => {
   const f = e.target.closest?.('[data-tocfold]'); if (f) { const k = f.dataset.tocfold; S.tocFold.has(k) ? S.tocFold.delete(k) : S.tocFold.add(k); tocSave(); ctlRender(); return; }
   const a = e.target.closest?.('[data-tocall]'); if (a) { if (a.dataset.tocall === 'open') S.tocFold.clear(); else document.querySelectorAll('[data-tocfold]').forEach(x => S.tocFold.add(x.dataset.tocfold)); tocSave(); ctlRender(); return; }
-  const c = e.target.closest?.('[data-tocsel]'); if (c) { S.tocSel = S.tocSel === c.dataset.tocsel ? null : c.dataset.tocsel; ctlRender(); return; }
+  const c = e.target.closest?.('[data-tocsel]'); if (c && mwsOn()) { S.tocSel = c.dataset.tocsel; if (c.dataset.tocmenu) { const r = c.getBoundingClientRect(); mwsRender(); mwsLayerMenu(S.tocSel, r.left, r.bottom + 2); } else if (e.detail >= 2) mwsOpen('layer'); else mwsRender(); return; } if (c) { S.tocSel = S.tocSel === c.dataset.tocsel ? null : c.dataset.tocsel; ctlRender(); return; }
   const z = e.target.closest?.('[data-toczoom]'); if (z) { tocZoom(z.dataset.toczoom); return; }
   const m = e.target.closest?.('[data-gismove]'); if (m) { const i = GIS.layers.findIndex(L => L.id === m.dataset.gismove), j = i + +m.dataset.dir; if (i < 0 || j < 0 || j >= GIS.layers.length) return; const a2 = [...GIS.layers]; [a2[i], a2[j]] = [a2[j], a2[i]]; GIS.layers = a2; renderView(true); }
 });
-document.addEventListener('contextmenu', e => { const r = e.target.closest?.('.toc-row'); if (!r) return; const id = r.parentElement?.dataset.toc, b = r.querySelector('[data-tocsel]'); if (!id || !b) return; e.preventDefault(); S.tocSel = id; ctlRender(); });
+document.addEventListener('contextmenu', e => { const r = e.target.closest?.('.toc-row'); if (!r) return; const id = r.parentElement?.dataset.toc, b = r.querySelector('[data-tocsel]'); if (!id || !b && !mwsOn()) return; e.preventDefault(); S.tocSel = id; ctlRender(); if (mwsOn()) mwsLayerMenu(id, e.clientX, e.clientY); });
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset?.gistr) { const L = GIS.layers.find(x => x.id === t.dataset.gistr); if (L) { L.op = Math.max(.05, 1 - +t.value); renderView(true); } return; }
@@ -3673,7 +3719,7 @@ function renderView(full) {
     checkLayers(b); refreshCalc(b); wsLog();
   } else if (S.tab === 'gw') { v.innerHTML = gwHTML(v.clientWidth || 1000); if ($('#hydro')) drawHydro(undefined, undefined, { H: 420 }); }
   else if (S.tab === 'report') { v.innerHTML = reportHTML(b); }
-  else if (S.tab === 'site') { v.innerHTML = siteHTML(); drawSite(); }
+  else if (S.tab === 'site') { v.innerHTML = siteHTML(); if (!mwsOn()) drawSite(); }
   else if (S.tab === 'xsec') { v.innerHTML = xsecHTML(); drawXsec(); }
   else if (S.tab === 'gwm') { v.innerHTML = gwmHTML(); gwEnsure(); }
   else if (S.tab === 'v3d') { v.innerHTML = v3dHTML(); v3dBuild(); gwAutoEnsure(); }
@@ -3686,6 +3732,7 @@ function renderView(full) {
   else if (S.tab === 'compose') { v.innerHTML = composeHTML(); requestAnimationFrame(() => { if (S.cout) { fillOutputs(); return; } drawCompose(); fillThumbs(); gwComposeEnsure(); }); }
   else { v.innerHTML = nextSteps(b) + (editable(b) ? '<div class="lt-new"><label for="lt-new">Add a layer by typing</label><input id="lt-new" autocomplete="off" spellcheck="false" placeholder="e.g. 2.4-3.1 CL silty clay, stiff, moist, brown (depths optional: it starts at the bottom of the log)"><span class="note" id="lt-new-read"></span></div>' : '') + (editable(b) ? '<p class="log-hint">Click any layer, sample, water level or the standpipe on the log to edit it. Click empty space in a column to add one at that depth.</p>' : '') + sheetHTML(b) + logLegendHTML(b); const el = $('#log'); el.innerHTML = logSVG(b, Math.max(el.clientWidth, 900)); }
   if (MAP_TABS.includes(S.tab)) v.insertAdjacentHTML('afterbegin', hiddenNote());
+  if (mwsOn()) drawPlan();   // the map takes what is left of the window, so it is drawn last
   if (BH_TABS.includes(S.tab)) markIssues(b);
   ctlRender();
 }
@@ -9669,7 +9716,7 @@ const nextToPlace = () => projList().find(x => x.easting == null && editable(x))
 const MAP_TOOLS = { select: ['Select', 'Click a shape to rename it, change its type or delete it.'], area: ['Draw area', 'Click each corner; click the first corner, double-click or press Enter to finish. Snaps to boreholes and corners (Alt: no snapping); Shift keeps 15° steps; Backspace takes back a point; Esc cancels.'], line: ['Draw line', 'Click each point; double-click or press Enter to finish. Snaps to boreholes and corners (Alt: no snapping); Shift keeps 15° steps; Backspace takes back a point; Esc cancels.'],
   rect: ['Rectangle', 'Click two opposite corners.'], circle: ['Circle', 'Click the centre, then a point on the edge (or type the radius on the right).'], measure: ['Measure', 'Click points to measure distance, bearing and area; double-click or Enter to finish. Nothing is saved; Esc clears it.'],
   label: ['Add label', 'Click where the label goes, then type its text on the right.'], place: ['Place borehole', 'Click the plan to place the borehole chosen on the right. Once every borehole has a location, each click adds a new one.'], move: ['Move boreholes', 'Drag a borehole to its correct location. Issued logs cannot be moved.'] };
-function mapEditorHTML() {
+function mapEdSideHTML() {
   const fs = featsOf(), f = fs.find(x => x.id === S.mapSel), noLoc = projList().filter(b => b.easting == null);
   const side = f ? `<h4>${f.type === 'point' ? 'Label' : f.type === 'line' ? 'Line' : 'Area'}</h4>
       <label class="cmp-lbl" for="mf-name">Name ${f.type === 'point' ? '(label text)' : '(shown on the plan)'}</label><input id="mf-name" data-mfeat="name" value="${esc(f.name || '')}">
@@ -9686,6 +9733,10 @@ function mapEditorHTML() {
       <p class="note">${S.mapTool === 'circle' || S.mapTool === 'rect' ? 'Or click on the map.' : '25@45: 25 m at a bearing of 45° from the last point. +5 -10: 5 m east and 10 m south of it. Or an easting and northing. Enter adds it.'}</p>
       <p class="note">Snaps to boreholes, corners and imported shapes within a few pixels (hold Alt to place freely); Shift keeps bearings to 15° steps; Backspace takes back the last point.</p>${S.measure ? '<button class="btn" data-mfclear>Clear the measurement</button>' : ''}`
     : `${imageryOf().length ? `<h4>Imagery</h4><ul class="mf-list">${imageryOf().map(i => `<li class="im-row"><span>${esc(i.name)}${S.imgCache.has(i.id) ? '' : ' <span class="note">(not in this browser)</span>'}</span><label class="note">Opacity <input type="range" min="0.1" max="1" step="0.05" value="${i.op ?? 1}" data-imop="${i.id}"></label><span class="cmp-row"><button class="btn link" data-imzoom="${i.id}">Zoom to</button><button class="btn link" data-imclear="${i.id}" title="Make the white border around the picture see-through">Clear white edges</button><button class="btn link danger-text" data-imdel="${i.id}">Remove</button></span></li>`).join('')}</ul>` : ''}<h4>Shapes on this plan</h4>${fs.length ? `<ul class="mf-list">${fs.map(x => `<li><button class="tl-btn" data-mfsel="${x.id}">${esc(x.name || FEAT_KINDS[x.kind]?.[0] || 'Shape')}<span>${x.type === 'polygon' ? 'area' : x.type}</span></button></li>`).join('')}</ul><button class="btn link" data-act="mf-clear">Remove all shapes</button>` : '<p class="note">None yet. Draw areas and lines with the tools above, or import a GeoJSON, KML, DXF or CSV file.</p>'}`;
+  return side;
+}
+function mapEditorHTML() {
+  const side = mapEdSideHTML();
   return `<div class="map-ed">
     <div class="map-bar"><span class="seg" role="group" aria-label="Map tool">${Object.entries(MAP_TOOLS).map(([k, [t]]) => `<button data-mtool="${k}" aria-pressed="${S.mapTool === k}">${t}</button>`).join('')}</span>
       ${goToHTML()}<span class="cmp-row"><button class="btn" data-act="imp-loc" title="CSV or Excel with a name column and easting/northing or latitude/longitude">Import locations…</button><button class="btn" data-act="imp-shp" title="GeoJSON, KML, DXF, or a CSV of vertices">Import shapes…</button><button class="btn" data-act="imp-img" title="Orthomosaic or aerial photo: GeoTIFF, or JPG/PNG with its world file">Add imagery…</button><button class="btn primary" data-act="map-edit">Done editing</button></span></div>
@@ -9697,7 +9748,7 @@ function planWorld(e) {   // client point -> [easting, northing] on the drawn pl
   const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * t.W / r.width, py = (e.clientY - r.top) * t.H / r.height;
   return [t.cx + (px - t.W / 2) / t.sc, t.cy - (py - t.H / 2) / t.sc];
 }
-const refreshMapEd = () => { const box = $('#map-ed-wrap'); if (box) { box.innerHTML = mapEditorHTML(); drawPlan(); } };
+const refreshMapEd = () => { if (mwsOn()) { mwsEditBar(); ctlRender(); drawPlan(); return; } const box = $('#map-ed-wrap'); if (box) { box.innerHTML = mapEditorHTML(); drawPlan(); } };
 /* the nearest borehole, corner or imported shape point within 11 px (Alt: none); skip: the corner being dragged */
 function snapPt(w, e, skip) {
   const t = S._plan; if (!t || e?.altKey) return null; const tol = 11 / t.sc; let best = null;
@@ -9820,7 +9871,7 @@ function placeTyped() {
 }
 let mDrag = null;
 document.addEventListener('pointerdown', e => {
-  if (!S.mapEdit || !e.target.closest('#plan svg')) return;
+  if (!mapInk() || e.button !== 0 || !e.target.closest('#plan svg')) return;
   const w = planWorld(e); if (!w) return;
   const tool = S.mapTool;
   if (['area', 'line', 'rect', 'circle', 'measure'].includes(tool)) { draftClick(e, w, tool); return; }
@@ -9831,7 +9882,7 @@ document.addEventListener('pointerdown', e => {
   const fe = e.target.closest('[data-feat]'); S.mapSel = fe ? fe.dataset.feat : null; refreshMapEd();
 });
 document.addEventListener('pointermove', e => {
-  if (!S.mapEdit || !$('#plan svg')) return;
+  if (!mapInk() || !$('#plan svg')) return;
   const w = planWorld(e); if (!w) return;
   const xy = $('#map-xy'); if (xy && e.target.closest('#plan')) xy.textContent = `${w[0].toFixed(1)} E, ${w[1].toFixed(1)} N`;
   if (S.draft) { const q = draftPoint(e, w); drawDraft(q.pt, q.snap); draftReadout(q.pt); } else if (['area', 'line', 'rect', 'circle', 'measure'].includes(S.mapTool)) { const sn = snapPt(w, e); drawDraft(); if (sn) { const svg = $('#plan svg'), t = S._plan, g = svg?.querySelector('#map-draft-g'); if (g) g.innerHTML = `<circle cx="${(t.W / 2 + (sn.pt[0] - t.cx) * t.sc).toFixed(1)}" cy="${(t.H / 2 - (sn.pt[1] - t.cy) * t.sc).toFixed(1)}" r="8" fill="none" stroke="#e11d48" stroke-width="2"/>`; } }
@@ -9842,11 +9893,11 @@ document.addEventListener('pointerup', () => {
   d.b.easting = +(d.e0 + d.w[0] - d.w0[0]).toFixed(2); d.b.northing = +(d.n0 + d.w[1] - d.w0[1]).toFixed(2);
   logChange(d.b, 'Location moved on the site plan'); store.save(d.b); toast(`${d.b.name} moved to ${d.b.easting.toFixed(1)} E, ${d.b.northing.toFixed(1)} N.`); drawPlan();
 });
-document.addEventListener('dblclick', e => { if (S.mapEdit && S.draft && e.target.closest('#plan') && !['rect', 'circle'].includes(S.draft.type)) { S.draft.pts.pop(); finishDraft(); } });
+document.addEventListener('dblclick', e => { if (mapInk() && S.draft && e.target.closest('#plan') && !['rect', 'circle'].includes(S.draft.type)) { S.draft.pts.pop(); finishDraft(); } });
 document.addEventListener('keydown', e => { if (e.target.id === 'mf-next' && e.key === 'Enter') { e.preventDefault(); draftTyped(e.target.value); } else if (e.target.id === 'mf-next' && e.key === 'Escape') { S.draft = null; drawPlan(); } });
 document.addEventListener('click', e => { if (e.target.closest?.('[data-mfclear]')) { S.measure = null; refreshMapEd(); } });
 document.addEventListener('keydown', e => {
-  if (!S.mapEdit || e.target.closest?.('input, textarea, select')) return;
+  if (!mapInk() || e.target.closest?.('input, textarea, select')) return;
   if (S.draft && e.key === 'Enter') { e.preventDefault(); finishDraft(); }
   else if (S.draft && e.key === 'Escape') { e.stopPropagation(); S.draft = null; drawPlan(); }
   else if (S.draft && e.key === 'Backspace') { e.preventDefault(); S.draft.pts.pop(); if (!S.draft.pts.length) S.draft = null; drawDraft(); draftReadout(); }
@@ -9854,7 +9905,7 @@ document.addEventListener('keydown', e => {
   else if (S.mapSel && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); mapAct('mf-del'); }
 }, true);
 function mapAct(act) {
-  if (act === 'map-edit') { S.mapEdit = !S.mapEdit; S.draft = null; S.mapSel = null; renderView(true); return; }
+  if (act === 'map-edit') { S.mapEdit = !S.mapEdit; S.draft = null; S.mapSel = null; if (mwsOn()) { S.mwsTool = 'explore'; S.measure = null; S.secDraw = null; S.mapTool = 'select'; if (S.mapEdit) mwsOpen('edit', true); else mwsShut('edit', true); } renderView(true); return; }
   if (act === 'imp-img') { if (window.desktop?.gis && gisOn()) { addImageryGis(); return; } const f = $('#img-file'); f.click(); return; }
   if (act === 'img-add-go') { addImageryGo(); return; }
   if (act === 'imp-loc' || act === 'imp-shp') { const f = $('#map-file'); f.dataset.mode = act; f.accept = act === 'imp-loc' ? '.csv,.txt,.xlsx,.xls' : '.geojson,.json,.kml,.kmz,.dxf,.csv,.txt,.xlsx'; f.click(); return; }
@@ -9865,6 +9916,226 @@ function mapAct(act) {
   if (act === 'mf-clear') { if (!confirm('Remove every shape from this site plan?')) return; saveFeats([]); S.mapSel = null; }
   refreshMapEd();
 }
+
+/* ---------- the map workspace: the Map page laid out as GIS programs are. One tool at a time; Contents and the borehole list share
+   the left; panes open on the right when asked for, each a tab; the scale, the cursor's coordinates and the coordinate system are in
+   the status bar. On a narrow screen the page keeps its simple layout. ---------- */
+const TOC_PROPS = new Map();
+S.mwsTool = 'explore'; S.mwsInfo = null; S.mwsGp = null;
+const mwsOn = () => S.tab === 'site' && innerWidth > 860 && !!cur();
+const mapInk = () => S.mapEdit || (mwsOn() && S.mwsTool === 'measure');          // a drawing tool has the map
+const mwsClicks = () => mwsOn() && !S.mapEdit && !S.secDraw && !S.gpSpot && ['explore', 'info'].includes(S.mwsTool);   // a click asks what is there
+const MWS_I = { explore: '<path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>', info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.6"/>', measure: '<path d="M3 16L16 3l5 5L8 21z"/><path d="M7 12l2 2M10 9l2 2M13 6l2 2"/>', add: '<path d="M3 8l9-5 9 5-9 5z"/><path d="M3 13l5 2.8M21 13l-2 1.1"/><path d="M16 15v6M13 18h6"/>', edit: '<path d="M4 20l1-5L16 4l4 4L9 19z"/><path d="M14 6l4 4"/>', layout: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M7 7h10v7H7zM7 17h6"/>' };
+const MWS_TOOLS = [['explore', 'Explore', 'Drag to move, scroll to zoom, click a borehole or shape to see what it is (Esc comes back here)'], ['info', 'Identify', 'Click anywhere to list everything there, with the values of the layers that are on'], ['measure', 'Measure', 'Click points to measure distance, bearing and area'], ['section', 'Section line', 'Click boreholes in the order the section runs']];
+const MWS_CHEV = '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+function mwsApply() {
+  const on = mwsOn(), B = document.body.classList; B.toggle('mws-map', on); B.toggle('mws-toc', on && S.ui.mwsSide !== 'bhs');
+  for (const id of ['mws-bar', 'mws-tabs', 'sb-map']) { const el = document.getElementById(id); if (el) el.hidden = !on; }
+  const c = $('#mws-contents'); if (c) c.hidden = !on || S.ui.mwsSide === 'bhs';
+  if (on) $('.shell')?.style.setProperty('--mws-w', mwsSideW() + 'px');
+  if (!on && S.mapEdit && S.tab !== 'site' && innerWidth > 860) { S.mapEdit = false; S.draft = null; mwsShut('edit', true); }   // leaving the map ends editing
+}
+const mwsSideW = () => Math.round(Math.min(480, Math.max(220, +S.ui.mwsW || 290)));
+const mwsTabs = () => (S.ui.mwsTabs || []).filter(id => id === 'edit' ? S.mapEdit : true);
+const mwsGpOn = () => !!(S.gpPanel && GP_TOOLS[S.gpPanel]);
+const mwsPaneW = () => mwsGpOn() ? Math.max(340, ctlClamp(S.ui.ctlW)) : S.ui.mwsPane && mwsTabs().includes(S.ui.mwsPane) ? ctlClamp(S.ui.ctlW) : 0;
+/* open a pane (a tab on the right), or close one; quiet: the caller redraws */
+function mwsOpen(id, quiet) {
+  const was = mwsPaneW(); if (mwsGpOn()) S.mwsGp = S.gpPanel; S.gpPanel = null;
+  S.ui.mwsTabs = [...(S.ui.mwsTabs || []).filter(x => x !== id), id]; S.ui.mwsPane = id; uiSave(); if (quiet) return;
+  if (mwsPaneW() !== was) renderView(true); else ctlRender();
+}
+function mwsShut(id, quiet) {
+  const was = mwsPaneW();
+  if (id === 'gp') { S.gpPanel = null; S.mwsGp = null; S.gpSpot = null; }
+  else { S.ui.mwsTabs = (S.ui.mwsTabs || []).filter(x => x !== id); if (id === 'info') S.mwsInfo = null; }
+  if (id === 'gp' || S.ui.mwsPane === id) S.ui.mwsPane = mwsTabs().at(-1) || null;
+  uiSave(); if (quiet) return;
+  if (id === 'edit' && S.mapEdit) { mapAct('map-edit'); return; }
+  if (mwsPaneW() !== was || id === 'info' || id === 'gp') renderView(true); else ctlRender();
+}
+function mwsTool(k) {
+  if (S.mapEdit) { S.mapEdit = false; mwsShut('edit', true); }
+  S.mwsTool = k; S.draft = null; S.measure = null; S.mapSel = null; S.secDraw = null; S.gpSpot = null; S.mapTool = k === 'measure' ? 'measure' : 'select';
+  if (k === 'section') mwsOpen('map-sec', true);
+  renderView(true);
+}
+function mwsBarHTML() {
+  const ro = S.readOnly ? 'disabled' : '', tl = (k, t, h) => '<button type="button" class="mws-t" data-mwstool="' + k + '" aria-pressed="' + (!S.mapEdit && S.mwsTool === k) + '" title="' + esc(h) + '">' + svgI(k === 'section' ? NAV_ICON.xsec : MWS_I[k]) + '<span>' + t + '</span></button>';
+  return MWS_TOOLS.map(t => tl(...t)).join('') + '<span class="mws-sep"></span>'
+    + '<button type="button" class="mws-t" data-mwsmenu="add" aria-haspopup="menu" ' + ro + ' title="Borehole locations, shapes, GIS files, imagery or a site drawing">' + svgI(MWS_I.add) + '<span>Add data</span>' + MWS_CHEV + '</button>'
+    + '<button type="button" class="mws-t" data-act="map-edit" aria-pressed="' + S.mapEdit + '" ' + ro + ' title="Draw and edit shapes, place and move boreholes">' + svgI(MWS_I.edit) + '<span>' + (S.mapEdit ? 'Done editing' : 'Edit') + '</span></button>'
+    + '<button type="button" class="mws-t" data-act="gp-menu" aria-haspopup="menu" aria-pressed="' + mwsGpOn() + '" title="GIS tools: GRASS GIS, GDAL, PyKrige, WhiteboxTools">' + svgI(NAV_ICON.gp) + '<span>Toolbox</span>' + MWS_CHEV + '</button>'
+    + '<button type="button" class="mws-t" data-ctlgo="map-res" title="Lab results and vapour readings on the map">' + svgI(NAV_ICON.contam) + '<span>Results</span></button>'
+    + '<button type="button" class="mws-t" data-ctlgo="map-base" title="Basemap and coordinate system">' + svgI(CTL_I.base) + '<span>Basemap</span></button><span class="mws-sep"></span>'
+    + '<button type="button" class="mws-t" data-mwsmenu="layout" aria-haspopup="menu" title="Location plan, report pages, north arrow and scale bar">' + svgI(MWS_I.layout) + '<span>Layout</span>' + MWS_CHEV + '</button><span class="sp"></span>' + goToHTML();
+}
+function mwsHTML() {
+  const t = S.mapEdit ? S.mapTool : '', k = S.mapEdit ? 'edit' : S.mwsTool;
+  return '<div class="mws"><div id="mws-ed"' + (S.mapEdit ? '' : ' hidden') + '>' + mwsEdHTML() + '</div><div id="plan" class="map-canvas" data-mws="' + k + '" data-tool="' + t + '"></div></div>';
+}
+function mwsEdHTML() {
+  if (!S.mapEdit) return '';
+  return '<div class="mws-ed"><span class="seg" role="group" aria-label="Editing tool">' + Object.entries(MAP_TOOLS).filter(([k]) => k !== 'measure').map(([k, [t]]) => '<button type="button" data-mtool="' + k + '" aria-pressed="' + (S.mapTool === k) + '">' + t + '</button>').join('') + '</span><span class="note">' + esc(MAP_TOOLS[S.mapTool]?.[1] || '') + '</span><span id="map-xy" class="map-xy"></span></div>';
+}
+function mwsEditBar() { const el = $('#mws-ed'), p = $('#plan'); if (el) { el.hidden = !S.mapEdit; el.innerHTML = mwsEdHTML(); } if (p) { p.dataset.tool = S.mapEdit ? S.mapTool : ''; p.dataset.mws = S.mapEdit ? 'edit' : S.mwsTool; } }
+/* the tool strip, the Contents and the open pane */
+function mwsRender() {
+  const bar = $('#mws-bar'), el = $('#ctl'), sh = $('.shell'); if (!bar || !el) return; uiApply();
+  if (!bar.contains(document.activeElement) || !document.activeElement.matches('input')) bar.innerHTML = mwsBarHTML();
+  const sd = S.ui.mwsSide === 'bhs' ? 'bhs' : 'toc', n = projList().length, tab = (k, t) => '<button type="button" role="tab" data-mwsside="' + k + '" aria-selected="' + (sd === k) + '">' + t + '</button>';
+  $('#mws-tabs').innerHTML = tab('toc', 'Contents') + tab('bhs', 'Boreholes ' + n) + '<span class="sp"></span><button type="button" class="tb" data-act="side-toggle" title="Hide this panel" aria-label="Hide this panel">' + svgI('<path d="M15 6l-6 6 6 6"/>') + '</button>';
+  const side = $('.side'); if (side && !side.querySelector('.mws-rz')) side.insertAdjacentHTML('beforeend', '<div class="mws-rz" data-mwsrz title="Drag to resize"></div>');
+  TOC_PROPS.clear(); const C = $('#mws-contents'), html = contentsHTML(); if (C) { const top = C.scrollTop; C.innerHTML = html; C.scrollTop = top; }
+  if (mwsGpOn()) S.mwsGp = S.gpPanel;
+  if (S.ui.mwsPane && !mwsTabs().includes(S.ui.mwsPane)) S.ui.mwsPane = mwsTabs().at(-1) || null;
+  const G = (CTL.site() || []).filter(g => g.id !== 'map-contents'), gp = mwsGpOn(), id = gp ? 'gp' : S.ui.mwsPane, w = mwsPaneW();
+  el.hidden = !w; el.classList.remove('min'); sh.style.setProperty('--ctl-w', w + 'px'); if (!w) { el.innerHTML = ''; delete el.dataset.gp; return; }
+  const name = k => ({ gp: 'Toolbox', edit: 'Edit', layer: 'Layer', info: 'Identify' })[k] || G.find(g => g.id === k)?.title || '';
+  const ids = [...mwsTabs().filter(name), ...(S.mwsGp && GP_TOOLS[S.mwsGp] ? ['gp'] : [])];
+  const tabs = '<div class="mws-pt" role="tablist" aria-label="Open panes">' + ids.map(k => '<span class="' + (k === id ? 'on' : '') + '"><button type="button" role="tab" aria-selected="' + (k === id) + '" data-mwspane="' + k + '">' + esc(name(k)) + '</button><button type="button" class="x" data-mwsshut="' + k + '" title="Close" aria-label="Close ' + esc(name(k)) + '">×</button></span>').join('') + '</div>';
+  const same = el.dataset.gp === (gp ? S.gpPanel : 'mws:' + id), top = same ? el.scrollTop : 0; el.dataset.gp = gp ? S.gpPanel : 'mws:' + id;
+  const rz = '<div class="ctl-rz" data-ctlrz title="Drag to resize the pane"></div>', body = h => rz + tabs + '<section class="ctl-g"><div class="ctl-gb">' + h + '</div></section>';
+  if (gp) el.innerHTML = tabs + gpPaneHTML(S.gpPanel);
+  else if (id === 'edit') el.innerHTML = body('<div class="map-side">' + mapEdSideHTML() + '</div>');
+  else if (id === 'info') el.innerHTML = body(mwsInfoHTML());
+  else if (id === 'layer') { const P = TOC_PROPS.get(S.tocSel); el.innerHTML = body(P?.props ? '<div class="mws-hit"><h5>' + esc(P.name) + '</h5></div>' + P.props : '<p class="note">Choose a layer in Contents.</p>'); }
+  else el.innerHTML = body(G.find(g => g.id === id)?.html || '');
+  el.scrollTop = top;
+}
+/* status bar: scale, coordinates, coordinate system */
+let mwsXY = null;
+function mwsStatus() {
+  const el = $('#sb-map'), t = S._plan; if (!el || !t) return;
+  if (!$('#mws-scale')) el.innerHTML = '<label title="Map scale on a standard screen (96 dots per inch). Type one and press Enter.">1:<input id="mws-scale" inputmode="numeric" autocomplete="off" aria-label="Map scale"></label><span class="xy" id="mws-xy"></span><button type="button" data-ctlgo="map-base" id="mws-crs" title="Coordinate system and basemap"></button>';
+  const sc = $('#mws-scale'); if (document.activeElement !== sc) { const n = PX_PER_M / t.sc; sc.value = Math.round(n >= 10000 ? n / 100 : n / (n >= 1000 ? 10 : 1)) * (n >= 10000 ? 100 : n >= 1000 ? 10 : 1); }
+  $('#mws-crs').textContent = 'EPSG:' + projEpsg() + ' · UTM ' + crsZone();
+  const xy = $('#mws-xy'), g = v => v.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); if (mwsXY) xy.textContent = 'E ' + g(mwsXY[0]) + '  N ' + g(mwsXY[1]); else if (!xy.textContent) xy.textContent = 'E –  N –';
+}
+document.addEventListener('pointermove', e => { if (!mwsOn() || !e.target.closest?.('#plan')) return; const w = planWorld(e); if (w) { mwsXY = w; mwsStatus(); } });
+document.addEventListener('keydown', e => {
+  if (e.target.id === 'mws-scale' && e.key === 'Enter') { const n = +e.target.value.replace(/^1\s*:/, '').replace(/[\s,]/g, ''), t = S._plan; if (!(n >= 10) || !t) { toast('Type a scale of 10 or more, for example 500 for 1:500.'); return; } S.mv = { cx: t.cx, cy: t.cy, sc: Math.max(.003, Math.min(PX_PER_M / n, 300)) }; S.mvProj = curProj(); e.target.blur(); drawPlan(); return; }
+  if (e.key !== 'Escape' || e.defaultPrevented || !mwsOn() || e.target.closest?.('input, textarea, select') || $('#menu') || !$('#overlay').hidden || !$('#find').hidden || S.tut) return;
+  if (S.mapEdit) { if (S.mapTool !== 'select') { S.mapTool = 'select'; S.draft = null; refreshMapEd(); } }
+  else if (S.mwsTool !== 'explore') mwsTool('explore');
+});
+/* what is at a point: boreholes, shapes, the Toolbox layers' features and cell values, pictures */
+const mwsInRing = (p, r) => { let on = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) if ((r[i][1] > p[1]) !== (r[j][1] > p[1]) && p[0] < (r[j][0] - r[i][0]) * (p[1] - r[i][1]) / (r[j][1] - r[i][1]) + r[i][0]) on = !on; return on; };
+const mwsSegD = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy, t = l ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l)) : 0; return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); };
+function mwsHitShape(p, f, tol) {   // the rings of an area, or the points of a line or point
+  if (!f.pts?.length) return false; const rings = Array.isArray(f.pts[0]?.[0]) ? f.pts : [f.pts];
+  if (f.type === 'point') return Math.hypot(rings[0][0][0] - p[0], rings[0][0][1] - p[1]) < tol * 1.4;
+  if (f.type === 'polygon') { let n = false; for (const r of rings) if (mwsInRing(p, r)) n = !n; if (n) return true; }
+  return rings.some(r => r.some((q, i) => i && mwsSegD(p, r[i - 1], q) < tol));
+}
+function mwsCell(L, p) { const [x0, y0, x1, y1] = L.box || []; if (!L.values || !(p[0] >= x0 && p[0] < x1 && p[1] > y0 && p[1] <= y1)) return null; if (L.hull && !mwsInRing(p, L.hull)) return null; return Math.floor((y1 - p[1]) / (y1 - y0) * L.ny) * L.nx + Math.floor((p[0] - x0) / (x1 - x0) * L.nx); }
+function mwsHits(w, all) {
+  const t = S._plan, tol = 7 / t.sc, H = [], size = r => ringArea(r);
+  const bhs = mapList().filter(b => b.easting != null && b.northing != null).map(b => ({ b, d: Math.hypot(b.easting - w[0], b.northing - w[1]) })).filter(x => x.d < 12 / t.sc).sort((a, c) => a.d - c.d);
+  for (const { b } of all ? bhs : bhs.slice(0, 1)) H.push({ k: 'bh', id: b.id, at: [b.easting, b.northing] });
+  if (lyrOn('feat')) featsOf().filter(f => lyrOn('fk:' + (FEAT_KINDS[f.kind] ? f.kind : 'other')) && mwsHitShape(w, f, tol)).map(f => ({ f, a: f.type === 'polygon' ? size(f.pts) : 0 })).sort((a, c) => a.a - c.a).forEach(({ f }) => H.push({ k: 'feat', id: f.id }));
+  for (const L of (GIS.layers || []).filter(x => x.on)) {
+    if (L.kind === 'raster') { const i = mwsCell(L, w); if (i != null && all) H.push({ k: 'cell', lid: L.id, i }); if (all) layerFeatures(L).filter(f => mwsHitShape(w, f, tol)).slice(0, 3).forEach(f => H.push({ k: 'lf', lid: L.id, f })); }
+    else if (L.kind !== 'image') layerFeatures(L).filter(f => mwsHitShape(w, f, tol)).slice(0, 20).forEach(f => H.push({ k: 'lf', lid: L.id, f }));
+    else if (all && L.box && w[0] > L.box[0] && w[0] < L.box[2] && w[1] > L.box[1] && w[1] < L.box[3]) H.push({ k: 'pic', t: L.name });
+  }
+  if (all && lyrOn('ortho')) for (const i of imageryOf()) if (!i.off && w[0] > i.e0 && w[0] < i.e1 && w[1] > i.n0 && w[1] < i.n1) H.push({ k: 'pic', t: i.name });
+  return H;
+}
+function mwsClickAt(x, y) {
+  const w = planWorld({ clientX: x, clientY: y }); if (!w) return; const all = S.mwsTool === 'info'; let H = mwsHits(w, all);
+  if (!all) H = H.slice(0, 1);
+  if (!H.length && !all) { if (S.mwsInfo) mwsShut('info'); return; }
+  S.mwsInfo = { at: w, hits: H }; const b = H.find(h => h.k === 'bh'); if (b) { S.sel = b.id; S.layer = 0; S.formStale = true; $('#main').dataset.bh = b.id; renderList(sortedList()); renderStatus(); }
+  mwsOpen('info', true); renderView(true);
+}
+function mwsPickBh(id, open) {
+  const b = S.bh.get(id); if (!b) return; if (open) { S.sel = id; goTab('edit'); return; }
+  S.sel = id; S.layer = 0; S.formStale = true; $('#main').dataset.bh = id; renderList(sortedList()); renderStatus();
+  if (b.easting == null || b.northing == null) { S.mwsInfo = { at: null, hits: [{ k: 'bh', id }] }; toast((b.name || 'This borehole') + ' has no coordinates yet. Use Edit › Place borehole.'); }
+  else { const t = S._plan; S.mwsInfo = { at: [b.easting, b.northing], hits: [{ k: 'bh', id, at: [b.easting, b.northing] }] };
+    if (t) { const px = t.W / 2 + (b.easting - t.cx) * t.sc, py = t.H / 2 - (b.northing - t.cy) * t.sc; if (px < 40 || py < 40 || px > t.W - 40 || py > t.H - 40) { S.mv = { cx: b.easting, cy: b.northing, sc: t.sc }; S.mvProj = curProj(); } } }
+  mwsOpen('info', true); renderView(true);
+}
+function mwsMark() {   // a ring on what Identify shows
+  const svg = $('#plan svg'), t = S._plan, I = S.mwsInfo; if (!svg || !t || !I?.at) return; const p = I.hits.find(h => h.at)?.at || I.at, x = (t.W / 2 + (p[0] - t.cx) * t.sc).toFixed(1), y = (t.H / 2 - (p[1] - t.cy) * t.sc).toFixed(1), bh = I.hits.some(h => h.at);
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g.setAttribute('pointer-events', 'none'); g.id = 'mws-mark';
+  g.innerHTML = bh ? '<circle cx="' + x + '" cy="' + y + '" r="13" fill="none" stroke="#fff" stroke-width="5"/><circle cx="' + x + '" cy="' + y + '" r="13" fill="none" stroke="#00a3c7" stroke-width="2.5"/>' : '<path d="M' + x + ' ' + y + 'm-9 0h18m-9 -9v18" stroke="#fff" stroke-width="5"/><path d="M' + x + ' ' + y + 'm-9 0h18m-9 -9v18" stroke="#00a3c7" stroke-width="2"/>'; svg.append(g);
+}
+function mwsInfoHTML() {
+  const I = S.mwsInfo; if (!I) return '<p class="note">Click a borehole or shape on the map, or choose Identify and click anywhere.</p>';
+  const tb = rows => '<table><tbody>' + rows.filter(r => r && r[1] !== '' && r[1] != null).map(r => '<tr><td>' + esc(r[0]) + '</td><td class="' + (r[2] || '') + '">' + esc(r[1]) + '</td></tr>').join('') + '</tbody></table>';
+  const card = (t, sub, rows, acts = '') => '<div class="mws-hit"><h5>' + esc(t) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</h5>' + tb(rows) + (acts ? '<div class="toc-acts">' + acts + '</div>' : '') + '</div>';
+  const go = (a, t) => '<button type="button" class="btn link" ' + a + '>' + t + '</button>';
+  const html = I.hits.map(h => {
+    if (h.k === 'bh') { const b = S.bh.get(h.id); if (!b) return ''; const w = latestWater(b), G = projGuide(), ps = resultParams([b]).map(([p]) => [p, resultAt(b, p)]).filter(x => x[1]);
+      const lab = ps.map(([p, r]) => { const g = G[p], over = !r.lt && g != null && isFinite(+g) && r.v > +g; return [resLabel(p), (r.lt ? '<' : '') + (+r.v).toLocaleString('en-CA') + ' at ' + fu(r.sm.depth) + (over ? ' (guideline ' + (+g).toLocaleString('en-CA') + ')' : ''), over ? 'over' : '', over]; }).sort((a, c) => (c[3] ? 1 : 0) - (a[3] ? 1 : 0));
+      return card(b.name || 'Untitled', (b.well?.installed ? 'Monitoring well' : 'Borehole') + ' · ' + (STATUS_LABEL[b.status || 'draft'] || '') + (wellId(b) ? ' · ' + wellId(b) : ''), [['Easting', b.easting == null ? 'none yet' : b.easting.toFixed(2)], ['Northing', b.northing == null ? 'none yet' : b.northing.toFixed(2)], ['Ground elevation', b.elevation != null ? fu(b.elevation) : ''], ['Depth', fu(depthOf(b))], ['Drilled', b.date || ''], ['Water', w ? fu(w.depth) + ' deep' + (w.date ? ', ' + w.date : '') : ''], ['Samples', String((b.samples || []).length)], ...lab.slice(0, 8)],
+        go('data-mwsbh="' + esc(b.id) + '" data-go="log"', 'Open log') + go('data-mwsbh="' + esc(b.id) + '" data-go="edit"', 'Edit data') + (ps.length ? go('data-mwsbh="' + esc(b.id) + '" data-go="contam"', 'Lab results') : '') + (w ? go('data-mwsbh="' + esc(b.id) + '" data-go="gw"', 'Water') : '') + (b.easting != null ? go('data-mwszoom="' + esc(b.id) + '"', 'Zoom to') : '')); }
+    if (h.k === 'feat') { const f = featsOf().find(x => x.id === h.id); if (!f) return ''; const pl = f.type === 'polygon';
+      return card(f.name || FEAT_KINDS[f.kind]?.[0] || 'Shape', 'Site shape', [['Type', FEAT_KINDS[f.kind]?.[0] || 'Other'], ['Kind', pl ? 'Area' : f.type === 'line' ? 'Line' : 'Label'], pl && ['Area', m2(ringArea(f.pts))], pl ? ['Perimeter', (pathLen(f.pts) + Math.hypot(f.pts[0][0] - f.pts.at(-1)[0], f.pts[0][1] - f.pts.at(-1)[1])).toFixed(1) + ' m'] : f.type === 'line' && ['Length', pathLen(f.pts).toFixed(1) + ' m']], S.readOnly ? '' : go('data-mwsfeat="' + esc(f.id) + '"', 'Edit shape')); }
+    const L = h.lid && GIS.layers.find(x => x.id === h.lid); if (h.lid && !L) return '';
+    if (h.k === 'cell') { const v = L.values[h.i], sl = L.terrain && L.slope ? L.slope[h.i] : null, C = /^classes/.test(L.ramp || '') ? L.classes?.[Math.round(v) - 1] : null;
+      return card(L.name, 'Value here', [[L.terrain ? 'Elevation' : 'Value', v == null || !isFinite(v) ? 'No data' : C || (+v).toLocaleString('en-CA', { maximumFractionDigits: 3 }) + (L.unit ? ' ' + L.unit : L.terrain ? ' m' : '')], sl != null && isFinite(sl) && ['Slope', (+sl).toFixed(1) + '°']]); }
+    if (h.k === 'lf') { const f = h.f, r0 = f.pts && (Array.isArray(f.pts[0]?.[0]) ? f.pts[0] : f.pts);
+      return card(f.name || L.name, L.name, [f.value != null && ['Value', String(f.value)], f.type === 'polygon' ? ['Area', m2(Math.max(0, ringArea(r0) - (Array.isArray(f.pts[0]?.[0]) ? f.pts.slice(1).reduce((a, r) => a + ringArea(r), 0) : 0)))] : f.type === 'line' ? ['Length', pathLen(r0).toFixed(1) + ' m'] : null]); }
+    return card(h.t, 'Picture', []);
+  }).join('');
+  return html + (html ? '' : '<p class="note">Nothing is drawn here on the layers that are on.</p>') + (I.at ? '<p class="note">At ' + I.at[0].toFixed(2) + ' E, ' + I.at[1].toFixed(2) + ' N</p>' : '');
+}
+/* menus: a layer's, a borehole's, the map's, Add data and Layout */
+function mwsMenu(x, y, html) {
+  closeMenu(); const m = document.createElement('div'); m.id = 'menu'; m.className = 'menu fmenu mws-menu'; m.setAttribute('role', 'menu'); m.innerHTML = html; document.body.append(m);
+  const r = m.getBoundingClientRect(); m.style.left = Math.max(6, Math.min(x, innerWidth - r.width - 6)) + 'px'; m.style.top = Math.max(6, Math.min(y, innerHeight - r.height - 6)) + 'px'; m.querySelector('.mi:not(:disabled)')?.focus({ preventScroll: true });
+}
+const mwsMi = (attr, t, cls = '', small = '') => '<button type="button" class="mi ' + cls + '" role="menuitem" ' + attr + '><span><b>' + t + '</b>' + (small ? '<small>' + small + '</small>' : '') + '</span></button>';
+function mwsLayerMenu(id, x, y) {
+  const P = TOC_PROPS.get(id); if (!P) return; const d = document.createElement('div'); d.innerHTML = P.props || '';
+  const acts = [...d.querySelectorAll('.toc-acts button')].map(b => { const at = [...b.attributes].filter(a => a.name.startsWith('data-') || a.name === 'disabled').map(a => a.name + '="' + esc(a.value) + '"').join(' '); return [mwsMi(at, esc(b.textContent), b.classList.contains('danger-text') ? 'danger-text' : ''), b.classList.contains('danger-text')]; });
+  const more = d.querySelector('input, select, details'), L = id.startsWith('g:') && GIS.layers.find(q => q.id === id.slice(2));
+  mwsMenu(x, y, '<p class="mh">' + esc(P.name) + '</p>' + (P.check ? mwsMi('data-mwstick="' + esc(id) + '"', 'Show or hide') : '') + acts.filter(a => !a[1]).map(a => a[0]).join('') + (more ? '<hr>' + mwsMi('data-mwsprops="' + esc(id) + '"', 'Properties…') : '') + (L && L.kind !== 'image' && layerFeatures(L).length ? mwsMi('data-mwsexport="' + esc(L.id) + '"', 'Export shapes (GeoJSON)…') : '') + (acts.some(a => a[1]) ? '<hr>' + acts.filter(a => a[1]).map(a => a[0]).join('') : ''));
+}
+function mwsExport(id) {   // a vector layer (or a surface's contours) as GeoJSON in latitude and longitude
+  const L = GIS.layers.find(x => x.id === id); if (!L) return; const z = crsZone(), ll = p => { const [la, lo] = utmToLL(p[0], p[1], z); return [+lo.toFixed(8), +la.toFixed(8)]; }, shut = r => r.length && (r[0][0] !== r.at(-1)[0] || r[0][1] !== r.at(-1)[1]) ? [...r, r[0]] : r;
+  const fs = layerFeatures(L).map(f => { const n = Array.isArray(f.pts[0]?.[0]); return { type: 'Feature', properties: { name: f.name || '', ...(f.value != null ? { value: f.value } : {}) }, geometry: f.type === 'polygon' ? { type: 'Polygon', coordinates: (n ? f.pts : [f.pts]).map(r => shut(r).map(ll)) } : f.type === 'line' ? { type: 'LineString', coordinates: f.pts.map(ll) } : { type: 'Point', coordinates: ll(f.pts[0]) } }; });
+  saveFile(L.name.replace(/[^\w .-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) + '.geojson', new Blob([JSON.stringify({ type: 'FeatureCollection', features: fs }, null, 1)], { type: 'application/geo+json' }));
+}
+document.addEventListener('click', e => {
+  const q = s => e.target.closest?.(s); let t;
+  if ((t = q('[data-mwsmenu]'))) { const r = t.getBoundingClientRect();
+    mwsMenu(r.left, r.bottom + 4, t.dataset.mwsmenu === 'add'
+      ? mwsMi('data-act="imp-loc"', 'Borehole locations…', '', 'CSV or Excel with names and coordinates') + mwsMi('data-act="imp-shp"', 'Site shapes…', '', 'GeoJSON, KML, DXF or a table of corners') + mwsMi('data-act="gp-open" data-tool="crs_import"', 'GIS layer from a file…', '', 'Shapefile, GeoPackage, KML, DXF, GPX, in any coordinate system') + '<hr>' + mwsMi('data-act="imp-img"', 'Imagery…', '', 'Orthomosaic or air photo: GeoTIFF, or JPG/PNG with a world file') + mwsMi('data-act="site-img"', 'Site drawing…', '', 'A picture placed by its corner coordinates')
+      : mwsMi('data-act="plan-pdf"', 'Location plan (PDF)…') + mwsMi('data-tab="compose"', 'Report pages (Outputs)') + mwsMi('data-tab="xsec"', 'Cross-section') + '<hr>' + mwsMi('data-ctlgo="map-furn"', 'North arrow and scale bar…') + mwsMi('data-ctlgo="map-lbl"', 'Borehole labels…')); return; }
+  if ((t = q('[data-mwstool]'))) { mwsTool(t.dataset.mwstool); return; }
+  if ((t = q('[data-mwsside]'))) { S.ui.mwsSide = t.dataset.mwsside === 'bhs' ? 'bhs' : 'toc'; uiSave(); mwsRender(); return; }
+  if ((t = q('[data-mwspane]'))) { const k = t.dataset.mwspane; if (k === 'gp') { const w = mwsPaneW(); S.gpPanel = S.mwsGp; if (mwsPaneW() !== w) renderView(true); else ctlRender(); } else mwsOpenTab(k); return; }
+  if ((t = q('[data-mwsshut]'))) { mwsShut(t.dataset.mwsshut); return; }
+  if ((t = q('[data-mwsbh]'))) { S.sel = t.dataset.mwsbh; S.layer = 0; if (t.dataset.go === 'contam') { S.labView = 'lab'; lsSet('bhlog.labView', 'lab'); } goTab(t.dataset.go); return; }
+  if ((t = q('[data-mwszoom]'))) { closeMenu(); const b = S.bh.get(t.dataset.mwszoom); if (b?.easting != null) { S.mv = { cx: b.easting, cy: b.northing, sc: Math.max(S._plan?.sc || 0, 8) }; S.mvProj = curProj(); drawPlan(); } else toast('No coordinates yet.'); return; }
+  if ((t = q('[data-mwsfeat]'))) { const id = t.dataset.mwsfeat; if (!S.mapEdit) mapAct('map-edit'); S.mapSel = id; refreshMapEd(); return; }
+  if ((t = q('[data-mwstick]'))) { closeMenu(); document.querySelector('#mws-contents [data-toc="' + CSS.escape(t.dataset.mwstick) + '"] > .toc-row .toc-chk')?.click(); return; }
+  if ((t = q('[data-mwsprops]'))) { closeMenu(); S.tocSel = t.dataset.mwsprops; mwsOpen('layer'); return; }
+  if ((t = q('[data-mwsexport]'))) { closeMenu(); mwsExport(t.dataset.mwsexport); return; }
+  if ((t = q('[data-mwsat]'))) { closeMenu(); const [x, y] = t.dataset.mwsat.split(',').map(Number), k = t.dataset.do;
+    if (k === 'copy') navigator.clipboard?.writeText(x.toFixed(2) + ', ' + y.toFixed(2)).then(() => toast('Coordinates copied.'), () => toast('Could not copy.'));
+    else if (k === 'centre') { S.mv = { cx: x, cy: y, sc: S._plan.sc }; S.mvProj = curProj(); drawPlan(); }
+    else { S.mwsInfo = { at: [x, y], hits: mwsHits([x, y], true) }; mwsOpen('info', true); renderView(true); } return; }
+  if (q('#menu.mws-menu .mi')) closeMenu();
+});
+function mwsOpenTab(k) { const was = mwsPaneW(); if (mwsGpOn()) S.mwsGp = S.gpPanel; S.gpPanel = null; S.ui.mwsPane = k; uiSave(); if (mwsPaneW() !== was) renderView(true); else ctlRender(); }
+document.addEventListener('contextmenu', e => {
+  if (!mwsOn()) return; const r = e.target.closest?.('#list .bl-row');
+  if (r) { e.preventDefault(); const id = esc(r.dataset.pick), b = S.bh.get(r.dataset.pick); if (!b) return; mwsMenu(e.clientX, e.clientY, '<p class="mh">' + esc(b.name || 'Untitled') + '</p>' + mwsMi('data-mwszoom="' + id + '"', 'Zoom to') + mwsMi('data-mwsbh="' + id + '" data-go="log"', 'Open log') + mwsMi('data-mwsbh="' + id + '" data-go="edit"', 'Edit data')); return; }
+  if (S.mapEdit || S.secDraw || S.draft || !e.target.closest?.('#plan svg')) return; const w = planWorld(e); if (!w) return; e.preventDefault();
+  const at = 'data-mwsat="' + w[0].toFixed(3) + ',' + w[1].toFixed(3) + '" data-do='; mwsMenu(e.clientX, e.clientY, mwsMi(at + '"info"', 'What’s here?') + mwsMi(at + '"copy"', 'Copy coordinates') + mwsMi(at + '"centre"', 'Centre the map here') + '<hr>' + mwsMi('data-mz="fit"', 'Zoom to the whole site'));
+});
+document.addEventListener('pointerdown', e => { if ($('#menu.mws-menu') && !e.target.closest?.('#menu')) closeMenu(); }, true);
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest?.('[data-mwsrz]')) return; e.preventDefault(); const x0 = e.clientX, w0 = mwsSideW(), sh = $('.shell'); document.body.classList.add('ctl-drag');
+  const mv = ev => { S.ui.mwsW = w0 + ev.clientX - x0; S.ui.mwsW = mwsSideW(); sh.style.setProperty('--mws-w', S.ui.mwsW + 'px'); };
+  const up = ev => { mv(ev); removeEventListener('pointermove', mv); removeEventListener('pointerup', up); document.body.classList.remove('ctl-drag'); uiSave(); workResized(); };
+  addEventListener('pointermove', mv); addEventListener('pointerup', up);
+});
 
 /* ---------- the site plan as a map: drag to pan, wheel or buttons to zoom; Fit returns to the whole site ---------- */
 S.mv = null; S.mvProj = null;
@@ -10003,7 +10274,7 @@ function previewView() {
   const svg = $('#plan svg'), D = S._drawn; if (!svg || !D || !S.mv) return;
   const s = S.mv.sc / D.sc, tx = (D.W / 2 - S.mv.cx * S.mv.sc) - s * (D.W / 2 - D.cx * D.sc), ty = (D.H / 2 + S.mv.cy * S.mv.sc) - s * (D.H / 2 + D.cy * D.sc);
   svg.style.transformOrigin = '0 0'; svg.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
-  S._plan = { ...D, ...S.mv };
+  S._plan = { ...D, ...S.mv }; if (mwsOn()) mwsStatus();
 }
 let mvT; const redrawSoon = () => { clearTimeout(mvT); mvT = setTimeout(() => drawPlan(), 140); };
 function zoomAt(px, py, k) {
@@ -10023,10 +10294,10 @@ addEventListener('keydown', e => { if (e.code === 'Space' && !e.target.closest?.
 addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; });
 document.addEventListener('pointerdown', e => {
   if (!e.target.closest?.('#plan svg') || !S._plan) return;
-  const onThing = e.target.closest('[data-secpick], [data-bhpt], [data-feat], [data-vtx], [data-vmid]');
-  const drawing = (S.mapEdit && S.mapTool !== 'select') || !!S.secDraw || !!S.gpSpot;
+  const onThing = !mwsClicks() && e.target.closest('[data-secpick], [data-bhpt], [data-feat], [data-vtx], [data-vmid]');
+  const drawing = (mapInk() && S.mapTool !== 'select') || !!S.secDraw || !!S.gpSpot;
   if (!(e.button === 1 || spaceDown || (!onThing && !drawing && e.button === 0))) return;
-  mPan = { x: e.clientX, y: e.clientY, v: { cx: S._plan.cx, cy: S._plan.cy, sc: S._plan.sc }, moved: false };
+  mPan = { x: e.clientX, y: e.clientY, v: { cx: S._plan.cx, cy: S._plan.cy, sc: S._plan.sc }, moved: false, b: e.button };
   e.stopImmediatePropagation(); e.preventDefault();
 }, true);
 document.addEventListener('pointermove', e => {
@@ -10034,7 +10305,7 @@ document.addEventListener('pointermove', e => {
   const dx = e.clientX - mPan.x, dy = e.clientY - mPan.y; if (Math.abs(dx) + Math.abs(dy) > 3) mPan.moved = true;
   S.mv = { sc: mPan.v.sc, cx: mPan.v.cx - dx / mPan.v.sc, cy: mPan.v.cy + dy / mPan.v.sc }; S.mvProj = curProj(); previewView();
 });
-document.addEventListener('pointerup', () => { if (!mPan) return; const m = mPan; mPan = null; if (m.moved) drawPlan(); else if (S.mapEdit && S.mapSel) { S.mapSel = null; refreshMapEd(); } });
+document.addEventListener('pointerup', () => { if (!mPan) return; const m = mPan; mPan = null; if (m.moved) drawPlan(); else if (mwsClicks() && m.b === 0) mwsClickAt(m.x, m.y); else if (S.mapEdit && S.mapSel) { S.mapSel = null; refreshMapEd(); } });
 
 /* ---------- imagery: orthomosaics and other georeferenced pictures, kept in the browser's picture store ---------- */
 S.imgCache = new Map();
@@ -10301,6 +10572,7 @@ function tilesSVG(key, W, H, cx, cy, sc, op) {
 }
 
 function siteHTML() {
+  if (mwsOn()) return mwsHTML();
   const pts = projList().filter(b => b.easting != null && b.northing != null), miss = projList().length - pts.length;
   return `<div class="site-grid site-only">
     ${S.mapEdit ? `<section class="sec" style="grid-column:1/-1"><header><h3>Map editor</h3><span class="note">Shapes and locations are saved as you go</span></header><div class="body" id="map-ed-wrap">${mapEditorHTML()}</div></section>` : ''}
@@ -10574,7 +10846,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.i
 document.addEventListener('input', e => { if (e.target.id === 'xs-date') { const d = xsDates(sectionList())[+e.target.value]; if (d) xsSetDate(d); } });
 function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); const ms = $('#xs-model-sec'); if (ms) ms.outerHTML = xsModelHTML(); }   // the forecast panel reads the drawn section's geometry
 const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
-function drawPlan(el = $('#plan')) { if (!el) return; if (S.tab === 'soil') { drawSoil(); return; } el.innerHTML = planSVG(Math.max(el.clientWidth, 420), S.mapEdit ? 620 : planH(el), true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); loadImagery(); }
+function drawPlan(el = $('#plan')) { if (!el) return; if (S.tab === 'soil') { drawSoil(); return; } const mws = mwsOn(); el.innerHTML = planSVG(Math.max(el.clientWidth, mws ? 200 : 420), mws ? Math.max(200, el.clientHeight) : S.mapEdit ? 620 : planH(el), true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); if (mws) { mwsMark(); mwsStatus(); } loadImagery(); }
 /* Delaunay triangulation (Bowyer–Watson) for contouring between boreholes */
 function delaunay(P) {
   const n = P.length; if (n < 3) return [];
@@ -10627,7 +10899,7 @@ function planSVG(W, H, interactive) {
   if (S.lyr.grid !== false) for (let n = Math.ceil((cy - H / 2 / sc) / gs) * gs; n < cy + H / 2 / sc; n += gs) o.push(`<line x1="0" x2="${W}" y1="${Y(n)}" y2="${Y(n)}" style="stroke:var(--grid)" opacity="${site?.img ? .5 : 1}"/>`);
   o.push(featuresSVG(X, Y, { edit: interactive && S.mapEdit, sel: S.mapSel }));
   o.push(gisLayersSVG(X, Y));   // what the Toolbox made: water table, flow arrows and paths, depth to water, areas
-  if (interactive && S.mapEdit && S.measure) o.push(measureSVG(X, Y));
+  if (interactive && mapInk() && S.measure) o.push(measureSVG(X, Y));
   if (interactive && S.gpPanel === 'elev_fix' && (S.gp.keeps || []).length) { const kr = (S.gp.prm?.elev_fix?.keepr > 0 ? +S.gp.prm.elev_fix.keepr : 20) * sc; o.push(S.gp.keeps.map(([x, y], i) => `<g><circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="${Math.max(5, kr).toFixed(1)}" fill="rgba(22,140,80,.12)" stroke="#168c50" stroke-width="2" stroke-dasharray="6 3"/><text x="${X(x).toFixed(1)}" y="${(Y(y) + 4).toFixed(1)}" font-size="11" font-weight="700" text-anchor="middle" fill="#0f5f36">K${i + 1}</text></g>`).join('')); }
   if (interactive && S.gpPanel === 'elev_fix' && (S.gp.spots || []).length) { const rr = (S.gp.prm?.elev_fix?.spotr > 0 ? +S.gp.prm.elev_fix.spotr : 5) * sc; o.push(S.gp.spots.map(([x, y], i) => `<g><circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="${Math.max(4, rr).toFixed(1)}" fill="rgba(140,60,170,.18)" stroke="#8c3caa" stroke-width="2" stroke-dasharray="4 2"/><text x="${X(x).toFixed(1)}" y="${(Y(y) + 4).toFixed(1)}" font-size="11" font-weight="700" text-anchor="middle" fill="#6a1b9a">${i + 1}</text></g>`).join('')); }
   const gb = interactive && (site?.gotoBox || (empty && !site?.goto && dlsToLL(projList().find(b => parseDLS(b.location))?.location)));
@@ -15744,6 +16016,7 @@ document.addEventListener('click', e => {
   const sl = e.target.closest('[data-slug]'); if (sl) { openSlug(+sl.dataset.slug); return; }
   const sp = e.target.closest('[data-secpick]');
   if (sp && S.secDraw) return;
+  if (sp && mwsOn() && sp.closest('#plan') && S.mwsTool !== 'section') return;   // the map's other tools use the click
   if (sp && secLineOf()) { secToggle(sp.dataset.secpick); return; }
   if (sp) { const id = sp.dataset.secpick; S.secIds.has(id) ? S.secIds.delete(id) : S.secIds.add(id); secPickSave(); redrawSec(); if ($('#sec-tools')) $('#sec-tools').outerHTML = secToolsHTML(); return; }
   const mz = e.target.closest('[data-mz]'); if (mz) { const t = S._plan; if (mz.dataset.mz === 'fit') { S.mv = null; drawPlan(); } else if (t) { zoomAt(t.W / 2, t.H / 2, mz.dataset.mz === 'in' ? 1.6 : 1 / 1.6); clearTimeout(mvT); drawPlan(); } return; }
@@ -15777,6 +16050,7 @@ document.addEventListener('click', e => {
   if (jump) { e.preventDefault(); $(jump.getAttribute('href'))?.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
   const t = e.target.closest('button, [data-pick]'); if (!t) { if (e.target.id === 'overlay') closeOverlay(); return; }
   if (t.dataset.goto) { S.sel = t.dataset.pick; S.layer = 0; S.tab = t.dataset.goto; lsSet('bhlog.tab', S.tab); S.formStale = true; render(); $('#sec-gw')?.scrollIntoView({ block: 'start' }); return; }
+  if (t.dataset.pick && mwsOn() && t.closest('#list')) { mwsPickBh(t.dataset.pick, e.detail >= 2); return; }
   if (t.dataset.pick) { if (t.closest('#list') && !BH_TABS.includes(S.tab)) { S.tab = 'edit'; lsSet('bhlog.tab', 'edit'); } S.sel = t.dataset.pick; S.layer = 0; S.formStale = true; S.drawer = null; renderDrawer(); render(); if (matchMedia('(max-width: 860px)').matches) $('#main').scrollIntoView({ block: 'start' }); return; }
   if (t.dataset.qlpick) { S.sel = t.dataset.qlpick; S.layer = 0; S.formStale = true; render(); openQL(t.dataset.qlstep); return; }
   if (t.dataset.dtab) { S.dtab = t.dataset.dtab; lsSet('bhlog.dtab', S.dtab); renderView(true); return; }
@@ -15869,7 +16143,7 @@ document.addEventListener('click', e => {
     case 'gp-pick': window.desktop?.gis?.pick?.().then(f => { if (!f) return; S.gp.demFile = f.token; S.gp.demName = f.name; S.gp.demSize = f.size; gpSave(); renderView(true); }); break;
     case 'gp-menu': openGpMenu(t.closest('.gp-tb') || t); break;
     case 'gp-open': { closeMenu(); S.gp.recent = [t.dataset.tool, ...(S.gp.recent || []).filter(x => x !== t.dataset.tool)].slice(0, 8); S.gp.tool = t.dataset.tool; S.gpPanel = t.dataset.tool; gpSave(); if (!GP_TABS.includes(S.tab)) { goTab(GP_TOOLS[S.gpPanel].kind === 'points3d' ? 'xsec' : 'site'); } else workResized(); renderBar(cur()); break; }
-    case 'gp-close': S.gpPanel = null; workResized(); renderBar(cur()); break;
+    case 'gp-close': S.gpPanel = null; S.mwsGp = null; workResized(); renderBar(cur()); break;
     case 'gp-chip': { const j = gisRunning()[0], k = j?.tool && GP_TOOLS[j.tool] ? j.tool : j?.job?.method && GP_TOOLS[j.job.method] ? j.job.method : S.gp.tool; S.gp.tool = k; S.gpPanel = k; if (!GP_TABS.includes(S.tab)) goTab(GP_TOOLS[k].kind === 'points3d' ? 'xsec' : 'site'); else workResized(); break; }
     case 'gp-cancel': window.desktop?.gis?.cancel(t.dataset.id); break;
     case 'gp-use': gpUse(GIS.jobs.get(t.dataset.id)); break;
@@ -15943,7 +16217,7 @@ document.addEventListener('click', e => {
     case 'go-gw': S.tab = 'gw'; lsSet('bhlog.tab', S.tab); S.formStale = true; renderMain(); break;
     case 'go-report': S.tab = 'report'; lsSet('bhlog.tab', S.tab); S.formStale = true; renderMain(); break;
     case 'sec-clear': S.secIds.clear(); secPickSave(); renderView(true); break;
-    case 'sec-draw': case 'sec-draw-redo': S.secDraw = { pts: [], redo: act === 'sec-draw-redo' }; if (S.tab !== 'site') goTab('site'); else renderView(true); toast('Click on the map to draw the section line; double-click or Enter to finish.'); break;
+    case 'sec-draw': case 'sec-draw-redo': if (S.mapEdit) { S.mapEdit = false; mwsShut('edit', true); } S.mwsTool = 'section'; S.mapTool = 'select'; S.measure = null; S.draft = null; S.secDraw = { pts: [], redo: act === 'sec-draw-redo' }; if (S.tab !== 'site') goTab('site'); else renderView(true); toast('Click on the map to draw the section line; double-click or Enter to finish.'); break;
     case 'sec-draw-done': finishSecLine(); break;
     case 'sec-draw-cancel': S.secDraw = null; renderView(true); break;
     case 'sec-line-rev': { const L = secLineOf(); if (L) { setSecLine({ ...L, pts: [...L.pts].reverse() }); renderView(true); } break; }
