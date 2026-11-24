@@ -1613,6 +1613,7 @@ body.mws-map #sb-proj, body.mws-map #sb-bh, body.mws-map #sb-iss, body.mws-map #
 .sy-rows { display: grid; gap: 2px; } .sy-row { display: grid; grid-template-columns: 18px 30px minmax(0, 1fr) auto 20px; gap: 6px; align-items: center; font-size: 12.5px; min-height: 28px; } .sy-row input[type="color"] { width: 30px; height: 22px; min-height: 0; padding: 1px; } .sy-row input[type="text"], .sy-row input[type="number"] { width: 100%; min-height: 26px !important; padding: 0 6px; } .sy-row .n { color: var(--muted); font-variant-numeric: tabular-nums; } .sy-row .x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0; } .sy-row input[type="checkbox"] { width: 15px; height: 15px; margin: 0; accent-color: var(--primary); }
 .sy-ramp { display: inline-block; width: 70px; height: 12px; border: 1px solid var(--rule); } .sy-f { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 20px; gap: 6px; align-items: center; } .sy-f input { grid-column: 1 / 3; } .sy-f select, .sy-f input { width: 100%; }
 .sy-ins { display: flex; flex-wrap: wrap; gap: 4px; } .sy-ins button { border: 1px solid var(--control, var(--line)); background: var(--surface); border-radius: 10px; font: 11.5px var(--f-body); padding: 1px 8px; cursor: pointer; } .sy-ins button:hover { background: var(--hover); }
+body.mws-tbl .sb-map > label, body.mws-tbl .sb-map > .xy, body.mws-tbl .mws-bar, body.mws-tbl .side, body.mws-tbl .ctl, body.mws-tbl .prail, body.mws-tbl #plan, body.mws-tbl .appbar, body.mws-tbl .mws-drz { display: none !important; } body.mws-tbl .shell { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: minmax(0, 1fr) !important; } body.mws-tbl .main { grid-column: 1 !important; grid-row: 1 !important; height: calc(100vh - var(--status-h)) !important; } body.mws-tbl .mws-dock { height: auto !important; flex: 1 1 auto; border-top: 0; }
 .mws-dlg { display: grid; gap: 10px; } .mws-dlg .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .mws-dlg select, .mws-dlg input { min-height: 34px; }
 .menu.mws-menu { width: auto; min-width: 210px; max-width: 340px; padding: 4px; right: auto; } .mws-menu .mi { padding: 6px 10px; align-items: center; } .mws-menu .mi b { font-weight: 500; font-size: 13px; } .mws-menu hr { border: 0; border-top: 1px solid var(--rule); margin: 4px 0; } .mws-menu .mi.danger-text b { color: var(--negative, #b42318); } .mws-menu .mh { margin: 2px 10px 4px; font: 600 11.5px var(--f-body); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .site-only { display: block; } .site-map > .body { padding: 8px; } .site-map .map-tip { margin: 6px 2px 0; font-size: 11.5px; }
@@ -1749,8 +1750,12 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const uid = (p = '') => p + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
 const num = v => { if (v === '' || v == null) return null; if (typeof v === 'number') return isFinite(v) ? v : null; const n = parseFloat(String(v).trim().replace(',', '.')); return isFinite(n) ? n : null; };
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };   // local date: toISOString is UTC, a day ahead on prairie evenings
-const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
-const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch { return false; } };
+/* a window opened on a page of its own (#win=site&p=…&b=…): where it is and its layout are its own, not the main window's */
+const WINQ = new URLSearchParams(location.hash.slice(1)), WIN = /^[a-z0-9]{1,12}$/.test(WINQ.get('win') || '') ? WINQ.get('win') : null, WIN_LS = new Map();
+const WIN_OWN = new Set(['bhlog.tab', 'bhlog.proj', 'bhlog.ui', 'bhlog.projOpened', 'bhlog.startQL']);
+if (WIN) { WIN_LS.set('bhlog.tab', WIN); WIN_LS.set('bhlog.proj', WINQ.get('p') ?? ''); WIN_LS.set('bhlog.startQL', '0'); }
+const lsGet = k => { if (WIN_LS.has(k)) return WIN_LS.get(k); try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { if (WIN && WIN_OWN.has(k)) { WIN_LS.set(k, v); return true; } try { localStorage.setItem(k, v); return true; } catch { return false; } };
 const lsDel = k => { try { localStorage.removeItem(k); } catch {} };
 /* saved data (boreholes, company, site) lives in IndexedDB, which has room for years of logs and site images. Local storage
    (about 5 MB) is where older versions kept it, and the fallback when IndexedDB fails: a key found there is newer than
@@ -1784,6 +1789,111 @@ function dataSave(k, v) {
   dataStore.pending.set(k, p); return p;
 }
 
+/* ---------- several windows, all of them saving. Each window has its own copy of the boreholes, the site records and the company
+   settings. A save is one database transaction: read what is stored, and if another window changed it, merge (what both started
+   from, mine, theirs) field by field, then write. The other windows are told and merge it in the same way. Where both changed the
+   same field, the later save wins; nothing else of either is lost. ---------- */
+const eqJ = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b);
+const idArr = a => Array.isArray(a) && a.length > 0 && a.every(x => x && typeof x === 'object' && x.id != null);
+const plainO = o => !!o && typeof o === 'object' && !Array.isArray(o);
+function merge3(b, m, t, key) {
+  if (eqJ(m, t)) return m; if (eqJ(m, b)) return t; if (eqJ(t, b)) return m;
+  if (plainO(m) && plainO(t)) {
+    const B = plainO(b) ? b : {}, o = {};
+    for (const k of new Set([...Object.keys(t), ...Object.keys(m)])) {
+      const im = k in m, it = k in t, ib = k in B;
+      if (im && it) o[k] = k === 'updated' || k === 'edited' ? (String(m[k] || '') > String(t[k] || '') ? m[k] : t[k]) : merge3(B[k], m[k], t[k], k);
+      else if (im) { if (!ib || !eqJ(m[k], B[k])) o[k] = m[k]; } else if (!ib || !eqJ(t[k], B[k])) o[k] = t[k];   // gone on one side: gone, unless the other side changed it
+    }
+    return o;
+  }
+  if (Array.isArray(m) && Array.isArray(t)) {
+    const ids = x => !x.length || idArr(x);
+    if (ids(m) && ids(t) && (idArr(m) || idArr(t))) {
+      const B = new Map((Array.isArray(b) && ids(b) ? b : []).map(x => [x.id, x])), M = new Map(m.map(x => [x.id, x])), T = new Map(t.map(x => [x.id, x])), out = [], bo = [...B.keys()].filter(i => M.has(i) && T.has(i)), mo = m.map(x => x.id).filter(i => B.has(i) && T.has(i));
+      const lead = eqJ(bo, mo) ? t : m, other = lead === t ? m : t, L = lead === t ? T : M, O = lead === t ? M : T;   // the side that put them in another order
+      const put = x => { const i = x.id, im = M.get(i), it = T.get(i), ib = B.get(i); if (im && it) out.push(merge3(ib, im, it)); else if (im) { if (!ib || !eqJ(im, ib)) out.push(im); } else if (!ib || !eqJ(it, ib)) out.push(it); };
+      lead.forEach(put);
+      other.forEach((x, n) => { if (L.has(x.id)) return; const had = B.get(x.id); if (had && eqJ(x, had)) return; let at = 0; for (let k = n - 1; k >= 0; k--) { const q = out.findIndex(y => y.id === other[k].id); if (q >= 0) { at = q + 1; break; } } out.splice(at, 0, x); });
+      return out;
+    }
+    if (key === 'history' || key === 'log') { const S1 = new Set((b || []).map(x => JSON.stringify(x))), M1 = new Set(m.map(x => JSON.stringify(x))), T1 = new Set(t.map(x => JSON.stringify(x))); return [...m.filter(x => T1.has(JSON.stringify(x)) || !S1.has(JSON.stringify(x))), ...t.filter(x => !M1.has(JSON.stringify(x)) && !S1.has(JSON.stringify(x)))].sort((p, q) => String(p.at || '').localeCompare(String(q.at || ''))); }
+  }
+  return m;
+}
+/* put src into dst, keeping the objects and arrays there (a form or dialog may hold them) */
+function inPlace(dst, src) {
+  for (const k of Object.keys(dst)) if (!(k in src)) delete dst[k];
+  for (const [k, v] of Object.entries(src)) {
+    const d = dst[k]; if (eqJ(d, v)) continue;
+    if (plainO(d) && plainO(v)) inPlace(d, v);
+    else if (Array.isArray(d) && Array.isArray(v)) { const by = idArr(d) ? new Map(d.map(x => [x.id, x])) : null, n = v.map(x => { const o = by && plainO(x) && by.get(x.id); return o ? inPlace(o, x) : x; }); d.length = 0; for (const x of n) d.push(x); }
+    else dst[k] = v;
+  }
+  return dst;
+}
+const SYNC = { me: Math.random().toString(36).slice(2), ch: null, st: {}, wait: false, sel: undefined, n: 0 };
+try { SYNC.ch = new BroadcastChannel('bhlog'); } catch { /* one window only */ }
+const syncPost = m => { try { SYNC.ch?.postMessage({ ...m, from: SYNC.me }); } catch { /* not sent: the next save still merges */ } };
+const SYNC_DOCS = {
+  'bhlog.local': { get: () => Object.fromEntries([...S.bh].map(([i, b]) => [i, b])), str: o => JSON.stringify(Object.values(o)), read: r => { const a = JSON.parse(r); if (!Array.isArray(a)) throw new Error('unreadable'); return Object.fromEntries(a.map(b => [b.id, normalize(b)])); },
+    put: o => { for (const id of [...S.bh.keys()]) if (!(id in o)) { S.bh.delete(id); hist.snap.delete(id); } for (const [id, b] of Object.entries(o)) { const c = S.bh.get(id); if (!c) S.bh.set(id, b); else if (!eqJ(c, b)) inPlace(c, b); else continue; hist.snap.set(id, histNow(id)); } S.dataGen = (S.dataGen || 0) + 1; } },
+  'bhlog.site': { get: () => S.site || {}, str: o => JSON.stringify(o || {}), read: r => JSON.parse(r) || {}, put: o => { if (!S.site) S.site = o; else inPlace(S.site, o); hist.snap.set('site', histNow('site')); } },
+  'bhlog.company': { get: () => S.co, str: o => JSON.stringify(o), read: r => JSON.parse(r) || {}, put: o => { inPlace(S.co, o); renderBrand(); } },
+};
+const plainCopy = o => JSON.parse(JSON.stringify(o));
+function syncMark(k, raw) { const D = SYNC_DOCS[k]; SYNC.st[k] = { raw: raw ?? null, base: raw == null ? null : D.str(D.read(raw)) }; }
+/* merge what is stored into this window's copy; returns whether anything came in */
+function syncMerge(k, cur) {
+  const D = SYNC_DOCS[k], st = SYNC.st[k] || { raw: null, base: null }, mine = plainCopy(D.get()), theirs = D.read(cur), base = st.base ? D.read(st.base) : {}, out = merge3(base, mine, theirs);
+  if (eqJ(out, mine)) return false; D.put(plainCopy(out)); return true;
+}
+function syncSave(k) {
+  const D = SYNC_DOCS[k], p = (dataStore.pending.get(k) || Promise.resolve()).then(() => syncTx(k)).then(() => { try { localStorage.removeItem(k); } catch {} return true; }, () => lsSet(k, D.str(D.get())))
+    .then(ok => { if (ok !== !S.storeFail && !S.loadFail) { S.storeFail = !ok; setSync(); if (!ok) toast('Changes are NOT being saved: this computer’s storage is full or blocked. Use File › Save project to keep your work in a file.'); } if (dataStore.pending.get(k) === p) dataStore.pending.delete(k); return ok; });
+  dataStore.pending.set(k, p); return p;
+}
+async function syncTx(k) {
+  const D = SYNC_DOCS[k], d = await dataStore.open(); let came = false, out = null, wrote = false;
+  await new Promise((res, rej) => {
+    const tx = d.transaction('kv', 'readwrite'), os = tx.objectStore('kv'), g = os.get(k); let err = null;
+    g.onsuccess = () => { try { const cur = g.result ?? null, st = SYNC.st[k]; if (cur != null && cur !== (st?.raw ?? null)) came = syncMerge(k, cur); out = D.str(D.get()); if (out !== cur) { os.put(out, k); wrote = true; } } catch (e) { err = e; tx.abort(); } };
+    tx.oncomplete = res; tx.onerror = tx.onabort = () => rej(err || tx.error || new Error('not written'));
+  });
+  SYNC.st[k] = { raw: out, base: out }; if (wrote) syncPost({ t: 'doc', k }); if (came) syncRender();
+}
+async function syncPull(k) {
+  if (S.mode !== 'local' || S.loadFail || !S.loaded) return; if (!document.hasFocus()) document.activeElement?.blur?.();   // what was typed here is kept first
+  let cur = null; try { cur = await dataStore.get(k); } catch { return; } const st = SYNC.st[k]; if (cur == null || cur === st?.raw) return;
+  let came = false; try { came = syncMerge(k, cur); syncMark(k, cur); } catch { return; }
+  if (came) { if (k === 'bhlog.local' || k === 'bhlog.site') syncProj(); syncRender(); }
+}
+async function syncAll() { for (const k of Object.keys(SYNC_DOCS)) { await (dataStore.pending.get(k) || 0); await syncPull(k); } await gisPull(); }
+function syncProj() { if (S.proj != null && !projNames().includes(S.proj)) { const b = S.bh.get(S.sel); if (b) { S.proj = b.project || ''; lsSet('bhlog.proj', S.proj); } } }   // renamed or deleted in another window
+/* redraw with what came in, but never under someone typing or dragging */
+let syncDown = false; addEventListener('pointerdown', () => { syncDown = true; }, true); for (const t of ['pointerup', 'pointercancel']) addEventListener(t, () => { syncDown = false; if (SYNC.wait) setTimeout(syncRender, 60); }, true);
+const syncTyping = () => { const a = document.activeElement; return !!a?.matches?.('input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=button]), textarea, select, [contenteditable]') && !!a.closest('#main, #ctl, .side, #drawer, #qlog') && document.hasFocus(); };
+function syncRender() {
+  if (syncTyping() || syncDown) { SYNC.wait = true; return; } SYNC.wait = false; SYNC.n++; S.formStale = true; if (S.sel && !S.bh.has(S.sel)) S.sel = null;
+  const y = document.scrollingElement?.scrollTop || 0; render(); setSync(); if (S.qlOpen) qlDraw(); if (document.scrollingElement) document.scrollingElement.scrollTop = y;
+}
+setInterval(() => { if (SYNC.wait) { if (!document.hasFocus()) syncDown = false; syncRender(); } }, 1000);   // a window without the focus gets no focus events
+document.addEventListener('focusout', () => { if (SYNC.wait) setTimeout(() => { if (SYNC.wait) syncRender(); }, 80); });
+if (SYNC.ch) SYNC.ch.onmessage = e => { const m = e.data; if (!m || m.from === SYNC.me || !S.loaded) return;
+  if (m.t === 'doc' && SYNC_DOCS[m.k]) syncPull(m.k);
+  else if (m.t === 'gis') { if (m.p === GIS.proj) gisPull(); }
+  else if (m.t === 'files') { if (window.desktop) for (const [k, f] of Object.entries(fileLinks())) S.fh.set(k, f); if (m.at) for (const [k, v] of m.at) if ((S.fileAt.get(k) || '') < v) S.fileAt.set(k, v); setSync(); }
+  else if (m.t === 'sel') { if (S.ui.linkSel === false || S.tab === 'projects' || m.p !== curProj() || m.id === S.sel || !S.bh.has(m.id) || document.hasFocus()) return; document.activeElement?.blur?.(); SYNC.sel = S.sel = m.id; S.layer = 0; if (mwsOn()) { const b = S.bh.get(m.id); S.mwsInfo = { at: b.easting != null ? [b.easting, b.northing] : null, hits: [{ k: 'bh', id: m.id, ...(b.easting != null ? { at: [b.easting, b.northing] } : {}) }] }; } syncRender(); }
+  else if (m.t === 'msel') { if (S.ui.linkSel === false || m.p !== curProj()) return; S.mwsSel = new Map(m.sel.map(([k, v]) => [k, new Set(v)])); if (mwsOn()) { mwsSelDraw(); mwsSelCount(); mwsDockFill(); } }
+  else if (m.t === 'zoom') { if (m.p === curProj() && mwsOn() && !document.body.classList.contains('mws-tbl') && S._plan) { const t = S._plan; S.mv = { cx: m.cx, cy: m.cy, sc: Math.min(t.W / m.w, t.H / m.h, 60) * .7 }; S.mvProj = curProj(); drawPlan(); } } };
+const selPost = () => { if (S.mode === 'local' && S.sel && S.sel !== SYNC.sel) { SYNC.sel = S.sel; if (S.ui.linkSel !== false) syncPost({ t: 'sel', p: curProj(), id: S.sel }); } };
+const mselPost = () => { if (S.ui.linkSel !== false) syncPost({ t: 'msel', p: curProj(), sel: [...S.mwsSel].map(([k, v]) => [k, [...v]]) }); };
+/* a window of its own for a page (the desktop app) */
+function openWin(tab, pane) {
+  if (!window.desktop?.openWindow) { toast('Separate windows need the desktop app.'); return; }
+  (async () => { try { await window.gisFlush?.(); if (store.localTimer) await store.saveLocal(); await Promise.all(dataStore.pending.values()); } catch { /* the new window loads what is stored */ }
+    const r = await window.desktop.openWindow({ tab, pane: pane || '', p: curProj(), b: S.sel || '' }); if (!r?.ok) toast(r?.error || 'The window could not be opened.'); })();
+}
 /* Soil and rock units — Modified Unified Soil Classification (CFEM), as used on Alberta and Saskatchewan logs */
 const SOILS = {
   GW: { p: 'GRAVEL', grad: 'well graded', fill: 's-gravel', pat: ['gravel'], group: 'coarse' },
@@ -1872,7 +1982,7 @@ const pageDepth = b => {
 };
 const pageDepthLabel = () => S.pageFit ? `fitted to each borehole's depth (up to ${FIT_MAX()} ${S.units} on one page)` : `${fixedDepth()} ${S.units} per page`;
 S.pageFit = lsGet('bhlog.pageFit') !== '0';
-if (!['log', 'edit', 'gw', 'report', 'site'].includes(S.tab)) S.tab = 'log';
+if (!['log', 'edit', 'gw', 'report', 'site', ...(WIN ? ['home', 'table', 'contam', 'soil', 'xsec', 'gwm', 'v3d', 'compose'] : [])].includes(S.tab)) S.tab = 'log';
 S.proj = lsGet('bhlog.proj') ?? null;
 
 const LEN = () => S.units;
@@ -2287,15 +2397,18 @@ const store = {
     try { data = JSON.parse(raw || 'null'); } catch {}
     /* saved boreholes that cannot be read are never replaced by the examples or written over: saving here stays off */
     if (raw && !Array.isArray(data)) { S.loadFail = true; S.storeFail = true; toast('The saved boreholes on this computer could not be read. They are left untouched and nothing here is saved on this computer; use File › Save project.'); }
-    try { S.co = { ...S.co, ...(JSON.parse(await dataGet('bhlog.company') || 'null') || {}) }; } catch {}
-    try { const st = await dataGet('bhlog.site'); if (st != null) S.site = JSON.parse(st); } catch {}
+    if (raw && Array.isArray(data)) try { syncMark('bhlog.local', raw); } catch {}
+    try { const c = await dataGet('bhlog.company'); S.co = { ...S.co, ...(JSON.parse(c || 'null') || {}) }; if (c != null) syncMark('bhlog.company', c); } catch {}
+    try { const st = await dataGet('bhlog.site'); if (st != null) { S.site = JSON.parse(st); syncMark('bhlog.site', st); } } catch {}
     for (const b of (Array.isArray(data) ? data : raw ? [] : exampleBoreholes())) S.bh.set(b.id, normalize(b));
+    for (const [k, D] of Object.entries(SYNC_DOCS)) SYNC.st[k] ||= { raw: null, base: D.str(D.get()) };   // nothing stored yet: what this window started with
+    if (WIN && S.bh.has(WINQ.get('b'))) { S.sel = WINQ.get('b'); SYNC.sel = S.sel; }
     renderBrand();
   },
-  saveLocal() { clearTimeout(this.localTimer); this.localTimer = null; if (S.loadFail) return Promise.resolve(false); return dataSave('bhlog.local', JSON.stringify([...S.bh.values()])); },
+  saveLocal() { clearTimeout(this.localTimer); this.localTimer = null; if (S.loadFail) return Promise.resolve(false); return syncSave('bhlog.local'); },
   saveCompany() {
     renderBrand();
-    if (S.mode !== 'db') { if (!S.loadFail) dataSave('bhlog.company', JSON.stringify(S.co)); return; }
+    if (S.mode !== 'db') { if (!S.loadFail) syncSave('bhlog.company'); return; }
     clearTimeout(this.timers.__co);
     this.timers.__co = setTimeout(async () => { try { await S.db.doc('settings/company').set(JSON.parse(JSON.stringify(S.co))); } catch (e) { writeError(e); } delete this.timers.__co; }, 400);
   },
@@ -2346,18 +2459,20 @@ function histRecord(key) {
 }
 function histApply(from, to, which) {
   const step = from.pop(); if (!step) { toast(which === 'before' ? 'Nothing to undo.' : 'Nothing to redo.'); return; }
-  hist.applying = true;
+  hist.applying = true; let gone = 0;
   try {
     for (const it of which === 'before' ? [...step.items].reverse() : step.items) {
       const v = it[which];
       if (it.key === 'gis') { gisRestore(v); continue; }
-      if (it.key === 'site') { S.site = JSON.parse(v); saveSite(); hist.snap.set('site', v); continue; }
+      const now = histNow(it.key), was = it[which === 'before' ? 'after' : 'before'];
+      if (it.key === 'site') { inPlace(S.site ||= {}, now === was || now == null || was == null ? JSON.parse(v) || {} : plainCopy(merge3(JSON.parse(was) || {}, JSON.parse(v) || {}, JSON.parse(now) || {}))); saveSite(); hist.snap.set('site', histNow('site')); continue; }
+      if (now == null && was != null) { gone++; continue; }   // deleted in another window
       if (v == null) { if (S.bh.has(it.key)) store.remove(it.key); if (S.sel === it.key) S.sel = sortedList()[0]?.id || null; }
-      else { const b = normalize(JSON.parse(v)); S.bh.set(b.id, b); store.save(b); }
+      else { const b = normalize(now === was || now == null || was == null ? JSON.parse(v) : plainCopy(merge3(JSON.parse(was), JSON.parse(v), JSON.parse(now)))); const c = S.bh.get(b.id); if (c) inPlace(c, b); else S.bh.set(b.id, b); store.save(S.bh.get(b.id)); }
     }
   } finally { hist.applying = false; }
   step.at = 0; to.push(step); S.formStale = true; render(); updateUndo();
-  toast(which === 'before' ? 'Undone.' : 'Redone.');
+  toast(gone ? 'That borehole was deleted in another window, so this could not be ' + (which === 'before' ? 'undone.' : 'redone.') : which === 'before' ? 'Undone.' : 'Redone.');
 }
 const undo = () => { gisHist(); histApply(hist.undo, hist.redo, 'before'); }, redo = () => histApply(hist.redo, hist.undo, 'after');
 function updateUndo() { const u = $('#btn-undo'), r = $('#btn-redo'); if (u) u.disabled = !hist.undo.length || S.readOnly; if (r) r.disabled = !hist.redo.length || S.readOnly; }
@@ -2481,7 +2596,7 @@ const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" strok
 const CTL = {}, CTL_ICON = '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>';
 S.ui = { ctlOpen: true, ctlW: 300, sideOpen: true, fold: {}, ...jsonLS('bhlog.ui', {}) };
 const uiSave = () => lsSet('bhlog.ui', JSON.stringify(S.ui));
-if (S.ui.openLast === false) S.tab = 'projects';
+if (S.ui.openLast === false && !WIN) S.tab = 'projects';
 const ctlClamp = w => Math.round(Math.min(480, Math.max(240, +w || 300)));
 function uiApply() { document.body.classList.toggle('side-min', S.ui.sideOpen === false); document.body.classList.toggle('side-off', S.tab === 'compose'); document.body.classList.toggle('proj-home', S.tab === 'projects'); mwsApply(); const c = $('#side-ct'); if (c) { const n = projList().length; c.textContent = `${n} borehole${n === 1 ? '' : 's'}`; } }
 /* the panel's column is set before a page draws, so drawings measure the work area they will really have */
@@ -7811,7 +7926,9 @@ const fileSlug = s => (s || '').replace(/[\\/:*?"<>|#%]+/g, '').replace(/\s+/g, 
 const canPick = () => 'showSaveFilePicker' in window && window.self === window.top;
 const projDirty = (p = curProj()) => { const at = S.fileAt.get(p); return !!at && (sortedList().some(b => projKey(b) === p && (b.updated || '') > at) || (S.site?.projects?.[p]?.edited || '') > at || (S.gisEdited?.[p] || '') > at); };
 async function photosFor(ids) { try { const all = await photoStore.all(); return ids ? all.filter(ph => ids.has(ph.bhId)) : all; } catch { return []; } }
-async function saveProject(as, proj, quiet) {
+const fileLock = f => S.mode === 'local' && navigator.locks?.request ? navigator.locks.request('bhlog-files', f) : f();
+async function saveProject(as, proj, quiet) { return fileLock(async () => { if (S.mode === 'local' && SYNC.ch) try { await syncAll(); } catch {} return saveProjectNow(as, proj, quiet); }); }
+async function saveProjectNow(as, proj, quiet) {
   const list = proj == null ? projList() : sortedList().filter(b => projKey(b) === proj); if (!list.length && !surveyOf().points.length) { if (!quiet) toast('There are no boreholes in this project to save.'); return; }
   const p = list.length ? projKey(list[0]) : proj ?? '', no = list.find(b => b.projNo)?.projNo || '';
   const st = S.site?.projects ? (S.site.projects[p] || S.site.projects['*'] || null) : (S.site?.img ? S.site : null);
@@ -7821,14 +7938,15 @@ async function saveProject(as, proj, quiet) {
   const data = { app: 'borehole-field-log', kind: 'project', version: 4, saved: new Date().toISOString(), project: p, projNo: no, company: S.co, site: st, boreholes: list, photos, ...(gis ? { gis } : {}) };
   await saveTo(p, `${fileSlug([no, p].filter(Boolean).join(' ')) || surveyOf().survey?.name || 'Borehole project'}.bhp`, 'bhp', data, as, quiet);
 }
-async function backup(as, quiet) {
+async function backup(as, quiet) { return fileLock(async () => { if (S.mode === 'local' && SYNC.ch) try { await syncAll(); } catch {} return backupNow(as, quiet); }); }
+async function backupNow(as, quiet) {
   const gis = {}; for (const q of new Set([...sortedList().map(projKey), ...(GIS.proj !== undefined ? [GIS.proj] : [])])) { const g = await gisFileData(q); if (g) gis[q] = g; }
   const data = { app: 'borehole-field-log', kind: 'workspace', version: 4, saved: new Date().toISOString(), company: S.co, site: S.site || null, boreholes: sortedList(), photos: await photosFor(), ...(Object.keys(gis).length ? { gis } : {}) };
   await saveTo(WS_KEY, `Borehole workspace ${today()}.bhlog`, 'bhlog', data, as, quiet);
 }
 async function saveTo(key, name, ext, data, as, quiet) {
   const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
-  const done = fname => { S.fileAt.set(key, data.saved); if (key === WS_KEY) for (const b of data.boreholes) S.fileAt.set(projKey(b), S.fileAt.get(projKey(b)) || data.saved); setSync(); if (!quiet) toast(`Saved ${fname}. Changes now save to it automatically.`); };
+  const done = fname => { S.fileAt.set(key, data.saved); if (key === WS_KEY) for (const b of data.boreholes) S.fileAt.set(projKey(b), S.fileAt.get(projKey(b)) || data.saved); setSync(); setTimeout(() => syncPost({ t: 'files', at: [...S.fileAt] }), 0); if (!quiet) toast(`Saved ${fname}. Changes now save to it automatically.`); };
   if (window.desktop) {   // desktop app: a real file on disk; later saves go straight back to it
     const r = await window.desktop.save({ name, data: await blob.arrayBuffer(), path: as ? null : S.fh.get(key)?.path, saveAs: !!as });
     if (r) { S.fh.set(key, { name: r.name, path: r.path }); lsSet('bhlog.files', JSON.stringify({ ...fileLinks(), [key]: { name: r.name, path: r.path } })); done(r.name); }
@@ -9958,7 +10076,7 @@ const MWS_I = { select: '<path d="M4 8V4h4M16 4h4v4M4 16v4h4" /><path d="M11 10l
 const MWS_TOOLS = [['explore', 'Explore', 'Drag to move, scroll to zoom, click a borehole or shape to see what it is (Esc comes back here)'], ['select', 'Select', 'Click or drag a box to select. Shift adds, Ctrl switches'], ['info', 'Identify', 'Click anywhere to list everything there, with the values of the layers that are on'], ['measure', 'Measure', 'Click points to measure distance, bearing and area'], ['section', 'Section line', 'Click boreholes in the order the section runs']];
 const MWS_CHEV = '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
 function mwsApply() {
-  const on = mwsOn(), B = document.body.classList; B.toggle('mws-map', on); B.toggle('mws-toc', on && S.ui.mwsSide !== 'bhs');
+  const on = mwsOn(), B = document.body.classList, tbl = on && WIN && WINQ.get('pane') === 'table'; B.toggle('mws-map', on); B.toggle('mws-tbl', !!tbl); if (tbl && S.loaded) { const M = S.mwsT; M.shut ||= new Set(); for (const k of mwsSources()) if (!M.open.includes(k) && !M.shut.has(k)) M.open.push(k); if (!M.src) M.src = M.open[0] || null; }   // a table window lists every layer that has one B.toggle('mws-toc', on && S.ui.mwsSide !== 'bhs');
   for (const id of ['mws-bar', 'mws-tabs', 'sb-map']) { const el = document.getElementById(id); if (el) el.hidden = !on; }
   const c = $('#mws-contents'); if (c) c.hidden = !on || S.ui.mwsSide === 'bhs';
   if (on) $('.shell')?.style.setProperty('--mws-w', mwsSideW() + 'px');
@@ -10276,7 +10394,7 @@ function mwsSelSet(src, ids, how = 'new', only = true) {   // new, add, toggle, 
   else if (how === 'toggle') { n = new Set(was); for (const i of ids) n.has(i) ? n.delete(i) : n.add(i); } else { if (only) S.mwsSel.clear(); n = new Set(ids); }
   if (n.size) S.mwsSel.set(src, n); else S.mwsSel.delete(src);
 }
-function mwsSelDone() { mwsSelDraw(); mwsSelCount(); mwsDockFill(); }
+function mwsSelDone() { mselPost(); mwsSelDraw(); mwsSelCount(); mwsDockFill(); }
 function mwsSelClear() { S.mwsSel.clear(); mwsSelDone(); }
 function mwsSelCount() { const el = $('#mws-seln'), n = mwsSelN(); if (el) { el.hidden = !n; el.textContent = n.toLocaleString('en-CA') + ' selected'; } }
 function mwsSelDraw() {
@@ -10326,7 +10444,7 @@ document.addEventListener('pointerup', e => {
 const mwsDockH = () => Math.round(Math.max(130, Math.min(innerHeight - 320, +S.ui.mwsDH || 240)));
 function mwsDockHTML() { return '<div class="mws-dock" id="mws-dock"' + (S.mwsT.src ? '' : ' hidden') + ' style="height:' + mwsDockH() + 'px"></div>'; }
 function mwsTOpen(src) { if (!src) return; const T = S.mwsT; if (!T.open.includes(src)) T.open.push(src); const was = !!T.src; T.src = src; if (was) { mwsDockFill(true); mwsRender(); } else renderView(true); }
-function mwsTShut(src) { const T = S.mwsT; T.open = T.open.filter(x => x !== src); if (T.src === src) T.src = T.open.at(-1) || null; if (T.src) mwsDockFill(true); else renderView(true); }
+function mwsTShut(src) { const T = S.mwsT; T.shut?.add(src); T.open = T.open.filter(x => x !== src); if (T.src === src) T.src = T.open.at(-1) || null; if (T.src) mwsDockFill(true); else renderView(true); }
 const mwsSt = () => S.mwsT.st[S.mwsT.src] ||= { sort: null, dir: 1, q: '', only: false, top: 0, left: 0 };
 const mwsColl = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 let mwsRows = [];   // the rows shown, in order
@@ -10343,7 +10461,7 @@ function mwsDockFill(full) {
   el.hidden = false; if (!full && el.querySelector('td input, td select')) return; const T = mwsTable(M.src), st = mwsSt(); mwsRows = mwsRowsOf(T, st); const sel = mwsSelOf(M.src), n = T.rows.length, feats = M.src === 'feat' || GIS.layers.find(L => 'g:' + L.id === M.src)?.kind === 'feats';
   if (full || !el.querySelector('.mws-dg')) {
     el.innerHTML = '<div class="mws-drz" data-mwsdrz title="Drag to resize"></div><div class="mws-pt mws-dt" role="tablist" aria-label="Attribute tables">' + M.open.map(k => '<span class="' + (k === M.src ? 'on' : '') + '"><button type="button" role="tab" aria-selected="' + (k === M.src) + '" data-mwstbl="' + esc(k) + '">' + esc(mwsSrcName(k)) + '</button><button type="button" class="x" data-mwstx="' + esc(k) + '" title="Close" aria-label="Close ' + esc(mwsSrcName(k)) + '">×</button></span>').join('') + '</div>'
-      + '<div class="mws-db"><span class="mws-dn"></span><input type="search" id="mws-q" placeholder="Filter rows" aria-label="Filter rows" value="' + esc(st.q) + '" autocomplete="off"><label class="check"><input type="checkbox" id="mws-only"' + (st.only ? ' checked' : '') + '> Selected only</label>' + [['val', 'Select by values…'], ['loc', 'Select by location…'], ['inv', 'Switch selection'], ['clr', 'Clear'], ['zoom', 'Zoom to selected'], ['lay', 'New layer from selected']].map(([k, t]) => '<button type="button" class="btn link" data-mwsd="' + k + '">' + t + '</button>').join('') + (feats && !S.readOnly ? '<button type="button" class="btn link danger-text" data-mwsd="del">Delete selected</button>' : '') + '<span class="sp"></span><button type="button" class="btn link" data-mwsd="csv">Export (CSV)</button></div><div class="mws-dg" id="mws-dg" tabindex="0"></div>';
+      + '<div class="mws-db"><span class="mws-dn"></span><input type="search" id="mws-q" placeholder="Filter rows" aria-label="Filter rows" value="' + esc(st.q) + '" autocomplete="off"><label class="check"><input type="checkbox" id="mws-only"' + (st.only ? ' checked' : '') + '> Selected only</label>' + [['val', 'Select by values…'], ['loc', 'Select by location…'], ['inv', 'Switch selection'], ['clr', 'Clear'], ['zoom', 'Zoom to selected'], ['lay', 'New layer from selected']].map(([k, t]) => '<button type="button" class="btn link" data-mwsd="' + k + '">' + t + '</button>').join('') + (feats && !S.readOnly ? '<button type="button" class="btn link danger-text" data-mwsd="del">Delete selected</button>' : '') + '<span class="sp"></span>' + (window.desktop?.openWindow && !WIN ? '<button type="button" class="btn link" data-winopen="site" data-pane="table">New window</button>' : '') + '<button type="button" class="btn link" data-mwsd="csv">Export (CSV)</button></div><div class="mws-dg" id="mws-dg" tabindex="0"></div>';
     $('#mws-dg').addEventListener('scroll', () => { const g = $('#mws-dg'), q = mwsSt(); q.top = g.scrollTop; q.left = g.scrollLeft; mwsGrid(T); });
   }
   el.querySelector('.mws-dn').textContent = (mwsRows.length < n ? mwsRows.length.toLocaleString('en-CA') + ' of ' : '') + n.toLocaleString('en-CA') + ' row' + (n === 1 ? '' : 's') + ', ' + sel.size.toLocaleString('en-CA') + ' selected';
@@ -10394,7 +10512,7 @@ function mwsLocDlg() {
 }
 function mwsZoomSel(src) {
   const ids = mwsSelOf(src), B = mwsShapes(src).filter(f => ids.has(f.id) && f.pts.length).map(mwsBox); if (!B.length) { toast('The selected rows have no coordinates.'); return; }
-  const a = Math.min(...B.map(b => b[0])), b = Math.min(...B.map(q => q[1])), c = Math.max(...B.map(q => q[2])), d = Math.max(...B.map(q => q[3])), t = S._plan, w = Math.max(c - a, 10), h = Math.max(d - b, 10); S.mv = { cx: (a + c) / 2, cy: (b + d) / 2, sc: Math.min(t.W / w, t.H / h, 60) * .7 }; S.mvProj = curProj(); drawPlan();
+  const a = Math.min(...B.map(b => b[0])), b = Math.min(...B.map(q => q[1])), c = Math.max(...B.map(q => q[2])), d = Math.max(...B.map(q => q[3])), t = S._plan, w = Math.max(c - a, 10), h = Math.max(d - b, 10); if (document.body.classList.contains('mws-tbl')) { syncPost({ t: 'zoom', p: curProj(), cx: (a + c) / 2, cy: (b + d) / 2, w, h }); return; } S.mv = { cx: (a + c) / 2, cy: (b + d) / 2, sc: Math.min(t.W / w, t.H / h, 60) * .7 }; S.mvProj = curProj(); drawPlan();
 }
 function mwsDo(k) {
   const src = S.mwsT.src, st = mwsSt(); if (k === 'val') return mwsValDlg(); if (k === 'loc') return mwsLocDlg();
@@ -10429,7 +10547,7 @@ document.addEventListener('click', e => {
     const i = +t.dataset.r, r = mwsRows[i], src = S.mwsT.src; if (!r || e.detail >= 2) return;
     if (e.shiftKey && mwsLastR?.src === src) { const a = Math.min(i, mwsLastR.i), b = Math.max(i, mwsLastR.i); mwsSelSet(src, mwsRows.slice(a, b + 1).map(x => x.id), e.ctrlKey || e.metaKey ? 'add' : 'new', false); }
     else { mwsSelSet(src, [r.id], e.ctrlKey || e.metaKey ? 'toggle' : 'new', false); mwsLastR = { src, i }; }
-    const sel = mwsSelOf(src); document.querySelectorAll('#mws-dg tr[data-r]').forEach(x => x.classList.toggle('on', sel.has(mwsRows[+x.dataset.r]?.id))); mwsSelDraw(); mwsSelCount(); if (mwsSt().only) mwsDockFill(); else { const n = $('#mws-dock .mws-dn'); if (n) n.textContent = n.textContent.replace(/[^ ]+ selected$/, sel.size.toLocaleString('en-CA') + ' selected'); document.querySelectorAll('#mws-dock [data-mwsd="zoom"], #mws-dock [data-mwsd="lay"], #mws-dock [data-mwsd="del"], #mws-dock [data-mwsd="clr"]').forEach(b => { b.disabled = !sel.size; }); }
+    const sel = mwsSelOf(src); document.querySelectorAll('#mws-dg tr[data-r]').forEach(x => x.classList.toggle('on', sel.has(mwsRows[+x.dataset.r]?.id))); mselPost(); mwsSelDraw(); mwsSelCount(); if (mwsSt().only) mwsDockFill(); else { const n = $('#mws-dock .mws-dn'); if (n) n.textContent = n.textContent.replace(/[^ ]+ selected$/, sel.size.toLocaleString('en-CA') + ' selected'); document.querySelectorAll('#mws-dock [data-mwsd="zoom"], #mws-dock [data-mwsd="lay"], #mws-dock [data-mwsd="del"], #mws-dock [data-mwsd="clr"]').forEach(b => { b.disabled = !sel.size; }); }
   }
 });
 document.addEventListener('dblclick', e => { const td = e.target.closest?.('#mws-dg td[data-c]'); if (td) mwsCellEdit(td); });
@@ -10442,6 +10560,12 @@ document.addEventListener('pointerdown', e => {
   addEventListener('pointermove', mv); addEventListener('pointerup', up);
 });
 
+/* ---------- windows: right-click a page on the rail, or View › Open this page in a new window; a table has its own button ---------- */
+let winSt = '';
+function winState() { const p = curProj(), t = (NAV_LABEL[S.tab] || 'Projects') + (p ? ' - ' + p : '') + ' - Borehole Field Log'; if (WIN && document.title !== t) document.title = t; const k = S.tab + '|' + p; if (WIN && k !== winSt) { winSt = k; window.desktop?.winState?.({ tab: S.tab, p }); } }
+if (WIN && WINQ.get('pane') === 'table') document.documentElement.classList.add('mws-tblw');
+document.addEventListener('contextmenu', e => { const b = e.target.closest?.('#prail [data-tab]'); if (!b || b.disabled || !window.desktop?.openWindow) return; e.preventDefault(); const k = b.dataset.tab; mwsMenu(e.clientX, e.clientY, mwsMi('data-winopen="' + k + '"', 'Open in a new window') + (k === 'site' ? mwsMi('data-winopen="site" data-pane="table"', 'Open the attribute table in a new window') : '') + '<hr>' + mwsMi('data-winlink="1"', (S.ui.linkSel === false ? '' : '✓ ') + 'Windows follow the selection')); });
+document.addEventListener('click', e => { let t = e.target.closest?.('[data-winopen]'); if (t) { closeMenu(); if (t.dataset.pane === 'table' && S.mwsT.src && !WIN) { mwsTShut(S.mwsT.src); } openWin(t.dataset.winopen, t.dataset.pane); return; } t = e.target.closest?.('[data-winlink]'); if (t) { closeMenu(); S.ui.linkSel = S.ui.linkSel === false; uiSave(); toast(S.ui.linkSel ? 'Choosing a borehole or selecting on the map here is followed by the other windows.' : 'This window no longer follows or leads the selection.'); } });
 /* ---------- the site plan as a map: drag to pan, wheel or buttons to zoom; Fit returns to the whole site ---------- */
 S.mv = null; S.mvProj = null;
 /* map symbols for boreholes and wells: a shape, fill, outline and size (radius, px). The project's own (site.symStyle) apply on
@@ -12436,7 +12560,8 @@ const fmtV = v => v >= 1 ? v.toFixed(1) + ' m/day' : v >= .01 ? v.toFixed(3) + '
 const fmtT = d => d < 60 ? Math.round(d) + ' days' : d < 730 ? (d / 30.4).toFixed(1) + ' months' : (d / 365.25).toFixed(1) + ' years';
 GIS.layers = [];
 let gisLayerSeq = 0;
-function gisAddLayer(L) { L.id = 'L' + (++gisLayerSeq); L.on = true; GIS.layers = [L, ...GIS.layers.filter(x => x.tool !== L.tool || x.name !== L.name)]; S.tocSel = 'g:' + L.id; S.tocFold.delete('gis'); return L; }
+const gisSfx = WIN ? Array.from({ length: 5 }, () => 'abcdefghjkmnpqrstuvwxyz'[Math.random() * 23 | 0]).join('') : '';   // ids made in different windows never meet
+function gisAddLayer(L) { L.id = 'L' + (++gisLayerSeq) + gisSfx; L.on = true; GIS.layers = [L, ...GIS.layers.filter(x => x.tool !== L.tool || x.name !== L.name)]; S.tocSel = 'g:' + L.id; S.tocFold.delete('gis'); return L; }
 /* ---------- Toolbox layers are kept with their project: on this computer (IndexedDB, as they are: grids as typed arrays, pictures as
    files) and in project and workspace files (grids gzipped in base64; slope left out and worked out again when opened). A light check
    every 2 s saves any change (a tool's result, a layer turned on or off, a colour, a label) and follows the project that is open. ---------- */
@@ -12450,24 +12575,26 @@ const gisRefs = new WeakMap(); let gisRefN = 0; const gisRef = v => { let n = gi
 const gisKeeps = (k, v) => !k.startsWith('_') && !GIS_DERIVED.has(k) && v !== undefined && typeof v !== 'function' && !(v instanceof Node);
 const gisSigOf = () => GIS.layers.map(L => Object.entries(L).filter(([k, v]) => gisKeeps(k, v)).map(([k, v]) => k + '=' + (gisHeavy(v) ? '@' + gisRef(v) : JSON.stringify(v))).join('|') + (L.kind === 'image' ? '|' + (L.url || '') : '')).join('\n') + '#' + JSON.stringify(S.v3dTerrain || null);
 const gisDK = (p, id) => 'gisd:' + p + '\u0000' + id;
+GIS.dr = new Map(); GIS.ix = []; GIS.rv = null;   // each layer's data revision, the index and its revision, as last read or written
 GIS.saved = new Map();   // layer id -> the arrays last written for it
 const gisSplit = o => { const light = {}, data = {}; for (const [k, v] of Object.entries(o)) (gisHeavy(v) ? data : light)[k] = v; return [light, data]; };
 async function gisRead(p) {   // { at, layers, v3dTerrain, seq }, or null. Throws when the store cannot be read
   const ix = await dataStore.get('gis2:' + p); if (!ix) return dataStore.get('gis:' + p);
-  return { ...ix, layers: await Promise.all(ix.layers.map(async l => ({ ...l, ...((await dataStore.get(gisDK(p, l.id))) || {}) }))) };
+  return { ...ix, _ix: ix.layers, layers: await Promise.all(ix.layers.map(async ({ dr, ...l }) => ({ ...l, ...((await dataStore.get(gisDK(p, l.id))) || {}) }))) };
 }
 async function gisWrite(p, rec) {   // everything, as it is
-  const old = await dataStore.under('gisd:' + p + '\u0000'), puts = [], ix = { v: 2, at: rec.at, seq: rec.seq || 0, v3dTerrain: rec.v3dTerrain || null, layers: [] };
-  rec.layers.forEach((l, i) => { const o = { ...l, id: l.id || 'L' + (i + 1) }, [light, data] = gisSplit(o); ix.layers.push(light); puts.push([gisDK(p, o.id), data]); });
+  const old = await dataStore.under('gisd:' + p + '\u0000'), puts = [], ix = { v: 2, at: rec.at, seq: rec.seq || 0, rv: uid('r'), v3dTerrain: rec.v3dTerrain || null, layers: [] };
+  rec.layers.forEach((l, i) => { const o = { ...l, id: l.id || 'L' + (i + 1) }, [light, data] = gisSplit(o); delete light.dr; ix.layers.push({ ...light, dr: uid('d') }); puts.push([gisDK(p, o.id), data]); });
   const keep = new Set(puts.map(q => q[0])); puts.push(['gis2:' + p, ix]);
-  await dataStore.write(puts, [...old.filter(k => !keep.has(k)), 'gis:' + p]);
+  await dataStore.write(puts, [...old.filter(k => !keep.has(k)), 'gis:' + p]); syncPost({ t: 'gis', p });
 }
-const gisWipe = async p => dataStore.write([], [...await dataStore.under('gisd:' + p + '\u0000'), 'gis2:' + p, 'gis:' + p]);
+const gisWipe = async p => { await dataStore.write([], [...await dataStore.under('gisd:' + p + '\u0000'), 'gis2:' + p, 'gis:' + p]); syncPost({ t: 'gis', p }); };
 /* undo: the layers as they were, sharing the same arrays (nothing is copied). Kept while the project stays open */
 const gisSnap = () => GIS.layers.map(L => ({ ...L }));
 function gisHist() {
   if (!S.loaded || GIS.proj === undefined || GIS.proj !== curProj() || hist.applying || S.readOnly) return;
   const sg = gisSigOf(); if (sg === GIS.histSig) return; const before = GIS.snap, after = gisSnap(); GIS.histSig = sg; GIS.snap = after;
+  if (SYNC.ch) setTimeout(gisWatch, 120);   // the other windows see it at once
   hist.undo.push({ at: 0, items: [{ key: 'gis', before, after }] }); if (hist.undo.length > 200) hist.undo.shift(); hist.redo = []; updateUndo();
 }
 function gisRestore(list) { GIS.layers = list.map(L => ({ ...L, url: L.kind === 'image' || !L.values ? L.url : null })); S.mwsSel?.clear(); if (S.tocSel?.startsWith('g:') && !GIS.layers.some(L => 'g:' + L.id === S.tocSel)) S.tocSel = null; GIS.snap = gisSnap(); GIS.histSig = gisSigOf(); }
@@ -12481,17 +12608,56 @@ async function gisRecs() {   // the layers as plain records: no blob URLs; a pic
 function gisFromRec(r) { const L = { ...r }; delete L.imgBlob; L.url = r.imgBlob ? URL.createObjectURL(r.imgBlob) : null; if (r.imgBlob) L._blob = r.imgBlob; return L; }
 async function gisPersist(p) {
   if (S.readOnly || p === undefined || GIS.bad) return;
-  const recs = await gisRecs(), puts = [], saved = new Map(), ix = { v: 2, at: new Date().toISOString(), seq: gisLayerSeq, v3dTerrain: S.v3dTerrain || null, layers: [] };
-  for (const o of recs) { const [light, data] = gisSplit(o); ix.layers.push(light); saved.set(o.id, data); const was = GIS.saved.get(o.id), ks = Object.keys(data); if (!was || Object.keys(was).length !== ks.length || ks.some(k => was[k] !== data[k])) puts.push([gisDK(p, o.id), data]); }
+  const sg = gisSigOf(), recs = await gisRecs(), dirty = new Map(), saved = new Map(), mine = [];
+  for (const o of recs) { const [light, data] = gisSplit(o); delete light.dr; saved.set(o.id, data); const was = GIS.saved.get(o.id), ks = Object.keys(data), ch = !was || Object.keys(was).length !== ks.length || ks.some(k => was[k] !== data[k]); const dr = ch ? uid('d') : GIS.dr.get(o.id) || uid('d'); if (ch) dirty.set(o.id, data); mine.push({ ...light, dr }); }
+  let ix = null, foreign = false;
   try {
-    const old = await dataStore.under('gisd:' + p + '\u0000'), keep = new Set(recs.map(o => gisDK(p, o.id)));
-    await dataStore.write([...puts, ['gis2:' + p, ix]], [...old.filter(k => !keep.has(k)), 'gis:' + p]); GIS.saved = saved; GIS.lastPut = puts.length;
-  } catch { gisSig = ''; if (!S.gisWarned) { S.gisWarned = true; toast('The map layers could not be saved on this computer (storage full or blocked). Save the project to a file to keep them.'); } }
+    const d = await dataStore.open();
+    await new Promise((res, rej) => {
+      const tx = d.transaction('kv', 'readwrite'), st = tx.objectStore('kv'), g = st.get('gis2:' + p); let err = null;
+      g.onsuccess = () => { try {
+        const cur = g.result || null; let layers = mine, v3 = S.v3dTerrain || null; foreign = !!cur && !!cur.rv && cur.rv !== GIS.rv;
+        if (foreign) { layers = merge3(GIS.ix || [], mine, cur.layers); if (eqJ(v3, GIS.v3 || null)) v3 = cur.v3dTerrain || null; }
+        ix = { v: 2, at: new Date().toISOString(), rv: uid('r'), seq: Math.max(gisLayerSeq, cur?.seq || 0), v3dTerrain: v3, layers };
+        const keep = new Set(layers.map(l => l.id)); for (const [id, data] of dirty) if (keep.has(id)) st.put(data, gisDK(p, id));
+        for (const l of [...(GIS.ix || []), ...(cur?.layers || [])]) if (!keep.has(l.id)) st.delete(gisDK(p, l.id)); st.delete('gis:' + p); st.put(ix, 'gis2:' + p);
+      } catch (e) { err = e; tx.abort(); } };
+      tx.oncomplete = res; tx.onerror = tx.onabort = () => rej(err || tx.error || new Error('not written'));
+    });
+  } catch { gisSig = ''; if (!S.gisWarned) { S.gisWarned = true; toast('The map layers could not be saved on this computer (storage full or blocked). Save the project to a file to keep them.'); } return; }
+  const drWas = new Map(mine.map(l => [l.id, l.dr])); GIS.lastPut = dirty.size; GIS.saved = saved; GIS.dr = drWas; GIS.ix = ix.layers; GIS.rv = ix.rv; GIS.v3 = ix.v3dTerrain; syncPost({ t: 'gis', p });
+  if (foreign && p === GIS.proj) { const moved = gisSigOf() !== sg; await gisTake(p, ix); if (moved) gisSig = ''; }
+}
+/* layers as another window saved them: styles and order onto the layers here, data read only where it changed */
+async function gisTake(p, ix) {
+  const by = new Map(GIS.layers.map(L => [L.id, L])), out = [];
+  for (const l of ix.layers) {
+    const { dr, ...light } = l, L = by.get(l.id), same = L && GIS.dr.get(l.id) === dr, data = same ? null : (await dataStore.get(gisDK(p, l.id)).catch(() => null)) || {};
+    if (p !== GIS.proj) return; const N = L || {}; for (const k of Object.keys(N)) if (gisKeeps(k, N[k]) && !(k in light) && !(same && gisHeavy(N[k]))) delete N[k];
+    Object.assign(N, light); if (N.url && (N.values || data?.imgBlob)) { URL.revokeObjectURL(N.url); N.url = null; }
+    if (data) { const b = data.imgBlob; Object.assign(N, data); delete N.imgBlob; if (b) { N._blob = b; N.url = URL.createObjectURL(b); } GIS.saved.set(l.id, data); }
+    GIS.dr.set(l.id, dr); out.push(N);
+  }
+  for (const [id] of by) if (!out.some(L => L.id === id)) { GIS.saved.delete(id); GIS.dr.delete(id); }
+  GIS.layers = out; S.v3dTerrain = ix.v3dTerrain || null; GIS.ix = ix.layers; GIS.rv = ix.rv; GIS.v3 = ix.v3dTerrain || null; gisLayerSeq = Math.max(gisLayerSeq, ix.seq || 0);
+  for (const st of ['undo', 'redo']) hist[st] = hist[st].filter(x => !x.items.some(i => i.key === 'gis')); updateUndo();
+  if (S.tocSel?.startsWith('g:') && !out.some(L => 'g:' + L.id === S.tocSel)) S.tocSel = null;
+  gisSig = GIS.histSig = gisSigOf(); GIS.snap = gisSnap(); if (['site', 'v3d', 'compose'].includes(S.tab)) syncRender();
+}
+async function gisPull() {
+  if (S.mode !== 'local' || GIS.proj === undefined || GIS.bad) return; if (gisBusy) { clearTimeout(GIS.pullT); GIS.pullT = setTimeout(gisPull, 150); return; }
+  gisBusy = true; const p = GIS.proj;
+  try {
+    gisHist(); if (gisSigOf() !== gisSig) { gisSig = gisSigOf(); await gisPersist(p); return; }   // a change of my own is waiting: saving it merges
+    const ix = await dataStore.get('gis2:' + p); if (!ix) { if (GIS.rv && GIS.layers.length) await gisTake(p, { layers: [], rv: null, seq: 0 }); return; }
+    if (ix.rv !== GIS.rv) await gisTake(p, ix);
+  } catch { /* the next change tries again */ } finally { gisBusy = false; }
 }
 async function gisLoad(p) {
   let rec = null; GIS.bad = false; try { rec = await gisRead(p); } catch { GIS.bad = true; toast('The map layers could not be read from this computer, so changes to them will not be saved. Restart the app to try again.'); }
   for (const L of GIS.layers) if (L.url) URL.revokeObjectURL(L.url);
   GIS.layers = (rec?.layers || []).map(gisFromRec);
+  GIS.ix = rec?._ix || []; GIS.rv = rec?.rv || null; GIS.v3 = rec?.v3dTerrain || null; GIS.dr = new Map(GIS.ix.map(l => [l.id, l.dr]));
   GIS.saved = new Map((rec?.v === 2 ? rec.layers : []).map(o => [o.id, gisSplit(o)[1]]));
   gisLayerSeq = Math.max(gisLayerSeq, rec?.seq || 0, ...GIS.layers.map(L => +String(L.id).replace(/\D/g, '') || 0));
   S.v3dTerrain = rec?.v3dTerrain || null;
@@ -15719,7 +15885,7 @@ function setSite(st, p = curProj(), stamp = true) {
   if (st) projects[p] = stamp ? { ...st, edited: new Date().toISOString() } : st; else { delete projects[p]; delete projects['*']; }
   S.site = { projects }; saveSite(); autosaveSoon(p);
 }
-function saveSite() { histRecord('site'); if (S.mode === 'db') S.db.doc('settings/site').set(JSON.parse(JSON.stringify(S.site || {}))).catch(writeError); else if (!S.loadFail) dataSave('bhlog.site', JSON.stringify(S.site || {})); }
+function saveSite() { histRecord('site'); if (S.mode === 'db') S.db.doc('settings/site').set(JSON.parse(JSON.stringify(S.site || {}))).catch(writeError); else if (!S.loadFail) syncSave('bhlog.site'); }
 function openSiteImg() {
   const st = siteOf() || {};
   dialog('Site plan image', `
@@ -16495,6 +16661,8 @@ document.addEventListener('click', e => {
   switch (act) {
     case 'menu': openMenu(); break;
     case 'find': openFind(); break;
+    case 'win-page': openWin(S.tab === 'projects' ? 'home' : S.tab); break;
+    case 'win-table': openWin('site', 'table'); break;
     case 'graphs': dialog('Graphs on the logs', graphsRowHTML() + '<p class="note" style="margin:0">Every borehole log in the project uses these graphs, on screen and in PDFs. Chart colours: lab results above their guideline are red.</p>', '<button class="btn primary" data-act="close">Done</button>'); break;
     case 'graph-add': if (!S.readOnly) { const SR = graphSeries(), have = new Set((S.co.graphs || []).map(g => g.series)), k = ['cvc', ...Object.keys(SR).filter(x => x.startsWith('lab:')), 'n', 'w', 'fines'].find(x => SR[x] && !have.has(x) && projList().some(bb => (bb.samples || []).some(sm => val(SR[x][3](sm, bb))))) || Object.keys(SR)[0]; S.co.graphs = [...(S.co.graphs || []), { id: uid('g'), series: k, type: k === 'cvc' ? 'heat' : 'line', scale: '' }]; store.saveCompany(); refreshGraphs(); } break;
     case 'bh-more': openActMenu(t, BH_MORE); break;
@@ -16843,7 +17011,7 @@ const MENUS = [
     ['Export this borehole (.bh)…', 'save-bh'], ['Export Excel workbook…', 'export'], ['Export all data (Excel)…', 'export-data'], ['Export AGS 4…', 'ags'], ['Export GIS…', 'gis'], '-', ['Back up everything (.bhlog)…', 'backup'], '-', ['Settings…', 'prefs', 'Mod+,']]],
   ['Edit', [['Undo', 'undo', 'Mod+Z'], ['Redo', 'redo', 'Mod+Y'], '-', { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }, '-', ['Find…', 'find', 'Mod+F']]],
   ['View', [['Overview', 'tab:home'], ['Map & sections', 'tab:site'], ['Data tables', 'tab:table'], ['Groundwater', 'tab:gw'], ['Lab & contamination', 'tab:contam'], ['Outputs', 'tab:compose'], '-',
-    ['Log & data', 'tab:edit', 'Mod+1'], ['Full log', 'tab:log', 'Mod+2'], ['PDF preview', 'tab:report', 'Mod+3'], '-', ['Field mode (large controls)', 'field'], { role: 'zoom' }, { role: 'dev' }]],
+    ['Log & data', 'tab:edit', 'Mod+1'], ['Full log', 'tab:log', 'Mod+2'], ['PDF preview', 'tab:report', 'Mod+3'], '-', ['Open this page in a new window', 'win-page', 'Mod+Shift+N'], ['Attribute table in a new window', 'win-table'], '-', ['Field mode (large controls)', 'field'], { role: 'zoom' }, { role: 'dev' }]],
   ['Project', [['New borehole', 'new'], ['Monitoring round…', 'round'], ['Copy details to all boreholes…', 'apply-project'], '-', ['Site drawing…', 'site-img'], ['Import locations…', 'imp-loc'], ['Import shapes…', 'imp-shp'], ['Add imagery…', 'imp-img'], '-', ['Remove example boreholes', 'clear-examples']]],
   ['Boreholes', [['Export this borehole (.bh)…', 'save-bh'], ['Import a borehole into this project (.bh)…', 'imp-bh'], '-', ['Log step by step', 'qlog', 'Mod+L'], ['Add sample', 'quick'], ['Drilling note', 'quick-note'], '-', ['Check log', 'check-log'], ['Mark ready for review', 'to-review'], ['Issue…', 'issue'], ['Revise', 'revise'], ['Comments', 'comments'], ['History', 'history'], '-',
     ['Duplicate', 'duplicate'], ['Save as template', 'bh-tpl'], ['Delete…', 'delete']]],
@@ -16919,6 +17087,7 @@ document.addEventListener('keydown', e => {
 });
 /* status bar: save state, project, borehole and its problems, units */
 function renderStatus() {
+  selPost(); winState();
   const b = cur(), p = curProj(), n = projList().length;
   const set = (id, h) => { const el = $('#' + id); if (el && el.innerHTML !== h) el.innerHTML = h; };
   set('sb-proj', p ? `Project <b>${esc(p.length > 60 ? p.slice(0, 58) + '…' : p)}</b>` : 'No project');
@@ -16973,12 +17142,13 @@ renderMenubar(); syncBar();
 if (window.desktop) {   // desktop app: menu commands and project files opened from the computer
   window.desktop.setMenu?.(MENUS);
   window.desktop.onMenu(runAct);
-  window.desktop.onOpenFile(f => { const go = () => S.loaded ? restore(new File([f.text], f.name), { name: f.name, path: f.path }) : setTimeout(go, 120); go(); });
+  if (!WIN) window.desktop.onOpenFile(f => { const go = () => S.loaded ? restore(new File([f.text], f.name), { name: f.name, path: f.path }) : setTimeout(go, 120); go(); });
   window.desktop.ready();
-  setTimeout(() => updateCheck(false), 5000);   // after start-up has settled; silent when offline or up to date
+  if (!WIN) setTimeout(() => updateCheck(false), 5000);   // after start-up has settled; silent when offline or up to date
   gisInit();   // the optional GIS engines: whether they are installed, and their versions
 }
 store.init().then(() => {
+  if (WIN) return;
   if (!(location.hash === '#quick' || window.QUICK_LOG_ONLY || lsGet('bhlog.startQL') === '1')) return;
   const go = () => { if (!S.loaded) { setTimeout(go, 120); return; } openQL(); };
   go();

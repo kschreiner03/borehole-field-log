@@ -1,5 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell, type MenuItemConstructorOptions } from 'electron';
-import { readFileSync } from 'node:fs';
+import { app, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell, type MenuItemConstructorOptions } from 'electron';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { mf6Binary, runMf6 } from './mf6run.mjs';
@@ -32,11 +32,44 @@ let rendererReady = false;
 let quitting = false;
 const queued: string[] = [];   // project files opened from the OS before the window was ready
 
+/* the app's windows: the main one, and any page opened in a window of its own. All are the same page, with the same rights; each
+   saves what is changed in it (the page merges what the others saved). Only these may use the bridge */
+const ours = new Set<number>();
+const writing = new Map<string, Promise<void>>();
+type Ev = Electron.IpcMainEvent | Electron.IpcMainInvokeEvent;
+const mine = (e: Ev) => ours.has(e.sender.id) && e.senderFrame === e.sender.mainFrame;
+const owner = (e: Ev) => BrowserWindow.fromWebContents(e.sender) ?? win!;
+type WinInfo = { tab: string; pane: string; p: string };
+const extra = new Map<BrowserWindow, WinInfo>();
+const MAX_EXTRA = 5;
+const winFile = () => join(app.getPath('userData'), 'windows.json');
+let mainClosing = false;
+// where the extra windows are, kept for the next start (not while everything is closing)
+const saveWindows = () => { if (mainClosing || quitting) return; try { writeFileSync(winFile(), JSON.stringify([...extra].filter(([w]) => !w.isDestroyed()).map(([w, i]) => ({ ...i, bounds: w.getNormalBounds(), max: w.isMaximized() })))); } catch { /* the layout is not kept */ } };
+const onScreen = (b: Electron.Rectangle) => screen.getAllDisplays().some(d => { const a = d.workArea, w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x), h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y); return w > 120 && h > 80; });
+const okInfo = (o: unknown): o is WinInfo & { b?: string } => { const q = o as Record<string, unknown>; return !!q && typeof q === 'object' && typeof q.tab === 'string' && /^[a-z0-9]{1,12}$/.test(q.tab) && (q.pane === '' || q.pane === 'table') && typeof q.p === 'string' && q.p.length < 400; };
+function openExtra(o: WinInfo & { b?: string }, bounds?: Electron.Rectangle, max?: boolean) {
+  if (extra.size >= MAX_EXTRA) return { ok: false, error: `Up to ${MAX_EXTRA} extra windows can be open. Close one first.` };
+  const tbl = o.pane === 'table', at = bounds && [bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) ? (onScreen(bounds) ? bounds : { width: bounds.width, height: bounds.height }) : tbl ? { width: 1100, height: 560 } : { width: 1280, height: 820 };
+  const w = new BrowserWindow({ ...at, minWidth: 480, minHeight: 320, title: 'Borehole Field Log', show: false, webPreferences: { preload: join(import.meta.dirname, '../preload/index.cjs'), contextIsolation: true, sandbox: true } });
+  extra.set(w, { tab: o.tab, pane: o.pane, p: o.p }); const id = w.webContents.id; ours.add(id);
+  w.once('ready-to-show', () => { if (max) w.maximize(); w.show(); });
+  guardWindow(w); w.on('moved', saveWindows); w.on('resized', saveWindows); w.on('maximize', saveWindows); w.on('unmaximize', saveWindows);
+  w.on('closed', () => { extra.delete(w); ours.delete(id); models.delete(id); saveWindows(); });
+  w.loadFile(join(app.getAppPath(), 'resources/legacy/index.html'), { hash: new URLSearchParams({ win: o.tab, pane: o.pane, p: o.p, b: typeof o.b === 'string' ? o.b.slice(0, 80) : '' }).toString() });
+  saveWindows(); return { ok: true };
+}
+ipcMain.handle('win:open', (e, o: unknown) => !mine(e) || !okInfo(o) ? { ok: false, error: 'Not allowed.' } : openExtra(o));
+ipcMain.on('win:state', (e, o: { tab?: unknown; p?: unknown }) => { const w = BrowserWindow.fromWebContents(e.sender), i = w && extra.get(w); if (!w || !i || !mine(e)) return; const n = { ...i, tab: o?.tab, p: o?.p }; if (okInfo(n)) { extra.set(w, { tab: n.tab, pane: n.pane, p: n.p }); saveWindows(); } });
+function restoreWindows() { let l: unknown = null; try { l = JSON.parse(readFileSync(winFile(), 'utf8')); } catch { return; } for (const o of Array.isArray(l) ? l.slice(0, MAX_EXTRA) : []) if (okInfo(o)) openExtra(o, (o as unknown as { bounds: Electron.Rectangle }).bounds, !!(o as unknown as { max: boolean }).max); }
+
 function createWindow(view: 'classic' | 'preview' = 'classic') {
+  mainClosing = false;
   win = new BrowserWindow({
     width: 1440, height: 920, minWidth: 1000, minHeight: 640, title: 'Borehole Field Log', show: false,
     webPreferences: { preload: join(import.meta.dirname, '../preload/index.cjs'), contextIsolation: true, sandbox: true },
   });
+  { const w0 = win, id = win.webContents.id; ours.add(id); w0.on('closed', () => { ours.delete(id); models.delete(id); if (win === w0) { mainClosing = true; win = null; for (const x of [...extra.keys()]) x.close(); } }); }
   win.once('ready-to-show', () => win?.show());
   // smoke test: BOREHOLE_SMOKE=<png path> loads the window, saves a screenshot and quits
   if (process.env.BOREHOLE_SMOKE) win.webContents.once('did-finish-load', () => setTimeout(async () => {
@@ -45,9 +78,16 @@ function createWindow(view: 'classic' | 'preview' = 'classic') {
     console.log('SMOKE', probe, 'MENU', JSON.stringify(Menu.getApplicationMenu()?.items.map(i => `${i.label}(${i.submenu?.items.length ?? 0})`)));
     app.quit();
   }, 3500));
-  win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
+  guardWindow(win);   // switching views replaces `win` before this window's close event fires
+  rendererReady = false;
+  if (view === 'classic') win.loadFile(join(app.getAppPath(), 'resources/legacy/index.html'));
+  else if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL);
+  else win.loadFile(join(import.meta.dirname, '../renderer/index.html'));
+}
+/* what every window of the app keeps to */
+function guardWindow(w: BrowserWindow) {
+  w.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   // the window only ever shows the app: outside pages would get the file bridge
-  const w = win;   // switching views replaces `win` before this window's close event fires
   w.webContents.on('will-navigate', (e, url) => { if (url !== w.webContents.getURL()) { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); } });
   // let the page write any save still waiting (local storage and the linked project file) before the window goes; give up after 5 s
   let flushed = false;
@@ -62,10 +102,6 @@ function createWindow(view: 'classic' | 'preview' = 'classic') {
         if (!w.isDestroyed()) w.close(); if (quitting) app.quit();   // holding the close cancelled a quit: carry it on
       });
   });
-  rendererReady = false;
-  if (view === 'classic') win.loadFile(join(app.getAppPath(), 'resources/legacy/index.html'));
-  else if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL);
-  else win.loadFile(join(import.meta.dirname, '../renderer/index.html'));
 }
 
 async function sendFile(path: string) {
@@ -75,20 +111,22 @@ async function sendFile(path: string) {
   catch (e) { dialog.showErrorBox('Could not open the file', `${path}\n\n${(e as Error).message}`); }
 }
 
-ipcMain.on('renderer-ready', () => { rendererReady = true; for (const p of queued.splice(0)) sendFile(p); });
+ipcMain.on('renderer-ready', e => { if (e.sender !== win?.webContents) return; rendererReady = true; for (const p of queued.splice(0)) sendFile(p); });
 
 /* save: write to the remembered path, or ask where (Save as, or the first save) */
 ipcMain.handle('file:save', async (e, o: { name: string; data: ArrayBuffer; path?: string | null; saveAs?: boolean }) => {
-  if (e.sender !== win?.webContents) return null;
+  if (!mine(e)) return null;
   // writing without asking is only for a project file the person opened or saved here; anything else goes through the dialog
   let path = !o.saveAs && files.canWrite(o.path) ? o.path! : null;
   if (!path) {
     const ext = extname(o.name).slice(1).toLowerCase();
-    const r = await dialog.showSaveDialog(win!, { defaultPath: o.name, filters: FILTERS[ext] || [{ name: 'All files', extensions: ['*'] }] });
+    const r = await dialog.showSaveDialog(owner(e), { defaultPath: o.name, filters: FILTERS[ext] || [{ name: 'All files', extensions: ['*'] }] });
     if (r.canceled || !r.filePath) return null;
     path = r.filePath;
   }
-  await writeFile(path, Buffer.from(o.data));
+  // saves to one file wait for each other, whichever window they come from
+  const to = path, prev = writing.get(to) || Promise.resolve(), job = prev.catch(() => undefined).then(() => writeFile(to, Buffer.from(o.data)));
+  writing.set(to, job); try { await job; } finally { if (writing.get(to) === job) writing.delete(to); }
   remember(path);
   if (/\.(bhp|bhlog)$/i.test(path)) app.addRecentDocument(path);
   return { path, name: basename(path) };
@@ -96,21 +134,21 @@ ipcMain.handle('file:save', async (e, o: { name: string; data: ArrayBuffer; path
 
 /* MODFLOW 6: the page sends model files (plain names, text only) and gets the listed outputs back; nothing else reaches the shell */
 ipcMain.handle('mf6:run', async (e, o: { files: Record<string, string>; outputs?: string[] }) => {
-  if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' };
+  if (!mine(e)) return { ok: false, error: 'Not allowed.' };
   return runMf6({ bin: mf6Binary(app.getAppPath()), files: o?.files, outputs: Array.isArray(o?.outputs) ? o.outputs : [] });
 });
 
 /* GIS engines (optional, per user): status, install with progress, remove, and one job at a time from a fixed list of methods */
 const gisCtx = () => ({ userData: app.getPath('userData'), root: app.getAppPath() });
-ipcMain.handle('gis:status', async e => e.sender !== win?.webContents ? null : gisStatus(gisCtx()));
-ipcMain.handle('gis:install', async e => { if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' }; const wc = e.sender; return gisInstall({ ...gisCtx(), onProgress: p => { if (!wc.isDestroyed()) wc.send('gis:progress', p); } }); });
-ipcMain.handle('gis:remove', async e => e.sender !== win?.webContents ? { ok: false, error: 'Not allowed.' } : gisRemove(gisCtx()));
-ipcMain.handle('gis:run', async (e, job: unknown) => { if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' }; const wc = e.sender; return gisRun({ ...gisCtx(), job, onProgress: p => { if (!wc.isDestroyed()) wc.send('gis:jobprogress', p); } }); });
-ipcMain.handle('gis:cancel', async (e, id: unknown) => e.sender === win?.webContents && typeof id === 'string' ? gisCancel(id) : false);
+ipcMain.handle('gis:status', async e => !mine(e) ? null : gisStatus(gisCtx()));
+ipcMain.handle('gis:install', async e => { if (!mine(e)) return { ok: false, error: 'Not allowed.' }; const wc = e.sender; return gisInstall({ ...gisCtx(), onProgress: p => { if (!wc.isDestroyed()) wc.send('gis:progress', p); } }); });
+ipcMain.handle('gis:remove', async e => !mine(e) ? { ok: false, error: 'Not allowed.' } : gisRemove(gisCtx()));
+ipcMain.handle('gis:run', async (e, job: unknown) => { if (!mine(e)) return { ok: false, error: 'Not allowed.' }; const wc = e.sender; return gisRun({ ...gisCtx(), job, onProgress: p => { if (!wc.isDestroyed()) wc.send('gis:jobprogress', p); } }); });
+ipcMain.handle('gis:cancel', async (e, id: unknown) => mine(e) && typeof id === 'string' ? gisCancel(id) : false);
 // an elevation model chosen here, in the shell's own Open dialog: the window gets a token for it, not its path
 ipcMain.handle('gis:pick', async (e, what: unknown) => {
-  if (e.sender !== win?.webContents || !win) return null;
-  const r = await dialog.showOpenDialog(win, what === 'lidar'
+  if (!mine(e)) return null;
+  const r = await dialog.showOpenDialog(owner(e), what === 'lidar'
     ? { title: 'Open a lidar point cloud', properties: ['openFile'], filters: [{ name: 'Lidar point clouds', extensions: ['las', 'laz', 'zlidar'] }, { name: 'All files', extensions: ['*'] }] }
     : what === 'csv' ? { title: 'Open a table', properties: ['openFile'], filters: [{ name: 'Tables', extensions: ['csv', 'txt'] }, { name: 'All files', extensions: ['*'] }] }
     : what === 'vector'
@@ -125,32 +163,32 @@ ipcMain.handle('gis:pick', async (e, what: unknown) => {
 
 // a file a WhiteboxTools tool made (a lidar file): saved where the user chooses, by its token
 ipcMain.handle('gis:savefile', async (e, token: unknown, name: unknown) => {
-  if (e.sender !== win?.webContents || !win || typeof token !== 'string') return null;
+  if (!mine(e) || typeof token !== 'string') return null;
   const src = gisFilePath(token); if (!src) return null;
-  const r = await dialog.showSaveDialog(win, { title: 'Save the file', defaultPath: typeof name === 'string' ? name.replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 120) : basename(src) });
+  const r = await dialog.showSaveDialog(owner(e), { title: 'Save the file', defaultPath: typeof name === 'string' ? name.replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 120) : basename(src) });
   if (r.canceled || !r.filePath) return null;
   await copyFile(src, r.filePath); return { name: basename(r.filePath) };
 });
 
 /* Apple Maps: the key is set up and kept here (the app's own folder); the page asks for pictures of areas and gets images back */
 const appleFile = () => join(app.getPath('userData'), 'apple-maps.json');
-ipcMain.handle('apple:status', async e => { if (e.sender !== win?.webContents) return null; const c = await loadCreds(appleFile()); return c ? { teamId: c.teamId, keyId: c.keyId } : null; });
-ipcMain.handle('apple:setup', async (e, c: unknown) => e.sender !== win?.webContents ? { ok: false, error: 'Not allowed.' } : c ? saveCreds(appleFile(), c) : (await clearCreds(appleFile()), { ok: true }));
+ipcMain.handle('apple:status', async e => { if (!mine(e)) return null; const c = await loadCreds(appleFile()); return c ? { teamId: c.teamId, keyId: c.keyId } : null; });
+ipcMain.handle('apple:setup', async (e, c: unknown) => !mine(e) ? { ok: false, error: 'Not allowed.' } : c ? saveCreds(appleFile(), c) : (await clearCreds(appleFile()), { ok: true }));
 ipcMain.handle('apple:snapshot', async (e, q) => {
-  if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' };
+  if (!mine(e)) return { ok: false, error: 'Not allowed.' };
   try { return await fetchSnapshot(q, await loadCreds(appleFile())); } catch (err) { return { ok: false, error: (err as Error).message }; }
 });
 
 /* updates: the newest release on GitHub against this version; the download page opens in the person's browser */
-ipcMain.handle('update:check', async e => e.sender !== win?.webContents ? { ok: false, error: 'Not allowed.' } : checkForUpdate({ current: app.getVersion(), platform: process.platform }));
-ipcMain.handle('update:open', async e => { if (e.sender === win?.webContents) await shell.openExternal(HUB); });
+ipcMain.handle('update:check', async e => !mine(e) ? { ok: false, error: 'Not allowed.' } : checkForUpdate({ current: app.getVersion(), platform: process.platform }));
+ipcMain.handle('update:open', async e => { if (mine(e)) await shell.openExternal(HUB); });
 
 /* vector PDF: the window's page drawings (standalone SVG) printed by Chromium, so text stays real text that can be selected and
    edited in Acrobat; each page keeps its own paper size (inches). The print window runs no scripts and is closed straight after */
 type PdfPage = { svg: string; w: number; h: number };
 const isPages = (p: unknown): p is PdfPage[] => Array.isArray(p) && p.length > 0 && p.length <= 2000 && p.every(x => x && typeof x.svg === 'string' && x.w > 0 && x.w < 100 && x.h > 0 && x.h < 100);
 ipcMain.handle('pdf:svg', async (e, o: { pages?: unknown }) => {
-  if (e.sender !== win?.webContents) return { ok: false, error: 'Not allowed.' };
+  if (!mine(e)) return { ok: false, error: 'Not allowed.' };
   const pages = o?.pages; if (!isPages(pages)) return { ok: false, error: 'No pages to print.' };
   const css = pages.map((p, i) => `@page p${i}{size:${p.w}in ${p.h}in;margin:0}.p${i}{page:p${i};width:${p.w}in;height:${p.h}in}`).join('');
   const html = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:#fff}.pg{overflow:hidden;break-after:page}.pg:last-child{break-after:auto}.pg>svg{display:block;width:100%;height:100%}${css}</style>` + pages.map((p, i) => `<div class="pg p${i}">${p.svg}</div>`).join('');
@@ -164,8 +202,8 @@ ipcMain.handle('pdf:svg', async (e, o: { pages?: unknown }) => {
   finally { pw.destroy(); unlink(file).catch(() => {}); }
 });
 ipcMain.handle('file:open', async e => {
-  if (e.sender !== win?.webContents) return null;
-  const r = await dialog.showOpenDialog(win!, { properties: ['openFile'], filters: [{ name: 'Borehole project, workspace or borehole', extensions: PROJECT_EXT }] });
+  if (!mine(e)) return null;
+  const r = await dialog.showOpenDialog(owner(e), { properties: ['openFile'], filters: [{ name: 'Borehole project, workspace or borehole', extensions: PROJECT_EXT }] });
   if (r.canceled || !r.filePaths[0]) return null;
   const path = r.filePaths[0];
   remember(path); app.addRecentDocument(path);
@@ -182,7 +220,7 @@ const DEFAULT_MENU: MenuModel = [
   ['View', [{ role: 'zoom' }, { role: 'dev' }]],
 ];
 function buildMenu(model: MenuModel = DEFAULT_MENU) {
-  const send = (act: string) => () => win?.webContents.send('menu', act);
+  const send = (act: string) => () => (BrowserWindow.getFocusedWindow() && ours.has(BrowserWindow.getFocusedWindow()!.webContents.id) ? BrowserWindow.getFocusedWindow() : win)?.webContents.send('menu', act);
   // Mod is Cmd on a Mac and Ctrl elsewhere; redo is Shift+Cmd+Z on a Mac
   const accel = (act: string, k?: string) => !k || k === 'F1' && isMac ? undefined : act === 'redo' && isMac ? 'Shift+CmdOrCtrl+Z' : k.replace('Mod+', 'CmdOrCtrl+');
   const role = (r: string): MenuItemConstructorOptions[] =>
@@ -205,7 +243,9 @@ function buildMenu(model: MenuModel = DEFAULT_MENU) {
   }
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
-ipcMain.on('menu:set', (e, model: unknown) => { if (e.sender === win?.webContents && isModel(model)) buildMenu(model); });
+const models = new Map<number, MenuModel>();   // each window's own menu, shown while it has the focus
+ipcMain.on('menu:set', (e, model: unknown) => { if (!mine(e) || !isModel(model)) return; models.set(e.sender.id, model); const f = BrowserWindow.getFocusedWindow(); if (!f || f.webContents.id === e.sender.id) buildMenu(model); });
+app.on('browser-window-focus', (_e, w) => { const k = models.get(w.webContents.id); if (k) buildMenu(k); });
 
 /* any page the app ever opens: no embedded web views, and new windows go to the person's browser (web links only) */
 app.on('web-contents-created', (_e, wc) => {
@@ -225,6 +265,7 @@ else {
     session.defaultSession.setPermissionCheckHandler((_wc, perm) => allowed.has(perm));
     buildMenu();
     createWindow(process.env.BOREHOLE_VIEW === 'preview' ? 'preview' : 'classic');
+    if (process.env.BOREHOLE_VIEW !== 'preview' && !process.env.BOREHOLE_SMOKE) restoreWindows();
     const f = process.argv.slice(1).find(a => PROJECT_EXT.some(x => a.toLowerCase().endsWith('.' + x))); if (f) sendFile(f);
     app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
   });
