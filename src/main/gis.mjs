@@ -238,7 +238,8 @@ export function checkJob(job) {
     if (cs != null && !(+cs >= 0.05)) return 'The cell size must be 0.05 m or more.';
     if (job.levels != null && (!Array.isArray(job.levels) || job.levels.length > 400 || !job.levels.every(isNum))) return 'Contour levels must be numbers.';
   } else if (kind === 'rast') {
-    if (!['profile', 'cutfill', 'watershed', 'diff', 'griddist', 'calc', 'reclass', 'zonal', 'filter'].includes(method)) return 'Unknown method.';
+    if (!['profile', 'cutfill', 'watershed', 'diff', 'griddist', 'calc', 'reclass', 'zonal', 'filter', 'hyd'].includes(method)) return 'Unknown method.';
+    if (method === 'hyd') { if (!['twi', 'dep', 'hand', 'flood', 'catch', 'trace', 'screen'].includes(job.params?.op)) return 'Unknown method.'; if (['catch', 'trace'].includes(job.params.op) && !(nums(job.points, 2) && job.points.length === 1)) return 'A point is needed.'; }
     if (!gridOk(job.rasters?.a) || (job.rasters.b != null && !gridOk(job.rasters.b)) || (job.rasters.c != null && !gridOk(job.rasters.c))) return 'A layer grid is missing or does not match its size.';
     if (method === 'calc') {   // r.mapcalc's language only: the layers A, B, C, numbers, operators and a fixed set of its functions
       const e = String(job.expr || ''), words = e.match(/[A-Za-z_]+/g) || [];

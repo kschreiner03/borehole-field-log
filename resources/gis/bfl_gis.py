@@ -999,6 +999,121 @@ def rasterize_polys(polys, gt, nx, ny):
     gdal.RasterizeLayer(ds, [1], ly, burn_values=[1])
     return ds.GetRasterBand(1).ReadAsArray().astype(bool)
 
+def fill_depressions(A):
+    """the surface with its closed hollows filled to where they spill (priority flood, Barnes et al. 2014). Edges and no-data drain"""
+    import heapq
+    import numpy as np
+    ny, nx = A.shape; F = A.copy(); ok = np.isfinite(A); done = ~ok
+    pad = np.pad(ok, 1, constant_values=False); edge = ok & ~(pad[:-2, 1:-1] & pad[2:, 1:-1] & pad[1:-1, :-2] & pad[1:-1, 2:] & pad[:-2, :-2] & pad[:-2, 2:] & pad[2:, :-2] & pad[2:, 2:])
+    f = F.ravel().tolist(); dn = bytearray(done.ravel().astype('uint8').tobytes()); h = []
+    for i in np.flatnonzero(edge.ravel()).tolist(): h.append((f[i], i)); dn[i] = 1
+    heapq.heapify(h); n, tot, push, pop = 0, max(1, int(ok.sum())), heapq.heappush, heapq.heappop
+    while h:
+        z, i = pop(h); n += 1
+        if n % 200000 == 0: prog(0.1 + 0.3 * n / tot, 'Filling hollows: %d of %d cells' % (n, tot))
+        c = i % nx; up, dw, lf, rt = i >= nx, i < (ny - 1) * nx, c > 0, c < nx - 1
+        for j, t in ((i - nx, up), (i + nx, dw), (i - 1, lf), (i + 1, rt), (i - nx - 1, up and lf), (i - nx + 1, up and rt), (i + nx - 1, dw and lf), (i + nx + 1, dw and rt)):
+            if t and not dn[j]:
+                dn[j] = 1
+                if f[j] < z: f[j] = z
+                push(h, (f[j], j))
+    return np.array(f).reshape(ny, nx)
+
+def follow(nxt, stop):
+    """where every cell ends up along its flow path: at the first stop cell, or where the path leaves the layer (pointer doubling)"""
+    import numpy as np
+    n = nxt.copy(); here = np.arange(n.size); n[stop] = here[stop]
+    for _ in range(40):
+        m = n[n]
+        if np.array_equal(m, n): break
+        n = m
+    return n
+
+def mask_polys(mask, gt, label=None, keep=3000):
+    """areas of a mask as polygons [[ring, ...]], with the label under each"""
+    from osgeo import gdal, ogr
+    import numpy as np
+    ny, nx = mask.shape; v = label if label is not None else mask
+    ds = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Int32); ds.SetGeoTransform(gt); ds.GetRasterBand(1).WriteArray(np.where(mask, v, 0).astype('int32'))
+    md = gdal.GetDriverByName('MEM').Create('', nx, ny, 1, gdal.GDT_Byte); md.SetGeoTransform(gt); md.GetRasterBand(1).WriteArray(mask.astype('uint8'))
+    vd = ogr.GetDriverByName('Memory').CreateDataSource('m'); ly = vd.CreateLayer('m', None, ogr.wkbPolygon); ly.CreateField(ogr.FieldDefn('v', ogr.OFTInteger))
+    gdal.Polygonize(ds.GetRasterBand(1), md.GetRasterBand(1), ly, 0, ['8CONNECTED=8'] if label is not None else [])
+    out = []
+    for f in ly:
+        g = f.GetGeometryRef(); out.append((f.GetField('v'), g.GetArea(), [[[round(x, 2), round(y, 2)] for x, y, *_ in g.GetGeometryRef(k).GetPoints()] for k in range(g.GetGeometryCount())]))
+    out.sort(key=lambda q: -q[1]); return out[:keep]
+
+def hyd_job(job, gs, ver, A, gt, to_grass, read):
+    """surface water and wetland screening from an elevation layer: one step each"""
+    import numpy as np
+    from scipy import ndimage
+    prm = job.get('params', {}); op = prm['op']; ny, nx = A.shape; cw, ch = abs(gt[1]), abs(gt[5]); cell = cw * ch; ok = np.isfinite(A)
+    num = lambda k, d: float(prm[k]) if prm.get(k) not in (None, '') else d
+    at = lambda x, y: (int((gt[3] - y) / ch), int((x - gt[0]) / cw))
+    xy = lambda i: (gt[0] + (i % nx + .5) * cw, gt[3] - (i // nx + .5) * ch)
+    def flow(mfd):
+        prog(0.45, 'r.watershed: flow directions and accumulation (%s)' % ('multiple flow directions' if mfd else 'single flow direction'))
+        gs.run_command('r.watershed', elevation='a', accumulation='acc', drainage='dr', flags='' if mfd else 's', overwrite=True, quiet=True)
+        return np.abs(read('acc')), read('dr')
+    def pointer(dr):   # GRASS: 1..8 = NE N NW W SW S SE E; below 0 the path leaves the layer
+        d = np.where(np.isfinite(dr), dr, 0).astype(int); r, c = np.mgrid[0:ny, 0:nx]; nr, nc = r.copy(), c.copy()
+        for k, (a, b) in {1: (-1, 1), 2: (-1, 0), 3: (-1, -1), 4: (0, -1), 5: (1, -1), 6: (1, 0), 7: (1, 1), 8: (0, 1)}.items():
+            m = d == k; nr[m] += a; nc[m] += b
+        bad = (nr < 0) | (nr >= ny) | (nc < 0) | (nc >= nx); nr[bad], nc[bad] = r[bad], c[bad]; n = nr * nx + nc
+        n = np.where(ok.ravel()[n.ravel()].reshape(ny, nx), n, r * nx + c); return n.ravel()
+    def channels(acc):
+        a = num('area', 0); thr = a / cell if a > 0 else max(20, int(ok.sum()) * .02); return ok & (acc >= thr), thr * cell
+    def hand(acc, dr):
+        st, ta = channels(acc); end = follow(pointer(dr), st.ravel()); on = st.ravel()[end].reshape(ny, nx) & ok
+        return np.where(on, np.maximum(0, A - A.ravel()[end].reshape(ny, nx)), np.nan), st, ta
+    def twi(acc, Z):
+        gy, gx = np.gradient(np.where(ok, Z, np.nan), ch, cw); t = np.maximum(np.hypot(gx, gy), 0.001); return np.log(np.maximum(acc, 1) * cell / cw / t), t
+    edge = lambda m: bool((m & (ndimage.binary_dilation(~ok, np.ones((3, 3))) | np.pad(np.zeros((max(0, ny - 2), max(0, nx - 2)), bool), 1, constant_values=True)[:ny, :nx])).any())
+    tool = 'GRASS GIS %s r.watershed' % ver
+    if op == 'twi':
+        acc, dr = flow(True); w, _ = twi(acc, A); w[~ok] = np.nan
+        return {'values_b64': b64f(w), 'min': float(np.nanmin(w)), 'max': float(np.nanmax(w)), 'p85': float(np.nanpercentile(w, 85)), 'tool': tool, 'detail': 'ln(area draining per metre of width / slope), slopes under 0.1 % taken as 0.1 %'}
+    if op == 'dep':
+        F = fill_depressions(A); D = np.where(ok, F - A, np.nan); mn = max(1e-4, num('mind', .05)); M = ok & (D >= mn); lab, n = ndimage.label(M, np.ones((3, 3))); feats, keep = [], np.zeros(n + 1, bool); mina = num('mina', 10)
+        if n:
+            idx = np.arange(1, n + 1); area = ndimage.sum(M, lab, idx) * cell; vol = ndimage.sum(np.where(M, D, 0), lab, idx) * cell; mx = ndimage.maximum(np.where(M, D, 0), lab, idx); sp = ndimage.maximum(np.where(M, F, -1e9), lab, idx); keep[1:] = area >= mina
+            for v, ar, rings in mask_polys(keep[lab] & M, gt, lab):
+                i = v - 1; feats.append({'type': 'polygon', 'pts': rings, 'name': '%.2f m' % mx[i], 'attrs': {'Deepest_m': round(float(mx[i]), 3), 'Area_m2': round(float(area[i]), 1), 'Volume_m3': round(float(vol[i]), 2), 'Spills_at_m': round(float(sp[i]), 3)}})
+        K = keep[lab] & M; return {'values_b64': b64f(np.where(K, D, np.nan)), 'features': feats, 'n': int(keep.sum()), 'area': float(K.sum() * cell), 'volume': float(np.where(K, D, 0).sum() * cell), 'max': float(D[K].max()) if K.any() else 0, 'tool': 'Priority flood (Barnes et al. 2014), SciPy, GDAL Polygonize', 'detail': 'hollows at least %.2f m deep and %.0f m²' % (mn, mina)}
+    if op == 'hand' or op == 'flood':
+        acc, dr = flow(False); H, st, ta = hand(acc, dr)
+        if not np.isfinite(H).any(): raise RuntimeError('No channel was found. Make the area that starts a channel smaller.')
+        if op == 'hand': return {'values_b64': b64f(H), 'max': float(np.nanmax(H)), 'p95': float(np.nanpercentile(H, 95)), 'chan': ta, 'cover': float(np.isfinite(H).sum() / ok.sum()), 'tool': tool, 'detail': 'height above the channel each cell drains to; channels where %.0f m² drain' % ta}
+        d = num('depth', 1.0); M = np.isfinite(H) & (H <= d)
+        return {'values_b64': b64f(np.where(M, d - H, np.nan)), 'features': [{'type': 'polygon', 'pts': r, 'name': '%.2f m' % d, 'attrs': {'Area_m2': round(a, 1)}} for _, a, r in mask_polys(M, gt)], 'area': float(M.sum() * cell), 'depth': d, 'chan': ta, 'tool': tool, 'detail': 'ground within %.2f m of the channel it drains to; channels where %.0f m² drain' % (d, ta)}
+    if op in ('catch', 'trace'):
+        x, y = job['points'][0]; r, c = at(x, y)
+        if not (0 <= r < ny and 0 <= c < nx and ok[r, c]): raise RuntimeError('The point is outside the elevation layer.')
+        acc, dr = flow(False); nx_ = pointer(dr)
+        if op == 'catch':
+            rad = max(0, num('snap', 0)); rr, cc = int(rad / ch), int(rad / cw)
+            if rr or cc:
+                r0, c0 = max(0, r - rr), max(0, c - cc); w = np.where(ok, acc, -1)[r0:r + rr + 1, c0:c + cc + 1]; q = np.unravel_index(int(np.argmax(w)), w.shape); r, c = r0 + q[0], c0 + q[1]
+            o = r * nx + c; stop = np.zeros(ny * nx, bool); stop[o] = True; M = (follow(nx_, stop) == o).reshape(ny, nx) & ok; P = mask_polys(M, gt)
+            return {'features': [{'type': 'polygon', 'pts': g, 'name': 'Catchment', 'attrs': {'Area_m2': round(a, 1)}} for _, a, g in P], 'outlet': list(xy(o)), 'area': float(M.sum() * cell), 'edge': edge(M), 'lo': float(A[M].min()), 'hi': float(A[M].max()), 'tool': tool, 'detail': 'single flow direction; the outlet moved %.1f m to the strongest flow' % math.hypot(xy(o)[0] - x, xy(o)[1] - y)}
+        i = r * nx + c; pts, zs, seen = [], [], set()
+        while i not in seen and len(pts) < 200000: seen.add(i); pts.append(xy(i)); zs.append(float(A.ravel()[i])); i = int(nx_[i])
+        return {'path': [[round(a, 2), round(b, 2)] for a, b in pts], 'length': float(sum(math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]) for k in range(1, len(pts)))), 'z0': zs[0], 'z1': zs[-1], 'left': edge((np.arange(ny * nx) == i).reshape(ny, nx)), 'tool': tool, 'detail': 'single flow direction, through hollows by the lowest way out'}
+    if op == 'screen':
+        F = fill_depressions(A); acc, dr = flow(False); H, st, ta = hand(acc, dr); acc2, _ = flow(True); w, t = twi(acc2, A); w[~ok] = np.nan
+        q = min(99., max(50., num('pct', 85))); tw = float(np.nanpercentile(w, q)); hd, sl, dp = num('hand', .5), num('slope', 2.) / 100, num('mind', .05)
+        ind = [('wet', ok & (w >= tw)), ('low', np.isfinite(H) & (H <= hd)), ('flat', ok & (t <= sl)), ('hollow', ok & (F - A >= dp))]
+        if job['rasters'].get('b'):
+            from osgeo import gdal
+            B, gb = grid_of(job['rasters']['b']); wr = gdal.Warp('', mem_ds(B, gb), format='MEM', outputBounds=[gt[0], gt[3] + gt[5] * ny, gt[0] + gt[1] * nx, gt[3]], width=nx, height=ny, resampleAlg='bilinear', srcNodata=-99999, dstNodata=-99999)
+            W = wr.GetRasterBand(1).ReadAsArray().astype(float); W[W <= -99998] = np.nan; ind.append(('water', np.isfinite(W) & ok & (W <= num('gwd', .3))))
+        S = sum(m.astype(int) for _, m in ind); n = len(ind); need = min(n, int(num('need', 3))); M = S >= need; lab, k = ndimage.label(M, np.ones((3, 3))); keep = np.zeros(k + 1, bool); feats = []
+        if k:
+            ar = ndimage.sum(M, lab, np.arange(1, k + 1)) * cell; mean = ndimage.mean(S, lab, np.arange(1, k + 1)); keep[1:] = ar >= num('mina', 50)
+            for v, a, rings in mask_polys(keep[lab] & M, gt, lab): feats.append({'type': 'polygon', 'pts': rings, 'name': 'Possible wet area', 'attrs': {'Area_m2': round(float(ar[v - 1]), 1), 'Indicators': round(float(mean[v - 1]), 2)}})
+        return {'values_b64': b64f(np.where(ok & (S > 0), S, np.nan)), 'features': feats, 'n_ind': n, 'need': need, 'n': int(keep.sum()), 'area': float((keep[lab] & M).sum() * cell), 'share': {a: float(m.sum() / ok.sum()) for a, m in ind}, 'twi': tw, 'chan': ta, 'tool': tool + ', priority flood, SciPy', 'detail': '%d of %d indicators' % (need, n)}
+    raise RuntimeError('Unknown method.')
+
 def in_grass_rast(job, gs, tmp):
     import numpy as np
     from osgeo import gdal
@@ -1021,6 +1136,7 @@ def in_grass_rast(job, gs, tmp):
         return r
     prog(0.05, 'r.in.gdal: the layer into GRASS, %d × %d cells' % (nx, ny))
     to_grass(A, 'a'); gs.run_command('g.region', raster='a', quiet=True)
+    if m == 'hyd': return hyd_job(job, gs, ver, A, gt, to_grass, read)
     if m == 'profile':
         pts = job['line']; res = float(prm.get('step') or 0) or abs(gt[1])
         prog(0.4, 'r.profile: %d points along the line every %.2f m' % (len(pts), res))
