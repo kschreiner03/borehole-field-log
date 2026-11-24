@@ -1327,6 +1327,11 @@ def import_vector(job):
             try: g.Transform(ct)
             except Exception: skipped += 1; continue
             nm = str(f.GetField(namef)) if namef and f.GetField(namef) is not None else ''
+            at = {}
+            for i in range(min(60, defn.GetFieldCount())):
+                v = f.GetField(i)
+                if v is not None: at[defn.GetFieldDefn(i).GetName()] = v if isinstance(v, (int, float, str)) and v == v else str(v)
+            n0 = len(feats)
             def add(gg):
                 t = gg.GetGeometryName()
                 if t == 'POINT': feats.append({'type': 'point', 'pts': [[gg.GetX(), gg.GetY()]], 'name': nm, 'layer': ly.GetName()})
@@ -1335,6 +1340,8 @@ def import_vector(job):
                 elif gg.GetGeometryCount():
                     for k in range(gg.GetGeometryCount()): add(gg.GetGeometryRef(k))
             add(g); cnt += 1
+            if at:
+                for q in feats[n0:]: q['attrs'] = at
             if len(feats) > 20000: break
         layers.append({'name': ly.GetName(), 'n': cnt, 'crs': sname})
         prog(0.2 + 0.7 * (li + 1) / ds.GetLayerCount(), 'Layer %s: %d shapes' % (ly.GetName(), cnt))

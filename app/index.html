@@ -1580,8 +1580,8 @@ body.mws-map .main > :not(#view) { display: none !important; }
 body.mws-map #view { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; } body.mws-map #view > .hid-note { margin: 0; }
 .mws { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .mws .map-canvas { flex: 1 1 auto; min-height: 0; border: 0; border-radius: 0; }
-.mws-ed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 10px; background: var(--active); border-bottom: 1px solid var(--border); font-size: 12.5px; }
-.mws-ed .seg button { padding: 4px 10px; min-height: 28px; font-size: 12.5px; } .mws-ed .seg { flex-wrap: wrap; background: var(--surface); } .mws-ed .note { flex: 1 1 260px; margin: 0; font-size: 12px; }
+.mws-ed { display: flex; flex-wrap: nowrap; align-items: center; gap: 10px; height: 42px; box-sizing: border-box; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; padding: 0 10px; background: var(--active); border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.mws-ed .seg button { padding: 4px 10px; min-height: 28px; font-size: 12.5px; } .mws-ed .seg { flex: none; background: var(--surface); } .mws-ed .note { flex: 1 1 0; min-width: 0; margin: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .mws-ed .map-xy { flex: none; float: none; white-space: nowrap; }
 .mws .map-canvas > svg { cursor: grab; } .mws .map-canvas[data-mws="info"] > svg { cursor: help; } .mws .map-canvas[data-mws="measure"] > svg, .mws .map-canvas[data-tool="area"] > svg, .mws .map-canvas[data-tool="line"] > svg, .mws .map-canvas[data-tool="rect"] > svg, .mws .map-canvas[data-tool="circle"] > svg, .mws .map-canvas[data-tool="label"] > svg, .mws .map-canvas[data-tool="place"] > svg { cursor: crosshair; } .mws .map-canvas[data-mws="section"] > svg { cursor: default; } .mws .map-canvas > svg:active { cursor: grabbing; }
 .mws .map-canvas[data-mws="measure"] > svg:active { cursor: crosshair; }
 .mws-tabs { display: flex; align-items: center; gap: 2px; padding: 0 6px; border-bottom: 1px solid var(--rule); flex: none; min-height: 37px; }
@@ -1600,6 +1600,17 @@ body.mws-map #sb-proj, body.mws-map #sb-bh, body.mws-map #sb-iss, body.mws-map #
 .sb-map input { width: 78px; height: 18px; padding: 0 4px; border: 1px solid var(--control, var(--line)); border-radius: 2px; font: 12px var(--f-body); background: #fff; } .sb-map .xy { min-width: 190px; font-variant-numeric: tabular-nums; }
 .mws-hit { border-bottom: 1px solid var(--rule); padding: 2px 0 12px; display: flex; flex-direction: column; gap: 6px; } .mws-hit:last-child { border-bottom: 0; } .mws-hit h5 { margin: 4px 0 0; font: 600 14px var(--f-body); color: var(--ink); } .mws-hit h5 small { display: block; font: 12px var(--f-body); color: var(--muted); }
 .mws-hit table { width: 100%; border-collapse: collapse; font-size: 12.5px; } .mws-hit td { padding: 3px 4px 3px 0; border-bottom: 1px solid var(--rule); vertical-align: top; overflow-wrap: anywhere; } .mws-hit td:first-child { color: var(--muted); width: 42%; } .mws-hit td.over { color: var(--negative, #b42318); font-weight: 600; }
+.mws .map-canvas[data-mws="select"] > svg, .mws .map-canvas[data-mws="select"] > svg:active { cursor: crosshair; }
+.mws-dock { flex: none; display: flex; flex-direction: column; min-height: 0; position: relative; background: var(--surface); border-top: 1px solid var(--border); } .mws-dock[hidden] { display: none; }
+.mws-drz { position: absolute; left: 0; right: 0; top: -3px; height: 6px; cursor: row-resize; z-index: 3; } .mws-drz:hover { background: var(--accent); opacity: .35; }
+.mws-dt { position: static; flex: none; min-height: 33px; } .mws-dt button { padding-top: 6px; padding-bottom: 6px; }
+.mws-db { display: flex; align-items: center; gap: 4px 10px; padding: 4px 10px; border-bottom: 1px solid var(--rule); font-size: 12.5px; flex: none; overflow-x: auto; scrollbar-width: none; white-space: nowrap; } .mws-db input[type="search"] { width: 170px; min-height: 27px; font-size: 12.5px; padding: 0 8px; } .mws-db .btn.link { font-size: 12.5px; } .mws-db .sp { flex: 1; } .mws-db .check { font-size: 12.5px; gap: 5px; }
+.mws-dg { flex: 1 1 auto; min-height: 0; overflow: auto; } .mws-dg table { border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 12.5px; width: max-content; }
+.mws-dg th, .mws-dg td { height: 26px; padding: 0 8px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; box-sizing: border-box; } .mws-dg td.r, .mws-dg th.r { text-align: right; font-variant-numeric: tabular-nums; }
+.mws-dg th { position: sticky; top: 0; z-index: 2; background: var(--panel-2, var(--ground)); padding: 0; } .mws-dg th button { width: 100%; height: 25px; padding: 0 8px; border: 0; background: none; font: 600 12px var(--f-body); color: var(--ink); text-align: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mws-dg tr.on td { background: #d4f1f7; } .mws-dg tbody tr { cursor: default; } .mws-dg tbody tr:hover td:not([colspan]) { box-shadow: inset 0 0 0 100px rgba(27,108,128,.06); } .mws-dg td.ed { color: var(--ink); } .mws-dg td.ro { color: var(--muted); }
+.mws-dg td input, .mws-dg td select { width: 100%; height: 22px; min-height: 0; padding: 0 4px; font: 12.5px var(--f-body); border: 1px solid var(--accent); } .mws-dg td:has(input) { padding: 0 2px; }
+.mws-dlg { display: grid; gap: 10px; } .mws-dlg .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .mws-dlg select, .mws-dlg input { min-height: 34px; }
 .menu.mws-menu { width: auto; min-width: 210px; max-width: 340px; padding: 4px; right: auto; } .mws-menu .mi { padding: 6px 10px; align-items: center; } .mws-menu .mi b { font-weight: 500; font-size: 13px; } .mws-menu hr { border: 0; border-top: 1px solid var(--rule); margin: 4px 0; } .mws-menu .mi.danger-text b { color: var(--negative, #b42318); } .mws-menu .mh { margin: 2px 10px 4px; font: 600 11.5px var(--f-body); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .site-only { display: block; } .site-map > .body { padding: 8px; } .site-map .map-tip { margin: 6px 2px 0; font-size: 11.5px; }
 /* report editor: the page gets the room; item and page settings live in the panel */
@@ -1748,6 +1759,9 @@ const dataStore = {
       .catch(e => { this.db = null; throw e; });
   },
   async get(k) { const d = await this.open(); return new Promise((res, rej) => { const q = d.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result ?? null); q.onerror = () => rej(q.error); }); },
+  /* several keys in one transaction: all of it is written, or none of it */
+  async write(puts, dels = []) { const d = await this.open(); await new Promise((res, rej) => { const tx = d.transaction('kv', 'readwrite'), st = tx.objectStore('kv'); for (const k of dels) st.delete(k); for (const [k, v] of puts) st.put(v, k); tx.oncomplete = res; tx.onerror = tx.onabort = () => rej(tx.error || new Error('not written')); }); },
+  async under(pre) { const d = await this.open(); return new Promise((res, rej) => { const q = d.transaction('kv').objectStore('kv').getAllKeys(IDBKeyRange.bound(pre, pre + '\uffff')); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); },
   async del(k) { const d = await this.open(); await new Promise(res => { const tx = d.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = res; tx.onerror = res; }); },
   async put(k, v) { const d = await this.open(); await new Promise((res, rej) => { const tx = d.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = tx.onabort = () => rej(tx.error); }); },
 };
@@ -2317,6 +2331,7 @@ const hist = { undo: [], redo: [], snap: new Map(), applying: false };
 const histNow = key => key === 'site' ? JSON.stringify(S.site ?? null) : S.bh.has(key) ? JSON.stringify(S.bh.get(key)) : null;
 function histReset() { hist.snap = new Map([...S.bh.keys()].map(k => [k, histNow(k)])); hist.snap.set('site', histNow('site')); hist.undo = []; hist.redo = []; updateUndo(); }
 function histRecord(key) {
+  if (S.loaded) gisHist();   // a layer change made before this one is its own step
   if (hist.applying) { hist.snap.set(key, histNow(key)); return; }
   const before = hist.snap.has(key) ? hist.snap.get(key) : null, after = histNow(key); if (before === after) return;
   hist.snap.set(key, after);
@@ -2332,6 +2347,7 @@ function histApply(from, to, which) {
   try {
     for (const it of which === 'before' ? [...step.items].reverse() : step.items) {
       const v = it[which];
+      if (it.key === 'gis') { gisRestore(v); continue; }
       if (it.key === 'site') { S.site = JSON.parse(v); saveSite(); hist.snap.set('site', v); continue; }
       if (v == null) { if (S.bh.has(it.key)) store.remove(it.key); if (S.sel === it.key) S.sel = sortedList()[0]?.id || null; }
       else { const b = normalize(JSON.parse(v)); S.bh.set(b.id, b); store.save(b); }
@@ -2340,7 +2356,7 @@ function histApply(from, to, which) {
   step.at = 0; to.push(step); S.formStale = true; render(); updateUndo();
   toast(which === 'before' ? 'Undone.' : 'Redone.');
 }
-const undo = () => histApply(hist.undo, hist.redo, 'before'), redo = () => histApply(hist.redo, hist.undo, 'after');
+const undo = () => { gisHist(); histApply(hist.undo, hist.redo, 'before'); }, redo = () => histApply(hist.redo, hist.undo, 'after');
 function updateUndo() { const u = $('#btn-undo'), r = $('#btn-redo'); if (u) u.disabled = !hist.undo.length || S.readOnly; if (r) r.disabled = !hist.redo.length || S.readOnly; }
 /* in a text box the box's own undo runs first; elsewhere Ctrl/⌘+Z undoes the last change to the data */
 addEventListener('keydown', e => {
@@ -2671,7 +2687,7 @@ document.addEventListener('change', e => {
 document.addEventListener('click', e => { const d = e.target.closest?.('[data-gisldef]'); if (!d) return; const L = GIS.layers.find(x => x.id === d.dataset.gisldef); if (L) { L.lab = null; renderView(true); } });
 document.addEventListener('toggle', e => { const d = e.target.closest?.('[data-gislbl]'); if (d) S.gisLblOpen = d.open ? d.dataset.gislbl : (S.gisLblOpen === d.dataset.gislbl ? null : S.gisLblOpen); }, true);
 document.addEventListener('change', e => { const id = e.target.dataset?.gislay; if (!id) return; const L = GIS.layers.find(x => x.id === id); if (L) { L.on = e.target.checked; renderView(true); } });
-document.addEventListener('click', e => { const d = e.target.closest?.('[data-gisdel]'); if (!d) return; e.preventDefault(); const gone = GIS.layers.find(x => x.id === d.dataset.gisdel); if (gone?.url) URL.revokeObjectURL(gone.url); GIS.layers = GIS.layers.filter(x => x.id !== d.dataset.gisdel); renderView(true); });
+document.addEventListener('click', e => { const d = e.target.closest?.('[data-gisdel]'); if (!d) return; e.preventDefault(); const gone = GIS.layers.find(x => x.id === d.dataset.gisdel); if (gone?.url && gone.kind !== 'image') URL.revokeObjectURL(gone.url); GIS.layers = GIS.layers.filter(x => x.id !== d.dataset.gisdel); renderView(true); });
 document.addEventListener('click', e => {
   const tl = e.target.closest?.('[data-gptool]'); if (tl) { S.gp.tool = tl.dataset.gptool; gpSave(); renderView(true); return; }
   const h = e.target.closest?.('[data-gphist]'); if (h) { const j = GIS.jobs.get(h.dataset.gphist); if (j) { S.gp.tool = j.tool && GP_TOOLS[j.tool] ? j.tool : j.job?.method && GP_TOOLS[j.job.method] ? j.job.method : S.gp.tool; if (j.p0) S.gp.p = j.p0; if (j.prm) S.gp.prm = { ...S.gp.prm, [S.gp.tool]: { ...j.prm } }; gpSave(); if (GP_TABS.includes(S.tab)) { S.gpPanel = S.gp.tool; workResized(); } else if (S.tab === 'gp') renderView(true); else { S.gpPanel = S.gp.tool; goTab('site'); } } }
@@ -2913,7 +2929,7 @@ function setProjMeta(name, patch) {
 const projOpened = name => { const op = jsonLS('bhlog.projOpened', {}); op[name] = new Date().toISOString(); lsSet('bhlog.projOpened', JSON.stringify(op)); };
 function openProject(name) {
   closeProjPop(); S.proj = name; lsSet('bhlog.proj', name); projOpened(name);
-  S.sel = sortedList().find(b => (b.project || '') === name)?.id || null; S.layer = 0; S.secIds = new Set(); S.mv = null; S.tocSel = null; S.gpPanel = null;
+  S.sel = sortedList().find(b => (b.project || '') === name)?.id || null; S.layer = 0; S.secIds = new Set(); S.mv = null; S.tocSel = null; S.gpPanel = null; S.mwsSel.clear(); S.mwsT = { src: null, open: [], st: {} }; S.mwsInfo = null;
   if (S.tab === 'projects') S.tab = 'home'; lsSet('bhlog.tab', S.tab); S.formStale = true; render();
 }
 const agoTxt = iso => { const t = Date.parse(iso || ''); if (!isFinite(t)) return ''; const m = (Date.now() - t) / 6e4; return m < 1 ? 'just now' : m < 60 ? Math.round(m) + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : m < 1440 * 30 ? Math.round(m / 1440) + ' d ago' : new Date(t).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }); };
@@ -3006,7 +3022,7 @@ async function saveProjDetails() {
    outputs, the linked project file, and when it was opened */
 async function renameProject(old, nw) {
   if (GIS.proj === old) { try { await gisPersist(old); } catch {} }
-  try { const g = await dataStore.get('gis:' + old); if (g) { await dataStore.put('gis:' + nw, g); await dataStore.del('gis:' + old); } } catch {}
+  try { const g = await gisRead(old); if (g) { await gisWrite(nw, g); await gisWipe(old); } } catch {}
   if (GIS.proj === old) GIS.proj = nw;
   for (const f of [q => 'imagery:' + q, REPORT_FILE_KEY, OUT_KEY]) { try { for (const ph of await photoStore.all(f(old))) await photoStore.put({ ...ph, bhId: f(nw) }); } catch {} }
   const P = projRecs(); if (P[old]) { P[nw] = P[old]; delete P[old]; S.site = { projects: P }; saveSite(); }
@@ -3027,7 +3043,7 @@ async function duplicateProject(name) {
   try { const ims = await photoStore.all('imagery:' + name); r.imagery = await Promise.all((r.imagery || []).map(async i => { const ph = ims.find(x => x.id === i.id), nid = uid('im'); if (ph) await photoStore.put({ ...ph, id: nid, bhId: 'imagery:' + nn }); return { ...i, id: nid }; })); } catch {}
   try { const fs2 = await photoStore.all(REPORT_FILE_KEY(name)), map = {}; for (const ph of fs2) { map[ph.id] = uid('rf'); await photoStore.put({ ...ph, id: map[ph.id], bhId: REPORT_FILE_KEY(nn) }); } for (const pg of r.report?.pages || []) if (pg.file && map[pg.file]) pg.file = map[pg.file]; } catch {}
   P[nn] = r; S.site = { projects: P }; saveSite();
-  try { if (GIS.proj === name) await gisPersist(name); const g = await dataStore.get('gis:' + name); if (g) await dataStore.put('gis:' + nn, g); } catch {}
+  try { if (GIS.proj === name) await gisPersist(name); const g = await gisRead(name); if (g) await gisWrite(nn, g); } catch {}
   if (S.mode === 'local') store.saveLocal(); render(); toast('Made ' + nn + '. Issued logs in the copy are drafts.');
 }
 async function deleteProject(name) {
@@ -3037,7 +3053,7 @@ async function deleteProject(name) {
   S.fh.delete(name); S.fileAt.delete(name);
   for (const b of bs) { store.remove(b.id); photoStore.all(b.id).then(ps => ps.forEach(p => photoStore.remove(p.id))).catch(() => {}); }
   if (GIS.proj === name) { GIS.layers = []; GIS.proj = undefined; }
-  try { await dataStore.del('gis:' + name); } catch {}
+  try { await gisWipe(name); } catch {}
   const P = projRecs(); delete P[name]; S.site = { projects: P }; saveSite();
   const fl = fileLinks(); if (fl[name]) { delete fl[name]; lsSet('bhlog.files', JSON.stringify(fl)); }
   const op = jsonLS('bhlog.projOpened', {}); delete op[name]; lsSet('bhlog.projOpened', JSON.stringify(op));
@@ -3732,6 +3748,7 @@ function renderView(full) {
   else if (S.tab === 'compose') { v.innerHTML = composeHTML(); requestAnimationFrame(() => { if (S.cout) { fillOutputs(); return; } drawCompose(); fillThumbs(); gwComposeEnsure(); }); }
   else { v.innerHTML = nextSteps(b) + (editable(b) ? '<div class="lt-new"><label for="lt-new">Add a layer by typing</label><input id="lt-new" autocomplete="off" spellcheck="false" placeholder="e.g. 2.4-3.1 CL silty clay, stiff, moist, brown (depths optional: it starts at the bottom of the log)"><span class="note" id="lt-new-read"></span></div>' : '') + (editable(b) ? '<p class="log-hint">Click any layer, sample, water level or the standpipe on the log to edit it. Click empty space in a column to add one at that depth.</p>' : '') + sheetHTML(b) + logLegendHTML(b); const el = $('#log'); el.innerHTML = logSVG(b, Math.max(el.clientWidth, 900)); }
   if (MAP_TABS.includes(S.tab)) v.insertAdjacentHTML('afterbegin', hiddenNote());
+  if (mwsOn()) mwsDockFill(true);
   if (mwsOn()) drawPlan();   // the map takes what is left of the window, so it is drawn last
   if (BH_TABS.includes(S.tab)) markIssues(b);
   ctlRender();
@@ -9594,11 +9611,13 @@ function rowsToPoints(rows) {
     return { name: String(r[c.name] ?? '').trim(), e: e != null ? +e.toFixed(2) : null, n: n != null ? +n.toFixed(2) : null, z: c.z != null ? numv(r[c.z]) : null, type: c.type != null ? String(r[c.type] || '') : '', ll, zone };
   }).filter(p => p.name);
 }
+/* a shape's own fields, as plain values (none: undefined) */
+const shpAttrs = p => { const o = {}; for (const [k, v] of Object.entries(p || {})) if (v != null && k !== 'name') o[k] = typeof v === 'object' ? JSON.stringify(v) : v; return Object.keys(o).length ? o : undefined; };
 function parseGeoJSON(txt) {
   const g = JSON.parse(txt), ll = !g.crs || /4326|CRS84|4617|4269/.test(JSON.stringify(g.crs)), out = [], feats = g.type === 'FeatureCollection' ? g.features : g.type === 'Feature' ? [g] : [{ geometry: g, properties: {} }];
   for (const f of feats) {
     const p = f.properties || {}, name = p.name || p.Name || p.NAME || p.label || p.id || '', geo = f.geometry; if (!geo) continue;
-    const add = (type, pts) => out.push({ name: String(name), type, pts: ll ? toUtm(pts) : pts, hint: p.type || p.layer || name });
+    const attrs = shpAttrs(p), add = (type, pts) => out.push({ name: String(name), type, pts: ll ? toUtm(pts) : pts, hint: p.type || p.layer || name, attrs });
     const t = geo.type, C = geo.coordinates;
     if (t === 'Point') add('point', [C]); else if (t === 'MultiPoint') C.forEach(c => add('point', [c]));
     else if (t === 'LineString') add('line', C); else if (t === 'MultiLineString') C.forEach(c => add('line', c));
@@ -9610,10 +9629,12 @@ function parseKML(txt) {
   const doc = new DOMParser().parseFromString(txt, 'application/xml'), out = [];
   const coords = el => el.textContent.trim().split(/\s+/).map(s => s.split(',').map(Number)).filter(c => c.length >= 2 && c.every(isFinite)).map(c => [c[0], c[1]]);
   for (const pm of doc.getElementsByTagName('Placemark')) {
-    const name = pm.getElementsByTagName('name')[0]?.textContent.trim() || '';
+    const name = pm.getElementsByTagName('name')[0]?.textContent.trim() || '', at0 = out.length, kv = {};
+    for (const d of pm.getElementsByTagName('Data')) kv[d.getAttribute('name')] = d.getElementsByTagName('value')[0]?.textContent.trim(); for (const d of pm.getElementsByTagName('SimpleData')) kv[d.getAttribute('name')] = d.textContent.trim();
     for (const pg of pm.getElementsByTagName('Polygon')) { const ob = pg.getElementsByTagName('outerBoundaryIs')[0] || pg; const c = ob.getElementsByTagName('coordinates')[0]; if (c) out.push({ name, type: 'polygon', pts: toUtm(coords(c)), hint: name }); }
     for (const ls of pm.getElementsByTagName('LineString')) { const c = ls.getElementsByTagName('coordinates')[0]; if (c) out.push({ name, type: 'line', pts: toUtm(coords(c)), hint: name }); }
     for (const pt of pm.getElementsByTagName('Point')) { const c = pt.getElementsByTagName('coordinates')[0]; if (c) out.push({ name, type: 'point', pts: toUtm(coords(c)), hint: name }); }
+    const at = shpAttrs(kv); if (at) for (const o of out.slice(at0)) o.attrs = at;
   }
   return out;
 }
@@ -9705,7 +9726,7 @@ function importShapesGo() {
   for (const s of S._shpImp || []) {
     const b = s.type === 'point' && toBh ? findBh(s.name) : null;
     if (b) { if (editable(b)) { b.easting = +s.pts[0][0].toFixed(2); b.northing = +s.pts[0][1].toFixed(2); logChange(b, 'Location set from imported file'); store.save(b); nb++; } continue; }
-    add.push({ id: uid('f'), name: s.name || '', type: s.type, kind: kind || s.kind, pts: s.pts.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]) });
+    add.push({ id: uid('f'), name: s.name || '', type: s.type, kind: kind || s.kind, pts: s.pts.map(p => [+p[0].toFixed(2), +p[1].toFixed(2)]), ...(s.attrs ? { attrs: s.attrs } : {}) });
   }
   saveFeats([...keep, ...add]); S._shpImp = null; S.lyr.feat = true; for (const f of add) delete S.lyr['fk:' + (FEAT_KINDS[f.kind] ? f.kind : 'other')]; lsSet('bhlog.lyr', JSON.stringify(S.lyr)); S.tocFold.delete('feat'); closeOverlay(); render(); toast(`Imported ${add.length} shape${add.length === 1 ? '' : 's'}${nb ? ` and set ${nb} borehole location${nb === 1 ? '' : 's'}` : ''}.`);
 }
@@ -9925,8 +9946,8 @@ S.mwsTool = 'explore'; S.mwsInfo = null; S.mwsGp = null;
 const mwsOn = () => S.tab === 'site' && innerWidth > 860 && !!cur();
 const mapInk = () => S.mapEdit || (mwsOn() && S.mwsTool === 'measure');          // a drawing tool has the map
 const mwsClicks = () => mwsOn() && !S.mapEdit && !S.secDraw && !S.gpSpot && ['explore', 'info'].includes(S.mwsTool);   // a click asks what is there
-const MWS_I = { explore: '<path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>', info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.6"/>', measure: '<path d="M3 16L16 3l5 5L8 21z"/><path d="M7 12l2 2M10 9l2 2M13 6l2 2"/>', add: '<path d="M3 8l9-5 9 5-9 5z"/><path d="M3 13l5 2.8M21 13l-2 1.1"/><path d="M16 15v6M13 18h6"/>', edit: '<path d="M4 20l1-5L16 4l4 4L9 19z"/><path d="M14 6l4 4"/>', layout: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M7 7h10v7H7zM7 17h6"/>' };
-const MWS_TOOLS = [['explore', 'Explore', 'Drag to move, scroll to zoom, click a borehole or shape to see what it is (Esc comes back here)'], ['info', 'Identify', 'Click anywhere to list everything there, with the values of the layers that are on'], ['measure', 'Measure', 'Click points to measure distance, bearing and area'], ['section', 'Section line', 'Click boreholes in the order the section runs']];
+const MWS_I = { select: '<path d="M4 8V4h4M16 4h4v4M4 16v4h4" /><path d="M11 10l9 4-4 1.4L14.4 20z"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', explore: '<path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>', info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.6"/>', measure: '<path d="M3 16L16 3l5 5L8 21z"/><path d="M7 12l2 2M10 9l2 2M13 6l2 2"/>', add: '<path d="M3 8l9-5 9 5-9 5z"/><path d="M3 13l5 2.8M21 13l-2 1.1"/><path d="M16 15v6M13 18h6"/>', edit: '<path d="M4 20l1-5L16 4l4 4L9 19z"/><path d="M14 6l4 4"/>', layout: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M7 7h10v7H7zM7 17h6"/>' };
+const MWS_TOOLS = [['explore', 'Explore', 'Drag to move, scroll to zoom, click a borehole or shape to see what it is (Esc comes back here)'], ['select', 'Select', 'Click or drag a box to select. Shift adds, Ctrl switches'], ['info', 'Identify', 'Click anywhere to list everything there, with the values of the layers that are on'], ['measure', 'Measure', 'Click points to measure distance, bearing and area'], ['section', 'Section line', 'Click boreholes in the order the section runs']];
 const MWS_CHEV = '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
 function mwsApply() {
   const on = mwsOn(), B = document.body.classList; B.toggle('mws-map', on); B.toggle('mws-toc', on && S.ui.mwsSide !== 'bhs');
@@ -9965,6 +9986,7 @@ function mwsBarHTML() {
   return MWS_TOOLS.map(t => tl(...t)).join('') + '<span class="mws-sep"></span>'
     + '<button type="button" class="mws-t" data-mwsmenu="add" aria-haspopup="menu" ' + ro + ' title="Borehole locations, shapes, GIS files, imagery or a site drawing">' + svgI(MWS_I.add) + '<span>Add data</span>' + MWS_CHEV + '</button>'
     + '<button type="button" class="mws-t" data-act="map-edit" aria-pressed="' + S.mapEdit + '" ' + ro + ' title="Draw and edit shapes, place and move boreholes">' + svgI(MWS_I.edit) + '<span>' + (S.mapEdit ? 'Done editing' : 'Edit') + '</span></button>'
+    + '<button type="button" class="mws-t" data-mwstbl="" aria-pressed="' + !!S.mwsT.src + '" title="Attribute table of the layer chosen in Contents">' + svgI(MWS_I.table) + '<span>Table</span></button>'
     + '<button type="button" class="mws-t" data-act="gp-menu" aria-haspopup="menu" aria-pressed="' + mwsGpOn() + '" title="GIS tools: GRASS GIS, GDAL, PyKrige, WhiteboxTools">' + svgI(NAV_ICON.gp) + '<span>Toolbox</span>' + MWS_CHEV + '</button>'
     + '<button type="button" class="mws-t" data-ctlgo="map-res" title="Lab results and vapour readings on the map">' + svgI(NAV_ICON.contam) + '<span>Results</span></button>'
     + '<button type="button" class="mws-t" data-ctlgo="map-base" title="Basemap and coordinate system">' + svgI(CTL_I.base) + '<span>Basemap</span></button><span class="mws-sep"></span>'
@@ -9972,11 +9994,11 @@ function mwsBarHTML() {
 }
 function mwsHTML() {
   const t = S.mapEdit ? S.mapTool : '', k = S.mapEdit ? 'edit' : S.mwsTool;
-  return '<div class="mws"><div id="mws-ed"' + (S.mapEdit ? '' : ' hidden') + '>' + mwsEdHTML() + '</div><div id="plan" class="map-canvas" data-mws="' + k + '" data-tool="' + t + '"></div></div>';
+  return '<div class="mws"><div id="mws-ed"' + (S.mapEdit ? '' : ' hidden') + '>' + mwsEdHTML() + '</div><div id="plan" class="map-canvas" data-mws="' + k + '" data-tool="' + t + '"></div>' + mwsDockHTML() + '</div>';
 }
 function mwsEdHTML() {
   if (!S.mapEdit) return '';
-  return '<div class="mws-ed"><span class="seg" role="group" aria-label="Editing tool">' + Object.entries(MAP_TOOLS).filter(([k]) => k !== 'measure').map(([k, [t]]) => '<button type="button" data-mtool="' + k + '" aria-pressed="' + (S.mapTool === k) + '">' + t + '</button>').join('') + '</span><span class="note">' + esc(MAP_TOOLS[S.mapTool]?.[1] || '') + '</span><span id="map-xy" class="map-xy"></span></div>';
+  return '<div class="mws-ed"><span class="seg" role="group" aria-label="Editing tool">' + Object.entries(MAP_TOOLS).filter(([k]) => k !== 'measure').map(([k, [t]]) => '<button type="button" data-mtool="' + k + '" aria-pressed="' + (S.mapTool === k) + '">' + t + '</button>').join('') + '</span><span class="note" title="' + esc(MAP_TOOLS[S.mapTool]?.[1] || '') + '">' + esc(MAP_TOOLS[S.mapTool]?.[1] || '') + '</span><span id="map-xy" class="map-xy"></span></div>';
 }
 function mwsEditBar() { const el = $('#mws-ed'), p = $('#plan'); if (el) { el.hidden = !S.mapEdit; el.innerHTML = mwsEdHTML(); } if (p) { p.dataset.tool = S.mapEdit ? S.mapTool : ''; p.dataset.mws = S.mapEdit ? 'edit' : S.mwsTool; } }
 /* the tool strip, the Contents and the open pane */
@@ -9987,6 +10009,7 @@ function mwsRender() {
   $('#mws-tabs').innerHTML = tab('toc', 'Contents') + tab('bhs', 'Boreholes ' + n) + '<span class="sp"></span><button type="button" class="tb" data-act="side-toggle" title="Hide this panel" aria-label="Hide this panel">' + svgI('<path d="M15 6l-6 6 6 6"/>') + '</button>';
   const side = $('.side'); if (side && !side.querySelector('.mws-rz')) side.insertAdjacentHTML('beforeend', '<div class="mws-rz" data-mwsrz title="Drag to resize"></div>');
   TOC_PROPS.clear(); const C = $('#mws-contents'), html = contentsHTML(); if (C) { const top = C.scrollTop; C.innerHTML = html; C.scrollTop = top; }
+  gisHist();
   if (mwsGpOn()) S.mwsGp = S.gpPanel;
   if (S.ui.mwsPane && !mwsTabs().includes(S.ui.mwsPane)) S.ui.mwsPane = mwsTabs().at(-1) || null;
   const G = (CTL.site() || []).filter(g => g.id !== 'map-contents'), gp = mwsGpOn(), id = gp ? 'gp' : S.ui.mwsPane, w = mwsPaneW();
@@ -10007,7 +10030,8 @@ function mwsRender() {
 let mwsXY = null;
 function mwsStatus() {
   const el = $('#sb-map'), t = S._plan; if (!el || !t) return;
-  if (!$('#mws-scale')) el.innerHTML = '<label title="Map scale on a standard screen (96 dots per inch). Type one and press Enter.">1:<input id="mws-scale" inputmode="numeric" autocomplete="off" aria-label="Map scale"></label><span class="xy" id="mws-xy"></span><button type="button" data-ctlgo="map-base" id="mws-crs" title="Coordinate system and basemap"></button>';
+  if (!$('#mws-scale')) el.innerHTML = '<label title="Map scale on a standard screen (96 dots per inch). Type one and press Enter.">1:<input id="mws-scale" inputmode="numeric" autocomplete="off" aria-label="Map scale"></label><span class="xy" id="mws-xy"></span><button type="button" data-ctlgo="map-base" id="mws-crs" title="Coordinate system and basemap"></button><button type="button" id="mws-seln" data-mwstbl="sel" hidden title="Open the table of the selected features"></button>';
+  mwsSelCount();
   const sc = $('#mws-scale'); if (document.activeElement !== sc) { const n = PX_PER_M / t.sc; sc.value = Math.round(n >= 10000 ? n / 100 : n / (n >= 1000 ? 10 : 1)) * (n >= 10000 ? 100 : n >= 1000 ? 10 : 1); }
   $('#mws-crs').textContent = 'EPSG:' + projEpsg() + ' · UTM ' + crsZone();
   const xy = $('#mws-xy'), g = v => v.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); if (mwsXY) xy.textContent = 'E ' + g(mwsXY[0]) + '  N ' + g(mwsXY[1]); else if (!xy.textContent) xy.textContent = 'E –  N –';
@@ -10017,12 +10041,14 @@ document.addEventListener('keydown', e => {
   if (e.target.id === 'mws-scale' && e.key === 'Enter') { const n = +e.target.value.replace(/^1\s*:/, '').replace(/[\s,]/g, ''), t = S._plan; if (!(n >= 10) || !t) { toast('Type a scale of 10 or more, for example 500 for 1:500.'); return; } S.mv = { cx: t.cx, cy: t.cy, sc: Math.max(.003, Math.min(PX_PER_M / n, 300)) }; S.mvProj = curProj(); e.target.blur(); drawPlan(); return; }
   if (e.key !== 'Escape' || e.defaultPrevented || !mwsOn() || e.target.closest?.('input, textarea, select') || $('#menu') || !$('#overlay').hidden || !$('#find').hidden || S.tut) return;
   if (S.mapEdit) { if (S.mapTool !== 'select') { S.mapTool = 'select'; S.draft = null; refreshMapEd(); } }
+  else if (S.mwsTool === 'select' && mwsSelN()) mwsSelClear();
   else if (S.mwsTool !== 'explore') mwsTool('explore');
 });
 /* what is at a point: boreholes, shapes, the Toolbox layers' features and cell values, pictures */
 const mwsInRing = (p, r) => { let on = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) if ((r[i][1] > p[1]) !== (r[j][1] > p[1]) && p[0] < (r[j][0] - r[i][0]) * (p[1] - r[i][1]) / (r[j][1] - r[i][1]) + r[i][0]) on = !on; return on; };
 const mwsSegD = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy, t = l ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l)) : 0; return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); };
-function mwsHitShape(p, f, tol) {   // the rings of an area, or the points of a line or point
+function mwsHitShape(p, f, tol) {
+  const bb = f._bb; if (bb && (p[0] < bb[0] - tol * 1.4 || p[0] > bb[2] + tol * 1.4 || p[1] < bb[1] - tol * 1.4 || p[1] > bb[3] + tol * 1.4)) return false;   // the rings of an area, or the points of a line or point
   if (!f.pts?.length) return false; const rings = Array.isArray(f.pts[0]?.[0]) ? f.pts : [f.pts];
   if (f.type === 'point') return Math.hypot(rings[0][0][0] - p[0], rings[0][0][1] - p[1]) < tol * 1.4;
   if (f.type === 'polygon') { let n = false; for (const r of rings) if (mwsInRing(p, r)) n = !n; if (n) return true; }
@@ -10035,8 +10061,8 @@ function mwsHits(w, all) {
   for (const { b } of all ? bhs : bhs.slice(0, 1)) H.push({ k: 'bh', id: b.id, at: [b.easting, b.northing] });
   if (lyrOn('feat')) featsOf().filter(f => lyrOn('fk:' + (FEAT_KINDS[f.kind] ? f.kind : 'other')) && mwsHitShape(w, f, tol)).map(f => ({ f, a: f.type === 'polygon' ? size(f.pts) : 0 })).sort((a, c) => a.a - c.a).forEach(({ f }) => H.push({ k: 'feat', id: f.id }));
   for (const L of (GIS.layers || []).filter(x => x.on)) {
-    if (L.kind === 'raster') { const i = mwsCell(L, w); if (i != null && all) H.push({ k: 'cell', lid: L.id, i }); if (all) layerFeatures(L).filter(f => mwsHitShape(w, f, tol)).slice(0, 3).forEach(f => H.push({ k: 'lf', lid: L.id, f })); }
-    else if (L.kind !== 'image') layerFeatures(L).filter(f => mwsHitShape(w, f, tol)).slice(0, 20).forEach(f => H.push({ k: 'lf', lid: L.id, f }));
+    if (L.kind === 'raster') { const i = mwsCell(L, w); if (i != null && all) H.push({ k: 'cell', lid: L.id, i }); if (all) mwsShapesOf(L).filter(f => mwsHitShape(w, f, tol)).slice(0, 3).forEach(f => H.push({ k: 'lf', lid: L.id, f })); }
+    else if (L.kind !== 'image') mwsShapesOf(L).filter(f => mwsHitShape(w, f, tol)).slice(0, 20).forEach(f => H.push({ k: 'lf', lid: L.id, f }));
     else if (all && L.box && w[0] > L.box[0] && w[0] < L.box[2] && w[1] > L.box[1] && w[1] < L.box[3]) H.push({ k: 'pic', t: L.name });
   }
   if (all && lyrOn('ortho')) for (const i of imageryOf()) if (!i.off && w[0] > i.e0 && w[0] < i.e1 && w[1] > i.n0 && w[1] < i.n1) H.push({ k: 'pic', t: i.name });
@@ -10073,12 +10099,12 @@ function mwsInfoHTML() {
       return card(b.name || 'Untitled', (b.well?.installed ? 'Monitoring well' : 'Borehole') + ' · ' + (STATUS_LABEL[b.status || 'draft'] || '') + (wellId(b) ? ' · ' + wellId(b) : ''), [['Easting', b.easting == null ? 'none yet' : b.easting.toFixed(2)], ['Northing', b.northing == null ? 'none yet' : b.northing.toFixed(2)], ['Ground elevation', b.elevation != null ? fu(b.elevation) : ''], ['Depth', fu(depthOf(b))], ['Drilled', b.date || ''], ['Water', w ? fu(w.depth) + ' deep' + (w.date ? ', ' + w.date : '') : ''], ['Samples', String((b.samples || []).length)], ...lab.slice(0, 8)],
         go('data-mwsbh="' + esc(b.id) + '" data-go="log"', 'Open log') + go('data-mwsbh="' + esc(b.id) + '" data-go="edit"', 'Edit data') + (ps.length ? go('data-mwsbh="' + esc(b.id) + '" data-go="contam"', 'Lab results') : '') + (w ? go('data-mwsbh="' + esc(b.id) + '" data-go="gw"', 'Water') : '') + (b.easting != null ? go('data-mwszoom="' + esc(b.id) + '"', 'Zoom to') : '')); }
     if (h.k === 'feat') { const f = featsOf().find(x => x.id === h.id); if (!f) return ''; const pl = f.type === 'polygon';
-      return card(f.name || FEAT_KINDS[f.kind]?.[0] || 'Shape', 'Site shape', [['Type', FEAT_KINDS[f.kind]?.[0] || 'Other'], ['Kind', pl ? 'Area' : f.type === 'line' ? 'Line' : 'Label'], pl && ['Area', m2(ringArea(f.pts))], pl ? ['Perimeter', (pathLen(f.pts) + Math.hypot(f.pts[0][0] - f.pts.at(-1)[0], f.pts[0][1] - f.pts.at(-1)[1])).toFixed(1) + ' m'] : f.type === 'line' && ['Length', pathLen(f.pts).toFixed(1) + ' m']], S.readOnly ? '' : go('data-mwsfeat="' + esc(f.id) + '"', 'Edit shape')); }
+      return card(f.name || FEAT_KINDS[f.kind]?.[0] || 'Shape', 'Site shape', [['Type', FEAT_KINDS[f.kind]?.[0] || 'Other'], ['Kind', pl ? 'Area' : f.type === 'line' ? 'Line' : 'Label'], pl && ['Area', m2(ringArea(f.pts))], pl ? ['Perimeter', (pathLen(f.pts) + Math.hypot(f.pts[0][0] - f.pts.at(-1)[0], f.pts[0][1] - f.pts.at(-1)[1])).toFixed(1) + ' m'] : f.type === 'line' && ['Length', pathLen(f.pts).toFixed(1) + ' m'], ...Object.entries(f.attrs || {}).map(([k, v]) => [k, String(v)])], S.readOnly ? '' : go('data-mwsfeat="' + esc(f.id) + '"', 'Edit shape')); }
     const L = h.lid && GIS.layers.find(x => x.id === h.lid); if (h.lid && !L) return '';
     if (h.k === 'cell') { const v = L.values[h.i], sl = L.terrain && L.slope ? L.slope[h.i] : null, C = /^classes/.test(L.ramp || '') ? L.classes?.[Math.round(v) - 1] : null;
       return card(L.name, 'Value here', [[L.terrain ? 'Elevation' : 'Value', v == null || !isFinite(v) ? 'No data' : C || (+v).toLocaleString('en-CA', { maximumFractionDigits: 3 }) + (L.unit ? ' ' + L.unit : L.terrain ? ' m' : '')], sl != null && isFinite(sl) && ['Slope', (+sl).toFixed(1) + '°']]); }
-    if (h.k === 'lf') { const f = h.f, r0 = f.pts && (Array.isArray(f.pts[0]?.[0]) ? f.pts[0] : f.pts);
-      return card(f.name || L.name, L.name, [f.value != null && ['Value', String(f.value)], f.type === 'polygon' ? ['Area', m2(Math.max(0, ringArea(r0) - (Array.isArray(f.pts[0]?.[0]) ? f.pts.slice(1).reduce((a, r) => a + ringArea(r), 0) : 0)))] : f.type === 'line' ? ['Length', pathLen(r0).toFixed(1) + ' m'] : null]); }
+    if (h.k === 'lf') { const f = h.f, at = Object.entries(f.attrs || {}).slice(0, 40).map(([k, v]) => [k, String(v)]), r0 = f.pts && (Array.isArray(f.pts[0]?.[0]) ? f.pts[0] : f.pts);
+      return card(f.name || L.name, L.name, [f.value != null && ['Value', String(f.value)], f.type === 'polygon' ? ['Area', m2(Math.max(0, ringArea(r0) - (Array.isArray(f.pts[0]?.[0]) ? f.pts.slice(1).reduce((a, r) => a + ringArea(r), 0) : 0)))] : f.type === 'line' ? ['Length', pathLen(r0).toFixed(1) + ' m'] : null, ...at]); }
     return card(h.t, 'Picture', []);
   }).join('');
   return html + (html ? '' : '<p class="note">Nothing is drawn here on the layers that are on.</p>') + (I.at ? '<p class="note">At ' + I.at[0].toFixed(2) + ' E, ' + I.at[1].toFixed(2) + ' N</p>' : '');
@@ -10093,11 +10119,11 @@ function mwsLayerMenu(id, x, y) {
   const P = TOC_PROPS.get(id); if (!P) return; const d = document.createElement('div'); d.innerHTML = P.props || '';
   const acts = [...d.querySelectorAll('.toc-acts button')].map(b => { const at = [...b.attributes].filter(a => a.name.startsWith('data-') || a.name === 'disabled').map(a => a.name + '="' + esc(a.value) + '"').join(' '); return [mwsMi(at, esc(b.textContent), b.classList.contains('danger-text') ? 'danger-text' : ''), b.classList.contains('danger-text')]; });
   const more = d.querySelector('input, select, details'), L = id.startsWith('g:') && GIS.layers.find(q => q.id === id.slice(2));
-  mwsMenu(x, y, '<p class="mh">' + esc(P.name) + '</p>' + (P.check ? mwsMi('data-mwstick="' + esc(id) + '"', 'Show or hide') : '') + acts.filter(a => !a[1]).map(a => a[0]).join('') + (more ? '<hr>' + mwsMi('data-mwsprops="' + esc(id) + '"', 'Properties…') : '') + (L && L.kind !== 'image' && layerFeatures(L).length ? mwsMi('data-mwsexport="' + esc(L.id) + '"', 'Export shapes (GeoJSON)…') : '') + (acts.some(a => a[1]) ? '<hr>' + acts.filter(a => a[1]).map(a => a[0]).join('') : ''));
+  mwsMenu(x, y, '<p class="mh">' + esc(P.name) + '</p>' + (mwsSrcOf(id) ? mwsMi('data-mwstbl="' + esc(mwsSrcOf(id)) + '"', 'Attribute table') : '') + (P.check ? mwsMi('data-mwstick="' + esc(id) + '"', 'Show or hide') : '') + acts.filter(a => !a[1]).map(a => a[0]).join('') + (more ? '<hr>' + mwsMi('data-mwsprops="' + esc(id) + '"', 'Properties…') : '') + (L && L.kind !== 'image' && layerFeatures(L).length ? mwsMi('data-mwsexport="' + esc(L.id) + '"', 'Export shapes (GeoJSON)…') : '') + (acts.some(a => a[1]) ? '<hr>' + acts.filter(a => a[1]).map(a => a[0]).join('') : ''));
 }
 function mwsExport(id) {   // a vector layer (or a surface's contours) as GeoJSON in latitude and longitude
   const L = GIS.layers.find(x => x.id === id); if (!L) return; const z = crsZone(), ll = p => { const [la, lo] = utmToLL(p[0], p[1], z); return [+lo.toFixed(8), +la.toFixed(8)]; }, shut = r => r.length && (r[0][0] !== r.at(-1)[0] || r[0][1] !== r.at(-1)[1]) ? [...r, r[0]] : r;
-  const fs = layerFeatures(L).map(f => { const n = Array.isArray(f.pts[0]?.[0]); return { type: 'Feature', properties: { name: f.name || '', ...(f.value != null ? { value: f.value } : {}) }, geometry: f.type === 'polygon' ? { type: 'Polygon', coordinates: (n ? f.pts : [f.pts]).map(r => shut(r).map(ll)) } : f.type === 'line' ? { type: 'LineString', coordinates: f.pts.map(ll) } : { type: 'Point', coordinates: ll(f.pts[0]) } }; });
+  const fs = layerFeatures(L).map(f => { const n = Array.isArray(f.pts[0]?.[0]); return { type: 'Feature', properties: { ...(f.attrs || {}), name: f.name || '', ...(f.value != null ? { value: f.value } : {}) }, geometry: f.type === 'polygon' ? { type: 'Polygon', coordinates: (n ? f.pts : [f.pts]).map(r => shut(r).map(ll)) } : f.type === 'line' ? { type: 'LineString', coordinates: f.pts.map(ll) } : { type: 'Point', coordinates: ll(f.pts[0]) } }; });
   saveFile(L.name.replace(/[^\w .-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) + '.geojson', new Blob([JSON.stringify({ type: 'FeatureCollection', features: fs }, null, 1)], { type: 'application/geo+json' }));
 }
 document.addEventListener('click', e => {
@@ -10134,6 +10160,220 @@ document.addEventListener('pointerdown', e => {
   if (!e.target.closest?.('[data-mwsrz]')) return; e.preventDefault(); const x0 = e.clientX, w0 = mwsSideW(), sh = $('.shell'); document.body.classList.add('ctl-drag');
   const mv = ev => { S.ui.mwsW = w0 + ev.clientX - x0; S.ui.mwsW = mwsSideW(); sh.style.setProperty('--mws-w', S.ui.mwsW + 'px'); };
   const up = ev => { mv(ev); removeEventListener('pointermove', mv); removeEventListener('pointerup', up); document.body.classList.remove('ctl-drag'); uiSave(); workResized(); };
+  addEventListener('pointermove', mv); addEventListener('pointerup', up);
+});
+
+/* ---------- attribute tables and selections. A source is 'bh' (boreholes), 'feat' (site shapes) or 'g:<id>' (a layer's shapes).
+   One selection per source; the table, the map and the dialogs all read and write it. Only the rows in view are in the page. ---------- */
+S.mwsSel = new Map(); S.mwsT = { src: null, open: [], st: {} };
+/* a layer's shapes, kept until its data changes */
+const mwsShC = new WeakMap(), mwsKey = L => L.features || L.polys || L.path || L.arrows || L.contours || L.marks;
+function mwsShapesOf(L) { const key = mwsKey(L); if (!key || typeof key !== 'object') return []; const sg = L.kind + (L.kind === 'feats' ? '' : JSON.stringify([L.lab, L.note, L.name])), c = mwsShC.get(key); if (c?.sg === sg) return c.list; const list = layerFeatures(L).map((f, i) => ({ ...f, id: i })); mwsShC.set(key, { sg, list }); return list; }
+function mwsSrcOf(id) { if (id === 'bh' || id.startsWith('bh:')) return 'bh'; if (id === 'feat' || id.startsWith('fk:')) return 'feat'; if (id.startsWith('g:')) { const L = GIS.layers.find(x => x.id === id.slice(2)); if (L && L.kind !== 'image' && mwsShapesOf(L).length) return id; } return null; }
+const mwsSrcName = src => src === 'bh' ? 'Boreholes' : src === 'feat' ? 'Site shapes' : GIS.layers.find(x => 'g:' + x.id === src)?.name || '';
+const mwsSources = () => [projList().length && 'bh', featsOf().length && 'feat', ...GIS.layers.map(L => 'g:' + L.id).filter(mwsSrcOf)].filter(Boolean);
+/* the shapes of a source: [{ id, type, pts, name, attrs }] */
+function mwsShapes(src, shown) {
+  if (src === 'bh') return (shown ? mapList() : projList()).filter(b => b.easting != null && b.northing != null).map(b => ({ id: b.id, type: 'point', pts: [[b.easting, b.northing]], name: b.name }));
+  if (src === 'feat') return shown && !lyrOn('feat') ? [] : featsOf().filter(f => !shown || lyrOn('fk:' + (FEAT_KINDS[f.kind] ? f.kind : 'other'))).map(f => ({ ...f }));
+  const L = GIS.layers.find(x => 'g:' + x.id === src); return !L || shown && !L.on ? [] : mwsShapesOf(L);
+}
+const mwsRings = f => Array.isArray(f.pts[0]?.[0]) ? f.pts : [f.pts];
+const mwsArea = f => { const r = mwsRings(f); return Math.max(0, ringArea(r[0]) - r.slice(1).reduce((a, q) => a + ringArea(q), 0)); };
+const mwsLen = f => mwsRings(f).reduce((a, r) => a + pathLen(r), 0);
+const mwsCache = new WeakMap();
+/* fields and rows of a source: v[k] is the value, as a number where it is one */
+function mwsTable(src) {
+  const F = [], f = (k, t, o = {}) => F.push({ k, t, ...o }), r2 = (v, d = 2) => v == null || !isFinite(v) ? null : +(+v).toFixed(d);
+  if (src === 'bh') {
+    const ps = projList(), U = LEN(), rp = resultParams();
+    f('name', 'Name'); f('type', 'Type'); f('status', 'Status'); f('e', 'Easting (m)', { num: 1, edit: 1 }); f('n', 'Northing (m)', { num: 1, edit: 1 }); f('z', 'Ground elevation (' + U + ')', { num: 1, edit: 1 }); f('d', 'Depth (' + U + ')', { num: 1 }); f('date', 'Drilled'); f('w', 'Water depth (' + U + ')', { num: 1 }); f('wd', 'Water date'); f('ns', 'Samples', { num: 1 });
+    rp.forEach(([p, l]) => f('r:' + p, l, { num: 1, lt: 1 }));
+    return { F, rows: ps.map(b => { const w = latestWater(b), v = { name: b.name || 'Untitled', type: b.well?.installed ? 'Monitoring well' : 'Borehole', status: STATUS_LABEL[b.status || 'draft'] || '', e: r2(b.easting), n: r2(b.northing), z: b.elevation == null ? null : r2(toD(b.elevation), 3), d: r2(toD(depthOf(b))), date: b.date || '', w: w ? r2(toD(w.depth)) : null, wd: w?.date || '', ns: (b.samples || []).length }, lt = {};
+      for (const [p] of rp) { const r = resultAt(b, p); v['r:' + p] = r ? r.v : null; if (r?.lt) lt['r:' + p] = 1; } return { id: b.id, v, lt, ro: !editable(b) }; }) };
+  }
+  const L = src === 'feat' ? null : GIS.layers.find(x => 'g:' + x.id === src); if (src !== 'feat' && !L) return { F, rows: [] };
+  const key = L ? mwsKey(L) : siteOf()?.features, hit = key && mwsCache.get(key); if (hit && hit.src === src && hit.ro === S.readOnly) return hit;
+  const sh = mwsShapes(src), ed = !S.readOnly && (src === 'feat' || L.kind === 'feats') ? 1 : 0, ak = new Map(); for (const q of sh) for (const [k, v] of Object.entries(q.attrs || {})) { const o = ak.get(k) || { num: 1 }; if (v !== '' && v != null && typeof v !== 'number') o.num = 0; ak.set(k, o); }
+  f('#', 'No.', { num: 1 }); f('name', 'Name', { edit: ed }); if (src === 'feat') f('kind', 'Type', { edit: ed, opts: Object.entries(FEAT_KINDS).map(([k, q]) => [k, q[0]]) }); f('geo', 'Geometry');
+  if (sh.some(q => q.value != null)) f('value', 'Value', { num: 1 }); if (sh.some(q => q.type === 'polygon')) f('area', 'Area (m²)', { num: 1 }); if (sh.some(q => q.type !== 'point')) f('len', 'Length or perimeter (m)', { num: 1 });
+  for (const [k, o] of ak) f('a:' + k, k, { num: o.num, edit: ed });
+  const rows = sh.map((q, i) => { const v = { '#': i + 1, name: q.name || '', kind: FEAT_KINDS[q.kind] ? q.kind : 'other', geo: q.type === 'polygon' ? 'Area' : q.type === 'line' ? 'Line' : 'Point', value: q.value ?? null, area: q.type === 'polygon' ? r2(mwsArea(q), 1) : null, len: q.type === 'point' ? null : r2(mwsLen(q) + (q.type === 'polygon' ? mwsRings(q).reduce((a, r) => a + (r.length ? Math.hypot(r[0][0] - r.at(-1)[0], r[0][1] - r.at(-1)[1]) : 0), 0) : 0), 1) }; for (const [k, x] of Object.entries(q.attrs || {})) v['a:' + k] = x; return { id: q.id, v }; });
+  const T = { src, ro: S.readOnly, F, rows }; if (key) mwsCache.set(key, T); return T;
+}
+const mwsShow = (c, r) => { const x = r.v[c.k]; if (x == null || x === '') return ''; if (c.opts) return c.opts.find(o => o[0] === x)?.[1] ?? x; return (r.lt?.[c.k] ? '<' : '') + (c.lt ? (+x).toLocaleString('en-CA') : String(x)); };
+/* selections */
+const mwsSelOf = src => S.mwsSel.get(src) || new Set();
+const mwsSelN = () => [...S.mwsSel.values()].reduce((a, q) => a + q.size, 0);
+function mwsSelSet(src, ids, how = 'new', only = true) {   // new, add, toggle, remove, keep (only those already selected)
+  const was = mwsSelOf(src); let n;
+  if (how === 'add') n = new Set([...was, ...ids]); else if (how === 'remove') { n = new Set(was); for (const i of ids) n.delete(i); } else if (how === 'keep') { const q = new Set(ids); n = new Set([...was].filter(i => q.has(i))); }
+  else if (how === 'toggle') { n = new Set(was); for (const i of ids) n.has(i) ? n.delete(i) : n.add(i); } else { if (only) S.mwsSel.clear(); n = new Set(ids); }
+  if (n.size) S.mwsSel.set(src, n); else S.mwsSel.delete(src);
+}
+function mwsSelDone() { mwsSelDraw(); mwsSelCount(); mwsDockFill(); }
+function mwsSelClear() { S.mwsSel.clear(); mwsSelDone(); }
+function mwsSelCount() { const el = $('#mws-seln'), n = mwsSelN(); if (el) { el.hidden = !n; el.textContent = n.toLocaleString('en-CA') + ' selected'; } }
+function mwsSelDraw() {
+  const svg = $('#plan svg'), t = S._drawn; if (!svg || !t || !mwsOn()) return; svg.querySelector('#mws-sel')?.remove(); if (!mwsSelN()) return;
+  for (const [src, ids] of [...S.mwsSel]) { const L = src.startsWith('g:') && GIS.layers.find(x => 'g:' + x.id === src), ok = src === 'bh' ? new Set(projList().map(b => b.id)) : src === 'feat' ? new Set(featsOf().map(f => f.id)) : null, n = ok ? 0 : L ? mwsShapesOf(L).length : 0, keep = new Set([...ids].filter(i => ok ? ok.has(i) : i < n)); if (keep.size !== ids.size) { if (keep.size) S.mwsSel.set(src, keep); else S.mwsSel.delete(src); } }
+  mwsSelCount();
+  const X = e => (t.W / 2 + (e - t.cx) * t.sc).toFixed(1), Y = n => (t.H / 2 - (n - t.cy) * t.sc).toFixed(1); let d = '', a = '', c = '';
+  for (const [src, ids] of S.mwsSel) for (const f of mwsShapes(src, true)) if (ids.has(f.id) && f.pts.length) { if (f.type === 'point') { const r = src === 'bh' ? 10 : 7; c += 'M' + X(f.pts[0][0]) + ' ' + Y(f.pts[0][1]) + 'm-' + r + ' 0a' + r + ' ' + r + ' 0 1 0 ' + 2 * r + ' 0a' + r + ' ' + r + ' 0 1 0 -' + 2 * r + ' 0'; } else { const p = mwsRings(f).map(r => 'M' + r.map(q => X(q[0]) + ' ' + Y(q[1])).join('L') + (f.type === 'polygon' ? 'Z' : '')).join(''); if (f.type === 'polygon') a += p; else d += p; } }
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g.id = 'mws-sel'; g.setAttribute('pointer-events', 'none');
+  g.innerHTML = '<path d="' + a + '" fill="#00c2e8" fill-opacity=".18" fill-rule="evenodd" stroke="none"/><path d="' + a + d + c + '" fill="none" stroke="#fff" stroke-width="5" stroke-opacity=".75"/><path d="' + a + d + c + '" fill="none" stroke="#00b4d8" stroke-width="2.5"/>'; svg.append(g);
+}
+/* distance between two shapes (0: they touch, cross or one is inside the other) */
+const mwsBox = f => { let a = 1e99, b = 1e99, c = -1e99, d = -1e99; for (const r of mwsRings(f)) for (const p of r) { if (p[0] < a) a = p[0]; if (p[1] < b) b = p[1]; if (p[0] > c) c = p[0]; if (p[1] > d) d = p[1]; } return [a, b, c, d]; };
+const mwsIn = (p, f) => { if (f.type !== 'polygon') return false; let n = false; for (const r of mwsRings(f)) if (mwsInRing(p, r)) n = !n; return n; };
+const mwsSegs = f => { const o = []; for (const r of mwsRings(f)) { if (r.length === 1) o.push([r[0], r[0]]); for (let i = 1; i < r.length; i++) o.push([r[i - 1], r[i]]); if (f.type === 'polygon' && r.length > 2) o.push([r.at(-1), r[0]]); } return o; };
+const mwsCross = (a, b, c, d) => { const o = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]); return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0; };
+function mwsNear(f, g, max) {   // are f and g within max of each other?
+  const A = f._bb ||= mwsBox(f), B = g._bb ||= mwsBox(g); if (A[0] > B[2] + max || B[0] > A[2] + max || A[1] > B[3] + max || B[1] > A[3] + max) return false;
+  if (mwsRings(f).some(r => r[0] && mwsIn(r[0], g)) || mwsRings(g).some(r => r[0] && mwsIn(r[0], f))) return true;
+  const P = f._sg ||= mwsSegs(f), Q = g._sg ||= mwsSegs(g), e = Math.max(max, 1e-9);
+  for (const [a, b] of P) for (const [c, d] of Q) if (mwsCross(a, b, c, d) || mwsSegD(a, c, d) <= e || mwsSegD(b, c, d) <= e || mwsSegD(c, a, b) <= e || mwsSegD(d, a, b) <= e) return true;
+  return false;
+}
+/* the Select tool: a click takes the top feature, a dragged box everything it touches */
+let mSelB = null;
+document.addEventListener('pointerdown', e => {
+  if (!mwsOn() || S.mapEdit || S.mwsTool !== 'select' || e.button !== 0 || spaceDown || S.gpSpot || S.secDraw || !e.target.closest?.('#plan svg')) return;
+  mSelB = { x: e.clientX, y: e.clientY, w: planWorld(e) }; e.preventDefault();
+});
+document.addEventListener('pointermove', e => {
+  if (!mSelB) return; const svg = $('#plan svg'), r = svg?.getBoundingClientRect(); if (!r) return; let q = svg.querySelector('#mws-rub'); if (!q) { q = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); q.id = 'mws-rub'; q.setAttribute('style', 'fill:rgba(0,180,216,.12);stroke:#00879f;stroke-dasharray:5 3;pointer-events:none'); svg.append(q); }
+  q.setAttribute('x', Math.min(e.clientX, mSelB.x) - r.left); q.setAttribute('y', Math.min(e.clientY, mSelB.y) - r.top); q.setAttribute('width', Math.abs(e.clientX - mSelB.x)); q.setAttribute('height', Math.abs(e.clientY - mSelB.y));
+});
+document.addEventListener('pointerup', e => {
+  if (!mSelB) return; const m = mSelB; mSelB = null; $('#mws-rub')?.remove(); const w = planWorld(e); if (!w || !m.w) return; const how = e.shiftKey ? 'add' : e.ctrlKey || e.metaKey ? 'toggle' : 'new';
+  if (Math.abs(e.clientX - m.x) + Math.abs(e.clientY - m.y) < 5) {
+    const tol = 7 / S._plan.sc; let hit = null;
+    for (const src of mwsSources()) { const L = mwsShapes(src, true).filter(f => src === 'bh' ? Math.hypot(f.pts[0][0] - w[0], f.pts[0][1] - w[1]) < 12 / S._plan.sc : mwsHitShape(w, f, tol)); if (L.length) { hit = [src, src === 'bh' ? L.sort((a, b) => Math.hypot(a.pts[0][0] - w[0], a.pts[0][1] - w[1]) - Math.hypot(b.pts[0][0] - w[0], b.pts[0][1] - w[1]))[0].id : L.sort((a, b) => (a.type === 'polygon' ? mwsArea(a) : 0) - (b.type === 'polygon' ? mwsArea(b) : 0))[0].id]; break; } }
+    if (hit) mwsSelSet(hit[0], [hit[1]], how); else if (how === 'new') S.mwsSel.clear();
+  } else {
+    const box = { type: 'polygon', pts: [[m.w[0], m.w[1]], [w[0], m.w[1]], [w[0], w[1]], [m.w[0], w[1]]] }; if (how === 'new') S.mwsSel.clear();
+    for (const src of mwsSources()) { const ids = mwsShapes(src, true).filter(f => f.pts.length && mwsNear(f, box, 0)).map(f => f.id); if (ids.length) mwsSelSet(src, ids, how === 'new' ? 'add' : how); }
+  }
+  mwsSelDone();
+});
+/* the dock under the map */
+const mwsDockH = () => Math.round(Math.max(130, Math.min(innerHeight - 320, +S.ui.mwsDH || 240)));
+function mwsDockHTML() { return '<div class="mws-dock" id="mws-dock"' + (S.mwsT.src ? '' : ' hidden') + ' style="height:' + mwsDockH() + 'px"></div>'; }
+function mwsTOpen(src) { if (!src) return; const T = S.mwsT; if (!T.open.includes(src)) T.open.push(src); const was = !!T.src; T.src = src; if (was) { mwsDockFill(true); mwsRender(); } else renderView(true); }
+function mwsTShut(src) { const T = S.mwsT; T.open = T.open.filter(x => x !== src); if (T.src === src) T.src = T.open.at(-1) || null; if (T.src) mwsDockFill(true); else renderView(true); }
+const mwsSt = () => S.mwsT.st[S.mwsT.src] ||= { sort: null, dir: 1, q: '', only: false, top: 0, left: 0 };
+const mwsColl = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+let mwsRows = [];   // the rows shown, in order
+let mwsRC = null;
+function mwsRowsOf(T, st) { if (!st.only && mwsRC && mwsRC.T === T && mwsRC.k === st.sort + '|' + st.dir + '|' + st.q) return mwsRC.R; const R = mwsRowsWork(T, st); mwsRC = st.only ? null : { T, k: st.sort + '|' + st.dir + '|' + st.q, R }; return R; }
+function mwsRowsWork(T, st) {
+  const sel = mwsSelOf(S.mwsT.src), q = st.q.trim().toLowerCase(); let R = T.rows; if (st.only) R = R.filter(r => sel.has(r.id)); if (q) R = R.filter(r => T.F.some(c => mwsShow(c, r).toLowerCase().includes(q)));
+  if (st.sort) { const k = st.sort, c = T.F.find(x => x.k === k); if (!c) return R; const g = r => c?.opts ? mwsShow(c, r) : r.v[k], no = x => x == null || x === ''; R = [...R].sort((a, b) => { const x = g(a), y = g(b); if (no(x) || no(y)) return (no(x) ? 1 : 0) - (no(y) ? 1 : 0); return (typeof x === 'number' && typeof y === 'number' ? x - y : mwsColl.compare(String(x), String(y))) * st.dir; }); }
+  return R;
+}
+function mwsDockFill(full) {
+  const el = $('#mws-dock'); if (!el) return; const M = S.mwsT; M.open = M.open.filter(x => mwsSources().includes(x)); if (M.src && !M.open.includes(M.src)) M.src = M.open.at(-1) || null;
+  if (!M.src) { if (!el.hidden) { el.hidden = true; el.innerHTML = ''; } return; }
+  el.hidden = false; if (!full && el.querySelector('td input, td select')) return; const T = mwsTable(M.src), st = mwsSt(); mwsRows = mwsRowsOf(T, st); const sel = mwsSelOf(M.src), n = T.rows.length, feats = M.src === 'feat' || GIS.layers.find(L => 'g:' + L.id === M.src)?.kind === 'feats';
+  if (full || !el.querySelector('.mws-dg')) {
+    el.innerHTML = '<div class="mws-drz" data-mwsdrz title="Drag to resize"></div><div class="mws-pt mws-dt" role="tablist" aria-label="Attribute tables">' + M.open.map(k => '<span class="' + (k === M.src ? 'on' : '') + '"><button type="button" role="tab" aria-selected="' + (k === M.src) + '" data-mwstbl="' + esc(k) + '">' + esc(mwsSrcName(k)) + '</button><button type="button" class="x" data-mwstx="' + esc(k) + '" title="Close" aria-label="Close ' + esc(mwsSrcName(k)) + '">×</button></span>').join('') + '</div>'
+      + '<div class="mws-db"><span class="mws-dn"></span><input type="search" id="mws-q" placeholder="Filter rows" aria-label="Filter rows" value="' + esc(st.q) + '" autocomplete="off"><label class="check"><input type="checkbox" id="mws-only"' + (st.only ? ' checked' : '') + '> Selected only</label>' + [['val', 'Select by values…'], ['loc', 'Select by location…'], ['inv', 'Switch selection'], ['clr', 'Clear'], ['zoom', 'Zoom to selected'], ['lay', 'New layer from selected']].map(([k, t]) => '<button type="button" class="btn link" data-mwsd="' + k + '">' + t + '</button>').join('') + (feats && !S.readOnly ? '<button type="button" class="btn link danger-text" data-mwsd="del">Delete selected</button>' : '') + '<span class="sp"></span><button type="button" class="btn link" data-mwsd="csv">Export (CSV)</button></div><div class="mws-dg" id="mws-dg" tabindex="0"></div>';
+    $('#mws-dg').addEventListener('scroll', () => { const g = $('#mws-dg'), q = mwsSt(); q.top = g.scrollTop; q.left = g.scrollLeft; mwsGrid(T); });
+  }
+  el.querySelector('.mws-dn').textContent = (mwsRows.length < n ? mwsRows.length.toLocaleString('en-CA') + ' of ' : '') + n.toLocaleString('en-CA') + ' row' + (n === 1 ? '' : 's') + ', ' + sel.size.toLocaleString('en-CA') + ' selected';
+  el.querySelectorAll('[data-mwsd="zoom"], [data-mwsd="lay"], [data-mwsd="del"], [data-mwsd="clr"]').forEach(b => { b.disabled = !sel.size; });
+  const g = $('#mws-dg'); g._at = null; mwsGrid(mwsTable(M.src)); if (full) { g.scrollTop = st.top; g.scrollLeft = st.left; g._at = null; mwsGrid(T); }
+}
+function mwsGrid(T) {
+  const g = $('#mws-dg'); if (!g) return; const H = 26, st = mwsSt(), N = mwsRows.length, a = Math.max(0, Math.min(N, Math.floor(g.scrollTop / H) - 8)) & ~1, b = Math.min(N, a + Math.ceil((g.clientHeight || 200) / H) + 18); if (g._at === a + ':' + b) return; if (g.querySelector('td input, td select') && g._at) return; g._at = a + ':' + b;
+  const sel = mwsSelOf(S.mwsT.src), cw = c => c.k === '#' ? 56 : c.k === 'name' ? 150 : Math.max(96, Math.min(220, c.t.length * 7 + 34));
+  g.innerHTML = '<table><colgroup>' + T.F.map(c => '<col style="width:' + cw(c) + 'px">').join('') + '</colgroup><thead><tr>' + T.F.map(c => '<th class="' + (c.num ? 'r' : '') + '" aria-sort="' + (st.sort === c.k ? st.dir > 0 ? 'ascending' : 'descending' : 'none') + '"><button type="button" data-mwss="' + esc(c.k) + '" title="' + esc(c.t) + '">' + esc(c.t) + (st.sort === c.k ? st.dir > 0 ? ' ▲' : ' ▼' : '') + '</button></th>').join('') + '</tr></thead><tbody>'
+    + (a ? '<tr style="height:' + a * H + 'px"><td colspan="' + T.F.length + '" style="height:' + a * H + 'px;border:0"></td></tr>' : '')
+    + mwsRows.slice(a, b).map((r, i) => '<tr data-r="' + (a + i) + '" class="' + (sel.has(r.id) ? 'on' : '') + '">' + T.F.map((c, j) => { const x = mwsShow(c, r); return '<td class="' + (c.num ? 'r ' : '') + (c.edit && !r.ro ? 'ed' : 'ro') + '" data-c="' + j + '"' + (x.length > 14 ? ' title="' + esc(x) + '"' : '') + '>' + esc(x) + '</td>'; }).join('') + '</tr>').join('')
+    + (b < N ? '<tr><td colspan="' + T.F.length + '" style="height:' + (N - b) * H + 'px;border:0"></td></tr>' : '') + '</tbody></table>' + (N ? '' : '<p class="note" style="padding:8px 10px">No rows match.</p>');
+}
+/* a cell typed over: the value goes to the borehole, the shape or the layer */
+function mwsCellEdit(td) {
+  const T = mwsTable(S.mwsT.src), r = mwsRows[+td.parentElement.dataset.r], c = T.F[+td.dataset.c]; if (!r || !c?.edit || S.readOnly) return; if (r.ro) { toast('This log is issued; revise it to change it.'); return; } if (td.querySelector('input, select')) return;
+  const v = r.v[c.k] ?? ''; td.innerHTML = c.opts ? '<select>' + c.opts.map(([k, t]) => '<option value="' + esc(k) + '"' + (k === v ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select>' : '<input value="' + esc(v) + '" autocomplete="off" spellcheck="false">';
+  const i = td.firstChild; i.focus(); i.select?.(); let shut = false; const src = S.mwsT.src;
+  const done = ok => { if (shut) return; shut = true; const nv = i.value; if (ok && String(nv) !== String(v)) { td.innerHTML = ''; if (mwsPut(src, r, c, nv)) { renderView(true); renderStatus(); return; } } td.innerHTML = ''; mwsDockFill(); };
+  i.addEventListener('blur', () => done(true)); if (c.opts) i.addEventListener('change', () => done(true));
+  i.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); done(true); } else if (e.key === 'Escape') { e.preventDefault(); done(false); } });
+}
+function mwsPut(src, r, c, raw) {
+  let x = raw.trim(); if (c.num) { if (x === '') x = null; else { x = +x.replace(/[\s,]/g, ''); if (!isFinite(x)) { toast(c.t + ' should be a number.'); return false; } } }
+  if (src === 'bh') { const b = S.bh.get(r.id); if (!b || !editable(b)) return false; const k = { e: 'easting', n: 'northing', z: 'elevation' }[c.k]; if (!k) return false; if (x == null && k !== 'elevation') { toast('Type a number.'); return false; } b[k] = x == null ? null : k === 'elevation' ? +fromD(x).toFixed(3) : +x.toFixed(3); logChange(b, c.t.replace(/ \(.*/, '') + ' edited in the attribute table'); store.save(b); return true; }
+  const set = f => { if (c.k === 'name') return { ...f, name: raw.trim() }; if (c.k === 'kind') return { ...f, kind: raw }; const k = c.k.slice(2), at = { ...(f.attrs || {}) }; if (x == null || x === '') delete at[k]; else at[k] = x; return { ...f, attrs: at }; };
+  if (src === 'feat') { saveFeats(featsOf().map(f => f.id === r.id ? set(f) : f)); return true; }
+  const L = GIS.layers.find(q => 'g:' + q.id === src); if (!L || L.kind !== 'feats') return false; L.features = L.features.map((f, i) => i === r.id ? set(f) : f); gisHist(); return true;
+}
+/* select by values, select by location */
+const mwsHow = () => '<select id="md-how" aria-label="What to do with the selection"><option value="new">New selection</option><option value="add">Add to the selection</option><option value="remove">Remove from the selection</option><option value="keep">Keep only these, of those selected</option></select>';
+const MWS_OPS = [['gt', 'is more than'], ['ge', 'is at least'], ['lt', 'is less than'], ['le', 'is at most'], ['eq', 'is'], ['ne', 'is not'], ['has', 'contains'], ['no', 'is empty'], ['yes', 'is not empty']];
+function mwsValDlg() {
+  const T = mwsTable(S.mwsT.src);
+  dialog('Select by values: ' + esc(mwsSrcName(S.mwsT.src)), '<div class="mws-dlg"><div class="row"><select id="md-f" aria-label="Field">' + T.F.map(c => '<option value="' + esc(c.k) + '"' + (c.k.startsWith('r:') && !T.F.slice(0, T.F.indexOf(c)).some(q => q.k.startsWith('r:')) ? ' selected' : '') + '>' + esc(c.t) + '</option>').join('') + '</select><select id="md-o" aria-label="Test">' + MWS_OPS.map(([k, t]) => '<option value="' + k + '">' + t + '</option>').join('') + '</select><input id="md-v" aria-label="Value" autocomplete="off" list="md-l"><datalist id="md-l"></datalist></div><div class="row">' + mwsHow() + '</div><p class="note" id="md-n"></p></div>', '<button class="btn" data-act="close">Close</button><button class="btn primary" data-mwsd="valgo">Select</button>'); mwsValHint();
+}
+function mwsValMatch() {
+  const T = mwsTable(S.mwsT.src), c = T.F.find(q => q.k === $('#md-f').value), o = $('#md-o').value, raw = $('#md-v').value.trim(); if (!c) return [];
+  const nv = raw === '' ? NaN : +raw.replace(/[\s,]/g, ''), cmp = o === 'no' || o === 'yes' || o === 'has'; if (!cmp && raw === '') return [];
+  return T.rows.filter(r => { const x = r.v[c.k], t = mwsShow(c, r), e = x == null || x === ''; if (o === 'no') return e; if (o === 'yes') return !e; if (o === 'ne') return !(c.num && isFinite(nv) ? !r.lt?.[c.k] && x === nv : t.toLowerCase() === raw.toLowerCase()); if (e) return false; if (o === 'has') return t.toLowerCase().includes(raw.toLowerCase());
+    const under = r.lt?.[c.k];   // below the detection limit: never over a value; under one only when its limit is at or under it
+    if (o === 'eq') return c.num && isFinite(nv) ? !under && +x === nv : t.toLowerCase() === raw.toLowerCase(); if (!isFinite(nv)) return false; if (under) return (o === 'lt' || o === 'le') && +x <= nv; const y = +x; return o === 'gt' ? y > nv : o === 'ge' ? y >= nv : o === 'lt' ? y < nv : y <= nv; }).map(r => r.id);
+}
+function mwsValHint() { const n = $('#md-n'); if (!n) return; const T = mwsTable(S.mwsT.src), c = T.F.find(q => q.k === $('#md-f').value); if (!c) return; const vals = [...new Set(T.rows.map(r => mwsShow(c, r)).filter(Boolean))].slice(0, 60), ls = $('#md-l'); if (ls && ls.dataset.f !== c.k) { ls.dataset.f = c.k; ls.innerHTML = vals.map(v => '<option value="' + esc(v) + '">').join(''); } const m = mwsValMatch().length; n.textContent = m + ' of ' + T.rows.length + ' match.' + (c.lt ? ' A result below its detection limit is never counted as over a value, and is under one only when its limit is.' : ''); }
+function mwsLocDlg() {
+  const src = S.mwsT.src, o = mwsSources(); dialog('Select by location: ' + esc(mwsSrcName(src)), '<div class="mws-dlg"><div class="row"><span>Select rows that are</span><select id="md-rel" aria-label="Relation"><option value="d">within a distance of</option><option value="x">inside or touching</option></select><select id="md-src" aria-label="Layer">' + o.map(k => '<option value="' + esc(k) + '"' + (k !== src ? ' selected' : '') + '>' + esc(mwsSrcName(k)) + '</option>').join('') + '</select></div><div class="row" id="md-dr"><label for="md-d">Distance (m)</label><input id="md-d" type="number" min="0" step="any" value="20" style="width:110px"></div><label class="check"><input type="checkbox" id="md-so"> Only the ones selected there</label><div class="row">' + mwsHow() + '</div></div>', '<button class="btn" data-act="close">Close</button><button class="btn primary" data-mwsd="locgo">Select</button>');
+}
+function mwsZoomSel(src) {
+  const ids = mwsSelOf(src), B = mwsShapes(src).filter(f => ids.has(f.id) && f.pts.length).map(mwsBox); if (!B.length) { toast('The selected rows have no coordinates.'); return; }
+  const a = Math.min(...B.map(b => b[0])), b = Math.min(...B.map(q => q[1])), c = Math.max(...B.map(q => q[2])), d = Math.max(...B.map(q => q[3])), t = S._plan, w = Math.max(c - a, 10), h = Math.max(d - b, 10); S.mv = { cx: (a + c) / 2, cy: (b + d) / 2, sc: Math.min(t.W / w, t.H / h, 60) * .7 }; S.mvProj = curProj(); drawPlan();
+}
+function mwsDo(k) {
+  const src = S.mwsT.src, st = mwsSt(); if (k === 'val') return mwsValDlg(); if (k === 'loc') return mwsLocDlg();
+  if (k === 'valgo') { const ids = mwsValMatch(); mwsSelSet(src, ids, $('#md-how').value); closeOverlay(); mwsSelDone(); toast(mwsSelOf(src).size + ' selected.'); return; }
+  if (k === 'locgo') {
+    const o = $('#md-src').value, only = $('#md-so').checked, os = mwsSelOf(o), max = $('#md-rel').value === 'x' ? 0 : +$('#md-d').value; if (!(max >= 0)) { toast('Type a distance of 0 or more.'); return; } if (only && !os.size) { toast('Nothing is selected in ' + mwsSrcName(o) + '.'); return; }
+    const G = mwsShapes(o).filter(f => f.pts.length && (!only || os.has(f.id))).map(f => ({ ...f })), ids = mwsShapes(src).filter(f => f.pts.length).map(f => ({ ...f })).filter(f => G.some(g => !(o === src && g.id === f.id) && mwsNear(f, g, max))).map(f => f.id);
+    mwsSelSet(src, ids, $('#md-how').value); closeOverlay(); mwsSelDone(); toast(mwsSelOf(src).size + ' selected.'); return;
+  }
+  if (k === 'clr') mwsSelSet(src, [], 'new', false); else if (k === 'inv') { const s0 = mwsSelOf(src); mwsSelSet(src, mwsTable(src).rows.map(r => r.id).filter(i => !s0.has(i)), 'new', false); }
+  else if (k === 'zoom') { mwsZoomSel(src); return; }
+  else if (k === 'csv') { const T = mwsTable(src); saveFile(mwsSrcName(src).replace(/[^\w .-]+/g, ' ').trim() + '.csv', new Blob(['﻿' + toCSV([T.F.map(c => c.t), ...mwsRows.map(r => T.F.map(c => mwsShow(c, r)))])], { type: 'text/csv' })); return; }
+  else if (k === 'lay') {
+    const ids = mwsSelOf(src), T = mwsTable(src), by = new Map(T.rows.map(r => [r.id, r])), fs2 = mwsShapes(src).filter(f => ids.has(f.id) && f.pts.length).map(f => { const at = f.attrs ? { ...f.attrs } : {}; if (src === 'bh') for (const c of T.F) if (!['name', 'e', 'n'].includes(c.k) && by.get(f.id)?.v[c.k] != null && by.get(f.id).v[c.k] !== '') at[c.t] = by.get(f.id).lt?.[c.k] ? mwsShow(c, by.get(f.id)) : by.get(f.id).v[c.k]; return { type: f.type, name: f.name || '', pts: f.type === 'polygon' ? mwsRings(f) : f.pts, ...(Object.keys(at).length ? { attrs: at } : {}) }; });
+    if (!fs2.length) { toast('The selected rows have no coordinates.'); return; } let nm = mwsSrcName(src) + ' selection', i = 2; while (GIS.layers.some(L => L.name === nm)) nm = mwsSrcName(src) + ' selection ' + i++;
+    gisAddLayer({ name: nm, kind: 'feats', features: fs2, color: '#00879f', note: fs2.length + ' shape' + (fs2.length === 1 ? '' : 's'), tool: 'selection' }); renderView(true); toast('Added the layer ' + nm + '.'); return;
+  }
+  else if (k === 'del') {
+    const ids = mwsSelOf(src), n = ids.size; if (src === 'feat') saveFeats(featsOf().filter(f => !ids.has(f.id))); else { const L = GIS.layers.find(q => 'g:' + q.id === src); if (!L || L.kind !== 'feats') return; if (n >= L.features.length) { toast('That would empty the layer. Remove the layer in Contents instead.'); return; } L.features = L.features.filter((f, i) => !ids.has(i)); L.note = L.features.length + ' shapes'; gisHist(); }
+    S.mwsSel.delete(src); S.mwsInfo = null; renderView(true); toast(n + ' deleted. Undo brings ' + (n === 1 ? 'it' : 'them') + ' back.'); return;
+  }
+  mwsSelDone();
+}
+let mwsLastR = null;
+document.addEventListener('click', e => {
+  const q = x => e.target.closest?.(x); let t;
+  if ((t = q('[data-mwstx]'))) { mwsTShut(t.dataset.mwstx); return; }
+  if ((t = q('[data-mwstbl]'))) { closeMenu(); const k = t.dataset.mwstbl; if (k === '' && S.mwsT.src) { S.mwsT.src = null; renderView(true); return; } mwsTOpen(k === 'sel' ? [...S.mwsSel.keys()][0] : k || (S.tocSel && mwsSrcOf(S.tocSel)) || 'bh'); return; }
+  if ((t = q('[data-mwsd]'))) { mwsDo(t.dataset.mwsd); return; }
+  if ((t = q('[data-mwss]'))) { const st = mwsSt(), k = t.dataset.mwss; if (st.sort !== k) { st.sort = k; st.dir = 1; } else if (st.dir > 0) st.dir = -1; else { st.sort = null; st.dir = 1; } mwsDockFill(); return; }
+  if ((t = q('#mws-dg tbody tr[data-r]')) && !e.target.closest('input, select')) {
+    const i = +t.dataset.r, r = mwsRows[i], src = S.mwsT.src; if (!r || e.detail >= 2) return;
+    if (e.shiftKey && mwsLastR?.src === src) { const a = Math.min(i, mwsLastR.i), b = Math.max(i, mwsLastR.i); mwsSelSet(src, mwsRows.slice(a, b + 1).map(x => x.id), e.ctrlKey || e.metaKey ? 'add' : 'new', false); }
+    else { mwsSelSet(src, [r.id], e.ctrlKey || e.metaKey ? 'toggle' : 'new', false); mwsLastR = { src, i }; }
+    const sel = mwsSelOf(src); document.querySelectorAll('#mws-dg tr[data-r]').forEach(x => x.classList.toggle('on', sel.has(mwsRows[+x.dataset.r]?.id))); mwsSelDraw(); mwsSelCount(); if (mwsSt().only) mwsDockFill(); else { const n = $('#mws-dock .mws-dn'); if (n) n.textContent = n.textContent.replace(/[^ ]+ selected$/, sel.size.toLocaleString('en-CA') + ' selected'); document.querySelectorAll('#mws-dock [data-mwsd="zoom"], #mws-dock [data-mwsd="lay"], #mws-dock [data-mwsd="del"], #mws-dock [data-mwsd="clr"]').forEach(b => { b.disabled = !sel.size; }); }
+  }
+});
+document.addEventListener('dblclick', e => { const td = e.target.closest?.('#mws-dg td[data-c]'); if (td) mwsCellEdit(td); });
+document.addEventListener('input', e => { if (e.target.id === 'mws-q') { const st = mwsSt(); st.q = e.target.value; $('#mws-dg').scrollTop = 0; mwsDockFill(); } else if (['md-f', 'md-o', 'md-v'].includes(e.target.id)) mwsValHint(); });
+document.addEventListener('change', e => { if (e.target.id === 'mws-only') { mwsSt().only = e.target.checked; mwsDockFill(); } else if (e.target.id === 'md-rel') $('#md-dr').hidden = e.target.value === 'x'; });
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest?.('[data-mwsdrz]')) return; e.preventDefault(); const y0 = e.clientY, h0 = mwsDockH(), el = $('#mws-dock');
+  const mv = ev => { S.ui.mwsDH = h0 + y0 - ev.clientY; S.ui.mwsDH = mwsDockH(); el.style.height = S.ui.mwsDH + 'px'; };
+  const up = ev => { mv(ev); removeEventListener('pointermove', mv); removeEventListener('pointerup', up); uiSave(); drawPlan(); mwsDockFill(); };
   addEventListener('pointermove', mv); addEventListener('pointerup', up);
 });
 
@@ -10295,7 +10535,7 @@ addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; });
 document.addEventListener('pointerdown', e => {
   if (!e.target.closest?.('#plan svg') || !S._plan) return;
   const onThing = !mwsClicks() && e.target.closest('[data-secpick], [data-bhpt], [data-feat], [data-vtx], [data-vmid]');
-  const drawing = (mapInk() && S.mapTool !== 'select') || !!S.secDraw || !!S.gpSpot;
+  const drawing = (mwsOn() && !S.mapEdit && S.mwsTool === 'select') || (mapInk() && S.mapTool !== 'select') || !!S.secDraw || !!S.gpSpot;
   if (!(e.button === 1 || spaceDown || (!onThing && !drawing && e.button === 0))) return;
   mPan = { x: e.clientX, y: e.clientY, v: { cx: S._plan.cx, cy: S._plan.cy, sc: S._plan.sc }, moved: false, b: e.button };
   e.stopImmediatePropagation(); e.preventDefault();
@@ -10846,7 +11086,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.i
 document.addEventListener('input', e => { if (e.target.id === 'xs-date') { const d = xsDates(sectionList())[+e.target.value]; if (d) xsSetDate(d); } });
 function drawXsec() { drawSection($('#xs-draw'), $('#xs-note'), undefined, sectionList()); const ms = $('#xs-model-sec'); if (ms) ms.outerHTML = xsModelHTML(); }   // the forecast panel reads the drawn section's geometry
 const redrawSec = () => S.tab === 'xsec' ? drawXsec() : drawSite();
-function drawPlan(el = $('#plan')) { if (!el) return; if (S.tab === 'soil') { drawSoil(); return; } const mws = mwsOn(); el.innerHTML = planSVG(Math.max(el.clientWidth, mws ? 200 : 420), mws ? Math.max(200, el.clientHeight) : S.mapEdit ? 620 : planH(el), true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); if (mws) { mwsMark(); mwsStatus(); } loadImagery(); }
+function drawPlan(el = $('#plan')) { if (!el) return; if (S.tab === 'soil') { drawSoil(); return; } const mws = mwsOn(); el.innerHTML = planSVG(Math.max(el.clientWidth, mws ? 200 : 420), mws ? Math.max(200, el.clientHeight) : S.mapEdit ? 620 : planH(el), true) + (S._plan ? planCtlHTML() : '') + (S._planEmpty ? `<p class="map-hint">No boreholes are located yet. Go to the site with the box beside the map, then use Edit map › Place borehole, or type eastings and northings in Data.</p>` : ''); if (mws) { mwsMark(); mwsSelDraw(); mwsStatus(); } loadImagery(); }
 /* Delaunay triangulation (Bowyer–Watson) for contouring between boreholes */
 function delaunay(P) {
   const n = P.length; if (n < 3) return [];
@@ -12131,33 +12371,68 @@ const fmtV = v => v >= 1 ? v.toFixed(1) + ' m/day' : v >= .01 ? v.toFixed(3) + '
 const fmtT = d => d < 60 ? Math.round(d) + ' days' : d < 730 ? (d / 30.4).toFixed(1) + ' months' : (d / 365.25).toFixed(1) + ' years';
 GIS.layers = [];
 let gisLayerSeq = 0;
-function gisAddLayer(L) { L.id = 'L' + (++gisLayerSeq); L.on = true; const keep = GIS.layers.filter(x => x.tool !== L.tool || x.name !== L.name); if (keep.length >= 24) toast('Only 24 Toolbox layers are kept: ' + keep.at(-1).name + ' (the bottom one) was removed.'); GIS.layers = [L, ...keep].slice(0, 24); S.tocSel = 'g:' + L.id; S.tocFold.delete('gis'); return L; }
+function gisAddLayer(L) { L.id = 'L' + (++gisLayerSeq); L.on = true; GIS.layers = [L, ...GIS.layers.filter(x => x.tool !== L.tool || x.name !== L.name)]; S.tocSel = 'g:' + L.id; S.tocFold.delete('gis'); return L; }
 /* ---------- Toolbox layers are kept with their project: on this computer (IndexedDB, as they are: grids as typed arrays, pictures as
    files) and in project and workspace files (grids gzipped in base64; slope left out and worked out again when opened). A light check
    every 2 s saves any change (a tool's result, a layer turned on or off, a colour, a label) and follows the project that is open. ---------- */
 GIS.proj = undefined; let gisSig = '', gisBusy = false; S.gisEdited = {};
 const GIS_TA = { Float32Array, Float64Array, Uint8Array, Int8Array, Uint16Array, Int16Array, Uint32Array, Int32Array };
-const gisSigOf = () => GIS.layers.map(L => [L.id, L.name, L.on ? 1 : 0, L.show, L.ramp, L.op, L.shade, L.showTrees, L.under, L.note, L.treesPhoto, JSON.stringify(L.lab || null), L.trees ? L.trees.length + ':' + L.trees[0]?.[0] + ':' + L.trees.at(-1)?.[1] : '', L.values?.length, L.box?.join()].join('|')).join('\n') + '#' + JSON.stringify(S.v3dTerrain || null);
+/* a layer's data (grids, shapes, pictures) is kept apart from its style and is never changed in place: an edit puts a new array in,
+   so a changed array is a changed layer. Only layers whose data changed are written again. */
+const GIS_DERIVED = new Set(['url', 'step', 'srange', 'ramp0']);   // worked out while drawing: not a change
+const gisHeavy = v => ArrayBuffer.isView(v) || v instanceof Blob || (Array.isArray(v) && (v.length > 64 || Array.isArray(v[0]) || (v[0] && typeof v[0] === 'object')));
+const gisRefs = new WeakMap(); let gisRefN = 0; const gisRef = v => { let n = gisRefs.get(v); if (!n) gisRefs.set(v, n = ++gisRefN); return n; };
+const gisKeeps = (k, v) => !k.startsWith('_') && !GIS_DERIVED.has(k) && v !== undefined && typeof v !== 'function' && !(v instanceof Node);
+const gisSigOf = () => GIS.layers.map(L => Object.entries(L).filter(([k, v]) => gisKeeps(k, v)).map(([k, v]) => k + '=' + (gisHeavy(v) ? '@' + gisRef(v) : JSON.stringify(v))).join('|') + (L.kind === 'image' ? '|' + (L.url || '') : '')).join('\n') + '#' + JSON.stringify(S.v3dTerrain || null);
+const gisDK = (p, id) => 'gisd:' + p + '\u0000' + id;
+GIS.saved = new Map();   // layer id -> the arrays last written for it
+const gisSplit = o => { const light = {}, data = {}; for (const [k, v] of Object.entries(o)) (gisHeavy(v) ? data : light)[k] = v; return [light, data]; };
+async function gisRead(p) {   // { at, layers, v3dTerrain, seq }, or null. Throws when the store cannot be read
+  const ix = await dataStore.get('gis2:' + p); if (!ix) return dataStore.get('gis:' + p);
+  return { ...ix, layers: await Promise.all(ix.layers.map(async l => ({ ...l, ...((await dataStore.get(gisDK(p, l.id))) || {}) }))) };
+}
+async function gisWrite(p, rec) {   // everything, as it is
+  const old = await dataStore.under('gisd:' + p + '\u0000'), puts = [], ix = { v: 2, at: rec.at, seq: rec.seq || 0, v3dTerrain: rec.v3dTerrain || null, layers: [] };
+  rec.layers.forEach((l, i) => { const o = { ...l, id: l.id || 'L' + (i + 1) }, [light, data] = gisSplit(o); ix.layers.push(light); puts.push([gisDK(p, o.id), data]); });
+  const keep = new Set(puts.map(q => q[0])); puts.push(['gis2:' + p, ix]);
+  await dataStore.write(puts, [...old.filter(k => !keep.has(k)), 'gis:' + p]);
+}
+const gisWipe = async p => dataStore.write([], [...await dataStore.under('gisd:' + p + '\u0000'), 'gis2:' + p, 'gis:' + p]);
+/* undo: the layers as they were, sharing the same arrays (nothing is copied). Kept while the project stays open */
+const gisSnap = () => GIS.layers.map(L => ({ ...L }));
+function gisHist() {
+  if (!S.loaded || GIS.proj === undefined || GIS.proj !== curProj() || hist.applying || S.readOnly) return;
+  const sg = gisSigOf(); if (sg === GIS.histSig) return; const before = GIS.snap, after = gisSnap(); GIS.histSig = sg; GIS.snap = after;
+  hist.undo.push({ at: 0, items: [{ key: 'gis', before, after }] }); if (hist.undo.length > 200) hist.undo.shift(); hist.redo = []; updateUndo();
+}
+function gisRestore(list) { GIS.layers = list.map(L => ({ ...L, url: L.kind === 'image' || !L.values ? L.url : null })); S.mwsSel?.clear(); if (S.tocSel?.startsWith('g:') && !GIS.layers.some(L => 'g:' + L.id === S.tocSel)) S.tocSel = null; GIS.snap = gisSnap(); GIS.histSig = gisSigOf(); }
 async function gisRecs() {   // the layers as plain records: no blob URLs; a picture's file read once and kept
   return Promise.all(GIS.layers.map(async L => {
     const o = {}; for (const [k, v] of Object.entries(L)) if (k !== 'url' && !k.startsWith('_') && typeof v !== 'function' && !(v instanceof Node)) o[k] = v;
+    for (const k of GIS_DERIVED) if (k !== 'url' && k !== 'step') delete o[k];
     if (L.kind === 'image' && L.url) { if (!L._blob) try { L._blob = await (await fetch(L.url)).blob(); } catch { L._blob = null; } if (L._blob) o.imgBlob = L._blob; }
     return o; }));
 }
 function gisFromRec(r) { const L = { ...r }; delete L.imgBlob; L.url = r.imgBlob ? URL.createObjectURL(r.imgBlob) : null; if (r.imgBlob) L._blob = r.imgBlob; return L; }
 async function gisPersist(p) {
-  if (S.readOnly || p === undefined) return;
-  const rec = { v: 1, at: new Date().toISOString(), layers: await gisRecs(), v3dTerrain: S.v3dTerrain || null, seq: gisLayerSeq };
-  try { await dataStore.put('gis:' + p, rec); } catch { if (!S.gisWarned) { S.gisWarned = true; toast('The map layers could not be saved on this computer (storage full or blocked). Save the project to a file to keep them.'); } }
+  if (S.readOnly || p === undefined || GIS.bad) return;
+  const recs = await gisRecs(), puts = [], saved = new Map(), ix = { v: 2, at: new Date().toISOString(), seq: gisLayerSeq, v3dTerrain: S.v3dTerrain || null, layers: [] };
+  for (const o of recs) { const [light, data] = gisSplit(o); ix.layers.push(light); saved.set(o.id, data); const was = GIS.saved.get(o.id), ks = Object.keys(data); if (!was || Object.keys(was).length !== ks.length || ks.some(k => was[k] !== data[k])) puts.push([gisDK(p, o.id), data]); }
+  try {
+    const old = await dataStore.under('gisd:' + p + '\u0000'), keep = new Set(recs.map(o => gisDK(p, o.id)));
+    await dataStore.write([...puts, ['gis2:' + p, ix]], [...old.filter(k => !keep.has(k)), 'gis:' + p]); GIS.saved = saved; GIS.lastPut = puts.length;
+  } catch { gisSig = ''; if (!S.gisWarned) { S.gisWarned = true; toast('The map layers could not be saved on this computer (storage full or blocked). Save the project to a file to keep them.'); } }
 }
 async function gisLoad(p) {
-  let rec = null; try { rec = await dataStore.get('gis:' + p); } catch { /* none */ }
-  for (const L of GIS.layers) if (L.url && !(rec?.layers || []).some(r => r.id === L.id && r.url === L.url)) URL.revokeObjectURL(L.url);
+  let rec = null; GIS.bad = false; try { rec = await gisRead(p); } catch { GIS.bad = true; toast('The map layers could not be read from this computer, so changes to them will not be saved. Restart the app to try again.'); }
+  for (const L of GIS.layers) if (L.url) URL.revokeObjectURL(L.url);
   GIS.layers = (rec?.layers || []).map(gisFromRec);
+  GIS.saved = new Map((rec?.v === 2 ? rec.layers : []).map(o => [o.id, gisSplit(o)[1]]));
   gisLayerSeq = Math.max(gisLayerSeq, rec?.seq || 0, ...GIS.layers.map(L => +String(L.id).replace(/\D/g, '') || 0));
   S.v3dTerrain = rec?.v3dTerrain || null;
   const T = GIS.layers.find(L => L.terrain && L.values && L.on && /^Elevation: /.test(L.name)); GIS.dem = T ? { values: T.values, box: T.box, nx: T.nx, ny: T.ny, name: T.name.replace(/^Elevation: /, '') } : null;
-  GIS.proj = p; gisSig = gisSigOf();
+  for (const st of ['undo', 'redo']) hist[st] = hist[st].filter(x => !x.items.some(i => i.key === 'gis')); updateUndo();
+  S.mwsSel?.clear(); GIS.proj = p; gisSig = gisSigOf(); GIS.histSig = gisSig; GIS.snap = gisSnap();
 }
 async function gisWatch() {
   if (gisBusy || S.loadFail) return; const p = curProj();
@@ -12167,7 +12442,7 @@ async function gisWatch() {
       if (GIS.proj !== undefined && gisSigOf() !== gisSig) await gisPersist(GIS.proj);
       await gisLoad(p); if (['site', 'v3d'].includes(S.tab)) renderView(true); return;
     }
-    const sg = gisSigOf(); if (sg === gisSig) return;
+    gisHist(); const sg = gisSigOf(); if (sg === gisSig) return;
     gisSig = sg; await gisPersist(p); S.gisEdited[p] = new Date().toISOString(); autosaveSoon(p); setSync?.();
   } finally { gisBusy = false; }
 }
@@ -12202,16 +12477,16 @@ function gisSlopeOf(L) {   // slope in degrees (Horn's method, as gdaldem), for 
   return s;
 }
 async function gisFileData(p) {   // a project's layers for its file (null when it has none)
-  let rec; if (p === GIS.proj) rec = { at: S.gisEdited[p] || new Date().toISOString(), layers: await gisRecs(), v3dTerrain: S.v3dTerrain || null }; else { try { rec = await dataStore.get('gis:' + p); } catch { rec = null; } }
+  let rec; if (p === GIS.proj) rec = { at: S.gisEdited[p] || new Date().toISOString(), layers: await gisRecs(), v3dTerrain: S.v3dTerrain || null }; else { try { rec = await gisRead(p); } catch { rec = null; } }
   if (!rec?.layers?.length) return null;
   return { v: 1, at: rec.at, v3dTerrain: rec.v3dTerrain || null, layers: await Promise.all(rec.layers.map(r => gisPack(r))) };
 }
 async function gisAdopt(p, g, replace) {   // layers from a file into this computer's store; a workspace file only replaces older ones
   if (!g?.layers) return;
-  if (!replace) { let have = null; try { have = await dataStore.get('gis:' + p); } catch { /* none */ } if (have?.layers?.length && (have.at || '') > (g.at || '')) return; }
+  if (!replace) { let have = null; try { have = await gisRead(p); } catch { /* none */ } if (have?.layers?.length && (have.at || '') > (g.at || '')) return; }
   const layers = await Promise.all(g.layers.map(gisUnpack));
   for (const L of layers) if (L.slope?.$slope) L.slope = L.values ? gisSlopeOf(L) : null;
-  try { await dataStore.put('gis:' + p, { v: 1, at: g.at || new Date().toISOString(), layers, v3dTerrain: g.v3dTerrain || null }); } catch { toast('The map layers in the file could not be saved on this computer.'); return; }
+  try { await gisWrite(p, { at: g.at || new Date().toISOString(), layers, v3dTerrain: g.v3dTerrain || null }); } catch { toast('The map layers in the file could not be saved on this computer.'); return; }
   if (p === GIS.proj) { gisBusy = true; try { await gisLoad(p); } finally { gisBusy = false; } }
 }
 /* run a groundwater or area tool: its job, then the layer and a plain summary */
@@ -12598,7 +12873,7 @@ document.addEventListener('click', async e => {
 const gridOf = L => ({ b64: f32b64(L.values), nx: L.nx, ny: L.ny, box: L.box.map(v => +v) });
 /* a Toolbox layer's shapes as features (lines, areas, points) for export or buffers */
 function layerFeatures(L) {
-  if (L.kind === 'feats') return L.features.map(f => ({ type: f.type, name: f.name || '', pts: f.pts }));
+  if (L.kind === 'feats') return L.features.map(f => ({ type: f.type, name: f.name || '', pts: f.pts, ...(f.attrs ? { attrs: f.attrs } : {}) }));
   if (L.kind === 'path') return [{ type: 'line', name: L.lab?.text ?? L.note ?? L.name, pts: L.path }];
   if (L.kind === 'polys') return L.polys.map((rings, i) => ({ type: 'polygon', name: L.plabels?.[i]?.[2] ?? L.lab?.text ?? L.name, pts: rings }));
   if (L.kind === 'arrows') { const l = L.len || 5; return L.arrows.map(([x, y, az]) => { const a = az * Math.PI / 180; return { type: 'line', name: Math.round(az) + '°', pts: [[x - Math.sin(a) * l / 2, y - Math.cos(a) * l / 2], [x + Math.sin(a) * l / 2, y + Math.cos(a) * l / 2]] }; }); }
