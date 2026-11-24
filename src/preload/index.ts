@@ -42,6 +42,13 @@ const desktop = {
     check: (): Promise<{ ok: boolean; newer?: boolean; none?: boolean; version?: string; current?: string; notes?: string; date?: string; error?: string }> => ipcRenderer.invoke('update:check'),
     open: (): Promise<void> => ipcRenderer.invoke('update:open'),
   },
+  // map services: hosts the person allowed, in the shell's own dialog; pictures and descriptions from those only
+  web: {
+    hosts: (): Promise<string[]> => ipcRenderer.invoke('web:hosts'),
+    allow: (u: string): Promise<{ ok: boolean; host?: string; error?: string; cancelled?: boolean }> => ipcRenderer.invoke('web:allow', u),
+    forget: (h: string): Promise<string[]> => ipcRenderer.invoke('web:forget', h),
+    get: (u: string): Promise<{ ok: boolean; type?: string; data?: string; status?: number; error?: string; host?: string }> => ipcRenderer.invoke('web:get', u),
+  },
   // Apple Maps satellite pictures, signed by the shell with the user's Maps key (which never comes to the window)
   appleMaps: {
     status: (): Promise<{ teamId: string; keyId: string } | null> => ipcRenderer.invoke('apple:status'),

@@ -8,6 +8,7 @@ import { stat, copyFile } from 'node:fs/promises';
 import { clearCreds, fetchSnapshot, loadCreds, saveCreds } from './applemaps.mjs';
 import { checkForUpdate, HUB } from './updates.mjs';
 import { fileGuard } from './guard.mjs';
+import { hostOf, webMaps } from './webmaps.mjs';
 
 /* The desktop shell. The current interface ("classic") runs from resources/legacy; the React interface is being
    built alongside it and opens from View > New interface (preview). Project files are ordinary files on disk. */
@@ -179,6 +180,19 @@ ipcMain.handle('gis:savefile', async (e, token: unknown, name: unknown) => {
   const r = await dialog.showSaveDialog(owner(e), { title: 'Save the file', defaultPath: typeof name === 'string' ? name.replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 120) : basename(src) });
   if (r.canceled || !r.filePath) return null;
   await copyFile(src, r.filePath); return { name: basename(r.filePath) };
+});
+
+/* map services: the person allows each host here; the page gets pictures from those only */
+let webm: ReturnType<typeof webMaps> | null = null;
+const web = () => (webm ||= webMaps(join(app.getPath('userData'), 'map-hosts.json')));
+ipcMain.handle('web:hosts', e => mine(e) ? web().list() : []);
+ipcMain.handle('web:get', (e, u: unknown) => mine(e) ? web().get(u) : { ok: false, error: 'Not allowed.' });
+ipcMain.handle('web:forget', (e, h: unknown) => { if (mine(e) && typeof h === 'string') web().forget(h); return web().list(); });
+ipcMain.handle('web:allow', async (e, u: unknown) => {
+  if (!mine(e)) return { ok: false, error: 'Not allowed.' };
+  const h = hostOf(u); if (!h) return { ok: false, error: 'Type an https address on the internet.' }; if (web().has(h)) return { ok: true, host: h };
+  const r = await dialog.showMessageBox(owner(e), { type: 'question', buttons: ['Allow', 'Cancel'], defaultId: 1, cancelId: 1, title: 'Map service', message: `Get maps from ${h}?`, detail: 'Borehole Field Log will ask this server for pictures of the area you view, so it can tell roughly where your site is. Your boreholes and results are not sent. You can take this back in Add-ons › Connections.' });
+  return r.response === 0 && web().allow(h) ? { ok: true, host: h } : { ok: false, cancelled: true };
 });
 
 /* Apple Maps: the key is set up and kept here (the app's own folder); the page asks for pictures of areas and gets images back */

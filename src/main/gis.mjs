@@ -250,6 +250,11 @@ export function checkJob(job) {
     if (method === 'profile' && (!nums(job.line, 2) || job.line.length < 2 || job.line.length > 500)) return 'A line of 2 to 500 points is needed.';
     if (method === 'griddist' && (!nums(job.points, 2) || job.points.length < 1 || job.points.length > 5000)) return 'Points are needed.';
     if (job.polys != null && (!Array.isArray(job.polys) || job.polys.length > 500 || !job.polys.every(p => Array.isArray(p) && p.every(r => nums(r, 2))))) return 'Areas must be rings of [x, y].';
+  } else if (kind === 'canada') {
+    if (!['lidar', 'wetland', 'water'].includes(method)) return 'Unknown method.';
+    if (!nums([job.box], 4) || !(Number.isInteger(job.epsg) && job.epsg > 1000 && job.epsg < 100000)) return 'An area and a coordinate system are needed.';
+    const w = job.box[2] - job.box[0], h = job.box[3] - job.box[1], mx = method === 'lidar' ? 6000 : 30000; if (!(w > 5 && h > 5)) return 'The area is too small.'; if (w > mx || h > mx) return 'The area is too large: keep it under ' + mx / 1000 + ' km across.';
+    if (job.params?.cell != null && !(job.params.cell >= 0.5 && job.params.cell <= 100)) return 'The cell size must be 0.5 to 100 m.';
   } else if (kind === 'rgdal') {
     if (!['warp', 'clip', 'dem', 'contour'].includes(method)) return 'Unknown method.';
     if (!gridOk(job.raster) || !CRS_CODE.test(String(job.epsg)) || (job.to != null && !CRS_CODE.test(String(job.to)))) return 'A layer grid and coordinate systems are needed.';

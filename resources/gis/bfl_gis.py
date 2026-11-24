@@ -2012,8 +2012,65 @@ def area_over(job):
         polys.append(rings)
     return {'polys': polys, 'area': tot, 'cells': int(mk.sum()), 'tool': 'GDAL %s Polygonize' % gdal.__version__, 'detail': '%d cells of %.3g × %.3g m' % (int(mk.sum()), dx, dy)}
 
+# ---------- Canadian open data (Natural Resources Canada, Open Government Licence - Canada): read over the network, only the area asked for ----------
+CAN_STAC = 'https://datacube.services.geo.ca/stac/api/search'
+CAN_HOSTS = ('https://canelevation-dem.s3.ca-central-1.amazonaws.com/', 'https://datacube-prod-data-public.s3.ca-central-1.amazonaws.com/', 'https://datacube-prod-data-public.s3.amazonaws.com/')
+CWI = {1: 'Bog', 2: 'Fen', 3: 'Swamp', 4: 'Marsh', 5: 'Water'}   # values as drawn by the publisher's own legend
+def can_items(coll, box, epsg):
+    """the files of a collection over the area (latitude and longitude of the area are sent)"""
+    import ssl, urllib.parse, urllib.request
+    from osgeo import osr
+    t = srs_of(epsg); g = srs_of(4617); ct = osr.CoordinateTransformation(t, g); P = [ct.TransformPoint(x, y)[:2] for x in (box[0], box[2]) for y in (box[1], box[3])]
+    q = urllib.parse.urlencode({'collections': coll, 'limit': 20, 'bbox': '%.5f,%.5f,%.5f,%.5f' % (min(p[0] for p in P), min(p[1] for p in P), max(p[0] for p in P), max(p[1] for p in P))})
+    try:
+        import certifi; cx = ssl.create_default_context(cafile=certifi.where())
+    except Exception: cx = ssl.create_default_context()
+    try:
+        with urllib.request.urlopen(urllib.request.Request(CAN_STAC + '?' + q, headers={'User-Agent': 'map-client'}), timeout=40, context=cx) as r: return json.loads(r.read(4000000).decode('utf-8')).get('features', [])
+    except Exception as e: raise RuntimeError('The Natural Resources Canada catalogue could not be reached (%s). Check the connection, or whether the network blocks datacube.services.geo.ca.' % str(getattr(e, 'reason', e))[:120])
+
+def canada(job):
+    from osgeo import gdal
+    import numpy as np
+    gdal.UseExceptions()
+    for k, v in {'GDAL_DISABLE_READDIR_ON_OPEN': 'EMPTY_DIR', 'CPL_VSIL_CURL_ALLOWED_EXTENSIONS': '.tif', 'GDAL_HTTP_TIMEOUT': '40', 'GDAL_HTTP_CONNECTTIMEOUT': '20', 'GDAL_HTTP_MAX_RETRY': '2', 'VSI_CACHE': 'TRUE', 'GDAL_PAM_ENABLED': 'NO'}.items(): gdal.SetConfigOption(k, v)
+    m, prm, box = job['method'], job.get('params', {}), job['box']; x0, y0, x1, y1 = box; span = max(x1 - x0, y1 - y0); sr = srs_of(job['epsg']).ExportToWkt()
+    def hrefs(coll, asset):
+        out = []
+        for f in sorted(can_items(coll, box, job['epsg']), key=lambda f: str(f.get('properties', {}).get('datetime')), reverse=True):
+            h = (f.get('assets', {}).get(asset) or {}).get('href', '')
+            if h.startswith(CAN_HOSTS) and h.endswith('.tif'): out.append((h, str(f.get('properties', {}).get('datetime', ''))[:4], f.get('id', '')))
+        return out
+    def warp(hs, res, alg, dst, nd):
+        return gdal.Warp(dst, ['/vsicurl/' + h for h in hs], format='GTiff' if dst else 'MEM', dstSRS=sr, outputBounds=box, xRes=res, yRes=res, resampleAlg=alg, dstNodata=nd, multithread=True, warpMemoryLimit=256)
+    if m == 'lidar':
+        kind = 'dsm' if str(prm.get('kind')) == 'dsm' else 'dtm'; want = float(prm.get('cell') or 0); tried, best = [], None
+        for coll, nat, name in (('hrdem-mosaic-1m', 1.0, 'HRDEM mosaic, 1 m'), ('hrdem-mosaic-2m', 2.0, 'HRDEM mosaic, 2 m'), ('mrdem-30', 30.0, 'MRDEM, 30 m')):
+            if best and (best[0] > .98 or nat >= 30 and best[0] > .02): break   # 30 m ground is never mixed with, or put in place of, lidar
+            prog(0.1 + .12 * len(tried), 'Looking for ' + name); hs = hrefs(coll, kind); tried.append(name)
+            if not hs: continue
+            res = max(want, 0) or max(nat, round(span / 1600, 1)); res = max(res, span / 2000)
+            prog(0.15 + .12 * len(tried), 'Reading %s at %.1f m, only this area' % (name, res)); f = '/vsimem/can_%d.tif' % len(tried)
+            w = warp([h[0] for h in hs[:4]], res, 'average' if res > nat * 1.2 else 'bilinear', f, -32767); a = w.ReadAsArray(); cov = float((a > -32000).mean()); w = None
+            if cov > 0 and (best is None or cov > best[0] + .02): best = (cov, f, name, nat, hs[0][1], res)
+        if not best: raise RuntimeError('There is no elevation data for this area in the national mosaics.')
+        cov, f, name, nat, yr, res = best; r = dem({**job, 'path': f, 'params': {**prm, 'cells': 'source'}})
+        r.update({'source': name + (', surface with trees and buildings' if kind == 'dsm' else ', bare ground'), 'native': nat, 'year': yr, 'cover': cov, 'src_res': nat, 'detail': 'Natural Resources Canada %s, read at %.2f m; %s' % (name, res, r.get('detail', ''))}); return r
+    coll, asset, nat = {'wetland': ('canadian-wetland-inventory', 'classification', 10.0), 'water': ('dynamic-surface-water-compilation', 'frequency', 30.0)}[m]
+    prog(0.2, 'Looking for the data'); hs = hrefs(coll, asset)[:1]
+    if not hs: raise RuntimeError('There is no data for this area.')
+    nd0 = 15 if m == 'wetland' else 255; res = max(nat if span < 8000 else nat * 2, span / 1500)
+    prog(0.5, 'Reading only this area at %.0f m' % res); w = gdal.Warp('', ['/vsicurl/' + hs[0][0]], format='MEM', dstSRS=sr, outputBounds=box, xRes=res, yRes=res, resampleAlg='near', dstNodata=nd0); a = w.ReadAsArray().astype(int); gt = w.GetGeoTransform(); ny, nx = a.shape; cell = abs(gt[1] * gt[5])
+    ok = (a >= 1) & (a <= 5) if m == 'wetland' else (a > 0) & (a <= 100)
+    out = {'values_b64': b64f(np.where(ok, a, np.nan)), 'nx': nx, 'ny': ny, 'box': [gt[0], gt[3] + gt[5] * ny, gt[0] + gt[1] * nx, gt[3]], 'year': hs[0][1], 'item': hs[0][2], 'res': res, 'area': float(ok.sum() * cell), 'total': float(nx * ny * cell), 'max': int(a[ok].max()) if ok.any() else 0, 'tool': 'GDAL %s, Natural Resources Canada' % gdal.__version__, 'detail': '%s, %.0f m cells' % (hs[0][2], res)}
+    if m == 'wetland':
+        out['classes'] = [{'v': k, 'name': n, 'area': float((a == k).sum() * cell)} for k, n in CWI.items()]
+        out['features'] = [{'type': 'polygon', 'pts': r, 'name': CWI[v], 'attrs': {'Class': CWI[v], 'Area_m2': round(ar, 1), 'Source': 'Canadian Wetland Inventory v3A'}} for v, ar, r in mask_polys(ok, gt, np.where(ok, a, 0)) if v in CWI]
+    return out
+
 def run(job):
     job = floats(job)
+    if job.get('kind') == 'canada': return canada(job)
     if job.get('network'):
         os.environ['PROJ_NETWORK'] = 'ON'
         cache = os.path.join(os.path.dirname(sys.prefix), 'proj-grids'); os.makedirs(cache, exist_ok=True); os.environ['PROJ_USER_WRITABLE_DIRECTORY'] = cache
@@ -2058,3 +2115,9 @@ if __name__ == '__main__':
     try: res = {'ok': True, **(in_grass(job) if inside else run(job))}
     except Exception as e: res = {'ok': False, 'error': '%s: %s' % (type(e).__name__, e)}
     with open(a[1], 'w') as f: json.dump(res, f)
+    if job.get('kind') == 'canada':   # on Windows, unloading GDAL after network reads can hang; the result is written, so the program simply ends
+        sys.stdout.flush()
+        if os.name == 'nt':
+            import ctypes
+            k = ctypes.windll.kernel32; k.GetCurrentProcess.restype = ctypes.c_void_p; k.TerminateProcess.argtypes = [ctypes.c_void_p, ctypes.c_uint]; k.TerminateProcess(k.GetCurrentProcess(), 0)
+        os._exit(0)
