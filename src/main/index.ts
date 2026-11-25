@@ -9,6 +9,7 @@ import { clearCreds, fetchSnapshot, loadCreds, saveCreds } from './applemaps.mjs
 import { checkForUpdate, HUB } from './updates.mjs';
 import { fileGuard } from './guard.mjs';
 import { hostOf, webMaps } from './webmaps.mjs';
+import { oilfield } from './oilfield.mjs';
 
 /* The desktop shell. The current interface ("classic") runs from resources/legacy; the React interface is being
    built alongside it and opens from View > New interface (preview). Project files are ordinary files on disk. */
@@ -194,6 +195,20 @@ ipcMain.handle('web:allow', async (e, u: unknown) => {
   const r = await dialog.showMessageBox(owner(e), { type: 'question', buttons: ['Allow', 'Cancel'], defaultId: 1, cancelId: 1, title: 'Map service', message: `Get maps from ${h}?`, detail: 'Borehole Field Log will ask this server for pictures of the area you view, so it can tell roughly where your site is. Your boreholes and results are not sent. You can take this back in Add-ons › Connections.' });
   return r.response === 0 && web().allow(h) ? { ok: true, host: h } : { ok: false, cancelled: true };
 });
+
+/* oilfield data: published Alberta files and Petrinex volumes, fetched to this computer when the person says so in a dialog here */
+let oil: ReturnType<typeof oilfield> | null = null;
+const oilf = () => (oil ||= oilfield(join(app.getPath('userData'), 'oilfield'), join(app.getAppPath(), 'resources', 'oilfield', 'worker.mjs')));
+ipcMain.handle('oil:run', async (e, q: { do?: unknown; keys?: unknown; months?: unknown }) => {
+  if (!mine(e)) return { ok: false, error: 'Not allowed.' };
+  if (q?.do === 'get' || q?.do === 'prod') {
+    const r = await dialog.showMessageBox(owner(e), { type: 'question', buttons: ['Download', 'Cancel'], defaultId: 1, cancelId: 1, title: 'Oilfield data', message: q.do === 'get' ? 'Download published Alberta oilfield data?' : 'Download monthly production?', detail: (q.do === 'get' ? 'About 7 to 210 MB from static.aer.ca (Alberta Energy Regulator) and www.petrinex.gov.ab.ca, depending on what was ticked. It takes a few minutes and is kept on this computer (about 110 MB).' : 'Up to ' + Number(q.months) + ' monthly files from www.petrinex.gov.ab.ca (about 3 MB each for Saskatchewan, 8 MB for Alberta). Months already here are not fetched again.') + ' Nothing about you or the project is sent.' });
+    if (r.response !== 0) return { ok: false, cancelled: true };
+  }
+  return oilf().run(q, m => { if (!e.sender.isDestroyed()) e.sender.send('oil:progress', m); });
+});
+ipcMain.handle('oil:cancel', e => mine(e) ? oilf().cancel() : false);
+ipcMain.handle('oil:clear', e => mine(e) ? oilf().clear() : false);
 
 /* Apple Maps: the key is set up and kept here (the app's own folder); the page asks for pictures of areas and gets images back */
 const appleFile = () => join(app.getPath('userData'), 'apple-maps.json');

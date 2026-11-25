@@ -49,6 +49,13 @@ const desktop = {
     forget: (h: string): Promise<string[]> => ipcRenderer.invoke('web:forget', h),
     get: (u: string): Promise<{ ok: boolean; type?: string; data?: string; status?: number; error?: string; host?: string }> => ipcRenderer.invoke('web:get', u),
   },
+  // oilfield data kept on this computer: search, download (asked in the shell's dialog), production
+  oil: {
+    run: (q: unknown): Promise<{ ok: boolean; data?: unknown; error?: string; cancelled?: boolean }> => ipcRenderer.invoke('oil:run', q),
+    cancel: (): Promise<boolean> => ipcRenderer.invoke('oil:cancel'),
+    clear: (): Promise<boolean> => ipcRenderer.invoke('oil:clear'),
+    onProgress: (f: (m: string) => void) => { const h = (_: unknown, m: string) => f(m); ipcRenderer.on('oil:progress', h); return () => ipcRenderer.removeListener('oil:progress', h); },
+  },
   // Apple Maps satellite pictures, signed by the shell with the user's Maps key (which never comes to the window)
   appleMaps: {
     status: (): Promise<{ teamId: string; keyId: string } | null> => ipcRenderer.invoke('apple:status'),
