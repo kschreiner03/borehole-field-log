@@ -2923,7 +2923,7 @@ function mapBaseHTML() {
     : !window.desktop?.appleMaps ? 'Apple Maps needs the desktop app; Esri imagery is shown.'
     : !S.apple.who ? 'Apple Maps needs a MapKit key from your Apple Developer account; Esri imagery is shown until then.'
     : S.apple.off ? 'Apple Maps refused the key, so Esri imagery is shown. Check it below.'
-    : `Apple Maps close in (key ${esc(S.apple.who.keyId)}), Esri further out and offline. PDFs use the same pictures.`;
+    : `Apple Maps close in (key ${esc(S.apple.who.keyId)}), Esri only further out, or when Apple cannot be reached. PDFs use the same pictures. Apple requires its logo to stay on its pictures: it is one small mark in the corner.`;
   return `${crow('Basemap', `<select id="basemap" ${S.readOnly ? 'disabled' : ''}>${Object.entries(BASEMAPS).map(([v, [t]]) => `<option value="${v}" ${k === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`, 'basemap')}
     <p class="note">${note} UTM Zone ${z}${zFixed ? ', from the boreholes' : ''}.</p>${k === 'apple' && window.desktop?.appleMaps && !S.readOnly ? `<button class="btn" data-act="apple-setup">${S.apple.who ? 'Apple Maps key…' : 'Set up Apple Maps…'}</button>` : ''}
     <h4>Coordinate system</h4>${crow('Project', `<span class="crs-f"><b>EPSG:${projEpsg()}</b> <span class="note">${esc(crsName('EPSG:' + projEpsg()) || (siteOf()?.epsg ? '' : 'from the boreholes'))}</span><span class="crs-b"><button class="btn" data-act="crs-project" ${S.readOnly ? 'disabled' : ''}>Change…</button>${siteOf()?.epsg ? '<button class="btn link" data-act="crs-project-auto">From the boreholes</button>' : ''}</span></span>`)}
@@ -12072,30 +12072,41 @@ function fetchTile(u) {
       if (!BASE_HOST.test(u)) { svcFailed(u, st); return; }
       if (!S.tileWarned) { S.tileWarned = true; toast('Basemap tiles could not be loaded. They need an internet connection, and some networks block them.'); } });
 }
-/* Apple Maps: one signed snapshot of the area in view (Apple serves no tiles), placed by its corners through the projection like a tile.
-   Pictures are kept in memory only, never on disk; while a new one comes the last is shown where it belongs. Close views only (zoom 10+). */
-S.apple = { who: null, pics: new Map(), last: null, off: false };
+/* Apple Maps: signed pictures (Apple serves no tiles) on a fixed grid, drawn near their own size, so moving the map reuses them and
+   the logo is never enlarged. Pictures overlap: one more, set exactly to the map's bottom-left corner, carries the visible logo and
+   notice. Kept in memory only, never on disk. Close views only (zoom 10+); Esri is shown further out or when Apple cannot be reached,
+   never mixed in with Apple's pictures. */
+const AP_STEP = 560, AP_SIZE = 640;
+S.apple = { who: null, pics: new Map(), off: false, fail: 0 };
 window.desktop?.appleMaps?.status().then(w => { S.apple.who = w; if (w && basemapKey() === 'apple') tileArrived(); }).catch(() => {});
 const appleOn = () => !!(window.desktop?.appleMaps && S.apple.who && !S.apple.off);
+const appleZ = (cy, cx, sc) => { const [lat] = utmToLL(cx, cy, crsZone()), C = 40075016.686 * Math.cos(lat * Math.PI / 180); return Math.min(20, Math.round(Math.log2(sc * C / 256))); };
+/* null: Apple has nothing for this view, so the caller draws Esri */
 function appleSVG(W, H, cx, cy, sc, op) {
-  if (!appleOn()) return '';
-  const zone = crsZone(), [lat, lon] = utmToLL(cx, cy, zone), C = 40075016.686 * Math.cos(lat * Math.PI / 180), k = Math.max(1, W / 640, H / 640);
-  const z = Math.min(20, Math.floor(Math.log2(sc / k * C / 256))); if (z < 10) return '';
-  const ppm = 2 ** z * 256 / C, q = { lat: +lat.toFixed(6), lon: +lon.toFixed(6), z, w: Math.min(640, Math.ceil(W / sc * ppm) + 2), h: Math.min(640, Math.ceil(H / sc * ppm) + 2), scale: 2 };
-  const key = JSON.stringify(q), pic = S.apple.pics.get(key) || (fetchApple(key, q), S.apple.last); if (!pic) return '';
-  const { q: p } = pic, X0 = lon2tx(p.lon, p.z) * 256 - p.w / 2, Y0 = lat2ty(p.lat, p.z) * 256 - p.h / 2;
-  const P = (i, j) => { const [e, n] = llToUtm(ty2lat((Y0 + j) / 256, p.z), tx2lon((X0 + i) / 256, p.z), zone); return [W / 2 + (e - cx) * sc, H / 2 - (n - cy) * sc]; };
-  const [ax, ay] = P(0, 0), [bx, by] = P(p.w, 0), [dx, dy] = P(0, p.h), m = [(bx - ax) / p.w, (by - ay) / p.w, (dx - ax) / p.h, (dy - ay) / p.h, ax, ay];
-  return `<g opacity="${op}"><image href="${pic.d}" width="${p.w}" height="${p.h}" preserveAspectRatio="none" transform="matrix(${m.map(v => +v.toFixed(6)).join(' ')})"/></g>`
-    + `<text x="${W - 8}" y="${H - 4}" text-anchor="end" style="font:9px Arial,sans-serif;fill:#333;paint-order:stroke;stroke:#fff;stroke-width:3px">${esc(BASEMAPS.apple[3])}</text>`;
+  if (!appleOn() || S.apple.fail > 2) return null;
+  const zone = crsZone(), z = appleZ(cy, cx, sc); if (z < 10) return null;
+  const px = (X, Y) => { const [la, lo] = utmToLL(cx + (X - W / 2) / sc, cy - (Y - H / 2) / sc, zone); return [lon2tx(lo, z) * 256, lat2ty(la, z) * 256]; }, K = [px(0, 0), px(W, 0), px(0, H), px(W, H), px(W / 2, 0), px(W / 2, H)], x0 = Math.min(...K.map(k => k[0])), x1 = Math.max(...K.map(k => k[0])), y0 = Math.min(...K.map(k => k[1])), y1 = Math.max(...K.map(k => k[1]));
+  if ((x1 - x0) * (y1 - y0) > 40 * AP_STEP * AP_STEP) return null;   // a very large page at a close scale: too many pictures
+  const ask = (X, Y, w, h) => { const q = { lat: +ty2lat(Y / 256, z).toFixed(7), lon: +tx2lon(X / 256, z).toFixed(7), z, w, h, scale: 2 }; return { key: JSON.stringify(q), q }; };
+  const draw = p => { const X0 = lon2tx(p.q.lon, p.q.z) * 256 - p.q.w / 2, Y0 = lat2ty(p.q.lat, p.q.z) * 256 - p.q.h / 2, P = (i, j) => { const [e, n] = llToUtm(ty2lat((Y0 + j) / 256, p.q.z), tx2lon((X0 + i) / 256, p.q.z), zone); return [W / 2 + (e - cx) * sc, H / 2 - (n - cy) * sc]; }, [ax, ay] = P(0, 0), [bx, by] = P(p.q.w, 0), [dx, dy] = P(0, p.q.h), [ex, ey] = P(p.q.w, p.q.h); if (Math.max(ax, bx, dx, ex) < 0 || Math.min(ax, bx, dx, ex) > W || Math.max(ay, by, dy, ey) < 0 || Math.min(ay, by, dy, ey) > H) return ''; const m = [(bx - ax) / p.q.w, (by - ay) / p.q.w, (dx - ax) / p.q.h, (dy - ay) / p.q.h, ax, ay]; return '<image href="' + p.d + '" width="' + p.q.w + '" height="' + p.q.h + '" preserveAspectRatio="none" transform="matrix(' + m.map(v => +v.toFixed(6)).join(' ') + ')"/>'; };
+  const cells = [], want = []; for (let r = Math.floor(y0 / AP_STEP); r <= Math.floor(y1 / AP_STEP); r++) for (let c = Math.floor(x1 / AP_STEP); c >= Math.floor(x0 / AP_STEP); c--) { const a = ask((c + .5) * AP_STEP, (r + .5) * AP_STEP, AP_SIZE, AP_SIZE), p = S.apple.pics.get(a.key); if (p) { cells.push(p); p.t = Date.now(); } else want.push(a); }
+  /* the corner picture: its own bottom left is the map's */
+  const [bx, by] = px(0, H - 42), aw = 300, ah = 160, an = ask(Math.round(bx) + aw / 2, Math.round(by) - ah / 2, aw, ah), ap = S.apple.pics.get(an.key); if (!ap) want.push(an); else ap.t = Date.now();
+  /* while some are on their way, what is already here from other zooms stands in */
+  const stand = want.some(a => a.q.w === AP_SIZE) ? [...S.apple.pics.values()].filter(p => p.q.z !== z && p.q.w === AP_SIZE && Math.abs(p.q.z - z) <= 3).sort((a, b) => Math.abs(b.q.z - z) - Math.abs(a.q.z - z) || a.t - b.t).slice(-30).map(draw).join('') : '';
+  appleWant(want); if (!cells.length && !stand && !want.length) return null;
+  return '<g opacity="' + op + '"><rect width="' + W + '" height="' + H + '" fill="#dfe3e0"/>' + stand + cells.map(draw).join('') + (ap ? draw(ap) : '') + '</g><text x="' + (W - 8) + '" y="' + (H - 4) + '" text-anchor="end" style="font:9px Arial,sans-serif;fill:#333;paint-order:stroke;stroke:#fff;stroke-width:3px">' + esc(BASEMAPS.apple[3]) + '</text>';
 }
+/* pictures are asked for a moment after the map stops, so passing views are not fetched */
+let apT, apWant = new Map();
+function appleWant(L) { for (const a of L) if (!S.tilePend.has('apple:' + a.key)) apWant.set(a.key, a); if (!apWant.size) return; S.tilePend.add('apple:wait'); clearTimeout(apT); apT = setTimeout(() => { const L2 = [...apWant.values()].slice(-60); apWant = new Map(); S.tilePend.delete('apple:wait'); for (const a of L2) fetchApple(a.key, a.q); }, 160); }
 function fetchApple(key, q) {
-  const id = 'apple:' + key; if (S.tilePend.has(id)) return; S.tilePend.add(id);   // reports wait for it like a tile
+  const id = 'apple:' + key; if (S.tilePend.has(id) || S.apple.pics.has(key)) return; S.tilePend.add(id);   // reports wait for it like a tile
   window.desktop.appleMaps.snapshot(q).catch(e => ({ ok: false, error: String(e) })).then(r => {
     S.tilePend.delete(id);
-    if (r?.ok) { S.apple.pics.set(key, S.apple.last = { d: r.data, q }); if (S.apple.pics.size > 24) S.apple.pics.delete(S.apple.pics.keys().next().value); }
-    else if (r?.status === 401 || r?.status === 403) { S.apple.off = true; toast(`${r.error} Esri imagery is shown meanwhile.`); }
-    else if (!S.tileWarned) { S.tileWarned = true; toast(`Apple Maps could not be reached (${r?.error || 'no answer'}). Esri imagery is shown meanwhile.`); }
+    if (r?.ok) { S.apple.fail = 0; S.apple.pics.set(key, { d: r.data, q, t: Date.now() }); if (S.apple.pics.size > 140) for (const [k] of [...S.apple.pics].sort((a, b) => a[1].t - b[1].t).slice(0, 30)) S.apple.pics.delete(k); }
+    else if (r?.status === 401 || r?.status === 403) { if (!S.apple.off) toast(r.error + ' Esri imagery is shown meanwhile.'); S.apple.off = true; }
+    else if (++S.apple.fail > 2) { if (S.apple.fail === 3) { toast('Apple Maps could not be reached (' + (r?.error || 'no answer') + '). Esri imagery is shown for a minute.'); setTimeout(() => { S.apple.fail = 0; tileArrived(); }, 60000); } }
     tileArrived();
   });
 }
@@ -12112,14 +12123,14 @@ async function appleSave() {
   const f = $('#ap-key')?.files[0]; if (!f) { toast('Choose the key file (.p8) you downloaded from Apple.'); return; }
   const c = { teamId: $('#ap-team').value.trim().toUpperCase(), keyId: $('#ap-kid').value.trim().toUpperCase(), key: await f.text() };
   const r = await window.desktop.appleMaps.setup(c); if (!r?.ok) { toast(r?.error || 'The key could not be saved.'); return; }
-  S.apple = { who: { teamId: c.teamId, keyId: c.keyId }, pics: new Map(), last: null, off: false }; closeOverlay(); renderView(true); toast('Apple Maps is set up.');
+  S.apple = { who: { teamId: c.teamId, keyId: c.keyId }, pics: new Map(), off: false, fail: 0 }; closeOverlay(); renderView(true); toast('Apple Maps is set up.');
 }
-async function appleClear() { await window.desktop.appleMaps.setup(null); S.apple = { who: null, pics: new Map(), last: null, off: false }; closeOverlay(); renderView(true); toast('Apple Maps key removed.'); }
+async function appleClear() { await window.desktop.appleMaps.setup(null); S.apple = { who: null, pics: new Map(), off: false, fail: 0 }; closeOverlay(); renderView(true); toast('Apple Maps key removed.'); }
 const basemapIdle = () => new Promise(res => { const t0 = Date.now(), tick = () => (!S.tilePend.size || Date.now() - t0 > 10000) ? res() : setTimeout(tick, 120); tick(); });
 function basemapSVG(W, H, cx, cy, sc, op = 1) {
   if (S.lyr.base === false) return '';
   const key = basemapKey(); if (key !== 'apple') return tilesSVG(key, W, H, cx, cy, sc, op);
-  return tilesSVG('imagery', W, H, cx, cy, sc, op) + (appleSVG(W, H, cx, cy, sc, op) || '');   // Esri imagery under Apple's picture fills its edges, and stands in while it loads or without a key
+  return appleSVG(W, H, cx, cy, sc, op) ?? tilesSVG('imagery', W, H, cx, cy, sc, op);   // one or the other, never both
 }
 function tilesSVG(key, W, H, cx, cy, sc, op) {
   const zone = crsZone(), [, url, zmax, attr] = typeof key === 'string' ? BASEMAPS[key] : key, [lat0] = utmToLL(cx, cy, zone);
