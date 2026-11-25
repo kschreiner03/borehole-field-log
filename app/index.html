@@ -437,6 +437,13 @@ table.kv th { text-align: left; width: 38%; font-weight: 600; white-space: norma
 .home-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: var(--gap); align-items: start; }
 /* Projects: the home screen, the top-bar breadcrumb and its menus */
 body.proj-home .prail, body.proj-home .side { display: none; }
+.pl-top, .pl-row, .pl-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } .pl-top { margin-bottom: 10px; gap: 14px; } .pl-top select, .pl-top input { width: auto; } .pl-tools { margin-bottom: 6px; } .pl-tools select { width: auto; } .pl-tip { flex-basis: 100%; }
+.pl-grid { display: grid; grid-template-columns: minmax(340px, 520px) minmax(0, 1fr); gap: 12px; } .pl-grid.one { grid-template-columns: minmax(0, 1100px); } .pl-side { display: grid; gap: 12px; align-content: start; min-width: 0; } .pl-grid:not(.one) .pl-side { max-height: calc(100vh - 210px); overflow: auto; }
+.pl .sec > header { flex-wrap: wrap; } .pl .sec > .body { padding: 10px 12px; } .pl-map { height: calc(100vh - 310px); min-height: 320px; overflow: hidden; border: 1px solid var(--line); touch-action: none; user-select: none; background: var(--panel-2); } .pl-map svg { display: block; }
+.pl-f { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; align-items: end; } .pl-f label { font-size: 12px; color: var(--muted); min-width: 0; } .pl-f input { width: 100%; } .pl-row > input:not([type=checkbox]) { flex: 1 1 60px; min-width: 0; } .pl-row > input[style] { flex: 0 0 auto !important; } .pl-row > select { width: auto; max-width: 210px; } .pl-row { margin: 4px 0; } .pl-row .sp, .pl-tools .sp { flex: 1; }
+.pl-tk, .pl-h { border-top: 1px solid var(--line); padding: 8px 4px; } .pl-h.on { background: var(--active); } .pl-h p { margin: 2px 0; } .pl-bad { color: var(--warn); font-weight: 600; font-size: 13px; } .pl-mind { color: #8a5c00; font-size: 13px; } .pl-w { margin: 0; padding-left: 18px; font-size: 13px; }
+.pl-t { width: 100%; border-collapse: collapse; font-size: 13px; } .pl-t td, .pl-t th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--grid); } .pl h4 { margin: 10px 0 4px; } .pl-two { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 1.8fr); gap: 20px; } .pl-su > .check { min-width: 205px; } .pl-sup { table-layout: fixed; } .pl-sup td:nth-child(2) { width: 100px; } .pl-sup td:nth-child(4) { width: 40px; } .pl-h .pl-row > select { max-width: 110px; } .pl-in { white-space: nowrap; margin-right: 10px; }
+@media (max-width: 980px) { .pl-grid, .pl-two { grid-template-columns: minmax(0, 1fr); } .pl-grid:not(.one) .pl-side { max-height: none; } .pl-map { height: 420px; } }
 body.proj-home .shell { --sidebar-width: 0px; grid-template-columns: 0 0 minmax(0, 1fr) 0; }
 .tb-proj { display: flex; align-items: center; gap: 2px; min-width: 0; }
 .tb-proj button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--r-sm, 4px); background: none; color: inherit; font: 500 13.5px var(--f-body); cursor: pointer; white-space: nowrap; }
@@ -2622,8 +2629,8 @@ function treeGroup(key, label, count, kids, extra = '') {
   return `<li class="tg${open ? ' open' : ''}"><div class="tr">${extra}<button class="tw" data-fold="${key}" aria-expanded="${open}" title="${open ? 'Collapse' : 'Expand'} ${esc(label)}">${TW}<span>${esc(label)}</span></button>${count != null ? `<span class="tc">${count}</span>` : ''}</div>${open ? `<ul class="tk">${kids}</ul>` : ''}</li>`;
 }
 const BH_TABS = ['log', 'edit', 'report'];
-const NAV_LABEL = { addons: 'Add-ons', gp: 'GIS Toolbox', v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Outputs', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
-const NAV_ICON = { addons: '<path d="M4 4h7v7H4zM13 13h7v7h-7zM4 13h7v7H4z"/><path d="M16.5 3.5v7M13 7h7"/>', gp: '<path d="M4 8h16v11H4z"/><path d="M9 8V5h6v3M4 12h16M11 12v2h2v-2"/>', soil: '<path d="M3 9l9-5 9 5-9 5z"/><path d="M3 14l9 5 9-5"/>', v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
+const NAV_LABEL = { plan: 'Phase II plan', addons: 'Add-ons', gp: 'GIS Toolbox', v3d: '3D view', gwm: 'Groundwater model', xsec: 'Cross-section', home: 'Overview', site: 'Map & sections', table: 'Data tables', gw: 'Groundwater', contam: 'Lab & contamination', soil: 'Soil survey', compose: 'Outputs', log: 'Full log', edit: 'Log & data', report: 'PDF preview' };
+const NAV_ICON = { plan: '<path d="M8 4h8v3H8zM8 5.5H5V21h14V5.5h-3"/><path d="M8 12l2 2 3-3M8 18h8"/>', addons: '<path d="M4 4h7v7H4zM13 13h7v7h-7zM4 13h7v7H4z"/><path d="M16.5 3.5v7M13 7h7"/>', gp: '<path d="M4 8h16v11H4z"/><path d="M9 8V5h6v3M4 12h16M11 12v2h2v-2"/>', soil: '<path d="M3 9l9-5 9 5-9 5z"/><path d="M3 14l9 5 9-5"/>', v3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>', gwm: '<path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0"/><rect x="3" y="15" width="18" height="5" rx="1"/><path d="M9 15v5M15 15v5"/>', xsec: '<path d="M3 6l5-2 6 2 7-2M3 11l5-1 6 1 7-1M3 16l5 1 6-1 7 1M3 20h18"/><path d="M9 3v18M15 3v18" stroke-dasharray="2 2"/>', table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16"/>', home: '<path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/>', site: '<path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>', gw: '<path d="M12 3c3.5 4.5 6 7.8 6 11a6 6 0 0 1-12 0c0-3.2 2.5-6.5 6-11z"/>', contam: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>', compose: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>' };
 /* a row in the settings panel: its label, then the control (and its unit) on the same line; the same on every page */
 const crow = (l, c, id) => `<div class="cr">${id ? `<label class="cr-l" for="${id}">${l}</label>` : `<span class="cr-l">${l}</span>`}<span class="cr-c">${c}</span></div>`;
 const svgI = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -2691,7 +2698,7 @@ document.addEventListener('pointerdown', e => {
 const bhGlyph = well => `<svg class="bhg" viewBox="0 0 16 16" aria-hidden="true">${well ? '<circle cx="8" cy="8" r="4.6" fill="#fff" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/>' : '<circle cx="8" cy="8" r="4.6" fill="currentColor"/>'}</svg>`;
 /* the sidebar is the project as a tree: project pages, and each borehole with its own pages nested under it when chosen */
 /* the left side: a rail of project pages, then the project's boreholes as a list with a filter, status chips and a sort */
-const RAIL_PAGES = [['home', 'Overview'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['soil', 'Soil'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['compose', 'Outputs'], ['addons', 'Add-ons']];
+const RAIL_PAGES = [['home', 'Overview'], ['plan', 'Plan'], ['edit', 'Borehole'], ['site', 'Map'], ['table', 'Tables'], ['gw', 'Water'], ['contam', 'Lab'], ['soil', 'Soil'], ['xsec', 'Section'], ['gwm', 'Model'], ['v3d', '3D'], ['compose', 'Outputs'], ['addons', 'Add-ons']];
 const BH_ICON = '<rect x="8" y="3" width="8" height="18" rx="2"/><path d="M8 9h8M8 14h8"/>';
 S.bl = { q: '', st: lsGet('bhlog.blSt') || 'all', sort: lsGet('bhlog.blSort') || 'name' };
 const blMeta = b => { const w = latestWater(b), v = vapourMax(b, null, null); return { d: depthOf(b), w: w ? w.depth : null, v: v ? v.cvc : null }; };
@@ -3203,7 +3210,7 @@ async function duplicateProject(name) {
   const P = projRecs(), r = P[name] ? structuredClone(P[name]) : {};
   r.meta = { ...(r.meta || {}), id: uid('pj'), created: new Date().toISOString(), archived: false };
   try { const ims = await photoStore.all('imagery:' + name); r.imagery = await Promise.all((r.imagery || []).map(async i => { const ph = ims.find(x => x.id === i.id), nid = uid('im'); if (ph) await photoStore.put({ ...ph, id: nid, bhId: 'imagery:' + nn }); return { ...i, id: nid }; })); } catch {}
-  try { const fs2 = await photoStore.all(REPORT_FILE_KEY(name)), map = {}; for (const ph of fs2) { map[ph.id] = uid('rf'); await photoStore.put({ ...ph, id: map[ph.id], bhId: REPORT_FILE_KEY(nn) }); } for (const pg of r.report?.pages || []) if (pg.file && map[pg.file]) pg.file = map[pg.file]; } catch {}
+  try { const fs2 = await photoStore.all(REPORT_FILE_KEY(name)), map = {}; for (const ph of fs2) { map[ph.id] = uid('rf'); await photoStore.put({ ...ph, id: map[ph.id], bhId: REPORT_FILE_KEY(nn) }); } for (const pg of r.report?.pages || []) if (pg.file && map[pg.file]) pg.file = map[pg.file]; for (const f of plArr(r.plan?.files)) if (map[f.id]) f.id = map[f.id]; for (const h of plArr(r.plan?.holes)) h.bh = ''; } catch {}
   P[nn] = r; S.site = { projects: P }; saveSite();
   try { if (GIS.proj === name) await gisPersist(name); const g = await gisRead(name); if (g) await gisWrite(nn, g); } catch {}
   if (S.mode === 'local') store.saveLocal(); render(); toast('Made ' + nn + '. Issued logs in the copy are drafts.');
@@ -3320,7 +3327,7 @@ function openActMenu(anchor, items) {
 function goTab(k) { S.tab = k; queueMicrotask(adDock); lsSet('bhlog.tab', k); S.formStale = true; S.drawer = null; renderDrawer(); render(); }
 function findItems() {
   const items = [], b = cur(), seen = new Set(), seenT = new Set(), home = {};
-  for (const k of ['home', 'site', 'table', 'gw', 'contam', 'soil', 'compose']) items.push({ t: NAV_LABEL[k], where: 'Project page', kind: 'Page', run: () => goTab(k) });
+  for (const k of ['home', 'plan', 'site', 'table', 'gw', 'contam', 'soil', 'compose']) items.push({ t: NAV_LABEL[k], where: 'Project page', kind: 'Page', run: () => goTab(k) });
   if (b) for (const k of BH_TABS) items.push({ t: `${NAV_LABEL[k]}: ${b.name}`, where: 'Borehole page', kind: 'Page', run: () => goTab(k) });
   if (b) for (const [k, t] of [['soil', 'Soil layers and observations'], ['samples', 'Samples and lab results'], ['ww', 'Water readings and well'], ['details', 'Borehole details and photos']]) items.push({ t, where: `${b.name} › Data`, kind: 'Section', run: () => { S.dtab = k; lsSet('bhlog.dtab', k); goTab('edit'); } });
   for (const x of sortedList()) items.push({ t: x.name || 'Untitled', where: x.project || 'No project', kind: x.well?.installed ? 'Well' : 'Borehole', run: () => { S.sel = x.id; S.layer = 0; goTab(BH_TABS.includes(S.tab) ? S.tab : 'edit'); } });
@@ -3378,7 +3385,7 @@ const RAIL = [
   ['log', 'Log', '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="1.5"/><path d="M7 8h10M7 13h10M7 17h10"/></svg>'],
   ['edit', 'Data', '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16M9 6v12"/></svg>'],
   ['report', 'PDF preview', '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 13h6M9 17h6"/></svg>']];
-const PROJECT_TABS = ['home', 'site', 'table', 'gw', 'contam', 'soil', 'reports', 'compose', 'gp'];
+const PROJECT_TABS = ['home', 'plan', 'site', 'table', 'gw', 'contam', 'soil', 'reports', 'compose', 'gp'];
 function renderRail() {
   const el = $('#rail'); if (!el) return; el.hidden = true; return; const b = cur();
   el.innerHTML = RAIL.map(x => typeof x === 'string' ? `<span class="rl">${x === 'Borehole' && b ? esc(b.name) : x}</span>` : `<button data-tab="${x[0]}" aria-current="${S.tab === x[0] ? 'page' : 'false'}" ${b ? '' : 'disabled'}>${x[2]}<span>${x[1]}</span></button>`).join('')
@@ -3902,6 +3909,7 @@ function renderView(full) {
   } else if (S.tab === 'gw') { v.innerHTML = gwHTML(v.clientWidth || 1000); if ($('#hydro')) drawHydro(undefined, undefined, { H: 420 }); }
   else if (S.tab === 'report') { v.innerHTML = reportHTML(b); }
   else if (S.tab === 'site') { v.innerHTML = siteHTML(); if (!mwsOn()) drawSite(); }
+  else if (S.tab === 'plan') { v.innerHTML = planHTML(); plDraw(); }
   else if (S.tab === 'xsec') { v.innerHTML = xsecHTML(); drawXsec(); }
   else if (S.tab === 'gwm') { v.innerHTML = gwmHTML(); gwEnsure(); }
   else if (S.tab === 'v3d') { v.innerHTML = v3dHTML(); v3dBuild(); gwAutoEnsure(); }
@@ -7975,7 +7983,7 @@ async function saveProjectNow(as, proj, quiet) {
   const list = proj == null ? projList() : sortedList().filter(b => projKey(b) === proj); if (!list.length && !surveyOf().points.length) { if (!quiet) toast('There are no boreholes in this project to save.'); return; }
   const p = list.length ? projKey(list[0]) : proj ?? '', no = list.find(b => b.projNo)?.projNo || '';
   const st = S.site?.projects ? (S.site.projects[p] || S.site.projects['*'] || null) : (S.site?.img ? S.site : null);
-  const used = new Set(((S.site?.projects?.[p] || (S.site?.projects ? null : S.site))?.report?.pages || []).filter(pg => pg.kind === 'pdf').map(pg => pg.file));   // imports the report still uses; deleted ones stay behind
+  const used = new Set(((S.site?.projects?.[p] || (S.site?.projects ? null : S.site))?.report?.pages || []).filter(pg => pg.kind === 'pdf').map(pg => pg.file)); for (const f of plArr(st?.plan?.files)) used.add(f.id);   // imports the report still uses; deleted ones stay behind
   const photos = (await photosFor(new Set([...list.map(b => b.id), 'imagery:' + p, REPORT_FILE_KEY(p), OUT_KEY(p)]))).filter(ph => ph.bhId !== REPORT_FILE_KEY(p) || used.has(ph.id) || ph.kind === 'output');
   const gis = await gisFileData(p);
   const data = { app: 'borehole-field-log', kind: 'project', version: 4, saved: new Date().toISOString(), project: p, projNo: no, company: S.co, site: st, boreholes: list, photos, ...(gis ? { gis } : {}) };
@@ -8067,8 +8075,8 @@ async function restore(file, handle) {
       const p = data.project ?? (list[0]?.project || ''), inFile = new Map(list.filter(r => r?.id).map(r => [r.id, r]));
       const mine = sortedList().filter(b => projKey(b) === p), gone = mine.filter(b => !inFile.has(b.id));
       const ahead = mine.filter(b => { const r = inFile.get(b.id); return r && JSON.stringify(b) !== JSON.stringify(normalize(structuredClone(r))) && (b.status === 'issued' || (b.updated || '') > (r.updated || '')); });
-      const here = S.site?.projects?.[p], siteAhead = !!(here?.report || here?.lblStyle || here?.symStyle) && !!here.edited && (!data.site?.edited || here.edited > data.site.edited) && JSON.stringify(here) !== JSON.stringify(data.site || null);
-      const lines = [...(siteAhead ? ['• Output pages, map labels and map settings: changed here after the file was saved'] : []), ...ahead.map(b => `• ${b.name || 'unnamed'}: ${b.status === 'issued' ? 'issued here' : 'edited here after the file was saved'}`), ...gone.map(b => `• ${b.name || 'unnamed'}: not in the file, so it will be removed`)];
+      const here = S.site?.projects?.[p], siteAhead = !!(here?.report || here?.plan || here?.lblStyle || here?.symStyle) && !!here.edited && (!data.site?.edited || here.edited > data.site.edited) && JSON.stringify(here) !== JSON.stringify(data.site || null);
+      const lines = [...(siteAhead ? ['• Drilling plan, output pages, map labels and map settings: changed here after the file was saved'] : []), ...ahead.map(b => `• ${b.name || 'unnamed'}: ${b.status === 'issued' ? 'issued here' : 'edited here after the file was saved'}`), ...gone.map(b => `• ${b.name || 'unnamed'}: not in the file, so it will be removed`)];
       if (lines.length && !confirm(`Opening ${file.name} replaces your copy of ${p || 'this project'} with the file's.\n\nYour copy has work that is not in the file:\n${lines.slice(0, 10).join('\n')}${lines.length > 10 ? `\n…and ${lines.length - 10} more` : ''}\n\nOK opens the file and replaces your copy. Cancel leaves your copy as it is (use Save project as… first to keep it).`)) return;
       for (const b of gone) store.remove(b.id);
       const fileIds = new Set((data.photos || []).map(ph => ph?.id));
@@ -9704,13 +9712,367 @@ async function pdfLogs(list) {
   } catch (e) { console.error(e); toast('The PDF could not be created.'); }
 }
 
+/* ---------- Phase II planner: locates, planned boreholes, samples, supplies and the printed plan. Everything is kept in the project's
+   site record (site.plan). Planned holes are not boreholes: they reach no log, table or section until a log is started from them.
+   Nothing here says a place is clear to dig: distances are to the lines entered, and locates and exposing decide. ---------- */
+const LOC_UTIL = { gas: ['Natural gas (distribution)', 'loc_gas'], pipe: ['High-pressure pipeline', 'loc_pipe'], power: ['Power', 'loc_power'], comm: ['Telecom / fibre', 'loc_comm'], water: ['Water', 'loc_water'], sewer: ['Sewer / storm', 'loc_sewer'], priv: ['Private / on-site lines', 'loc_priv'] };
+const LOC_TAG = { gas: 'GAS', pipe: 'HP PIPELINE', power: 'POWER', comm: 'TELECOM', water: 'WATER', sewer: 'SEWER', priv: 'PRIVATE' };
+const LOC_OF = Object.fromEntries(Object.entries(LOC_UTIL).map(([k, v]) => [v[1], k]));
+const LOC_STATUS = { req: 'Requested', marked: 'Marked', none: 'Owner reports no lines here', later: 'Not requested yet' };
+/* clearances are the owners' and regulators' minimums as published (see src); the person can raise or change them */
+const GD_RULES = {
+  AB: { name: 'Alberta', hand: 1, hp: 5, notify: 30, days: 3, full: true, valid: null, call: 'Utility Safety Partners (utilitysafety.ca)',
+    src: 'Alberta OHS Code, Part 1: hand expose zone 1 m each side of the locate marks, 5 m for a high-pressure pipeline (700 kPa or more). Part 32 s. 447: owners include pipelines within 30 m of the work site. Utility Safety Partners: three full working days’ notice (five for a large project). A locate expires on the date written on it.' },
+  SK: { name: 'Saskatchewan', hand: 1, hp: 5, notify: 30, days: 3, full: false, valid: 30, call: 'Sask 1st Call (sask1stcall.com)',
+    src: 'Dig Safe Sask: expose by hand within 1 m each side of the flags; request three business days ahead; locates last 30 calendar days or while the paint shows, whichever is less. The Pipelines Act, 1998: notice within 30 m of a pipeline, consent in the right of way or within 5 m where there is none (5 m is used here for high-pressure pipelines). The OHS regulation’s own distance could not be read; a training source gives 0.6 m, so the larger 1 m is used.' },
+};
+/* analyses: which containers, and the holding time in days. Sources: Bureau Veritas soil hold times (CCME column, the shorter where two apply) */
+const PL_SUITES = {
+  salinity: ['Salinity (EC, SAR, chloride, pH)', { inorg: 1 }, 30], metals: ['Metals (with mercury)', { inorg: 1 }, 28], psa: ['Particle size', { psa: 1 }, 30],
+  btex: ['BTEX, PHC F1', { vial: 2, org: 1 }, 14], phc: ['PHC F2–F4', { org: 1 }, 14], pah: ['PAHs', { org: 1 }, 14], voc: ['VOCs', { vial: 2, org: 1 }, 14],
+};
+const PL_CONT = { vial: ['Methanol vial, pre-charged', '40 mL'], org: ['Glass jar, organics and moisture', ''], inorg: ['Bag or jar, inorganics', ''], psa: ['Bag, particle size', ''] };
+const PL_WSUITES = { salinity: ['Salinity / routine chemistry', { wroutine: 1 }], metals: ['Dissolved metals', { wmetal: 1 }], btex: ['BTEX, PHC F1', { wvial: 2 }], phc: ['PHC F2', { wamber: 1 }], pah: ['PAHs', { wamber2: 1 }], voc: ['VOCs', { wvial: 2 }] };
+const PL_WCONT = { wroutine: 'Water: plastic bottle, routine', wmetal: 'Water: metals bottle (with filter)', wvial: 'Water: vial, volatiles', wamber: 'Water: amber bottle, F2', wamber2: 'Water: amber bottle, PAH' };
+const PL_STEPS = [['loc', '1 Locates'], ['bh', '2 Boreholes'], ['smp', '3 Samples'], ['sup', '4 Supplies'], ['print', '5 Print']];
+const plNum = (v, d, lo = 0, hi = 1e6) => { const n = num(v); return n == null ? d : Math.max(lo, Math.min(hi, n)); };
+const plStr = (v, n = 200) => typeof v === 'string' ? v.slice(0, n) : typeof v === 'number' ? String(v) : '';
+const plDate = v => /^\d{4}-\d\d-\d\d$/.test(v || '') ? v : '';
+const plArr = v => Array.isArray(v) ? v.filter(x => x && typeof x === 'object') : [];
+const plId = v => /^[\w-]{1,40}$/.test(v || '') ? v : uid('pl');
+/* the plan as stored, with every value checked: it can come from a file somebody else made */
+function planOf(st = siteOf()) {
+  const p = st?.plan && typeof st.plan === 'object' ? st.plan : {}, prov = p.prov === 'AB' || p.prov === 'SK' ? p.prov : crsZone() >= 13 ? 'SK' : 'AB', R = GD_RULES[prov], keys = (o, K, f) => Object.fromEntries(Object.keys(K).map(k => [k, f(o?.[k], k)]));
+  const schemes = plArr(p.schemes).slice(0, 20).map((s, i) => ({ id: plId(s.id), name: plStr(s.name, 60) || 'Scheme ' + (i + 1), head: s.head !== false,
+    rules: plArr(s.rules).slice(0, 10).map(r => ({ from: plNum(r.from, 0, 0, 500), to: num(r.to) == null ? null : plNum(r.to, 0, 0, 500), every: plNum(r.every, 1, .1, 100) })),
+    suites: keys(s.suites, PL_SUITES, u => ({ on: u?.on === true, mode: u?.mode === 'n' ? 'n' : 'all', n: Math.round(plNum(u?.n, 2, 1, 99)), from: plNum(u?.from, 0, 0, 500), to: num(u?.to) == null ? null : plNum(u.to, 0, 0, 500) })) }));
+  if (!schemes.length) schemes.push({ id: 'main', name: 'Main', head: true, rules: [{ from: .5, to: 3, every: .5 }, { from: 4, to: null, every: 1 }], suites: keys(null, PL_SUITES, (_, k) => ({ on: ['salinity', 'metals', 'psa'].includes(k), mode: k === 'salinity' ? 'all' : 'n', n: k === 'psa' ? 1 : 2, from: 0, to: null })) });
+  const files = plArr(p.files).slice(0, 60).map(f => ({ id: plId(f.id), name: plStr(f.name, 120), pages: plNum(f.pages, 1), kind: f.kind === 'image' ? 'image' : 'pdf', use: f.use !== false, tk: plStr(f.tk, 40) }));
+  return { prov, date: plDate(p.date), hand: plNum(p.hand, R.hand, 0, 100), hp: plNum(p.hp, R.hp, 0, 200), notify: plNum(p.notify, R.notify, 0, 500), prefix: typeof p.prefix === 'string' ? plStr(p.prefix, 20) : 'BH' + today().slice(2, 4) + '-', depth: plNum(p.depth, 6, .1, 500), dia: plNum(p.dia, 150, 10, 2000), onMap: p.onMap !== false, notes: plStr(p.notes, 3000),
+    tickets: plArr(p.tickets).slice(0, 60).map(t => ({ id: plId(t.id), util: LOC_UTIL[t.util] ? t.util : 'gas', owner: plStr(t.owner, 80), no: plStr(t.no, 60), by: plStr(t.by, 80), status: LOC_STATUS[t.status] ? t.status : 'later', req: plDate(t.req), marked: plDate(t.marked), exp: plDate(t.exp) })),
+    holes: plArr(p.holes).slice(0, 500).filter(h => num(h.e) != null && num(h.n) != null).map(h => ({ id: plId(h.id), name: plStr(h.name, 40), e: num(h.e), n: num(h.n), depth: plNum(h.depth, 6, .1, 500), well: h.well === true, scheme: schemes.some(s => s.id === h.scheme) ? h.scheme : schemes[0].id, why: plStr(h.why, 200), top: num(h.top), bot: num(h.bot), bh: plStr(h.bh, 60) })), schemes, files,
+    wsuites: keys(p.wsuites, PL_WSUITES, v => v === true), cont: keys(p.cont, PL_CONT, (v, k) => ({ size: plStr(v?.size ?? PL_CONT[k][1], 60) })), perSuite: keys(p.perSuite, PL_SUITES, (v, k) => Object.fromEntries(Object.entries(PL_SUITES[k][1]).map(([c, n]) => [c, Math.round(plNum(v?.[c], n, 0, 50))]))), hold: keys(p.hold, PL_SUITES, (v, k) => Math.round(plNum(v, PL_SUITES[k][2], 0, 1000))),
+    kit: Object.fromEntries(Object.entries({ dup: 10, spare: 10, blank: 1, cooler: 30, ice: 2, coc: 10, sandKg: 25, sandDen: 1600, bentKg: 22.7, bentDen: 1100, pipe: 60, stick: .9, pipeLen: 1.5, backfill: 1, glove: 2 }).map(([k, d]) => [k, plNum(p.kit?.[k], d, ['cooler', 'coc', 'sandKg', 'sandDen', 'bentKg', 'bentDen', 'pipe', 'pipeLen'].includes(k) ? .1 : 0, 1e5)])),
+    over: Object.fromEntries(Object.entries(p.over && typeof p.over === 'object' ? p.over : {}).filter(([k]) => /^[\w:-]{1,40}$/.test(k)).slice(0, 200).map(([k, v]) => [k, plNum(v, 0)])), extra: plArr(p.extra).slice(0, 100).map(x => ({ id: plId(x.id), t: plStr(x.t, 120), q: plNum(x.q, 1), u: plStr(x.u, 30) })), pages: keys(p.pages, { map: 1, loc: 1, bh: 1, smp: 1, sup: 1, sign: 1 }, v => v !== false) };
+}
+function savePlan(fn) { if (S.readOnly) return; const p = planOf(); fn(p); setSite({ ...(siteOf() || {}), plan: p }); plSoon(); }
+const PLS = () => S.pl ||= { step: 'loc', tool: 'pan', util: 'gas', draft: [], sel: null, checked: new Set() };
+/* after a change the page is drawn again, keeping the box the person moved to */
+let plT; function plSoon() { clearTimeout(plT); plT = setTimeout(() => { if (S.tab !== 'plan') return; const a = document.activeElement, k = a?.dataset?.plk, sel = k && a.matches('input') && a.type === 'text' ? a.selectionStart : null, v = $('#view'), y = v?.querySelector('.pl-side')?.scrollTop, y2 = scrollY; renderView(true); const s = $('.pl-side'); if (s && y) s.scrollTop = y; scrollTo(0, y2); const n = k && [...document.querySelectorAll('[data-plk]')].find(x => x.dataset.plk === k); if (n) { n.focus({ preventScroll: true }); try { if (sel != null) n.setSelectionRange(sel, sel); else n.select?.(); } catch {} } }, 0); }
+/* ---- distances ---- */
+const plSegD = (x, y, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L)) : 0; return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy); };
+function plFeatD(f, x, y) { const P = f.pts || []; if (!P.length) return Infinity; if (f.type === 'polygon' && P.length > 2 && inPolyG(x, y, P)) return 0; if (P.length === 1) return Math.hypot(x - P[0][0], y - P[0][1]); let d = Infinity; for (let i = 1; i < P.length; i++) d = Math.min(d, plSegD(x, y, P[i - 1], P[i])); if (f.type === 'polygon') d = Math.min(d, plSegD(x, y, P.at(-1), P[0])); return d; }
+const plLines = () => featsOf().filter(f => LOC_OF[f.kind] || f.kind === 'pipeline');
+const plLineName = f => LOC_OF[f.kind] ? LOC_UTIL[LOC_OF[f.kind]][0] : 'Pipeline / utility, type not set';
+/* dates are whole days; working days leave out weekends (holidays are the person's to add) */
+const plDay = (s, n) => { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+function plCallBy(p) { if (!p.date) return ''; const R = GD_RULES[p.prov]; let d = p.date, left = R.days + (R.full ? 1 : 0); while (left > 0) { d = plDay(d, -1); const w = new Date(d + 'T12:00:00Z').getUTCDay(); if (w && w < 6) left--; } return d; }
+const plRefDate = p => p.date || today();
+/* the project-wide gaps in the locates */
+function plGaps(p = planOf()) {
+  const o = [], at = plRefDate(p), L = plLines();
+  if (!p.date) o.push('No drilling date set: expiry is checked against today.');
+  for (const [k, [t, kind]] of Object.entries(LOC_UTIL)) { const ts = p.tickets.filter(x => x.util === k);
+    if (!ts.length) { o.push(`${t}: no locate recorded.`); continue; }
+    for (const x of ts) { const n = t + (x.no ? ' ' + x.no : '');
+      if (x.status === 'later') o.push(n + ': not requested yet.'); else if (x.status === 'req') o.push(n + ': requested, not marked yet.');
+      else if (!x.exp) o.push(n + ': no expiry date.'); else if (x.exp < at) o.push(`${n}: expires ${x.exp}, before ${p.date ? 'the drilling date' : 'today'}.`);
+      if (x.marked && x.exp && x.exp < x.marked) o.push(n + ': expires before it was marked.');
+      if (x.status === 'marked' && !L.some(f => f.kind === kind)) o.push(n + ': marked, but no line of this type is on the plan.'); } }
+  if (L.some(f => f.kind === 'pipeline')) o.push(`${L.filter(f => f.kind === 'pipeline').length} line(s) have no utility type: the larger distance (${Math.max(p.hand, p.hp)} m) is used for them.`);
+  if (!featsOf().some(f => f.kind === 'loc_area')) o.push('No located area drawn, so holes outside the located area cannot be found.');
+  return o;
+}
+/* one hole: distance from its edge to the nearest entered line, and what to mind */
+function plCheck(h, p = planOf()) {
+  const r = p.dia / 2000, warn = [], mind = []; let near = null;
+  for (const f of plLines()) { const d = Math.max(0, plFeatD(f, h.e, h.n) - r), k = LOC_OF[f.kind], zone = k === 'pipe' ? p.hp : k ? p.hand : Math.max(p.hand, p.hp), nm = plLineName(f) + (f.name && f.name !== LOC_TAG[k] ? ' (' + f.name + ')' : '');
+    if (!near || d < near.d) near = { d, nm };
+    if (d <= zone + 1e-9) warn.push(`${d.toFixed(1)} m from ${nm}: inside the ${zone} m hand-expose distance. Move it, or expose the line first.`);
+    else if (d <= p.notify && (k === 'pipe' || !k)) mind.push(`${d.toFixed(1)} m from ${nm}: notify its owner (within ${p.notify} m).`); }
+  const A = featsOf().filter(f => f.kind === 'loc_area' && f.type === 'polygon' && f.pts?.length > 2);
+  if (A.length) { const inside = A.some(f => inPolyG(h.e, h.n, f.pts) && plSegMin(f.pts, h.e, h.n) >= r); if (!inside) warn.push('Outside the located area, or its edge crosses it.'); }
+  return { near, warn, mind };
+}
+const plSegMin = (P, x, y) => Math.min(...P.map((q, i) => plSegD(x, y, q, P[(i + 1) % P.length])));
+function plNameNext(p, n = 1) { const px = p.prefix, used = new Set([...p.holes.map(h => h.name.toLowerCase()), ...projList().filter(b => b.easting != null || b.status === 'issued' || (b.layers || []).some(l => l.bottom != null)).map(b => (b.name || '').toLowerCase())]), out = []; for (let i = 1; out.length < n && i < 5000; i++) { const t = px + String(i).padStart(2, '0'); if (!used.has(t.toLowerCase())) out.push(t); } return out; }
+function plAdd(pts) { if (S.readOnly || !pts.length) return; if (planOf().holes.length + pts.length > 500) { toast('A plan holds up to 500 holes.'); return; }
+  savePlan(p => { const names = plNameNext(p, pts.length); pts.forEach(([e, n], i) => p.holes.push({ id: uid('ph'), name: names[i], e: +e.toFixed(2), n: +n.toFixed(2), depth: p.depth, well: false, scheme: p.schemes[0].id, why: '', top: null, bot: null, bh: '' })); });
+  toast(`Added ${pts.length} planned hole${pts.length > 1 ? 's' : ''}.`); }
+/* ---- samples ---- */
+function plDepths(h, s) { const o = new Set(); for (const r of s.rules) { const end = Math.min(h.depth, r.to ?? h.depth); for (let i = 0, d = r.from; d <= end + 1e-6 && i < 1000; i++, d = r.from + i * r.every) if (d > 0) o.add(+d.toFixed(2)); } return [...o].sort((a, c) => a - c); }
+/* n of a list, spread evenly and including the first and last */
+const plSpread = (a, n) => n >= a.length ? a : n === 1 ? [a[Math.floor((a.length - 1) / 2)]] : [...new Set(Array.from({ length: n }, (_, i) => a[Math.round(i * (a.length - 1) / (n - 1))]))];
+function plSamples(p = planOf()) {
+  const out = [];
+  for (const h of p.holes) { const s = p.schemes.find(x => x.id === h.scheme) || p.schemes[0], D = plDepths(h, s), get = {};
+    for (const [k, u] of Object.entries(s.suites)) if (u.on) { const c = D.filter(d => d >= u.from - 1e-9 && d <= (u.to ?? 1e9) + 1e-9); for (const d of u.mode === 'n' ? plSpread(c, u.n) : c) (get[d] ||= []).push(k); }
+    D.forEach((d, i) => out.push({ h, d, id: `${h.name}-${String(i + 1).padStart(2, '0')}`, suites: get[d] || [], head: s.head })); }
+  return out;
+}
+/* ---- supplies: every row { key, t, q, why } ---- */
+function plSupplies(p = planOf()) {
+  const sm = plSamples(p), lab = sm.filter(x => x.suites.length), up = q => Math.ceil(q - 1e-9), spare = q => up(q * (1 + p.kit.spare / 100)), wells = p.holes.filter(h => h.well), rows = [], c = {}, add = (g, key, t, q, why, u = '') => { if (q > 0 || p.over[key] != null) rows.push({ g, key, t, q: p.over[key] ?? q, calc: q, why, u }); };
+  for (const x of lab) { const need = {}; for (const k of x.suites) for (const [ct, n] of Object.entries(p.perSuite[k])) need[ct] = Math.max(need[ct] || 0, n); for (const [ct, n] of Object.entries(need)) { (c[ct] ||= { n: 0, s: 0 }).n += n; if (n) c[ct].s++; } }
+  const dupN = n => n && p.kit.dup ? Math.max(1, up(n * p.kit.dup / 100)) : 0, total = {}, dupS = dupN(lab.length); let boxes = 0;
+  for (const [ct, v] of Object.entries(c)) { const per = v.s ? v.n / v.s : 0, d = up(dupN(v.s) * per); total[ct] = v.n + d; boxes += total[ct]; }
+  const wOn = Object.keys(PL_WSUITES).filter(k => p.wsuites[k]), wc = {}; if (wells.length && wOn.length) { const need = {}; for (const k of wOn) for (const [ct, n] of Object.entries(PL_WSUITES[k][1])) need[ct] = Math.max(need[ct] || 0, n); const n = wells.length + dupN(wells.length); for (const [ct, q] of Object.entries(need)) { wc[ct] = q * n; boxes += q * n; } }
+  const coolers = up(boxes / p.kit.cooler), volS = (total.vial || 0) > 0, volW = (wc.wvial || 0) > 0, blanks = volS || volW ? coolers * p.kit.blank : 0;
+  for (const ct of Object.keys(PL_CONT)) if (total[ct]) add('Lab containers', 'c:' + ct, PL_CONT[ct][0] + (p.cont[ct].size ? ', ' + p.cont[ct].size : ', size per lab'), spare(total[ct]), `${c[ct].n} for samples, ${total[ct] - c[ct].n} for duplicates, then ${p.kit.spare}% spare`);
+  for (const ct of Object.keys(PL_WCONT)) if (wc[ct]) add('Lab containers', 'c:' + ct, PL_WCONT[ct] + ', size and preservative per lab', spare(wc[ct]), `${wells.length} well(s) and duplicates, then ${p.kit.spare}% spare`);
+  add('Lab containers', 'blank', 'Trip blank set, from the lab', blanks, `${p.kit.blank} for each cooler, because volatiles are sampled`);
+  add('Sampling', 'head', 'Headspace bags', spare(sm.filter(x => x.head).length), 'one for each planned depth');
+  add('Sampling', 'glove', 'Nitrile gloves, pairs', spare((sm.length + dupS) * p.kit.glove + wells.length * 2), `${p.kit.glove} pair(s) a sample, 2 a well`);
+  add('Sampling', 'label', 'Labels', spare(boxes), 'one for each container'); add('Sampling', 'coc', 'Chain of custody forms', up((lab.length + dupS + blanks + (wOn.length ? wells.length + dupN(wells.length) : 0)) / p.kit.coc), `${p.kit.coc} samples a form`);
+  add('Sampling', 'cooler', 'Coolers', coolers, `${p.kit.cooler} containers a cooler`); add('Sampling', 'ice', 'Ice, bags', up(coolers * p.kit.ice), `${p.kit.ice} a cooler`); add('Sampling', 'seal', 'Custody seals', coolers * 2, '2 a cooler');
+  let scr = 0, ris = 0, sand = 0, bent = 0; const A = Math.PI / 4 * (Math.max(0, p.dia ** 2 - p.kit.pipe ** 2)) / 1e6, A0 = Math.PI / 4 * p.dia ** 2 / 1e6;
+  for (const h of p.holes) { if (h.well) { const [t, b] = plScreen(h); scr += up((b - t) / p.kit.pipeLen); ris += up((t + p.kit.stick) / p.kit.pipeLen); const s0 = Math.max(0, t - .3); sand += A * (b - s0); bent += A * Math.max(0, s0 - .3); if (h.depth > b) bent += A0 * (h.depth - b); } else if (p.kit.backfill) bent += A0 * h.depth; }
+  const pl = p.kit.pipeLen + ' m'; add('Well materials', 'screen', `Screen, ${pl} lengths`, scr, 'whole lengths for each well'); add('Well materials', 'riser', `Riser pipe, ${pl} lengths`, ris, `ground to screen, plus ${p.kit.stick} m stick-up`);
+  add('Well materials', 'cap', 'Bottom plugs and locking caps, sets', wells.length, 'one a well'); add('Well materials', 'cover', 'Protective casing or flush mount', wells.length, 'one a well'); add('Well materials', 'lock', 'Locks', wells.length, 'one a well');
+  add('Well materials', 'sand', `Silica sand, ${p.kit.sandKg} kg bags`, spare(sand * p.kit.sandDen / p.kit.sandKg), `${sand.toFixed(2)} m³: screen and 0.3 m above`); add('Well materials', 'bent', `Bentonite chips, ${p.kit.bentKg} kg bags`, spare(bent * p.kit.bentDen / p.kit.bentKg), `${bent.toFixed(2)} m³: seals${p.kit.backfill ? ' and holes without a well' : ''}`);
+  for (const x of p.extra) rows.push({ g: 'Added', key: 'x:' + x.id, t: x.t, q: x.q, u: x.u, x });
+  return { rows, sm, lab, dupS, coolers, blanks };
+}
+/* a well's screen: as typed, else the bottom 3 m of the hole */
+const plScreen = h => { const b = Math.min(h.depth, h.bot > 0 ? h.bot : h.depth), t = Math.max(0, Math.min(b, h.top != null && h.top >= 0 && h.top < b ? h.top : b - 3)); return [t, b]; };
+/* ---- the planned holes on a map ---- */
+function plannedSVG(X, Y, sc, o = {}) {
+  const p = planOf(); let s = '';
+  if (o.zones) { for (const f of plLines()) { const k = LOC_OF[f.kind], z = k === 'pipe' ? p.hp : k ? p.hand : Math.max(p.hand, p.hp), w = Math.min(400, 2 * z * sc); if (f.pts?.length > 1 && w > 3) s += `<path d="${f.pts.map((q, i) => (i ? 'L' : 'M') + X(q[0]).toFixed(1) + ' ' + Y(q[1]).toFixed(1)).join('')}${f.type === 'polygon' ? 'Z' : ''}" fill="none" stroke="#d0342c" stroke-opacity=".16" stroke-width="${w.toFixed(1)}" stroke-linejoin="round" stroke-linecap="round"/>`; const nm = f.name || LOC_TAG[k] || 'LINE, TYPE NOT SET', q = f.pts.length > 1 ? [(f.pts[0][0] + f.pts[1][0]) / 2, (f.pts[0][1] + f.pts[1][1]) / 2] : f.pts?.[0]; if (q) s += `<text x="${X(q[0]).toFixed(1)}" y="${(Y(q[1]) - 5).toFixed(1)}" text-anchor="middle" style="font:700 9.5px Arial,sans-serif;fill:#222;paint-order:stroke;stroke:#fff;stroke-width:3px">${esc(nm)}</text>`; } }
+  for (const h of p.holes) { if (h.bh && S.bh.get(h.bh)?.easting != null) continue; const x = X(h.e), y = Y(h.n), c = o.check ? plCheck(h, p) : null, col = c?.warn.length ? '#c4242a' : '#1d4f91', on = o.sel === h.id;
+    s += `<g data-plh="${h.id}" style="cursor:${o.check ? 'grab' : 'default'}"><title>${esc(`${h.name}: planned, ${h.depth} m${h.well ? ', well' : ''}${c?.warn.length ? '. ' + c.warn.join(' ') : ''}`)}</title><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="transparent"/>${on ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="none" stroke="#e8a33d" stroke-width="2.5"/>` : ''}<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="#fff" stroke="${col}" stroke-width="2" ${h.well ? '' : 'stroke-dasharray="3 2"'}/><path d="M${(x - 4).toFixed(1)} ${y.toFixed(1)}h8M${x.toFixed(1)} ${(y - 4).toFixed(1)}v8" stroke="${col}" stroke-width="1.6"/>${h.well ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" fill="${col}"/>` : ''}<text x="${(x + 11).toFixed(1)}" y="${(y + 4).toFixed(1)}" style="font:700 11px Arial,sans-serif;fill:${col};paint-order:stroke;stroke:#fff;stroke-width:3px">${esc(h.name)}</text></g>`; }
+  return s;
+}
+function plMapSVG(W, H, v, print) {
+  let sc, cx, cy; const svg = withRO({ planned: true, print, legend: false, mres: { p: 'none' }, ...(v ? { cx: v.cx, cy: v.cy, scale: PX_PER_M / v.sc } : {}) }, () => { const K = [S.lyr, S.flowArrow, S.contours]; S.lyr = { ...S.lyr, feat: true, wl: false, sec: false, gwm: false, ...Object.fromEntries([...Object.keys(LOC_OF), 'loc_area', 'pipeline'].map(k => ['fk:' + k, true])) }; S.flowArrow = S.contours = false;   // site and locates only, and the locates always
+    try { const r = planSVG(W, H, false); sc = RO.sc; cx = RO.cxd; cy = RO.cyd; return r; } finally { [S.lyr, S.flowArrow, S.contours] = K; } });
+  return { svg, sc, cx, cy, W, H };
+}
+function plDraw() {
+  const el = $('#pl-map'); if (!el) return; const P = PLS(), W = Math.max(280, el.clientWidth), H = Math.max(260, el.clientHeight), m = plMapSVG(W, H, P.proj === curProj() ? P.mv : null); P.m = m;
+  el.innerHTML = m.svg; plDraftDraw();
+}
+const plXY = m => [x => m.W / 2 + (x - m.cx) * m.sc, y => m.H / 2 - (y - m.cy) * m.sc];
+function plDraftDraw(tip) {
+  const P = PLS(), el = $('#pl-map svg'); if (!el || !P.m) return; el.querySelector('[data-pldraft]')?.remove(); const pts = tip ? [...P.draft, tip] : P.draft; if (!pts.length || P.tool === 'pan' || P.tool === 'hole') return;
+  const [X, Y] = plXY(P.m), g = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g.setAttribute('data-pldraft', '1'); g.setAttribute('pointer-events', 'none'); let h = '';
+  if (P.tool === 'grid' && pts.length > 1) { const [a, b] = [pts[0], pts.at(-1)]; h = `<rect x="${Math.min(X(a[0]), X(b[0]))}" y="${Math.min(Y(a[1]), Y(b[1]))}" width="${Math.abs(X(a[0]) - X(b[0]))}" height="${Math.abs(Y(a[1]) - Y(b[1]))}" fill="rgba(29,79,145,.1)" stroke="#1d4f91" stroke-dasharray="5 3"/>`; }
+  else h = `<path d="${pts.map((q, i) => (i ? 'L' : 'M') + X(q[0]) + ' ' + Y(q[1])).join('')}" fill="none" stroke="#d0342c" stroke-width="2" stroke-dasharray="5 3"/>`;
+  const gen = P.tool === 'grid' || P.tool === 'line2' ? plPattern(P.tool, pts) : []; h += [...pts.map(q => `<circle cx="${X(q[0])}" cy="${Y(q[1])}" r="3" fill="#fff" stroke="#d0342c"/>`), ...gen.slice(0, 500).map(q => `<circle cx="${X(q[0])}" cy="${Y(q[1])}" r="4" fill="none" stroke="#1d4f91" stroke-width="1.6"/>`)].join(''); g.innerHTML = h; el.appendChild(g);
+}
+/* the points a pattern makes: a grid in a box, holes along a line, or a ring round a point */
+function plPattern(tool, pts) {
+  const P = PLS(), sp = plNum(P.sp, 20, 1, 5000), out = [];
+  if (tool === 'grid' && pts.length > 1) { const [a, b] = [pts[0], pts.at(-1)], x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]), dy = P.tri ? sp * Math.sqrt(3) / 2 : sp; if ((x1 - x0) / sp * ((y1 - y0) / dy) > 500) return []; for (let j = 0, y = y0; y <= y1 + 1e-6; y = y0 + ++j * dy) for (let x = x0 + (P.tri && j % 2 ? sp / 2 : 0); x <= x1 + 1e-6; x += sp) out.push([x, y]); }
+  else if (tool === 'line2' && pts.length > 1) { const [a, b] = [pts[0], pts.at(-1)], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L / sp > 500 || !L) return []; for (let d = 0; d <= L + 1e-6; d += sp) out.push([a[0] + (b[0] - a[0]) * d / L, a[1] + (b[1] - a[1]) * d / L]); }
+  else if (tool === 'ring' && pts.length) { const n = Math.round(plNum(P.rn, 4, 1, 60)); for (let i = 0; i < n; i++) { const t = Math.PI * 2 * i / n; out.push([pts[0][0] + sp * Math.sin(t), pts[0][1] + sp * Math.cos(t)]); } }
+  return out;
+}
+function plFinish() { const P = PLS(), d = P.draft; P.draft = []; if (P.tool === 'line' && d.length > 1 || P.tool === 'area' && d.length > 2) { const line = P.tool === 'line'; saveFeats([...featsOf(), { id: uid('f'), name: line ? LOC_TAG[P.util] : 'Located area', type: line ? 'line' : 'polygon', kind: line ? LOC_UTIL[P.util][1] : 'loc_area', pts: d.map(q => [+q[0].toFixed(2), +q[1].toFixed(2)]) }]); S.lyr.feat = true; plSoon(); return; } plDraftDraw(); }
+const plWorld = e => { const m = PLS().m, s = $('#pl-map svg'); if (!m || !s) return null; const r = s.getBoundingClientRect(); return [m.cx + (e.clientX - r.left - m.W / 2) / m.sc, m.cy - (e.clientY - r.top - m.H / 2) / m.sc]; };
+let plDrag = null;
+document.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || S.tab !== 'plan' || !e.target.closest?.('#pl-map svg')) return; const P = PLS(), w = plWorld(e), hit = e.target.closest('[data-plh]'); if (!w) return; e.preventDefault(); document.activeElement?.blur?.();
+  if (P.tool === 'pan' || hit && P.tool === 'hole') { const h = hit && planOf().holes.find(x => x.id === hit.dataset.plh); if (h) P.sel = h.id; plDrag = { x: e.clientX, y: e.clientY, h: h && !S.readOnly && !h.bh ? h : null, hit: !!h, g: hit, mv: { cx: P.m.cx, cy: P.m.cy, sc: P.m.sc } }; return; }
+  if (S.readOnly) return;
+  if (P.tool === 'hole') { plAdd([w]); return; }
+  if (P.tool === 'ring') { plAdd(plPattern('ring', [w])); return; }
+  P.draft.push(w);
+  if ((P.tool === 'grid' || P.tool === 'line2') && P.draft.length === 2) { const g = plPattern(P.tool, P.draft); P.draft = []; if (g.length) plAdd(g); else { toast('That spacing makes no holes, or more than 500.'); plDraftDraw(); } return; }
+  plDraftDraw();
+});
+document.addEventListener('pointermove', e => {
+  if (S.tab !== 'plan') return; const P = PLS();
+  if (plDrag) { const dx = e.clientX - plDrag.x, dy = e.clientY - plDrag.y; if (!plDrag.moved && Math.hypot(dx, dy) < 4) return; plDrag.moved = true; if (plDrag.h) plDrag.g.setAttribute('transform', `translate(${dx} ${dy})`); else { const s = $('#pl-map svg'); if (s) s.style.transform = `translate(${dx}px,${dy}px)`; } return; }
+  if (P.draft.length && e.target.closest?.('#pl-map')) plDraftDraw(plWorld(e));
+});
+document.addEventListener('pointerup', e => { const d = plDrag; if (!d) return; plDrag = null; const P = PLS(), dx = e.clientX - d.x, dy = e.clientY - d.y;
+  if (!d.moved) { if (!d.hit) P.sel = null; plSoon(); return; }
+  if (d.h) { savePlan(p => { const h = p.holes.find(x => x.id === d.h.id); if (h) { h.e = +(h.e + dx / d.mv.sc).toFixed(2); h.n = +(h.n - dy / d.mv.sc).toFixed(2); } }); }
+  else { P.mv = { cx: d.mv.cx - dx / d.mv.sc, cy: d.mv.cy + dy / d.mv.sc, sc: d.mv.sc }; P.proj = curProj(); plDraw(); } });
+document.addEventListener('pointercancel', () => { if (plDrag) { plDrag = null; plDraw(); } });
+document.addEventListener('dblclick', e => { if (S.tab === 'plan' && e.target.closest?.('#pl-map') && PLS().draft.length) { const d = PLS().draft; if (d.length > 1 && Math.hypot(d.at(-1)[0] - d.at(-2)[0], d.at(-1)[1] - d.at(-2)[1]) * PLS().m.sc < 5) d.pop(); plFinish(); } });
+document.addEventListener('keydown', e => { if (S.tab !== 'plan' || !$('#overlay').hidden || e.target.closest?.('input, select, textarea')) return; const P = PLS(); if (e.key === 'Enter' && P.draft.length) { e.preventDefault(); plFinish(); } else if (e.key === 'Backspace' && P.draft.length) { P.draft.pop(); plDraftDraw(); } else if (e.key === 'Escape') { if (P.draft.length) { P.draft = []; plDraftDraw(); } else if (P.tool !== 'pan') { P.tool = 'pan'; plSoon(); } } else if (e.key === 'Delete' && P.sel && !S.readOnly) { const id = P.sel; P.sel = null; savePlan(p => { p.holes = p.holes.filter(h => h.id !== id); }); } });
+function plZoom(k, at) { const P = PLS(), m = P.m; if (!m) return; const [x, y] = at || [m.cx, m.cy], sc = Math.max(1e-4, Math.min(200, m.sc * k)), q = m.sc / sc; P.mv = { cx: x + (m.cx - x) * q, cy: y + (m.cy - y) * q, sc }; P.proj = curProj(); plDraw(); }
+document.addEventListener('wheel', e => { if (S.tab !== 'plan' || !e.target.closest?.('#pl-map')) return; e.preventDefault(); plZoom(Math.exp(-e.deltaY * .0015), plWorld(e)); }, { passive: false });
+/* ---- files: locate sheets and ground disturbance forms, kept like imported report pages ---- */
+async function plAddFiles(list, tk = '') {
+  if (S.readOnly) return; let n = 0; const p0 = curProj(), add = [];
+  for (const file of list) { const id = uid('rf'); let rec;
+    if (/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name)) { const bytes = new Uint8Array(await file.arrayBuffer()); let pages; try { pages = (await PDFLib.PDFDocument.load(bytes)).getPageCount(); } catch { toast(`${file.name} is secured or damaged, so it cannot be put in the package. Print it to PDF and add that copy.`); continue; } if (S.mode === 'db' && bytes.length > REPORT_FILE_MAX) { toast(`${file.name} is too big for the shared online project.`); continue; } rec = { kind: 'pdf', pages, data: await bytesDataUrl(bytes, 'application/pdf') }; }
+    else if (/^image\/(png|jpeg|webp|gif|bmp)$/.test(file.type)) { const d = await readPicture(file); if (!d) { toast(`${file.name} could not be read.`); continue; } rec = { kind: 'image', pages: 1, data: d }; }
+    else { toast(`${file.name} is not a PDF or a picture.`); continue; }
+    try { await photoStore.put({ id, bhId: REPORT_FILE_KEY(p0), name: file.name, takenAt: new Date().toISOString(), ...rec }); } catch { toast(`${file.name} could not be saved on this computer.`); continue; }
+    add.push({ id, name: file.name.slice(0, 120), kind: rec.kind, pages: rec.pages, use: true, tk }); n++; }
+  if (n && curProj() === p0) { savePlan(p => p.files.push(...add)); toast(`Added ${n} file${n > 1 ? 's' : ''}.`); }
+}
+/* ---- the page ---- */
+const plIn = (k, v, o = {}) => `<input data-plk="${k}" type="${o.t || 'text'}" ${o.t === 'number' ? `step="${o.st || 'any'}" min="${o.min ?? 0}"` : ''} value="${esc(v ?? '')}" ${o.ph ? `placeholder="${esc(o.ph)}"` : ''} ${o.w ? `style="width:${o.w}px"` : ''} aria-label="${esc(o.l || k)}" ${S.readOnly || o.off ? 'disabled' : ''}>`;
+const plSel = (k, v, opts, l) => `<select data-plk="${k}" aria-label="${esc(l || k)}" ${S.readOnly ? 'disabled' : ''}>${opts.map(([a, t]) => `<option value="${esc(a)}" ${a === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+const plChk = (k, v, t) => `<label class="check"><input type="checkbox" data-plk="${k}" ${v ? 'checked' : ''} ${S.readOnly ? 'disabled' : ''}>${t}</label>`;
+const plBtn = (k, t, c = '') => `<button type="button" class="btn ${c}" data-pldo="${k}" ${S.readOnly ? 'disabled' : ''}>${t}</button>`;
+const plX = (k, l) => `<button type="button" class="btn link" data-pldo="${k}" aria-label="${esc(l)}" title="${esc(l)}" ${S.readOnly ? 'disabled' : ''}>✕</button>`;
+const PL_NOTE = 'Distances are to the lines entered here, and marks are approximate. Other lines may exist. Nothing on this page means a place is clear to dig.';
+function planHTML() {
+  const P = PLS(), p = planOf(); if (P.pj !== curProj()) { P.pj = curProj(); P.sel = null; P.draft = []; P.checked = new Set(); P.mv = null; }
+  const map = P.step === 'loc' || P.step === 'bh', body = { loc: plLocHTML, bh: plBhHTML, smp: plSmpHTML, sup: plSupHTML, print: plPrintHTML }[P.step](p, P);
+  return `<div class="pl"><div class="pl-top"><span class="seg" role="group" aria-label="Planning step">${PL_STEPS.map(([k, t]) => `<button type="button" data-plstep="${k}" aria-pressed="${P.step === k}">${t}</button>`).join('')}</span><label class="note">Province ${plSel('prov', p.prov, Object.entries(GD_RULES).map(([k, r]) => [k, r.name]), 'Province')}</label><label class="note">Drilling date ${plIn('date', p.date, { t: 'date', l: 'Drilling date' })}</label><span class="note">${p.holes.length} planned hole${p.holes.length === 1 ? '' : 's'}</span></div>
+  <div class="pl-grid${map ? '' : ' one'}"><div class="pl-side">${body}</div>${map ? `<div class="pl-mapw"><div class="pl-tools">${plToolsHTML(P)}</div><div id="pl-map" class="pl-map"></div><p class="note">${PL_NOTE}</p></div>` : ''}</div></div>`;
+}
+function plToolsHTML(P) {
+  const T = P.step === 'loc' ? [['pan', 'Move'], ['line', 'Draw line'], ['area', 'Draw located area']] : [['pan', 'Move'], ['hole', 'Place hole'], ['grid', 'Grid'], ['line2', 'Along a line'], ['ring', 'Ring']]; if (!T.some(t => t[0] === P.tool)) { P.tool = 'pan'; P.draft = []; }
+  const tip = { pan: 'Drag to move the map or a planned hole. Scroll to zoom.', line: 'Click along the line. Double-click or Enter ends it.', area: 'Click round the area that was located. Double-click ends it.', hole: 'Click to place a hole.', grid: 'Click two corners of a box.', line2: 'Click the start and the end.', ring: 'Click the middle, for example the source.' }[P.tool], need = ['grid', 'line2', 'ring'].includes(P.tool);
+  return `<span class="seg">${T.map(([k, t]) => `<button type="button" data-pltool="${k}" aria-pressed="${P.tool === k}">${t}</button>`).join('')}</span>${P.tool === 'line' ? `<select data-plu="util" aria-label="Line type">${Object.entries(LOC_UTIL).map(([k, v]) => `<option value="${k}" ${P.util === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>` : ''}${need ? `<label class="note">${P.tool === 'ring' ? 'Radius' : 'Spacing'} <input data-plu="sp" type="number" min="1" value="${esc(P.sp ?? 20)}" style="width:68px"> m</label>` : ''}${P.tool === 'ring' ? `<label class="note">Holes <input data-plu="rn" type="number" min="1" max="60" value="${esc(P.rn ?? 4)}" style="width:56px"></label>` : ''}${P.tool === 'grid' ? `<label class="check"><input type="checkbox" data-plu="tri" ${P.tri ? 'checked' : ''}>Staggered</label>` : ''}<span class="sp"></span><button type="button" class="btn" data-plz="in" aria-label="Zoom in">+</button><button type="button" class="btn" data-plz="out" aria-label="Zoom out">−</button><button type="button" class="btn" data-plz="fit">Fit</button><span class="note pl-tip">${tip}</span>`;
+}
+function plLocHTML(p) {
+  const R = GD_RULES[p.prov], by = plCallBy(p), gaps = plGaps(p), L = featsOf().filter(f => LOC_OF[f.kind] || f.kind === 'pipeline' || f.kind === 'loc_area');
+  return `<section class="sec"><header><h3>Locate tickets</h3>${plBtn('tk-add', 'Add a ticket')}${plBtn('tk-all', 'Add every type')}</header><div class="body"><p class="note">${R.call}. ${by ? `For drilling on ${p.date}, request by <b>${by}</b> (${R.days} ${R.full ? 'full working' : 'business'} days, weekends left out; take off holidays too).` : 'Set the drilling date to see when to request.'}</p>
+    ${p.tickets.map((t, i) => `<div class="pl-tk"><div class="pl-row">${plSel(`t:${t.id}:util`, t.util, Object.entries(LOC_UTIL).map(([k, v]) => [k, v[0]]), 'Utility')}${plSel(`t:${t.id}:status`, t.status, Object.entries(LOC_STATUS), 'Status')}<span class="sp"></span>${plX('tk-del:' + t.id, 'Remove ticket ' + (i + 1))}</div><div class="pl-f"><label>Owner${plIn(`t:${t.id}:owner`, t.owner)}</label><label>Ticket no.${plIn(`t:${t.id}:no`, t.no)}</label><label>Located by${plIn(`t:${t.id}:by`, t.by)}</label><label>Requested${plIn(`t:${t.id}:req`, t.req, { t: 'date' })}</label><label>Marked${plIn(`t:${t.id}:marked`, t.marked, { t: 'date' })}</label><label>Expires${plIn(`t:${t.id}:exp`, t.exp, { t: 'date' })}</label></div><div class="pl-row">${p.files.filter(f => f.tk === t.id).map(f => `<span class="note">📎 ${esc(f.name)} ${plX('fl-del:' + f.id, 'Remove ' + f.name)}</span>`).join('')}<label class="btn link">Attach locate sheet<input type="file" hidden multiple accept=".pdf,image/*" data-plfile="${t.id}" ${S.readOnly ? 'disabled' : ''}></label></div></div>`).join('') || '<p>No tickets yet.</p>'}</div></section>
+    <section class="sec"><header><h3>Lines on the plan</h3><button type="button" class="btn" data-act="imp-shp" ${S.readOnly ? 'disabled' : ''}>Import lines…</button></header><div class="body">${L.length ? `<table class="pl-t"><tbody>${L.map(f => `<tr><td>${f.kind === 'loc_area' ? 'Located area' : plSel(`f:${f.id}:kind`, f.kind, [['pipeline', 'Type not set'], ...Object.values(LOC_UTIL).map(v => [v[1], v[0]])], 'Type')}</td><td>${plIn(`f:${f.id}:name`, f.name, { ph: 'Name', w: 120 })}</td><td>${plX('ft-del:' + f.id, 'Remove this shape')}</td></tr>`).join('')}</tbody></table>` : '<p class="note">Draw the marked lines on the map, or import them.</p>'}</div></section>
+    <section class="sec"><header><h3>Distances</h3>${plBtn('gd-std', 'Use the ' + R.name + ' numbers')}</header><div class="body"><div class="pl-f"><label>Hand expose (m)${plIn('hand', p.hand, { t: 'number' })}</label><label>High-pressure pipeline (m)${plIn('hp', p.hp, { t: 'number' })}</label><label>Notify pipeline owner (m)${plIn('notify', p.notify, { t: 'number' })}</label></div><p class="note">${R.src} Use your company’s number where it is larger.</p></div></section>
+    <section class="sec"><header><h3>Still open</h3><span class="note">${gaps.length}</span></header><div class="body">${gaps.length ? '<ul class="pl-w">' + gaps.map(g => `<li>${esc(g)}</li>`).join('') + '</ul>' : '<p>Nothing recorded as missing.</p>'}</div></section>`;
+}
+function plBhHTML(p, P) {
+  const ed = !S.readOnly;
+  return `<section class="sec"><header><h3>New holes</h3></header><div class="body"><div class="pl-f"><label>Name starts with${plIn('prefix', p.prefix)}</label><label>Depth (m)${plIn('depth', p.depth, { t: 'number' })}</label><label>Hole size (mm)${plIn('dia', p.dia, { t: 'number' })}</label></div><div class="pl-row"><input id="pl-co" placeholder="Type coordinates or a land description" aria-label="Coordinates" ${ed ? '' : 'disabled'}>${plBtn('co-add', 'Place')}</div>${plChk('onMap', p.onMap, 'Show planned holes on the Map page')}</div></section>
+  <section class="sec"><header><h3>Planned holes</h3><button type="button" class="btn" data-pldo="csv" ${p.holes.length ? '' : 'disabled'}>Coordinates (CSV)</button></header><div class="body">${p.holes.length ? `<div class="pl-row"><label class="check"><input type="checkbox" data-pldo="chk-all" ${P.checked.size && P.checked.size >= p.holes.length ? 'checked' : ''}>All</label>${P.checked.size ? `<span class="note">${P.checked.size} chosen</span><input id="pl-bd" type="number" min=".1" placeholder="Depth" style="width:72px" aria-label="Depth for chosen holes">${plBtn('b-depth', 'Set depth')}${plBtn('b-well', 'Well')}${plBtn('b-nowell', 'No well')}<select id="pl-bs" aria-label="Sample scheme for chosen holes">${p.schemes.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('')}</select>${plBtn('b-sch', 'Set samples')}${plBtn('b-del', 'Remove', 'danger')}` : ''}</div>
+  ${p.holes.map(h => { const c = plCheck(h, p), k = `h:${h.id}:`, done = h.bh && S.bh.get(h.bh); return `<div class="pl-h${P.sel === h.id ? ' on' : ''}" data-plrow="${h.id}"><div class="pl-row"><input type="checkbox" data-plck="${h.id}" ${P.checked.has(h.id) ? 'checked' : ''} aria-label="Choose ${esc(h.name)}">${plIn(k + 'name', h.name, { w: 92, l: 'Name' })}<label class="note">Depth ${plIn(k + 'depth', h.depth, { t: 'number', w: 64, l: 'Depth' })} m</label>${plChk(k + 'well', h.well, 'Well')}${plSel(k + 'scheme', h.scheme, p.schemes.map(s => [s.id, s.name]), 'Samples')}<span class="sp"></span>${done ? `<button type="button" class="btn link" data-plopen="${esc(h.bh)}">Open log</button>` : plBtn('log:' + h.id, 'Start log')}${plX('h-del:' + h.id, 'Remove ' + h.name)}</div>
+    <div class="pl-row">${plIn(k + 'e', h.e, { t: 'number', w: 104, l: 'Easting', off: !!done })}${plIn(k + 'n', h.n, { t: 'number', w: 112, l: 'Northing', off: !!done })}${plIn(k + 'why', h.why, { ph: 'Why here (source, downgradient, background…)' })}</div>${h.well ? `<div class="pl-row"><span class="note">Screen</span>${plIn(k + 'top', h.top, { t: 'number', w: 70, ph: plScreen({ ...h, top: null })[0].toFixed(1), l: 'Screen top' })}<span class="note">to</span>${plIn(k + 'bot', h.bot, { t: 'number', w: 70, ph: plScreen(h)[1].toFixed(1), l: 'Screen bottom' })}<span class="note">m</span></div>` : ''}
+    ${c.warn.map(t => `<p class="pl-bad">${esc(t)}</p>`).join('')}${c.mind.map(t => `<p class="pl-mind">${esc(t)}</p>`).join('')}<p class="note">${c.near ? `Nearest entered line: ${c.near.d.toFixed(1)} m, ${esc(c.near.nm)}` : 'No lines entered to measure from.'}</p></div>`; }).join('')}` : '<p class="note">Choose a tool above the map, or type coordinates.</p>'}</div></section>`;
+}
+function plSmpHTML(p) {
+  const sm = plSamples(p), by = k => sm.filter(x => x.suites.includes(k)).length;
+  return p.schemes.map(s => { const k = `s:${s.id}:`, n = p.holes.filter(h => h.scheme === s.id).length; return `<section class="sec"><header><h3>${plIn(k + 'name', s.name, { w: 160, l: 'Scheme name' })}</h3><span class="note">${n} hole${n === 1 ? '' : 's'}</span><span class="sp"></span>${p.schemes.length > 1 ? plX('s-del:' + s.id, 'Remove this scheme') : ''}</header><div class="body"><div class="pl-two"><div><h4>Depths</h4>${s.rules.map((r, i) => `<div class="pl-row"><span class="note">From</span>${plIn(`${k}r${i}:from`, r.from, { t: 'number', w: 66, l: 'From' })}<span class="note">to</span>${plIn(`${k}r${i}:to`, r.to, { t: 'number', w: 76, ph: 'bottom', l: 'To' })}<span class="note">every</span>${plIn(`${k}r${i}:every`, r.every, { t: 'number', w: 66, min: .1, l: 'Every' })}<span class="note">m</span>${plX(`r-del:${s.id}:${i}`, 'Remove this rule')}</div>`).join('')}${plBtn('r-add:' + s.id, 'Add depths')}${plChk(k + 'head', s.head, 'Headspace bag at every depth')}</div>
+    <div><h4>Analyses (depths in m)</h4>${Object.entries(PL_SUITES).map(([q, [t]]) => { const u = s.suites[q], z = `${k}u:${q}:`; return `<div class="pl-row pl-su">${plChk(z + 'on', u.on, esc(t))}${u.on ? `${plSel(z + 'mode', u.mode, [['all', 'every depth'], ['n', 'this many a hole']], t)}${u.mode === 'n' ? plIn(z + 'n', u.n, { t: 'number', w: 58, min: 1, l: 'How many' }) : ''}<span class="note">between</span>${plIn(z + 'from', u.from, { t: 'number', w: 60, l: 'From' })}<span class="note">and</span>${plIn(z + 'to', u.to, { t: 'number', w: 72, ph: 'bottom', l: 'To' })}` : ''}</div>`; }).join('')}</div></div></div></section>`; }).join('') + `<div class="pl-row">${plBtn('s-add', 'Add a scheme (for example Background)')}</div>
+  <section class="sec"><header><h3>Groundwater</h3><span class="note">${p.holes.filter(h => h.well).length} well(s)</span></header><div class="body pl-row">${Object.entries(PL_WSUITES).map(([k, v]) => plChk('w:' + k, p.wsuites[k], esc(v[0]))).join('')}</div></section>
+  <section class="sec"><header><h3>Totals</h3></header><div class="body"><p>${sm.length} depths, ${sm.filter(x => x.suites.length).length} sent to the lab. ${Object.entries(PL_SUITES).filter(([k]) => by(k)).map(([k, v]) => `${v[0]}: <b>${by(k)}</b>`).join(' · ')}</p><p class="note">“This many a hole” spreads the samples evenly down the range. In the field, send the depths that look worst instead.</p>${p.holes.length ? '<div class="scroll-x"><table class="pl-t"><thead><tr><th>Sample</th><th>Depth (m)</th><th>Analyses</th></tr></thead><tbody>' + sm.slice(0, 400).map(x => `<tr><td>${esc(x.id)}</td><td>${x.d}</td><td>${x.suites.map(k => esc(PL_SUITES[k][0])).join(', ') || '<span class="note">hold / headspace only</span>'}</td></tr>`).join('') + '</tbody></table></div>' + (sm.length > 400 ? '<p class="note">First 400 shown; the printed plan has all.</p>' : '') : ''}</div></section>`;
+}
+function plSupHTML(p) {
+  const s = plSupplies(p), groups = [...new Set(s.rows.map(r => r.g))], K = (k, t, u = '') => `<label>${t}${plIn('k:' + k, p.kit[k], { t: 'number' })}${u}</label>`;
+  return `<section class="sec"><header><h3>What to bring</h3>${plBtn('x-add', 'Add an item')}</header><div class="body">${s.rows.length ? groups.map(g => `<h4>${g}</h4><table class="pl-t pl-sup"><tbody>${s.rows.filter(r => r.g === g).map(r => r.x ? `<tr><td>${plIn(`x:${r.x.id}:t`, r.t, { ph: 'Item' })}</td><td>${plIn(`x:${r.x.id}:q`, r.q, { t: 'number', w: 80 })}</td><td>${plIn(`x:${r.x.id}:u`, r.u, { ph: 'unit', w: 80 })}</td><td>${plX('x-del:' + r.x.id, 'Remove ' + r.t)}</td></tr>` : `<tr><td>${esc(r.t)}</td><td>${plIn('o:' + r.key, p.over[r.key] ?? '', { t: 'number', w: 80, ph: String(r.calc), l: r.t })}</td><td class="note">${esc(r.why)}${p.over[r.key] != null ? ` (worked out: ${r.calc})` : ''}</td><td></td></tr>`).join('')}</tbody></table>`).join('') : '<p class="note">Plan holes and samples first.</p>'}</div></section>
+  <section class="sec"><header><h3>Containers and holding times</h3></header><div class="body"><p class="note">Containers for each sample. One container serves every analysis that uses it. Confirm the sizes, containers and holding times with your lab: holding times come from Bureau Veritas’ soil table (CCME), except water, which is left to your lab.</p><table class="pl-t"><thead><tr><th>Analysis</th><th>Containers</th><th>Days</th></tr></thead><tbody>${Object.entries(PL_SUITES).map(([k, [t, c]]) => `<tr><td>${esc(t)}</td><td>${Object.keys(c).map(ct => `<span class="pl-in">${plIn(`ps:${k}:${ct}`, p.perSuite[k][ct], { t: 'number', w: 56, st: 1, l: PL_CONT[ct][0] })} ${esc(PL_CONT[ct][0])}</span>`).join(' ')}</td><td>${plIn('hd:' + k, p.hold[k], { t: 'number', w: 66, st: 1, l: 'Holding time' })}</td></tr>`).join('')}</tbody></table><div class="pl-f">${Object.entries(PL_CONT).map(([k, v]) => `<label>${esc(v[0])}${plIn('cs:' + k, p.cont[k].size, { ph: 'size from your lab' })}</label>`).join('')}</div></div></section>
+  <section class="sec"><header><h3>How it is worked out</h3></header><div class="body pl-f">${K('dup', 'Duplicates (%)')}${K('spare', 'Spares (%)')}${K('blank', 'Trip blanks a cooler')}${K('cooler', 'Containers a cooler')}${K('ice', 'Ice bags a cooler')}${K('coc', 'Samples a custody form')}${K('glove', 'Glove pairs a sample')}${K('pipe', 'Well pipe outside (mm)')}${K('pipeLen', 'Pipe length (m)')}${K('stick', 'Stick-up (m)')}${K('sandKg', 'Sand bag (kg)')}${K('sandDen', 'Sand density (kg/m³)')}${K('bentKg', 'Bentonite bag (kg)')}${K('bentDen', 'Bentonite density (kg/m³)')}<label>${plChk('k:backfill', p.kit.backfill, 'Backfill other holes with bentonite')}</label></div></section>`;
+}
+const PL_PAGES = { map: 'Location plan', loc: 'Locate register', bh: 'Borehole table', smp: 'Sampling plan', sup: 'Supply list', sign: 'Checklist and sign-off' };
+function plPrintHTML(p) {
+  const gaps = plGaps(p), bad = p.holes.filter(h => plCheck(h, p).warn.length);
+  return `<section class="sec"><header><h3>Package</h3></header><div class="body"><div class="pl-row">${Object.entries(PL_PAGES).map(([k, t]) => plChk('pg:' + k, p.pages[k], t)).join('')}</div><label class="note">Notes printed on the sign-off page<textarea data-plk="notes" rows="3" ${S.readOnly ? 'disabled' : ''}>${esc(p.notes)}</textarea></label></div></section>
+  <section class="sec"><header><h3>Attach</h3><label class="btn">Add ground disturbance form…<input type="file" hidden multiple accept=".pdf,image/*" data-plfile="" ${S.readOnly ? 'disabled' : ''}></label></header><div class="body">${p.files.length ? `<table class="pl-t"><tbody>${p.files.map((f, i) => `<tr><td>${plChk('fu:' + f.id, f.use, esc(f.name))}</td><td class="note">${f.tk ? 'locate sheet' : 'form'}, ${f.pages} page${f.pages === 1 ? '' : 's'}</td><td><button type="button" class="btn link" data-pldo="fl-up:${f.id}" ${i && !S.readOnly ? '' : 'disabled'} aria-label="Move ${esc(f.name)} up">↑</button>${plX('fl-del:' + f.id, 'Remove ' + f.name)}</td></tr>`).join('')}</tbody></table>` : '<p class="note">PDFs or pictures: your ground disturbance form, locate sheets, crossing agreements. They follow the plan in this order.</p>'}</div></section>
+  <section class="sec"><header><h3>Before you print</h3></header><div class="body">${bad.length ? `<p class="pl-bad">${bad.length} hole(s) need attention: ${esc(bad.map(h => h.name).join(', '))}</p>` : ''}${gaps.length ? '<ul class="pl-w">' + gaps.map(g => `<li>${esc(g)}</li>`).join('') + '</ul>' : ''}<p class="note">${PL_NOTE} These open items are printed too.</p><div class="pl-row"><button type="button" class="btn primary" data-pldo="pdf">Make the PDF…</button></div></div></section>`;
+}
+/* ---- the printed package: landscape Letter pages, then the attached files ---- */
+function plWrap(t, w, font) { const out = []; for (const para of String(t ?? '').split('\n')) { let l = ''; for (let word of para.split(/\s+/)) { while (textW(word, font) > w && word.length > 1) { let n = word.length - 1; while (n > 1 && textW(word.slice(0, n), font) > w) n--; if (l) { out.push(l); l = ''; } out.push(word.slice(0, n)); word = word.slice(n); } const z = l ? l + ' ' + word : word; if (l && textW(z, font) > w) { out.push(l); l = word; } else l = z; } out.push(l); } return out; }
+const PL_DIM = { W: 1056, H: 816, M: 30 };
+function plTable(title, cols, rows, note) {
+  const { W, H, M } = PL_DIM, top = M + 76, F = '9px Arial,sans-serif', sum = cols.reduce((a, c) => a + c.w, 0), cw = cols.map(c => c.w / sum * (W - 2 * M)), foot = H - M - 46, pages = []; let o, y;
+  const head = () => { o = []; y = top; let x = M; o.push(`<rect x="${M}" y="${y}" width="${W - 2 * M}" height="20" fill="#e8ecf0" stroke="#222" stroke-width=".8"/>`); cols.forEach((c, i) => { o.push(`<text x="${x + 4}" y="${y + 13.5}" style="font:700 9px Arial,sans-serif;fill:#111">${esc(c.h)}</text>`); x += cw[i]; }); y += 20; };
+  const close = () => { plWrap(PL_NOTE, W - 2 * M, '8px Arial').slice(0, 2).forEach((l, i) => o.push(`<text x="${M}" y="${H - M - 24 + i * 10}" style="font:8px Arial,sans-serif;fill:#555">${esc(l)}</text>`)); pages.push({ title, body: o.join('') }); };
+  head();
+  if (!rows.length) o.push(`<text x="${M + 4}" y="${y + 18}" style="font:10px Arial,sans-serif;fill:#555">None entered.</text>`);
+  for (const r of rows) { const L = r.map((v, i) => plWrap(v, cw[i] - 8, F)); let at = 0; const n = Math.max(...L.map(l => l.length));
+    while (at < n) { let fit = Math.floor((foot - y - 6) / 11); if (fit < Math.min(n - at, 6)) { close(); head(); fit = Math.floor((foot - y - 6) / 11); } const k = Math.min(fit, n - at), h = k * 11 + 6; let x = M;
+      o.push(`<rect x="${M}" y="${y.toFixed(1)}" width="${W - 2 * M}" height="${h}" fill="none" stroke="#999" stroke-width=".5"/>`); L.forEach((l, i) => { l.slice(at, at + k).forEach((t, j) => o.push(`<text x="${(x + 4).toFixed(1)}" y="${(y + 11 + j * 11).toFixed(1)}" style="font:${F};fill:#111">${esc(t)}</text>`)); x += cw[i]; }); y += h; at += k; } }
+  if (note) { const ls = plWrap(note, W - 2 * M, '9px Arial'); if (y + ls.length * 12 + 16 > foot) { close(); head(); } ls.forEach((l, i) => o.push(`<text x="${M}" y="${(y + 18 + i * 12).toFixed(1)}" style="font:9px Arial,sans-serif;fill:#333">${esc(l)}</text>`)); }
+  close(); return pages;
+}
+function plPages(p = planOf()) {
+  const { W, H, M } = PL_DIM, out = [], z = crsZone(), R = GD_RULES[p.prov], lb = p.tickets, T = (x, y, t, s = 10, w = '') => `<text x="${x}" y="${y}" style="font:${w} ${s}px Arial,sans-serif;fill:#111">${esc(t)}</text>`;
+  if (p.pages.map) { const mw = W - 2 * M - 200, mh = H - M * 2 - 110, m = plMapSVG(mw, mh, null, true), x = M + mw + 14; let y = M + 92; const o = [`<g transform="translate(${M} ${M + 76})"><svg width="${mw}" height="${mh}" viewBox="0 0 ${mw} ${mh}" overflow="hidden">${m.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')}</svg><rect width="${mw}" height="${mh}" fill="none" stroke="#222"/></g>`]; o.push(T(x, y, 'Legend', 11, 700)); y += 20;
+    const K = (sym, t) => { o.push(sym(x + 12, y - 4)); plWrap(t, 150, '9.5px Arial').forEach((l, i) => { o.push(T(x + 34, y + i * 12, l, 9.5)); if (i) y += 12; }); y += 19; };
+    K((a, b) => `<circle cx="${a}" cy="${b}" r="6" fill="#fff" stroke="#1d4f91" stroke-width="2" stroke-dasharray="3 2"/>`, 'Planned borehole'); if (p.holes.some(h => h.well)) K((a, b) => `<circle cx="${a}" cy="${b}" r="6" fill="#fff" stroke="#1d4f91" stroke-width="2"/><circle cx="${a}" cy="${b}" r="2.6" fill="#1d4f91"/>`, 'Planned monitoring well'); if (p.holes.some(h => plCheck(h, p).warn.length)) K((a, b) => `<circle cx="${a}" cy="${b}" r="6" fill="#fff" stroke="#c4242a" stroke-width="2"/>`, 'Needs attention: see the borehole table');
+    if (mapList().some(b => b.easting != null)) K((a, b) => BH_SYMBOL(a, b, false), 'Existing borehole');
+    for (const kd of [...new Set(featsOf().map(f => f.kind))]) { const F = FEAT_KINDS[kd]; if (!F) continue; const fs = siteOf()?.featStyle?.[kd], col = fs ? oneLook(oneDef({ kd }), fs).line : F[2]; K((a, b) => `<path d="M${a - 11} ${b}h22" stroke="${col}" stroke-width="2.6" stroke-dasharray="${F[3]}"/>`, F[0]); }
+    K((a, b) => `<path d="M${a - 11} ${b}h22" stroke="#d0342c" stroke-opacity=".2" stroke-width="9"/>`, `Hand-expose distance: ${p.hand} m, high-pressure pipeline ${p.hp} m`);
+    y += 4; plWrap(`Coordinates: UTM zone ${z}. Scale about 1:${Math.round(PX_PER_M / m.sc).toLocaleString('en-CA')} at Letter size. ${PL_NOTE}`, 182, '9px Arial').forEach(l => { o.push(T(x, y, l, 9)); y += 12; }); out.push({ title: 'PLANNED BOREHOLE LOCATIONS', body: o.join('') }); }
+  if (p.pages.loc) { out.push(...plTable('LOCATE REGISTER', [{ h: 'Utility', w: 18 }, { h: 'Owner', w: 14 }, { h: 'Ticket no.', w: 11 }, { h: 'Status', w: 13 }, { h: 'Located by', w: 13 }, { h: 'Requested', w: 9 }, { h: 'Marked', w: 9 }, { h: 'Expires', w: 9 }, { h: 'Sheet attached', w: 14 }], lb.map(t => [LOC_UTIL[t.util][0], t.owner, t.no, LOC_STATUS[t.status], t.by, t.req, t.marked, t.exp, p.files.filter(f => f.tk === t.id && f.use).map(f => f.name).join(', ') || '—']), `${R.name}. ${R.call}. Hand expose ${p.hand} m, high-pressure pipeline ${p.hp} m, pipeline owners notified within ${p.notify} m. ${R.src.split(' The OHS regulation')[0]}`)); const g = plGaps(p); if (g.length) out.push(...plTable('LOCATES: STILL OPEN', [{ h: 'Item', w: 1 }], g.map(x => [x]))); }
+  if (p.pages.bh) out.push(...plTable('PLANNED BOREHOLES', [{ h: 'Hole', w: 9 }, { h: 'Easting (m)', w: 9 }, { h: 'Northing (m)', w: 10 }, { h: 'Latitude, longitude', w: 16 }, { h: 'Depth (m)', w: 7 }, { h: 'Well screen (m)', w: 9 }, { h: 'Purpose', w: 17 }, { h: 'Nearest entered line', w: 17 }, { h: 'Attention', w: 30 }], p.holes.map(h => { const c = plCheck(h, p), [la, lo] = utmToLL(h.e, h.n, z), s = plScreen(h); return [h.name, h.e.toFixed(1), h.n.toFixed(1), `${la.toFixed(6)}, ${lo.toFixed(6)}`, String(h.depth), h.well ? `${s[0].toFixed(1)} to ${s[1].toFixed(1)}` : '—', h.why, c.near ? `${c.near.d.toFixed(1)} m, ${c.near.nm}` : 'no lines entered', [...c.warn, ...c.mind].join(' ') || '—']; }), `UTM zone ${z}, NAD83(CSRS). Hole size ${p.dia} mm; distances are from the edge of the hole. Drilling date ${p.date || 'not set'}.`));
+  const sup = plSupplies(p);
+  if (p.pages.smp) { const used = Object.keys(PL_SUITES).filter(k => sup.sm.some(x => x.suites.includes(k))); out.push(...plTable('SAMPLING PLAN', [{ h: 'Sample', w: 14 }, { h: 'Hole', w: 10 }, { h: 'Depth (m)', w: 8 }, { h: 'Headspace', w: 8 }, { h: 'Analyses', w: 50 }, { h: 'Taken (time, initials)', w: 18 }], sup.sm.map(x => [x.id, x.h.name, String(x.d), x.head ? 'Yes' : '—', x.suites.map(k => PL_SUITES[k][0]).join('; ') || 'Hold', '']), `${sup.sm.length} depths, ${sup.lab.length} for the lab, ${sup.dupS} duplicate sample(s), ${sup.blanks} trip blank(s). Holding times to confirm with the lab: ${used.map(k => `${PL_SUITES[k][0]} ${p.hold[k]} days`).join('; ') || 'none'}.${p.holes.some(h => h.well) && Object.values(p.wsuites).some(Boolean) ? ' Groundwater at each well: ' + Object.keys(PL_WSUITES).filter(k => p.wsuites[k]).map(k => PL_WSUITES[k][0]).join('; ') + '.' : ''}`)); }
+  if (p.pages.sup) out.push(...plTable('SUPPLY LIST', [{ h: 'Packed', w: 6 }, { h: 'Item', w: 40 }, { h: 'Quantity', w: 9 }, { h: 'For', w: 45 }], sup.rows.filter(r => r.q > 0).map(r => ['[   ]', r.t, `${r.q}${r.u ? ' ' + r.u : ''}`, r.why && p.over[r.key] == null ? r.why : r.x ? '' : 'Quantity typed in']), 'Confirm container types, sizes, preservatives and holding times with the lab before ordering.'));
+  if (p.pages.sign) { const o = []; let y = M + 100; o.push(T(M, y, 'Before ground is disturbed', 12, 700)); y += 22; for (const t of [`Locate requested through ${R.call}, and owners who are not members contacted`, 'Private and on-site lines located', 'Every locate sheet read, on site and not expired; marks match the sheets and can be seen', 'Owner consent or crossing agreement in hand where work is in a right of way or controlled area', `Pipeline owners within ${p.notify} m notified`, `Lines within the hand-expose distance (${p.hand} m, or ${p.hp} m for a high-pressure pipeline) exposed by hand or hydrovac where the owner allows`, 'Hole locations checked against the marks on the ground; moved holes checked again', 'Overhead lines checked for rig height', 'Emergency numbers and owner contacts on site; crew briefed']) { o.push(`<rect x="${M}" y="${y - 10}" width="11" height="11" fill="none" stroke="#222"/>`, T(M + 20, y, t, 10.5)); y += 21; }
+    y += 8; o.push(T(M, y, 'Notes', 12, 700)); y += 16; plWrap(p.notes, W - 2 * M, '10px Arial').slice(0, 14).forEach(l => { o.push(T(M, y, l, 10)); y += 13; }); y = H - M - 150; for (const t of ['Prepared by', 'Reviewed by', 'Ground disturbance supervisor', 'Drilling contractor']) { o.push(T(M, y, t, 10, 700)); [['Name', 190], ['Signature', 470], ['Date', 790]].forEach(([n, x]) => o.push(T(x, y, n, 9), `<path d="M${x + 50} ${y + 2}h${x > 700 ? 130 : 200}" stroke="#222" stroke-width=".7"/>`)); y += 32; }
+    out.push({ title: 'CHECKLIST AND SIGN-OFF', body: o.join('') }); }
+  return out;
+}
+async function plPdfBytes() {
+  const p = planOf(); if (p.pages.map && basemapKey() !== 'none') { plMapSVG(PL_DIM.W - 260, PL_DIM.H - 170, null); await basemapIdle(); }
+  const pg = plPages(p), files = p.files.filter(f => f.use), n = pg.length + files.reduce((a, f) => a + f.pages, 0), { PDFDocument } = PDFLib, out = await PDFDocument.create(); if (!n) throw new Error('Choose at least one page.');
+  if (pg.length) { const d = await PDFDocument.load(await pagesPdf(pg.map((q, i) => ({ svg: pageFrame(q.title, i + 1, n, q.body, PL_DIM), W: PL_DIM.W, H: PL_DIM.H })))); for (const q of await out.copyPages(d, d.getPageIndices())) out.addPage(q); }
+  const recs = files.length ? await photoStore.all(REPORT_FILE_KEY(curProj())) : [];
+  for (const f of files) { const r = recs.find(x => x.id === f.id); if (!r) throw new Error(`“${f.name}” is missing on this computer. Add it again, or untick it.`); const bytes = dataUrlBytes(r.data);
+    if (f.kind === 'image') { const im = /^data:image\/png/.test(r.data) ? await out.embedPng(bytes) : await out.embedJpg(bytes), k = Math.min(540 / im.width, 720 / im.height), q = out.addPage([612, 792]); q.drawImage(im, { x: (612 - im.width * k) / 2, y: (792 - im.height * k) / 2, width: im.width * k, height: im.height * k }); }
+    else { const d = await PDFDocument.load(bytes); for (const q of await out.copyPages(d, d.getPageIndices())) out.addPage(q); } }
+  out.setTitle('Ground disturbance and sampling plan'); out.setProducer('Borehole Field Log'); return out.save();
+}
+/* a log started from a planned hole: an empty, unplaced borehole of that name is used, else a new one */
+function plStart(id) {
+  const p = planOf(), h = p.holes.find(x => x.id === id); if (!h || S.readOnly) return; const src = projList()[0]; let b = projList().find(x => (x.name || '').toLowerCase() === h.name.toLowerCase());
+  if (b && (b.easting != null || !editable(b))) { toast(`${h.name} is already a borehole in this project. Rename the planned hole first.`); return; }
+  if (!b) { b = blankBorehole(h.name); if (src) for (const k of HEADER_COPY) b[k] = src[k]; S.bh.set(b.id, b); }
+  b.easting = h.e; b.northing = h.n; if (!b.crs) b.crs = `UTM NAD83(CSRS) Zone ${crsZone()}`; if (b.diameter == null) b.diameter = p.dia;
+  if (h.well && !b.well.installed) { const [t, c] = plScreen(h); b.well = { ...b.well, screenTop: t, screenBottom: c, depth: c }; }
+  logChange(b, 'Log started from the drilling plan'); store.save(b); savePlan(q => { const x = q.holes.find(y => y.id === id); if (x) x.bh = b.id; }); S.sel = b.id; goTab('edit'); toast(`${b.name} started at the planned place. Check the position after drilling.`);
+}
+/* ---- controls ---- */
+function plSet(k, el) {
+  const v = el.type === 'checkbox' ? el.checked : el.value, n = num(v), [a, b, c, d] = k.split(':'), pick = (list, id) => list.find(x => x.id === id);
+  if (a === 'f') { saveFeats(featsOf().map(f => f.id === b ? { ...f, [c]: c === 'kind' && !FEAT_KINDS[v] ? f.kind : v, ...(c === 'kind' && LOC_OF[v] && (!f.name || Object.values(LOC_TAG).includes(f.name)) ? { name: LOC_TAG[LOC_OF[v]] } : {}) } : f)); plSoon(); return; }
+  const bad = el.type === 'number' && v === '' && el.validity?.badInput; if (bad) { plSoon(); return; }
+  savePlan(p => {
+    if (a === 'prov') { p.prov = v; const R = GD_RULES[v]; Object.assign(p, { hand: R.hand, hp: R.hp, notify: R.notify }); }
+    else if (['date', 'prefix', 'notes'].includes(k)) p[k] = v; else if (k === 'onMap') p.onMap = v;
+    else if (['hand', 'hp', 'notify', 'depth', 'dia'].includes(k)) { if (n != null) p[k] = n; }
+    else if (a === 't') { const t = pick(p.tickets, b); if (t) { t[c] = v; if (c === 'marked' && v && !t.exp && GD_RULES[p.prov].valid) t.exp = plDay(v, GD_RULES[p.prov].valid); if (c === 'marked' && v && (t.status === 'later' || t.status === 'req')) t.status = 'marked'; if (c === 'req' && v && t.status === 'later') t.status = 'req'; } }
+    else if (a === 'h') { const h = pick(p.holes, b); if (!h) return; if (['e', 'n', 'depth'].includes(c)) { if (n != null) h[c] = n; } else if (c === 'top' || c === 'bot') h[c] = n; else if (c === 'name') { const t = v.trim(); if (!t || p.holes.some(x => x.id !== b && x.name.toLowerCase() === t.toLowerCase())) toast(t ? 'Another planned hole has that name.' : 'A hole needs a name.'); else h.name = t; } else h[c] = v; }
+    else if (a === 's') { const s = pick(p.schemes, b); if (!s) return; if (c === 'u') { const u = s.suites[d], f = k.split(':')[4]; if (u) u[f] = f === 'on' ? v : f === 'mode' ? v : n; } else if (/^r\d+$/.test(c)) { const r = s.rules[+c.slice(1)]; if (r) r[d] = n; } else s[c] = v; }
+    else if (a === 'w') p.wsuites[b] = v; else if (a === 'k') p.kit[b] = b === 'backfill' ? +v : n; else if (a === 'ps') p.perSuite[b][c] = n; else if (a === 'hd') p.hold[b] = n; else if (a === 'cs') p.cont[b].size = v;
+    else if (a === 'o') { const key = k.slice(2); if (n == null) delete p.over[key]; else p.over[key] = n; } else if (a === 'x') { const x = pick(p.extra, b); if (x) x[c] = c === 'q' ? n ?? 0 : v; }
+    else if (a === 'pg') p.pages[b] = v; else if (a === 'fu') { const f = pick(p.files, b); if (f) f.use = v; }
+  });
+}
+document.addEventListener('change', e => {
+  const t = e.target; if (t.dataset?.plk) { plSet(t.dataset.plk, t); return; }
+  if (t.dataset?.plu) { const P = PLS(); P[t.dataset.plu] = t.type === 'checkbox' ? t.checked : t.value; plDraftDraw(); return; }
+  if (t.dataset?.plck) { const C = PLS().checked; t.checked ? C.add(t.dataset.plck) : C.delete(t.dataset.plck); plSoon(); return; }
+  if (t.dataset?.plfile != null) { const fs = [...t.files]; t.value = ''; plAddFiles(fs, t.dataset.plfile); }
+});
+document.addEventListener('click', e => {
+  const q = e.target.closest?.('[data-plstep], [data-pltool], [data-plz], [data-pldo], [data-plopen], [data-plrow]'); if (!q || S.tab !== 'plan') return; const P = PLS(), D = q.dataset;
+  if (D.plstep) { P.step = D.plstep; P.draft = []; renderView(true); return; }
+  if (D.pltool) { P.tool = D.pltool; P.draft = []; renderView(true); return; }
+  if (D.plz) { if (D.plz === 'fit') { P.mv = null; plDraw(); } else plZoom(D.plz === 'in' ? 1.5 : 1 / 1.5); return; }
+  if (D.plopen) { if (S.bh.has(D.plopen)) { S.sel = D.plopen; goTab('edit'); } return; }
+  if (D.plrow) { if (e.target.closest('input, select, button, label') || P.sel === D.plrow) return; P.sel = D.plrow; plSoon(); return; }
+  const [k, a, b] = D.pldo.split(':');
+  if (k === 'csv') { const z = crsZone(); csvOut(`${curProj() || 'project'} planned holes.csv`, [['Name', 'Easting', 'Northing', 'Latitude', 'Longitude', 'Depth m', 'Well', 'Purpose'], ...planOf().holes.map(h => { const [la, lo] = utmToLL(h.e, h.n, z); return [h.name, h.e, h.n, la.toFixed(7), lo.toFixed(7), h.depth, h.well ? 'Yes' : 'No', h.why]; })]); return; }
+  if (k === 'pdf') { (async () => { if (!window.PDFLib) { toast('The PDF library did not load.'); return; } q.disabled = true; toast('Creating PDF…'); try { const by = await plPdfBytes(); await saveFile(`${(curProj() || 'project').replace(/[^\w .-]+/g, ' ').trim()} drilling plan.pdf`, pdfBlob(by)); } catch (x) { console.error(x); toast(x?.message || 'The PDF could not be created.'); } q.disabled = false; })(); return; }
+  if (k === 'chk-all') { const H = planOf().holes; P.checked = P.checked.size >= H.length ? new Set() : new Set(H.map(h => h.id)); plSoon(); return; }
+  if (S.readOnly) return;
+  if (k === 'co-add') { const c = parseCoords($('#pl-co')?.value); if (c.error) { toast(c.error); return; } const w = coordsToProject(c), warn = coordsWarn(c, w); if (w.fresh) setSite({ ...(siteOf() || {}), zone: w.zone }); P.mv = null; plAdd([[w.e, w.n]]); if (c.approx || warn) toast(`Placed.${c.approx ? ' A land description gives the middle of the section, so it is approximate.' : ''}${warn}`); return; }
+  if (k === 'log') { plStart(a); return; }
+  if (k === 'ft-del') { saveFeats(featsOf().filter(f => f.id !== a)); plSoon(); return; }
+  const chosen = p => p.holes.filter(h => P.checked.has(h.id)), bd = num($('#pl-bd')?.value), bs = $('#pl-bs')?.value;
+  savePlan(p => {
+    const tk = u => p.tickets.push({ id: uid('tk'), util: u, status: 'later' });
+    if (k === 'tk-add') tk(Object.keys(LOC_UTIL).find(u => !p.tickets.some(t => t.util === u)) || 'gas'); else if (k === 'tk-all') Object.keys(LOC_UTIL).forEach(u => { if (!p.tickets.some(t => t.util === u)) tk(u); }); else if (k === 'tk-del') { p.tickets = p.tickets.filter(t => t.id !== a); for (const f of p.files) if (f.tk === a) f.tk = ''; }
+    else if (k === 'gd-std') { const R = GD_RULES[p.prov]; Object.assign(p, { hand: R.hand, hp: R.hp, notify: R.notify }); }
+    else if (k === 'h-del') p.holes = p.holes.filter(h => h.id !== a); else if (k === 'b-depth') { if (bd > 0) for (const h of chosen(p)) h.depth = bd; } else if (k === 'b-well' || k === 'b-nowell') for (const h of chosen(p)) h.well = k === 'b-well'; else if (k === 'b-sch') for (const h of chosen(p)) h.scheme = bs; else if (k === 'b-del') { p.holes = p.holes.filter(h => !P.checked.has(h.id)); P.checked = new Set(); }
+    else if (k === 's-add') p.schemes.push({ ...structuredClone(p.schemes[0]), id: uid('s'), name: 'Scheme ' + (p.schemes.length + 1) }); else if (k === 's-del') p.schemes = p.schemes.filter(s => s.id !== a); else if (k === 'r-add') p.schemes.find(s => s.id === a)?.rules.push({ from: 1, to: null, every: 1 }); else if (k === 'r-del') p.schemes.find(s => s.id === a)?.rules.splice(+b, 1);
+    else if (k === 'x-add') p.extra.push({ id: uid('x'), t: '', q: 1, u: '' }); else if (k === 'x-del') p.extra = p.extra.filter(x => x.id !== a);
+    else if (k === 'fl-del') p.files = p.files.filter(f => f.id !== a); else if (k === 'fl-up') { const i = p.files.findIndex(f => f.id === a); if (i > 0) p.files.splice(i - 1, 0, p.files.splice(i, 1)[0]); }
+  });
+});
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'pl-co') { e.preventDefault(); $('[data-pldo="co-add"]')?.click(); } });
+addEventListener('resize', () => { if (S.tab === 'plan') plDraw(); });
+
 /* ---------- site & lab: plan, chosen cross-section, plasticity chart ---------- */
 /* ---------- site features and the map editor: shapes (areas, lines, labels) on the site plan, drawn or imported from
    GeoJSON, KML, DXF or a CSV of vertices; borehole locations imported from a CSV / Excel table or placed on the map ---------- */
 const FEAT_KINDS = {
   boundary: ['Lease / property boundary', 'none', '#7a4b1d', '9 4'], building: ['Building', '#d9d4cc', '#6b6258', ''], pad: ['Pavement / gravel pad', '#e8e5de', '#9a948a', ''],
   road: ['Road', '#ecebe7', '#8f8a80', ''], excavation: ['Excavation', '#f3e1c6', '#a8743a', '5 3'], tank: ['Tank / UST', '#f2dede', '#a33a3a', ''],
-  water: ['Water / dugout', '#d4e6f5', '#2f70bb', ''], pipeline: ['Pipeline / utility', 'none', '#b5651d', '7 3'], vegetation: ['Vegetation', '#dfe9d6', '#6f8f58', ''], other: ['Other', '#eeeeee', '#666666', ''],
+  water: ['Water / dugout', '#d4e6f5', '#2f70bb', ''], pipeline: ['Pipeline / utility', 'none', '#b5651d', '7 3'], vegetation: ['Vegetation', '#dfe9d6', '#6f8f58', ''],
+  loc_gas: ['Located: natural gas', 'none', '#d9a400', '8 3'], loc_pipe: ['Located: high-pressure pipeline', 'none', '#b5651d', '12 3'], loc_power: ['Located: power', 'none', '#d0202a', '8 3'], loc_comm: ['Located: telecom', 'none', '#ee7a00', '4 3'], loc_water: ['Located: water', 'none', '#1767c0', '8 3'], loc_sewer: ['Located: sewer / storm', 'none', '#2e8b3d', '8 3'], loc_priv: ['Located: private line', 'none', '#8c3caa', '4 3'], loc_area: ['Located area', 'none', '#444444', '2 4'], other: ['Other', '#eeeeee', '#666666', ''],
 };
 const guessKind = s => { s = String(s || '').toLowerCase(); return /lease|bound|property|lot line|parcel|fence/.test(s) ? 'boundary' : /build|shed|house|kiosk|office|garage|struct/.test(s) ? 'building' : /road|street|ave|drive|lane|access/.test(s) ? 'road' : /pad|pave|gravel|asphalt|concrete|lot/.test(s) ? 'pad' : /excav|pit|dig/.test(s) ? 'excavation' : /tank|ust|ast/.test(s) ? 'tank' : /water|pond|dugout|creek|slough|lake/.test(s) ? 'water' : /pipe|line|util|sewer|gas|power/.test(s) ? 'pipeline' : /tree|veg|grass|shrub/.test(s) ? 'vegetation' : 'other'; };
 const featsOf = () => siteOf()?.features || [];
@@ -11082,7 +11444,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', e => { const t = e.target; if (t.id === 'sv-u') { S.svc.found = null; const b = document.querySelector('[data-svgo]'); if (b) b.textContent = 'Look'; } const id = t.dataset?.svon || t.dataset?.svop; if (!id || S.readOnly) return; setSite({ ...siteOf(), services: servicesOf().map(v => v.id !== id ? v : t.dataset.svon ? { ...v, off: !t.checked } : { ...v, op: Math.max(.05, 1 - +t.value) }) }); renderView(true); });
 document.addEventListener('input', e => { if (e.target.id === 'sv-f') { const q = e.target.value.trim().toLowerCase(); for (const r of document.querySelectorAll('#sv-rows > label')) r.style.display = q && !r.textContent.toLowerCase().includes(q) ? 'none' : ''; } if (e.target.id === 'sv-u' && S.svc.found) { S.svc.found = null; const l = $('#sv-list'), b = document.querySelector('[data-svgo]'); if (l) l.innerHTML = ''; if (b) b.textContent = 'Look'; } });
 let tileT;
-function tileArrived() { clearTimeout(tileT); tileT = setTimeout(() => { if (S.tab === 'site' || S.tab === 'soil') drawPlan(); else if (['home', 'gw', 'contam', 'compose'].includes(S.tab)) renderView(true); }, 250); }
+function tileArrived() { clearTimeout(tileT); tileT = setTimeout(() => { if (S.tab === 'site' || S.tab === 'soil') drawPlan(); else if (S.tab === 'plan') { if (!plDrag) plDraw(); } else if (['home', 'gw', 'contam', 'compose'].includes(S.tab)) renderView(true); }, 250); }
 function fetchTile(u) {
   if (S.tilePend.has(u) || S.tileBad.has(u)) return; const own = BASE_HOST.test(u); let n = 0; for (const p of S.tilePend) if (BASE_HOST.test(p) === own) n++; if (n > (own ? 40 : 16)) return; S.tilePend.add(u);   // a slow service never holds up the basemap, nor the other way round
   tileStore.get(u).catch(() => null).then(c => c || (BASE_HOST.test(u) ? fetch(u, { mode: 'cors' }).then(r => r.ok ? r.blob() : Promise.reject(r.status)) : svcBlob(u))
@@ -11480,7 +11842,7 @@ const PX_PER_M = 96 / .0254;   // page pixels per metre at 1:1, so a 1:N plan us
 function planSVG(W, H, interactive) {
   const pts = mapList().filter(b => b.easting != null && b.northing != null);
   const site = siteOf();
-  const fpts = S.lyr.feat === false ? [] : featsOf().flatMap(f => f.pts);
+  const plOn = RO.planned || interactive && siteOf()?.plan?.holes?.length && planOf().onMap, fpts = [...(S.lyr.feat === false ? [] : featsOf().flatMap(f => f.pts)), ...(plOn ? planOf().holes.map(h => [h.e, h.n]) : [])];
   const empty = !pts.length && !site?.img && !fpts.length;
   const home = () => { const z = crsZone(), dls = !site?.goto && dlsToLL(projList().find(b => parseDLS(b.location))?.location), at = site?.goto || dls?.center, [e, n] = at ? llToUtm(at[0], at[1], z) : llToUtm(53, -110, z), r = at ? 900 : 450000; return [[e - r, n - r], [e + r, n + r]]; };
   const pad = 46, ex = empty ? home() : [...pts.map(b => [b.easting, b.northing]), ...(site?.img ? [[site.e0, site.n0], [site.e1, site.n1]] : []), ...fpts];
@@ -11576,6 +11938,7 @@ function planSVG(W, H, interactive) {
       ${BH_SYMBOL(X(b.easting), Y(b.northing), !!b.well?.installed)}
       ${bhLabelSVG(b, X(b.easting), Y(b.northing), S.lyr.wl !== false && lw && b.elevation != null ? fx(b.elevation - lw.depth) : null, 'box', RO.names ?? S.lyr.labels !== false)}</g>`);
   }
+  if (plOn && !keyMap) o.push(plannedSVG(X, Y, sc, { zones: !!RO.planned, check: !!RO.planned, sel: RO.planned && !RO.print ? S.pl?.sel : null }));
   LBL_AVOID = null;
   if (RO.legend ?? lyrOn('legend')) o.push(mapLegendSVG(W, H, pts, RO.mres ? MR : lyrOn('res') ? MR : null));
   o.push(mapFurnSVG(W, H, sc));
